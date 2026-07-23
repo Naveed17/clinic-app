@@ -1,0 +1,21 @@
+export type AppRole = 'admin' | 'doctor' | 'receptionist' | 'lab_technician';
+
+export type NotificationKind = 'info' | 'success' | 'warning' | 'error';
+
+export interface RealtimeNotification {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  message: string;
+  createdAt: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface ChatMessage {
+  id: string;
+  roomId: string;
+  sender: string;
+  role: string;
+  message: string;
+  createdAt: string;
+}
