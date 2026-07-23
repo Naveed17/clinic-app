@@ -61,6 +61,10 @@ ipcMain.handle('print:html', async (_e, html: string) => {
 });
 
 function createWindow(): void {
+  const iconPath = is.dev
+    ? join(__dirname, '../../src/main/assets/icons/icon.png')
+    : join(__dirname, '../assets/icons/icon.png');
+
   const window = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -68,6 +72,7 @@ function createWindow(): void {
     minHeight: 640,
     show: false,
     autoHideMenuBar: true,
+    icon: iconPath,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

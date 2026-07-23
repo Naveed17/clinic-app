@@ -41,7 +41,14 @@
       }
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "src/main/assets/icons/icon.ico"
+    },
+    "mac": {
+      "icon": "src/main/assets/icons/icon.icns"
+    },
+    "linux": {
+      "icon": "src/main/assets/icons/icon.png"
     },
     "directories": {
       "output": "release"

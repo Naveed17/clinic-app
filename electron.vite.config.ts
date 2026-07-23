@@ -9,7 +9,9 @@ export default defineConfig({
       rollupOptions: {
         external: [],
       },
+      copyPublicDir: true,
     },
+    publicDir: resolve('src/main/assets'),
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
