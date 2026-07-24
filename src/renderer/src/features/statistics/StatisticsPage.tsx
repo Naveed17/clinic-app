@@ -1,8 +1,8 @@
 import {
-  AreaChart,
-  Area,
   BarChart,
   Bar,
+  AreaChart,
+  Area,
   LineChart,
   Line,
   PieChart,
@@ -17,6 +17,10 @@ import {
 } from 'recharts';
 import { Box, Chip, Paper, Stack, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
+import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
+import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
+import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import { useQuery } from '@tanstack/react-query';
 import { appointmentsService } from '@/services/appointments.service';
 import { invoicesService } from '@/services/invoices.service';
@@ -29,28 +33,23 @@ function StatCard({
   value,
   note,
   color,
+  icon,
 }: {
   label: string;
   value: string | number;
   note: string;
   color: string;
+  icon: React.ReactNode;
 }) {
   return (
-    <Paper
-      variant="outlined"
-      sx={{
-        p: 2.5,
-        borderLeft: `4px solid ${color}`,
-        bgcolor: alpha(color, 0.04),
-      }}
-    >
-      <Typography variant="body2" color="text.secondary">
-        {label}
-      </Typography>
-      <Typography sx={{ mt: 1, fontSize: 26, fontWeight: 700, color }}>{value}</Typography>
-      <Typography variant="caption" color="text.secondary">
-        {note}
-      </Typography>
+    <Paper sx={{ p: 2.5, bgcolor: 'background.paper', overflow: 'hidden', position: 'relative' }}>
+      <Box sx={{ position: 'absolute', bottom: -12, right: -12, width: 72, height: 72, borderRadius: '50%', bgcolor: alpha(color, 0.1) }} />
+      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+        <Typography variant="body2" color="text.secondary" fontWeight={500}>{label}</Typography>
+        <Box sx={{ width: 36, height: 36, borderRadius: '10px', bgcolor: alpha(color, 0.12), display: 'flex', alignItems: 'center', justifyContent: 'center', color, flexShrink: 0 }}>{icon}</Box>
+      </Stack>
+      <Typography sx={{ mt: 2, fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em' }}>{value}</Typography>
+      <Typography variant="caption" color="text.secondary">{note}</Typography>
     </Paper>
   );
 }
@@ -149,31 +148,35 @@ export function StatisticsPage(): React.JSX.Element {
           value={appointments.length}
           note="All time"
           color={theme.palette.primary.main}
+          icon={<CalendarMonthOutlinedIcon />}
         />
         <StatCard
           label="Completed"
           value={completedAppts}
           note={`${appointments.length ? Math.round((completedAppts / appointments.length) * 100) : 0}% completion rate`}
           color={theme.palette.success.main}
+          icon={<TrendingUpOutlinedIcon />}
         />
         <StatCard
           label="Total Revenue"
           value={money(totalRevenue)}
           note="From all invoices"
           color={theme.palette.secondary.main}
+          icon={<PaymentsOutlinedIcon />}
         />
         <StatCard
           label="Total Patients"
           value={patientsData?.total ?? 0}
           note="Registered patients"
           color={theme.palette.warning.main}
+          icon={<GroupOutlinedIcon />}
         />
       </Box>
 
       {/* Row 1: Bar + Area */}
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' } }}>
         {/* Monthly Appointments Bar Chart */}
-        <Paper variant="outlined" sx={{ p: 3 }}>
+        <Paper sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
             <Box>
               <Typography fontWeight={700}>Monthly Appointments</Typography>
@@ -184,8 +187,8 @@ export function StatisticsPage(): React.JSX.Element {
             <Chip label="This Year" size="small" color="primary" sx={{ borderRadius: 1 }} />
           </Box>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={monthlyAppts} barSize={28}>
-              <CartesianGrid strokeDasharray="3 3" stroke={alpha(theme.palette.divider, 0.6)} vertical={false} />
+            <BarChart data={monthlyAppts} barSize={22} barCategoryGap="35%">
+              <CartesianGrid strokeDasharray="3 3" stroke={alpha(theme.palette.divider, 0.5)} vertical={false} />
               <XAxis
                 dataKey="month"
                 tick={{ fontSize: 12, fill: theme.palette.text.secondary }}
@@ -202,23 +205,32 @@ export function StatisticsPage(): React.JSX.Element {
                 contentStyle={{
                   background: theme.palette.background.paper,
                   border: `1px solid ${theme.palette.divider}`,
-                  borderRadius: 8,
+                  borderRadius: 10,
                   fontSize: 13,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
                 }}
                 cursor={{ fill: alpha(theme.palette.primary.main, 0.06) }}
               />
               <Bar
                 dataKey="appointments"
-                fill={theme.palette.primary.main}
-                radius={[6, 6, 0, 0]}
+                radius={[99, 99, 99, 99]}
                 label={false}
-              />
+              >
+                {monthlyAppts.map((_, i) => (
+                  <Cell
+                    key={i}
+                    fill={i === monthlyAppts.reduce((mi, m, idx, arr) => m.appointments > arr[mi].appointments ? idx : mi, 0)
+                      ? theme.palette.primary.main
+                      : alpha(theme.palette.primary.main, 0.25)}
+                  />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </Paper>
 
         {/* Monthly Revenue Area Chart */}
-        <Paper variant="outlined" sx={{ p: 3 }}>
+        <Paper sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
             <Box>
               <Typography fontWeight={700}>Revenue Trend</Typography>
@@ -232,11 +244,11 @@ export function StatisticsPage(): React.JSX.Element {
             <AreaChart data={monthlyRevenue}>
               <defs>
                 <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={theme.palette.success.main} stopOpacity={0.25} />
-                  <stop offset="95%" stopColor={theme.palette.success.main} stopOpacity={0} />
+                  <stop offset="5%" stopColor={theme.palette.success.main} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={theme.palette.success.main} stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={alpha(theme.palette.divider, 0.6)} vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={alpha(theme.palette.divider, 0.5)} vertical={false} />
               <XAxis
                 dataKey="month"
                 tick={{ fontSize: 12, fill: theme.palette.text.secondary }}
@@ -253,8 +265,9 @@ export function StatisticsPage(): React.JSX.Element {
                 contentStyle={{
                   background: theme.palette.background.paper,
                   border: `1px solid ${theme.palette.divider}`,
-                  borderRadius: 8,
+                  borderRadius: 10,
                   fontSize: 13,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
                 }}
                 formatter={(v) => [money(Number(v ?? 0)), 'Revenue']}
               />
@@ -264,8 +277,8 @@ export function StatisticsPage(): React.JSX.Element {
                 stroke={theme.palette.success.main}
                 strokeWidth={2.5}
                 fill="url(#revenueGrad)"
-                dot={{ r: 4, fill: theme.palette.success.main, strokeWidth: 0 }}
-                activeDot={{ r: 6 }}
+                dot={false}
+                activeDot={{ r: 6, fill: theme.palette.success.main, strokeWidth: 0 }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -275,7 +288,7 @@ export function StatisticsPage(): React.JSX.Element {
       {/* Row 2: Line (reason breakdown) + Pie (status) */}
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '1.4fr 0.6fr' } }}>
         {/* Reason Breakdown Line Chart */}
-        <Paper variant="outlined" sx={{ p: 3 }}>
+        <Paper sx={{ p: 3 }}>
           <Box sx={{ mb: 2.5 }}>
             <Typography fontWeight={700}>Appointment Reasons</Typography>
             <Typography variant="caption" color="text.secondary">
@@ -301,8 +314,9 @@ export function StatisticsPage(): React.JSX.Element {
                 contentStyle={{
                   background: theme.palette.background.paper,
                   border: `1px solid ${theme.palette.divider}`,
-                  borderRadius: 8,
+                  borderRadius: 10,
                   fontSize: 12,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
                 }}
               />
               <Legend
@@ -326,7 +340,7 @@ export function StatisticsPage(): React.JSX.Element {
         </Paper>
 
         {/* Status Pie Chart */}
-        <Paper variant="outlined" sx={{ p: 3 }}>
+        <Paper sx={{ p: 3 }}>
           <Box sx={{ mb: 2.5 }}>
             <Typography fontWeight={700}>Appointment Status</Typography>
             <Typography variant="caption" color="text.secondary">
@@ -360,8 +374,9 @@ export function StatisticsPage(): React.JSX.Element {
                     contentStyle={{
                       background: theme.palette.background.paper,
                       border: `1px solid ${theme.palette.divider}`,
-                      borderRadius: 8,
+                      borderRadius: 10,
                       fontSize: 12,
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
                     }}
                   />
                 </PieChart>

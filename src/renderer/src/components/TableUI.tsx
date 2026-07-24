@@ -19,9 +19,9 @@ import type { ReactNode } from 'react';
 export const tableSx = {
   head: {
     '& .MuiTableCell-head': {
-      fontSize: 12,
-      fontWeight: 500,
-      color: 'text.disabled',
+      fontSize: 11.5,
+      fontWeight: 700,
+      color: 'text.secondary',
       py: 1.5,
       px: 2,
       borderBottom: 'none',
@@ -32,7 +32,7 @@ export const tableSx = {
   row: {
     cursor: 'default',
     '& .MuiTableCell-body': {
-      fontSize: 13.5,
+      fontSize: 12.5,
       py: 0.75,
       px: 2,
       border: 'none',

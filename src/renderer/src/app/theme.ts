@@ -23,7 +23,7 @@ export function createAppTheme(mode: PaletteMode) {
       ...Array(20).fill('0 8px 32px rgba(0,0,0,0.14)'),
     ] as any,
     typography: {
-      fontFamily: 'Inter, Segoe UI, Arial, sans-serif',
+      fontFamily: '"Plus Jakarta Sans", Inter, Segoe UI, Arial, sans-serif',
       h5: { fontWeight: 800, letterSpacing: '-0.02em' },
       h6: { fontWeight: 700, letterSpacing: '-0.01em' },
       subtitle1: { fontWeight: 600 },
