@@ -46,10 +46,10 @@ export function AdminDashboard(): React.JSX.Element {
   const doctors = Array.from(doctorMap.values()).sort((a, b) => b.count - a.count);
 
   const statCards = [
-    { label: 'Total Patients',    value: patients.data?.total ?? 0,              icon: <GroupOutlinedIcon />,          color: theme.palette.primary.main },
-    { label: 'Appointments Today',value: summary.data?.todaysPatients ?? 0,       icon: <CalendarMonthOutlinedIcon />,  color: theme.palette.secondary.main },
-    { label: 'Monthly Revenue',   value: money(summary.data?.monthlyRevenue ?? 0),icon: <TrendingUpOutlinedIcon />,     color: theme.palette.success.main },
-    { label: 'Total Invoices',    value: totalInvoices,                           icon: <PaymentsOutlinedIcon />,       color: theme.palette.warning.main },
+    { label: 'Total Patients', value: patients.data?.total ?? 0, icon: <GroupOutlinedIcon />, color: theme.palette.primary.main },
+    { label: 'Appointments Today', value: summary.data?.todaysPatients ?? 0, icon: <CalendarMonthOutlinedIcon />, color: theme.palette.secondary.main },
+    { label: 'Monthly Revenue', value: money(summary.data?.monthlyRevenue ?? 0), icon: <TrendingUpOutlinedIcon />, color: theme.palette.success.main },
+    { label: 'Total Invoices', value: totalInvoices, icon: <PaymentsOutlinedIcon />, color: theme.palette.warning.main },
   ];
 
   return (
@@ -57,7 +57,7 @@ export function AdminDashboard(): React.JSX.Element {
       <Box>
         <Typography variant="h5" fontWeight={800}>Admin Dashboard</Typography>
         <Typography color="text.secondary" variant="body2" sx={{ mt: 0.5 }}>
-          Full clinic overview — all modules, all data.
+          Full clinic overview
         </Typography>
       </Box>
 
@@ -129,9 +129,9 @@ export function AdminDashboard(): React.JSX.Element {
         </Stack>
         <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: 'repeat(3,1fr)' } }}>
           {[
-            { label: 'New Patient',     icon: <PersonAddOutlinedIcon />,       color: theme.palette.primary.main,   path: '/patients' },
-            { label: 'New Appointment', icon: <CalendarMonthOutlinedIcon />,   color: theme.palette.secondary.main, path: '/appointments' },
-            { label: 'New Invoice',     icon: <PaymentsOutlinedIcon />,        color: theme.palette.success.main,   path: '/billing' },
+            { label: 'New Patient', icon: <PersonAddOutlinedIcon />, color: theme.palette.primary.main, path: '/patients' },
+            { label: 'New Appointment', icon: <CalendarMonthOutlinedIcon />, color: theme.palette.secondary.main, path: '/appointments' },
+            { label: 'New Invoice', icon: <PaymentsOutlinedIcon />, color: theme.palette.success.main, path: '/billing' },
           ].map((action) => (
             <Paper
               key={action.label}

@@ -43,6 +43,7 @@ declare global {
       realtime: {
         connect: () => Promise<void>;
         disconnect: () => void;
+        onDataChanged: (handler: (e: { entity: string; action: string }) => void) => () => void;
         onNotification: (handler: (notification: unknown) => void) => () => void;
         onChatMessage: (handler: (message: unknown) => void) => () => void;
         sendChatMessage: (message: unknown) => Promise<boolean>;

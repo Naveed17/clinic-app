@@ -3,7 +3,7 @@ import { createPatient, deletePatient, listPatients, updatePatient } from '../..
 import type { PatientInput, PatientListInput } from '../../patients/patient.service';
 import { asyncHandler } from '../utils/async-handler';
 import { requireRole } from '../middleware/auth';
-import { emitNotification } from '../realtime';
+import { emitNotification, emitDataChange } from '../realtime';
 import type { Server as SocketIOServer } from 'socket.io';
 
 export function createPatientsRouter(io: SocketIOServer): Router {
@@ -33,6 +33,7 @@ export function createPatientsRouter(io: SocketIOServer): Router {
         message: `${patient.firstName} ${patient.lastName} was added to the clinic records.`,
         payload: { entity: 'patient', id: patient.id },
       });
+      emitDataChange(io, 'patient', 'created');
       res.status(201).json(patient);
     }),
   );
@@ -48,6 +49,7 @@ export function createPatientsRouter(io: SocketIOServer): Router {
         message: `${patient.firstName} ${patient.lastName} was updated.`,
         payload: { entity: 'patient', id: patient.id },
       });
+      emitDataChange(io, 'patient', 'updated');
       res.json(patient);
     }),
   );
@@ -63,6 +65,7 @@ export function createPatientsRouter(io: SocketIOServer): Router {
         message: 'A patient record was deleted.',
         payload: { entity: 'patient', id: req.params.id },
       });
+      emitDataChange(io, 'patient', 'deleted');
       res.status(204).send();
     }),
   );

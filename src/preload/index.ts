@@ -268,6 +268,11 @@ const api = {
       return Promise.resolve();
     },
     disconnect: () => { socket?.disconnect(); },
+    onDataChanged: (handler: (e: { entity: string; action: string }) => void) => {
+      const activeSocket = ensureSocket();
+      activeSocket.on('data:changed', handler);
+      return () => activeSocket.off('data:changed', handler);
+    },
     onNotification: (handler: (notification: unknown) => void) => {
       const activeSocket = ensureSocket();
       activeSocket.on('notification:new', handler);

@@ -12,7 +12,7 @@ import {
 import type { AppointmentInput } from '../../appointments/appointment.service';
 import { asyncHandler } from '../utils/async-handler';
 import { requireRole } from '../middleware/auth';
-import { emitNotification } from '../realtime';
+import { emitNotification, emitDataChange } from '../realtime';
 
 export function createAppointmentsRouter(io: SocketIOServer): Router {
   const router = Router();
@@ -52,6 +52,7 @@ export function createAppointmentsRouter(io: SocketIOServer): Router {
         message: 'A new appointment was scheduled.',
         payload: { entity: 'appointment', id: appointment.id },
       });
+      emitDataChange(io, 'appointment', 'created');
       res.status(201).json(appointment);
     }),
   );
@@ -67,6 +68,7 @@ export function createAppointmentsRouter(io: SocketIOServer): Router {
         message: 'An appointment was updated.',
         payload: { entity: 'appointment', id: appointment.id },
       });
+      emitDataChange(io, 'appointment', 'updated');
       res.json(appointment);
     }),
   );
@@ -85,6 +87,7 @@ export function createAppointmentsRouter(io: SocketIOServer): Router {
         message: `Appointment status changed to ${appointment.status}.`,
         payload: { entity: 'appointment', id: appointment.id },
       });
+      emitDataChange(io, 'appointment', 'updated');
       res.json(appointment);
     }),
   );
@@ -100,6 +103,7 @@ export function createAppointmentsRouter(io: SocketIOServer): Router {
         message: 'An appointment was cancelled.',
         payload: { entity: 'appointment', id: appointment.id },
       });
+      emitDataChange(io, 'appointment', 'deleted');
       res.json(appointment);
     }),
   );

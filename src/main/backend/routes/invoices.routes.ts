@@ -4,7 +4,7 @@ import { createInvoice, invoicePatients, listInvoices, addPayment, voidInvoice, 
 import type { InvoiceInput } from '../../invoices/invoice.service';
 import { asyncHandler } from '../utils/async-handler';
 import { requireRole } from '../middleware/auth';
-import { emitNotification } from '../realtime';
+import { emitNotification, emitDataChange } from '../realtime';
 
 export function createInvoicesRouter(io: SocketIOServer): Router {
   const router = Router();
@@ -36,6 +36,7 @@ export function createInvoicesRouter(io: SocketIOServer): Router {
         message: `Invoice ${invoice.invoiceNumber} was created.`,
         payload: { entity: 'invoice', id: invoice.id },
       });
+      emitDataChange(io, 'invoice', 'created');
       res.status(201).json(invoice);
     }),
   );
@@ -47,6 +48,7 @@ export function createInvoicesRouter(io: SocketIOServer): Router {
       const { amount, method, reference } = req.body as { amount: number; method: string; reference?: string };
       const invoice = await addPayment(req.params['id'] as string, amount, method, reference);
       emitNotification(io, { kind: 'success', title: 'Payment recorded', message: `Payment of ${amount} recorded.`, payload: { entity: 'invoice', id: invoice.id } });
+      emitDataChange(io, 'invoice', 'updated');
       res.json(invoice);
     }),
   );
@@ -57,6 +59,7 @@ export function createInvoicesRouter(io: SocketIOServer): Router {
     asyncHandler(async (req, res) => {
       const invoice = await voidInvoice(req.params['id'] as string);
       emitNotification(io, { kind: 'warning', title: 'Invoice voided', message: `Invoice ${invoice.invoiceNumber} was voided.`, payload: { entity: 'invoice', id: invoice.id } });
+      emitDataChange(io, 'invoice', 'deleted');
       res.json(invoice);
     }),
   );

@@ -93,7 +93,7 @@ export function SettingsPage(): React.JSX.Element {
     setPrevMode(settings.serverMode);
     if (modeChanged) {
       setSaved(true);
-      setTimeout(() => void window.clinic?.app.restart(), 1200);
+      setTimeout(() => void window.clinic?.settings.save(settings).then(() => window.location.reload()), 1200);
     } else {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);

@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { Server as SocketIOServer, Socket } from 'socket.io';
 import type { ChatMessage, RealtimeNotification } from './types';
 
+export function emitDataChange(io: SocketIOServer, entity: string, action: string): void {
+  io.emit('data:changed', { entity, action });
+}
+
 export function emitNotification(
   io: SocketIOServer,
   notification: Omit<RealtimeNotification, 'id' | 'createdAt'>,

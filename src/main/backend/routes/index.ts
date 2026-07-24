@@ -12,8 +12,8 @@ import { createReportsRouter } from './reports.routes';
 import { createScheduleRouter } from './schedule.routes';
 
 export function registerRoutes(app: Express, io: SocketIOServer): void {
-  app.use('/api/tokens', createTokensRouter());
-  app.use('/api/lab', createLabRouter());
+  app.use('/api/tokens', createTokensRouter(io));
+  app.use('/api/lab', createLabRouter(io));
   app.use('/api/auth', createAuthRouter());
   app.use('/api/patients', createPatientsRouter(io));
   app.use('/api/appointments', createAppointmentsRouter(io));
