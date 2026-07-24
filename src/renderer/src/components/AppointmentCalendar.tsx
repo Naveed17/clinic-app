@@ -309,7 +309,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
       <Divider orientation="vertical" flexItem />
 
       {/* ── Right: Day schedule ── */}
-      <Box sx={{ width: 340, flexShrink: 0, p: 3, display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
+      <Box sx={{ width: 340, flexShrink: 0, p: 3, display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden', maxHeight: '75vh' }}>
         <Box>
           <Typography variant="subtitle1" fontWeight={700}>Scheduled</Typography>
           <Typography variant="caption" color="text.secondary">

@@ -39,6 +39,21 @@ function ToastIcon({ entity, kind }: { entity?: string; kind: RealtimeNotificati
   return <InfoOutlinedIcon sx={sx} />;
 }
 
+function playNotificationSound(): void {
+  const ctx = new AudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.frequency.setValueAtTime(880, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.15);
+  gain.gain.setValueAtTime(0.15, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.4);
+  osc.onended = () => ctx.close();
+}
+
 export function AppointmentToast(): React.JSX.Element {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
@@ -46,6 +61,7 @@ export function AppointmentToast(): React.JSX.Element {
     const unsubscribe = realtimeService.onNotification((n: RealtimeNotification) => {
       const entity = n.payload?.entity as string | undefined;
       setToasts((prev) => [...prev, { id: n.id, kind: n.kind, entity, title: n.title, message: n.message, createdAt: n.createdAt }]);
+      playNotificationSound();
       setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== n.id)), 6000);
     });
     return unsubscribe;
@@ -57,7 +73,7 @@ export function AppointmentToast(): React.JSX.Element {
         <Collapse key={toast.id} in unmountOnExit>
           <Paper
             elevation={4}
-            sx={{ width: 320, p: 1.75, borderLeft: '4px solid', borderColor: kindColor[toast.kind], borderRadius: 2 }}
+            sx={{ width: 380, p: 2.5, borderLeft: '4px solid', borderColor: kindColor[toast.kind], borderRadius: 1 }}
           >
             <Stack direction="row" spacing={1.5} alignItems="flex-start">
               <Box sx={{ mt: 0.2, flexShrink: 0 }}>

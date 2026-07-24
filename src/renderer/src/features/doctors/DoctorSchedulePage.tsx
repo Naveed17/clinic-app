@@ -78,7 +78,7 @@ export function DoctorSchedulePage(): React.JSX.Element {
             label="Select Doctor"
             value={doctorId}
             onChange={(e) => { setDoctorId(e.target.value); setSlots(defaultSlots()); }}
-            sx={{ borderRadius: 2 }}
+            sx={{ borderRadius: 1 }}
           >
             {doctorList.map((d) => (
               <MenuItem key={d.id} value={d.id}>{d.firstName} {d.lastName}</MenuItem>

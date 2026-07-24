@@ -7,6 +7,7 @@ import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Chip,
@@ -287,7 +288,19 @@ export function InvoicesPage(): React.JSX.Element {
               return (
                 <TableRow key={invoice.id} sx={tableSx.row}>
                   <TableCell><Typography fontSize={13.5} fontWeight={600}>{invoice.invoiceNumber}</Typography></TableCell>
-                  <TableCell>{personLabel(invoice.patient)}</TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                      <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'primary.main' }}>
+                        {invoice.patient.firstName[0]}{invoice.patient.lastName[0]}
+                      </Avatar>
+                      <Box>
+                        <Typography fontSize={13.5} fontWeight={600}>{personLabel(invoice.patient)}</Typography>
+                        <Typography fontSize={11.5} color="text.secondary">
+                          {invoice.invoiceNumber} · {new Date(invoice.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell><Chip label={cfg.label} color={cfg.color} size="small" sx={chipSx} /></TableCell>
                   <TableCell align="right"><Typography fontSize={13.5} fontWeight={700}>{money(invoice.total)}</Typography></TableCell>

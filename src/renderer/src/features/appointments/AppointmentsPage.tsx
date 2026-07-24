@@ -10,6 +10,7 @@ import RepeatOutlinedIcon from '@mui/icons-material/RepeatOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Chip,
@@ -400,29 +401,47 @@ export function AppointmentsPage(): React.JSX.Element {
         >
           <TableHead sx={tableSx.head}>
             <TableRow>
-              <TableCell>Date & time</TableCell>
               <TableCell>Patient</TableCell>
               <TableCell>Doctor</TableCell>
-              <TableCell>Reason</TableCell>
+              <TableCell>Time</TableCell>
+              <TableCell>Duration</TableCell>
               <TableCell>Status</TableCell>
+              <TableCell>Reason</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {appointments.isLoading ? (
-              <TableRow><TableCell colSpan={6} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>Loading appointments...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>Loading appointments...</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={6} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No appointments scheduled.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No appointments scheduled.</TableCell></TableRow>
             ) : (
               filtered.map((a) => (
                 <TableRow key={a.id} sx={tableSx.row}>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(a.startsAt).toLocaleString()}</TableCell>
-                  <TableCell><Typography fontSize={13.5} fontWeight={600}>{personLabel(a.patient)}</Typography></TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                      <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'primary.main' }}>
+                        {a.patient.firstName[0]}{a.patient.lastName[0]}
+                      </Avatar>
+                      <Box>
+                        <Typography fontSize={13.5} fontWeight={600}>{personLabel(a.patient)}</Typography>
+                        <Typography fontSize={11.5} color="text.secondary">
+                          {new Date(a.startsAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} · {Math.round((new Date(a.endsAt).getTime() - new Date(a.startsAt).getTime()) / 60000)} min
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </TableCell>
                   <TableCell>{personLabel(a.provider)}</TableCell>
-                  <TableCell>{a.reason || '—'}</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                    {new Date(a.startsAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                    {new Date(a.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(a.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </TableCell>
                   <TableCell>
                     <Chip color={statusConfig[a.status]?.color ?? 'default'} label={statusConfig[a.status]?.label ?? a.status} size="small" sx={chipSx} />
                   </TableCell>
+                  <TableCell>{a.reason || '—'}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" gap={0.5} justifyContent="flex-end">
                       <Tooltip title="Edit"><span>
