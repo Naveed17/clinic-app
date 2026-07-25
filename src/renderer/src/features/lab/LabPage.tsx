@@ -6,6 +6,7 @@ import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Chip,
@@ -188,14 +189,34 @@ export function LabPage(): React.JSX.Element {
           ) : (
             filtered.map((order) => (
               <TableRow key={order.id} sx={tableSx.row}>
-                <TableCell><Typography fontSize={13.5} fontWeight={600}>{order.patientName}</Typography></TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                    <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'primary.main' }}>
+                      {order.patientName[0]}
+                    </Avatar>
+                    <Box>
+                      <Typography fontSize={13.5} fontWeight={600}>{order.patientName}</Typography>
+                      <Typography fontSize={11.5} color="text.secondary">{order.test}</Typography>
+                    </Box>
+                  </Box>
+                </TableCell>
                 <TableCell>
                   <Stack direction="row" alignItems="center" gap={0.8}>
                     <BiotechOutlinedIcon sx={{ fontSize: 16, color: 'primary.main' }} />
                     {order.test}
                   </Stack>
                 </TableCell>
-                <TableCell>{order.orderedByName}</TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                    <Avatar sx={{ width: 28, height: 28, fontSize: 11, fontWeight: 700, bgcolor: 'secondary.main' }}>
+                      {order.orderedByName[0]}
+                    </Avatar>
+                    <Box>
+                      <Typography fontSize={13}>{order.orderedByName}</Typography>
+                      <Typography fontSize={11} color="text.secondary">Doctor</Typography>
+                    </Box>
+                  </Box>
+                </TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(order.orderedAt).toLocaleString()}</TableCell>
                 <TableCell sx={{ color: order.result ? 'text.primary' : 'text.disabled', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {order.result || '—'}

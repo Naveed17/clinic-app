@@ -7,10 +7,13 @@ let isLanClient = false;
 
 const settingsReady = ipcRenderer
   .invoke('settings:get')
-  .then((s: { serverMode: string; clientApiUrl: string }) => {
+  .then(async (s: { serverMode: string; clientApiUrl: string }) => {
     if (s.serverMode === 'lan-client' && s.clientApiUrl) {
       apiUrl = s.clientApiUrl;
       isLanClient = true;
+    } else {
+      const url = await ipcRenderer.invoke('app:get-api-url').catch(() => null);
+      if (url) apiUrl = url as string;
     }
   })
   .catch(() => {});

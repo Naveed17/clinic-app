@@ -28,6 +28,8 @@ import {
   MenuItem,
   Popover,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Toolbar,
   Tooltip,
@@ -35,7 +37,7 @@ import {
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useRef, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useColorMode } from '@/app/colorMode';
 import { useAuth } from '@/features/auth/AuthContext';
 import { getNavItems } from './navigation';
@@ -80,19 +82,7 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
     navigate('/login', { replace: true });
   };
 
-  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
-
   const activeIndex = navItems.findIndex((item) => item.path === location.pathname);
-
-  useEffect(() => {
-    const el = activeIndex >= 0 ? tabRefs.current[activeIndex] : undefined;
-    if (el) {
-      setIndicatorStyle({ left: el.offsetLeft, width: el.offsetWidth });
-    } else {
-      setIndicatorStyle({ left: 0, width: 0 });
-    }
-  }, [activeIndex, location.pathname]);
 
   useEffect(() => {
     void realtimeService.connect();
@@ -129,73 +119,49 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
           <MenuIcon />
         </IconButton>
 
-        {/* Centered pill nav */}
-        <Box
-          sx={{
-            display: { xs: 'none', md: 'flex' },
-            flex: 1,
-            justifyContent: 'center',
-          }}
-        >
-          <Box
+        {/* Scrollable nav tabs */}
+        <Box sx={{ display: { xs: 'none', md: 'flex' }, flex: 1, justifyContent: 'center', minWidth: 0 }}>
+          <Tabs
+            value={activeIndex < 0 ? false : activeIndex}
+            onChange={(_, i) => navigate(navItems[i].path)}
+            variant="scrollable"
+            scrollButtons={false}
             sx={{
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
               bgcolor: alpha(theme.palette.text.primary, 0.05),
               borderRadius: 99,
               p: '4px',
-              gap: 0,
+              minHeight: 0,
+              '& .MuiTabs-indicator': {
+                height: '100%',
+                borderRadius: 99,
+                bgcolor: 'background.paper',
+                boxShadow: theme.shadows[2],
+                zIndex: 0,
+              },
+              '& .MuiTabs-scrollButtons': { borderRadius: 99 },
             }}
           >
-            {/* Sliding pill indicator */}
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 4,
-                bottom: 4,
-                left: indicatorStyle.left,
-                width: indicatorStyle.width,
-                bgcolor: 'background.paper',
-                borderRadius: 99,
-                boxShadow: theme.shadows[2],
-                transition: 'left 0.28s cubic-bezier(0.4,0,0.2,1), width 0.28s cubic-bezier(0.4,0,0.2,1)',
-                zIndex: 0,
-              }}
-            />
-            {navItems.map((item, i) => {
-              const isActive = i === activeIndex;
-              return (
-                <Box
-                  key={item.path}
-                  component="button"
-                  ref={(el: HTMLButtonElement | null) => {
-                    tabRefs.current[i] = el;
-                  }}
-                  onClick={() => navigate(item.path)}
-                  sx={{
-                    position: 'relative',
-                    zIndex: 1,
-                    px: 2.2,
-                    py: 0.85,
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    borderRadius: 99,
-                    fontFamily: theme.typography.fontFamily,
-                    fontSize: 14,
-                    fontWeight: isActive ? 700 : 500,
-                    color: isActive ? 'text.primary' : 'text.secondary',
-                    transition: 'color 0.2s',
-                    whiteSpace: 'nowrap',
-                    '&:hover': { color: 'text.primary' },
-                  }}
-                >
-                  {item.label}
-                </Box>
-              );
-            })}
-          </Box>
+            {navItems.map((item) => (
+              <Tab
+                key={item.path}
+                label={item.label}
+                disableRipple
+                sx={{
+                  position: 'relative',
+                  zIndex: 1,
+                  minHeight: 0,
+                  px: 2.2,
+                  py: 0.85,
+                  borderRadius: 99,
+                  fontSize: 14,
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  color: 'text.secondary',
+                  '&.Mui-selected': { fontWeight: 700, color: 'text.primary' },
+                }}
+              />
+            ))}
+          </Tabs>
         </Box>
 
         {/* Right actions */}

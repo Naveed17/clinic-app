@@ -6,6 +6,7 @@ import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Chip,
@@ -281,7 +282,17 @@ export function UsersPage(): React.JSX.Element {
           ) : (
             users.map((user: User) => (
               <TableRow key={user.id} sx={tableSx.row}>
-                <TableCell><Typography fontSize={13.5} fontWeight={600}>{user.firstName} {user.lastName}</Typography></TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                    <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'primary.main' }}>
+                      {user.firstName[0]}{user.lastName[0]}
+                    </Avatar>
+                    <Box>
+                      <Typography fontSize={13.5} fontWeight={600}>{user.firstName} {user.lastName}</Typography>
+                      <Typography fontSize={11.5} color="text.secondary">{roleLabels[user.role] ?? user.role}</Typography>
+                    </Box>
+                  </Box>
+                </TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell><Chip label={roleLabels[user.role] ?? user.role} color={roleColors[user.role] ?? 'default'} size="small" sx={{ ...chipSx, border: 'none' }} /></TableCell>
                 <TableCell>{user.doctorProfile ? <Typography variant="body2">{user.doctorProfile.specialization}</Typography> : <Typography variant="body2" color="text.disabled">—</Typography>}</TableCell>

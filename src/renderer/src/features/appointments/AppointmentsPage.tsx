@@ -431,7 +431,17 @@ export function AppointmentsPage(): React.JSX.Element {
                       </Box>
                     </Box>
                   </TableCell>
-                  <TableCell>{personLabel(a.provider)}</TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                      <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'secondary.main' }}>
+                        {a.provider.firstName[0]}{a.provider.lastName[0]}
+                      </Avatar>
+                      <Box>
+                        <Typography fontSize={13.5} fontWeight={600}>{personLabel(a.provider)}</Typography>
+                        <Typography fontSize={11.5} color="text.secondary">{a.provider.role ?? 'Doctor'}</Typography>
+                      </Box>
+                    </Box>
+                  </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     {new Date(a.startsAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
                   </TableCell>
