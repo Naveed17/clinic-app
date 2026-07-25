@@ -1,8 +1,8 @@
 {
-  "name": "clinic-management-system",
+  "name": "care-flow",
   "version": "0.1.0",
   "private": true,
-  "description": "Clinic Management System desktop application",
+  "description": "CareFlow desktop application",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -19,8 +19,8 @@
     "dist": "npm run prisma:generate && npm run build && electron-builder"
   },
   "build": {
-    "appId": "com.clinic.app",
-    "productName": "Clinic Management System",
+    "appId": "com.careflow.app",
+    "productName": "CareFlow",
     "asar": true,
     "files": [
       "out/**/*",

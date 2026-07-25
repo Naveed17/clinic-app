@@ -95,7 +95,7 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
 
   return (
     <AppBar
-      position="sticky"
+      position="static"
       color="inherit"
       elevation={0}
       sx={{
@@ -103,14 +103,16 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
         border: 'none',
         borderBottom: '1px solid',
         borderColor: 'divider',
-        bgcolor: 'background.paper',
+        bgcolor: alpha(theme.palette.background.paper, 0.72),
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         borderRadius: 3,
         boxShadow: '0 1px 8px rgba(0,0,0,0.06)',
       }}
     >
-      <Toolbar sx={{ minHeight: { xs: 48, md: 52 }, gap: 2 }}>
+      <Toolbar sx={{ minHeight: { xs: 48, md: 52 }, gap: 2, px: { xs: 3, md: 1 } }} >
         {/* Mobile menu */}
-        <IconButton
+        < IconButton
           aria-label="Open navigation"
           edge="start"
           onClick={onMenuClick}
@@ -126,7 +128,9 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
             onChange={(_, i) => navigate(navItems[i].path)}
             variant="scrollable"
             scrollButtons={false}
+
             sx={{
+              width: '100%',
               bgcolor: alpha(theme.palette.text.primary, 0.05),
               borderRadius: 99,
               p: '4px',
@@ -227,7 +231,8 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
                 <Typography variant="body2" color="text.disabled">No notifications.</Typography>
               </Box>
             ) : (
-              <List dense disablePadding sx={{ maxHeight: 360, overflowY: 'auto',
+              <List dense disablePadding sx={{
+                maxHeight: 360, overflowY: 'auto',
                 '&::-webkit-scrollbar': { width: 4 },
                 '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
               }}>
@@ -235,7 +240,8 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
                   <ListItem key={n.id} divider alignItems="flex-start"
                     sx={{ gap: 1, '&:hover': { bgcolor: 'action.hover' } }}
                   >
-                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', mt: 0.8, flexShrink: 0,
+                    <Box sx={{
+                      width: 8, height: 8, borderRadius: '50%', mt: 0.8, flexShrink: 0,
                       bgcolor: n.kind === 'success' ? 'success.main' : n.kind === 'warning' ? 'warning.main' : n.kind === 'error' ? 'error.main' : 'primary.main',
                     }} />
                     <ListItemText
@@ -317,6 +323,6 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
           </Tooltip>
         </Box>
       </Toolbar>
-    </AppBar>
+    </AppBar >
   );
 }

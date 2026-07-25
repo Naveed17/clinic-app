@@ -95,7 +95,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
-  electronApp.setAppUserModelId('com.clinic.management');
+  electronApp.setAppUserModelId('com.careflow.app');
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window));
   try {
     const settings = getSettings();

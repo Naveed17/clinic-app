@@ -32,7 +32,7 @@ import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Document, Page, Text, View, StyleSheet, PDFViewer, Font } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, pdf, Font } from '@react-pdf/renderer';
 import type { Token, TokenInput, TokenPerson, TokenStatus } from '@/types/token';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
@@ -169,7 +169,9 @@ function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone }: {
 }
 
 function TokenPrintPreview({ token, onClose }: { token: Token; onClose: () => void }) {
-  const [clinic, setClinic] = useState({ clinicName: '', clinicAddress: '', clinicPhone: '' });
+  const [clinic, setClinic] = useState<{ clinicName: string; clinicAddress: string; clinicPhone: string } | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+
   useEffect(() => {
     void window.clinic?.settings.get().then((s) => setClinic({
       clinicName: s.clinicName ?? '',
@@ -177,12 +179,27 @@ function TokenPrintPreview({ token, onClose }: { token: Token; onClose: () => vo
       clinicPhone: s.clinicPhone ?? '',
     }));
   }, []);
+
+  useEffect(() => {
+    if (!clinic) return;
+    let url: string;
+    void pdf(<TokenSlipDocument token={token} {...clinic} />).toBlob().then((blob) => {
+      url = URL.createObjectURL(blob);
+      setBlobUrl(url);
+    });
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [clinic, token]);
+
   return (
     <Dialog open onClose={onClose} maxWidth="xs" fullWidth>
       <DialogContent sx={{ p: 0, height: 560 }}>
-        <PDFViewer width="100%" height="100%" showToolbar>
-          <TokenSlipDocument token={token} {...clinic} />
-        </PDFViewer>
+        {blobUrl ? (
+          <iframe src={blobUrl} width="100%" height="100%" style={{ border: 'none' }} />
+        ) : (
+          <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Typography color="text.secondary">Loading...</Typography>
+          </Box>
+        )}
       </DialogContent>
       <DialogActions sx={{ px: 2, pb: 2 }}>
         <Button onClick={onClose}>Close</Button>
