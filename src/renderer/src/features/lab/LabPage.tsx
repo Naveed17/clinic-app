@@ -58,6 +58,7 @@ export function LabPage(): React.JSX.Element {
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [tokenSearch, setTokenSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [resultDialog, setResultDialog] = useState<LabOrder | null>(null);
   const [printOrder, setPrintOrder] = useState<LabOrder | null>(null);
@@ -67,6 +68,7 @@ export function LabPage(): React.JSX.Element {
   const { data: orders = [], isLoading, isError } = useQuery<LabOrder[]>({
     queryKey: ['lab-orders'],
     queryFn: () => window.clinic.lab.list(),
+    refetchInterval: 15_000,
   });
 
   const { data: patients = [] } = useQuery<{ id: string; firstName: string; lastName: string }[]>({
@@ -127,7 +129,8 @@ export function LabPage(): React.JSX.Element {
       order.patientName.toLowerCase().includes(search.toLowerCase()) ||
       order.test.toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === 'ALL' || order.status === filterStatus;
-    return matchSearch && matchStatus;
+    const matchToken = !tokenSearch.trim() || String(order.tokenNumber ?? '').includes(tokenSearch.trim());
+    return matchSearch && matchStatus && matchToken;
   });
 
   const pending = orders.filter((o) => o.status === 'PENDING').length;
@@ -146,7 +149,14 @@ export function LabPage(): React.JSX.Element {
         }
         toolbar={
           <>
-            <SearchField value={search} onChange={setSearch} placeholder="Search by patient or test" sx={{ flex: 1, maxWidth: 320 }} />
+            <SearchField value={search} onChange={setSearch} placeholder="Search by patient or test" sx={{ flex: 1, maxWidth: 260 }} />
+            <TextField
+              size="small"
+              placeholder="Token #"
+              value={tokenSearch}
+              onChange={(e) => setTokenSearch(e.target.value)}
+              sx={{ width: 100 }}
+            />
             <FormControl size="small" sx={{ minWidth: 150 }}>
               <InputLabel>Status</InputLabel>
               <Select label="Status" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} sx={{ borderRadius: 2, fontSize: 13.5 }}>
@@ -174,6 +184,7 @@ export function LabPage(): React.JSX.Element {
           <TableRow>
             <TableCell>Patient</TableCell>
             <TableCell>Test</TableCell>
+            <TableCell>Token</TableCell>
             <TableCell>Ordered by</TableCell>
             <TableCell>Date & time</TableCell>
             <TableCell>Result</TableCell>
@@ -183,9 +194,9 @@ export function LabPage(): React.JSX.Element {
         </TableHead>
         <TableBody>
           {isLoading ? (
-            <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center' }}><CircularProgress size={24} /></TableCell></TableRow>
+            <TableRow><TableCell colSpan={8} sx={{ py: 6, textAlign: 'center' }}><CircularProgress size={24} /></TableCell></TableRow>
           ) : filtered.length === 0 ? (
-            <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No lab orders found.</TableCell></TableRow>
+            <TableRow><TableCell colSpan={8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No lab orders found.</TableCell></TableRow>
           ) : (
             filtered.map((order) => (
               <TableRow key={order.id} sx={tableSx.row}>
@@ -205,6 +216,12 @@ export function LabPage(): React.JSX.Element {
                     <BiotechOutlinedIcon sx={{ fontSize: 16, color: 'primary.main' }} />
                     {order.test}
                   </Stack>
+                </TableCell>
+                <TableCell>
+                  {order.tokenNumber != null
+                    ? <Chip label={`#${String(order.tokenNumber).padStart(3, '0')}`} size="small" color="primary" variant="outlined" sx={{ fontWeight: 700, borderRadius: 1 }} />
+                    : <Typography fontSize={12} color="text.disabled">—</Typography>
+                  }
                 </TableCell>
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>

@@ -3,17 +3,59 @@ import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
 import HowToRegOutlinedIcon from '@mui/icons-material/HowToRegOutlined';
-import { Box, Paper, Stack, Typography, Chip, Avatar, Button } from '@mui/material';
+import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
+import { Box, Paper, Stack, Typography, Chip, Avatar, Button, Divider } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { appointmentsService } from '@/services/appointments.service';
 import { patientsService } from '@/services/patients.service';
 import { invoicesService } from '@/services/invoices.service';
+import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
 import { useNavigate } from 'react-router-dom';
 
 const statusColor: Record<string, 'default' | 'primary' | 'success' | 'error' | 'warning'> = {
   SCHEDULED: 'primary', CHECKED_IN: 'warning', COMPLETED: 'success', CANCELLED: 'error', NO_SHOW: 'default',
 };
+
+function PrescriptionFeed(): React.JSX.Element {
+  const theme = useTheme();
+  const [feed, setFeed] = useState<{ id: string; message: string; time: string }[]>([]);
+
+  useEffect(() => {
+    const unsub = realtimeService.onNotification((n: RealtimeNotification) => {
+      if (n.payload?.entity === 'prescription') {
+        setFeed((prev) => [{ id: n.id, message: n.message, time: n.createdAt }, ...prev].slice(0, 20));
+      }
+    });
+    return unsub;
+  }, []);
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2.5, minWidth: 200 }}>
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+        <MedicalServicesOutlinedIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+        <Typography fontWeight={700} fontSize={14}>Prescriptions</Typography>
+        {feed.length > 0 && <Chip label={feed.length} size="small" color="primary" sx={{ height: 18, fontSize: 10 }} />}
+      </Stack>
+      <Divider sx={{ mb: 1.5 }} />
+      {feed.length === 0 ? (
+        <Typography variant="caption" color="text.disabled">No prescriptions yet today.</Typography>
+      ) : (
+        <Stack spacing={1}>
+          {feed.map((item) => (
+            <Box key={item.id} sx={{ p: 1, borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, 0.05), border: '1px solid', borderColor: alpha(theme.palette.primary.main, 0.15) }}>
+              <Typography variant="caption" fontWeight={600} sx={{ display: 'block' }}>{item.message}</Typography>
+              <Typography variant="caption" color="text.disabled">
+                {new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Typography>
+            </Box>
+          ))}
+        </Stack>
+      )}
+    </Paper>
+  );
+}
 
 export function ReceptionistDashboard(): React.JSX.Element {
   const theme = useTheme();
@@ -94,31 +136,34 @@ export function ReceptionistDashboard(): React.JSX.Element {
         </Paper>
 
         {/* Quick actions */}
-        <Paper variant="outlined" sx={{ p: 3, minWidth: 200 }}>
-          <Typography fontWeight={700} sx={{ mb: 2 }}>Quick Actions</Typography>
-          <Stack spacing={1.5}>
-            {[
-              { label: 'Register Patient',  icon: <PersonAddOutlinedIcon />,     color: theme.palette.primary.main,   path: '/patients' },
-              { label: 'Book Appointment',  icon: <CalendarMonthOutlinedIcon />, color: theme.palette.secondary.main, path: '/appointments' },
-              { label: 'Create Invoice',    icon: <PaymentsOutlinedIcon />,      color: theme.palette.success.main,   path: '/billing' },
-            ].map((action) => (
-              <Button
-                key={action.label}
-                variant="outlined"
-                startIcon={action.icon}
-                onClick={() => navigate(action.path)}
-                fullWidth
-                sx={{
-                  justifyContent: 'flex-start', borderRadius: 2, py: 1.2,
-                  borderColor: alpha(action.color, 0.4), color: action.color,
-                  '&:hover': { bgcolor: alpha(action.color, 0.06), borderColor: action.color },
-                }}
-              >
-                {action.label}
-              </Button>
-            ))}
-          </Stack>
-        </Paper>
+        <Stack spacing={2}>
+          <Paper variant="outlined" sx={{ p: 3, minWidth: 200 }}>
+            <Typography fontWeight={700} sx={{ mb: 2 }}>Quick Actions</Typography>
+            <Stack spacing={1.5}>
+              {[
+                { label: 'Register Patient',  icon: <PersonAddOutlinedIcon />,     color: theme.palette.primary.main,   path: '/patients' },
+                { label: 'Book Appointment',  icon: <CalendarMonthOutlinedIcon />, color: theme.palette.secondary.main, path: '/appointments' },
+                { label: 'Create Invoice',    icon: <PaymentsOutlinedIcon />,      color: theme.palette.success.main,   path: '/billing' },
+              ].map((action) => (
+                <Button
+                  key={action.label}
+                  variant="outlined"
+                  startIcon={action.icon}
+                  onClick={() => navigate(action.path)}
+                  fullWidth
+                  sx={{
+                    justifyContent: 'flex-start', borderRadius: 2, py: 1.2,
+                    borderColor: alpha(action.color, 0.4), color: action.color,
+                    '&:hover': { bgcolor: alpha(action.color, 0.06), borderColor: action.color },
+                  }}
+                >
+                  {action.label}
+                </Button>
+              ))}
+            </Stack>
+          </Paper>
+          <PrescriptionFeed />
+        </Stack>
       </Box>
     </Stack>
   );

@@ -1,3 +1,4 @@
+import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
@@ -30,9 +31,10 @@ function ToastIcon({ entity, kind }: { entity?: string; kind: RealtimeNotificati
   const color = kindColor[kind];
   const sx = { fontSize: 20, color };
 
-  if (entity === 'appointment') return <CalendarMonthOutlinedIcon sx={sx} />;
-  if (entity === 'patient')     return <PersonOutlinedIcon sx={sx} />;
-  if (entity === 'token')       return <ConfirmationNumberOutlinedIcon sx={sx} />;
+  if (entity === 'appointment')  return <CalendarMonthOutlinedIcon sx={sx} />;
+  if (entity === 'patient')      return <PersonOutlinedIcon sx={sx} />;
+  if (entity === 'token')        return <ConfirmationNumberOutlinedIcon sx={sx} />;
+  if (entity === 'prescription') return <MedicalServicesOutlinedIcon sx={sx} />;
   if (kind === 'success')       return <CheckCircleOutlineIcon sx={sx} />;
   if (kind === 'warning')       return <WarningAmberOutlinedIcon sx={sx} />;
   if (kind === 'error')         return <ErrorOutlineIcon sx={sx} />;

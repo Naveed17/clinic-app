@@ -33,7 +33,8 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Document, Page, Text, View, StyleSheet, pdf, Font } from '@react-pdf/renderer';
-import type { Token, TokenInput, TokenPerson, TokenStatus } from '@/types/token';
+import type { Token, TokenInput, TokenPerson, TokenStatus, PrescriptionInput, PrescriptionMedicine } from '@/types/token';
+import { useAuth } from '@/features/auth/AuthContext';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
   WAITING:     { label: 'Waiting',     color: 'warning' },
@@ -46,7 +47,7 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function IssueTokenDialog({ open, onClose, date }: { open: boolean; onClose: () => void; date: string }) {
+export function IssueTokenDialog({ open, onClose, date }: { open: boolean; onClose: () => void; date: string }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<TokenInput>({ patientId: '', doctorId: '', date, notes: '' });
 
@@ -142,9 +143,10 @@ function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone }: {
 }) {
   const date = new Date(token.createdAt).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
   const time = new Date(token.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const pr = token.prescription;
   return (
     <Document>
-      <Page size={[226, 480]} style={ts.page} wrap={false}>
+      <Page size={[226, pr ? 700 : 480]} style={ts.page} wrap={false}>
         <Text style={ts.shopName}>{clinicName || 'CLINIC'}</Text>
         {clinicAddress ? <Text style={ts.shopSub}>{clinicAddress}</Text> : null}
         {clinicPhone ? <Text style={ts.shopSub}>Tel: {clinicPhone}</Text> : null}
@@ -161,6 +163,31 @@ function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone }: {
         <View style={ts.row}><Text style={ts.lbl}>Date</Text><Text style={ts.val}>{date}</Text></View>
         <View style={ts.row}><Text style={ts.lbl}>Time</Text><Text style={ts.val}>{time}</Text></View>
         {token.notes ? <View style={ts.row}><Text style={ts.lbl}>Note</Text><Text style={ts.val}>{token.notes}</Text></View> : null}
+        {pr && (
+          <>
+            <Text style={ts.stars}>{STAR_LINE}</Text>
+            <Text style={[ts.title, { marginBottom: 4 }]}>PRESCRIPTION</Text>
+            {pr.diagnosis ? <View style={ts.row}><Text style={ts.lbl}>Diagnosis</Text><Text style={ts.val}>{pr.diagnosis}</Text></View> : null}
+            {pr.medicines.length > 0 && (
+              <>
+                <Text style={[ts.lbl, { marginTop: 4, marginBottom: 2 }]}>Medicines:</Text>
+                {pr.medicines.map((m, i) => (
+                  <View key={i} style={{ marginBottom: 3 }}>
+                    <Text style={[ts.val, { fontWeight: 'bold' }]}>{i + 1}. {m.name}</Text>
+                    <Text style={ts.lbl}>   {m.dosage} · {m.duration}{m.instructions ? ` · ${m.instructions}` : ''}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+            {pr.tests.length > 0 && (
+              <>
+                <Text style={[ts.lbl, { marginTop: 4, marginBottom: 2 }]}>Lab Tests:</Text>
+                {pr.tests.map((t, i) => <Text key={i} style={ts.val}>  • {t}</Text>)}
+              </>
+            )}
+            {pr.advice ? <><Text style={[ts.lbl, { marginTop: 4 }]}>Advice:</Text><Text style={ts.val}>{pr.advice}</Text></> : null}
+          </>
+        )}
         <Text style={ts.stars}>{STAR_LINE}</Text>
         <Text style={ts.footer}>Please wait for your token to be called.{`\n`}Thank you for your visit.</Text>
       </Page>
@@ -168,7 +195,137 @@ function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone }: {
   );
 }
 
-function TokenPrintPreview({ token, onClose }: { token: Token; onClose: () => void }) {
+export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: () => void }) {
+  const qc = useQueryClient();
+  const emptyMed = (): PrescriptionMedicine => ({ name: '', dosage: '', duration: '', instructions: '' });
+  const [diagnosis, setDiagnosis] = useState(token.prescription?.diagnosis ?? '');
+  const [medicines, setMedicines] = useState<PrescriptionMedicine[]>(
+    token.prescription?.medicines.length ? token.prescription.medicines : [emptyMed()]
+  );
+  const [tests, setTests] = useState<string[]>(token.prescription?.tests ?? []);
+  const [testInput, setTestInput] = useState('');
+  const [advice, setAdvice] = useState(token.prescription?.advice ?? '');
+  const [labTest, setLabTest] = useState('');
+
+  const { data: labOrders = [], refetch: refetchLabOrders } = useQuery<import('@/types/lab').LabOrder[]>({
+    queryKey: ['lab-orders-token', token.id],
+    queryFn: () => window.clinic.lab.listByToken(token.id),
+  });
+
+  const createLabOrderMutation = useMutation({
+    mutationFn: (test: string) =>
+      window.clinic.lab.create({ patientId: token.patientId, orderedById: token.doctorId, tokenId: token.id, test }),
+    onSuccess: () => { void refetchLabOrders(); setLabTest(''); },
+  });
+
+  const mutation = useMutation({
+    mutationFn: () => window.clinic.tokens.upsertPrescription(token.id, { diagnosis, medicines, tests, advice } as PrescriptionInput),
+    onSuccess: async () => { await qc.invalidateQueries({ queryKey: ['tokens'] }); onClose(); },
+  });
+
+  const updateMed = (i: number, field: keyof PrescriptionMedicine, val: string) =>
+    setMedicines((prev) => prev.map((m, idx) => idx === i ? { ...m, [field]: val } : m));
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        Prescription — Token #{String(token.tokenNumber).padStart(3, '0')}
+        <Typography variant="body2" color="text.secondary">
+          {token.patient.firstName} {token.patient.lastName} · Dr. {token.doctor.firstName} {token.doctor.lastName}
+        </Typography>
+      </DialogTitle>
+      <DialogContent>
+        <Stack spacing={2.5} sx={{ mt: 1 }}>
+          <TextField label="Diagnosis" fullWidth value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} />
+
+          <Box>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Medicines</Typography>
+            <Stack spacing={1.5}>
+              {medicines.map((m, i) => (
+                <Paper key={i} variant="outlined" sx={{ p: 1.5 }}>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: 1 }}>
+                    <TextField size="small" label="Medicine" value={m.name} onChange={(e) => updateMed(i, 'name', e.target.value)} />
+                    <TextField size="small" label="Dosage" value={m.dosage} onChange={(e) => updateMed(i, 'dosage', e.target.value)} />
+                    <TextField size="small" label="Duration" value={m.duration} onChange={(e) => updateMed(i, 'duration', e.target.value)} />
+                    <TextField size="small" label="Instructions" value={m.instructions} onChange={(e) => updateMed(i, 'instructions', e.target.value)} />
+                    <IconButton size="small" color="error" onClick={() => setMedicines((p) => p.filter((_, idx) => idx !== i))} disabled={medicines.length === 1}>
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </Paper>
+              ))}
+              <Button size="small" startIcon={<AddOutlinedIcon />} onClick={() => setMedicines((p) => [...p, emptyMed()])} sx={{ alignSelf: 'flex-start' }}>
+                Add Medicine
+              </Button>
+            </Stack>
+          </Box>
+
+          <Box>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Lab Orders</Typography>
+            <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+              <TextField
+                size="small"
+                label="Test name"
+                value={labTest}
+                onChange={(e) => setLabTest(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && labTest.trim()) createLabOrderMutation.mutate(labTest.trim()); }}
+                sx={{ flex: 1 }}
+              />
+              <Button
+                size="small"
+                variant="outlined"
+                disabled={!labTest.trim() || createLabOrderMutation.isPending}
+                onClick={() => createLabOrderMutation.mutate(labTest.trim())}
+              >
+                Order
+              </Button>
+            </Stack>
+            {labOrders.length > 0 && (
+              <Stack spacing={0.5}>
+                {labOrders.map((o) => (
+                  <Box key={o.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Chip
+                      label={o.test}
+                      size="small"
+                      color={o.status === 'COMPLETED' ? 'success' : o.status === 'CANCELLED' ? 'error' : 'warning'}
+                      variant="outlined"
+                    />
+                    <Typography variant="caption" color="text.secondary">{o.status.replace('_', ' ')}</Typography>
+                    {o.result && <Typography variant="caption" color="text.secondary">— {o.result}</Typography>}
+                  </Box>
+                ))}
+              </Stack>
+            )}
+          </Box>
+
+          <Box>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Notes / Tests (text)</Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
+              {tests.map((t, i) => (
+                <Chip key={i} label={t} onDelete={() => setTests((p) => p.filter((_, idx) => idx !== i))} size="small" />
+              ))}
+            </Stack>
+            <Stack direction="row" spacing={1}>
+              <TextField size="small" label="Add note" value={testInput} onChange={(e) => setTestInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && testInput.trim()) { setTests((p) => [...p, testInput.trim()]); setTestInput(''); } }}
+              />
+              <Button size="small" onClick={() => { if (testInput.trim()) { setTests((p) => [...p, testInput.trim()]); setTestInput(''); } }}>Add</Button>
+            </Stack>
+          </Box>
+
+          <TextField label="Advice / Notes" fullWidth multiline rows={2} value={advice} onChange={(e) => setAdvice(e.target.value)} />
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" disabled={mutation.isPending} onClick={() => mutation.mutate()}>Save Prescription</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+export function TokenPrintPreview({ token, onClose }: { token: Token; onClose: () => void }) {
   const [clinic, setClinic] = useState<{ clinicName: string; clinicAddress: string; clinicPhone: string } | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
@@ -211,6 +368,8 @@ function TokenPrintPreview({ token, onClose }: { token: Token; onClose: () => vo
 export function TokensPage(): React.JSX.Element {
   const theme = useTheme();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const isDoctor = user?.role === 'doctor';
   const [date, setDate] = useState(todayStr());
   const [filterDoctor, setFilterDoctor] = useState('ALL');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -238,7 +397,8 @@ export function TokensPage(): React.JSX.Element {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tokens'] }),
   });
 
-  const filtered = filterDoctor === 'ALL' ? tokens : tokens.filter((t) => t.doctorId === filterDoctor);
+  const roleFiltered = isDoctor ? tokens.filter((t) => t.doctorId === user?.id) : tokens;
+  const filtered = filterDoctor === 'ALL' ? roleFiltered : roleFiltered.filter((t) => t.doctorId === filterDoctor);
 
   const waiting = tokens.filter((t) => t.status === 'WAITING').length;
   const inProgress = tokens.filter((t) => t.status === 'IN_PROGRESS').length;
@@ -324,20 +484,21 @@ export function TokensPage(): React.JSX.Element {
           </Paper>
         )}
 
-        {/* Filter by doctor */}
-        <Stack direction="row" gap={1} alignItems="center">
-          <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>Filter:</Typography>
-          {[{ id: 'ALL', firstName: 'All', lastName: 'Doctors' }, ...doctors].map((d) => (
-            <Chip
-              key={d.id}
-              label={d.id === 'ALL' ? 'All Doctors' : `Dr. ${d.firstName} ${d.lastName}`}
-              onClick={() => setFilterDoctor(d.id)}
-              color={filterDoctor === d.id ? 'primary' : 'default'}
-              variant={filterDoctor === d.id ? 'filled' : 'outlined'}
-              sx={{ borderRadius: 2 }}
-            />
-          ))}
-        </Stack>
+        {!isDoctor && (
+          <Stack direction="row" gap={1} alignItems="center">
+            <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>Filter:</Typography>
+            {[{ id: 'ALL', firstName: 'All', lastName: 'Doctors' }, ...doctors].map((d) => (
+              <Chip
+                key={d.id}
+                label={d.id === 'ALL' ? 'All Doctors' : `Dr. ${d.firstName} ${d.lastName}`}
+                onClick={() => setFilterDoctor(d.id)}
+                color={filterDoctor === d.id ? 'primary' : 'default'}
+                variant={filterDoctor === d.id ? 'filled' : 'outlined'}
+                sx={{ borderRadius: 2 }}
+              />
+            ))}
+          </Stack>
+        )}
 
         {/* Queue list */}
         {isError && <Alert severity="error">Failed to load tokens.</Alert>}
@@ -445,6 +606,7 @@ export function TokensPage(): React.JSX.Element {
 
       <IssueTokenDialog open={dialogOpen} onClose={() => setDialogOpen(false)} date={date} />
       {printToken && <TokenPrintPreview token={printToken} onClose={() => setPrintToken(null)} />}
+
     </>
   );
 }

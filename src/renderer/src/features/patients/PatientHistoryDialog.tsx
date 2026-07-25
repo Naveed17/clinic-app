@@ -5,12 +5,14 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
 import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import ReceiptOutlinedIcon from '@mui/icons-material/ReceiptOutlined';
+import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
 import {
   Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, Divider, IconButton, Paper, Tab, Tabs, Tooltip, Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import type { Prescription } from '@/types/token';
 import { Table, TableBody, TableCell, TableHead, TableRow } from '@/components/TableUI';
 import { appointmentsService } from '@/services/appointments.service';
 import { invoicesService } from '@/services/invoices.service';
@@ -28,6 +30,70 @@ function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }): Re
     <Box sx={{ py: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5, color: 'text.disabled' }}>
       <Box sx={{ fontSize: 40 }}>{icon}</Box>
       <Typography fontSize={13} color="text.secondary">{text}</Typography>
+    </Box>
+  );
+}
+
+function PrescriptionsTab({ patientId }: { patientId: string }): React.JSX.Element {
+  const { data: tokens = [], isLoading } = useQuery({
+    queryKey: ['tokens-all-prescriptions', patientId],
+    queryFn: async () => {
+      const today = new Date();
+      const results: Prescription[] = [];
+      // Fetch last 90 days
+      for (let i = 0; i < 90; i++) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().slice(0, 10);
+        const dayTokens = await window.clinic.tokens.list(dateStr);
+        dayTokens.forEach((t: { patientId: string; prescription: Prescription | null }) => {
+          if (t.patientId === patientId && t.prescription) results.push(t.prescription as Prescription & { _token: typeof t });
+        });
+      }
+      return results;
+    },
+  });
+
+  if (isLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>;
+  if (tokens.length === 0) return <EmptyState icon={<MedicalServicesOutlinedIcon sx={{ fontSize: 40 }} />} text="No prescriptions found." />;
+
+  return (
+    <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {(tokens as (Prescription & { _token?: { tokenNumber?: number; date?: string; doctor?: { firstName: string; lastName: string } } })[]).map((pr) => (
+        <Paper key={pr.id} variant="outlined" sx={{ p: 2, borderRadius: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+            <Box>
+              {pr.diagnosis && <Typography fontWeight={700} fontSize={14}>{pr.diagnosis}</Typography>}
+              <Typography variant="caption" color="text.secondary">
+                {new Date(pr.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}
+              </Typography>
+            </Box>
+            <Chip label="Prescription" size="small" color="primary" variant="outlined" sx={{ fontSize: 10, height: 20 }} />
+          </Box>
+          {pr.medicines.length > 0 && (
+            <Box sx={{ mb: 1 }}>
+              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>Medicines</Typography>
+              {pr.medicines.map((m, i) => (
+                <Typography key={i} variant="body2" sx={{ mt: 0.25 }}>
+                  {i + 1}. <strong>{m.name}</strong> — {m.dosage} · {m.duration}{m.instructions ? ` · ${m.instructions}` : ''}
+                </Typography>
+              ))}
+            </Box>
+          )}
+          {pr.tests.length > 0 && (
+            <Box sx={{ mb: 1 }}>
+              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lab Tests</Typography>
+              <Typography variant="body2">{pr.tests.join(', ')}</Typography>
+            </Box>
+          )}
+          {pr.advice && (
+            <Box>
+              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>Advice</Typography>
+              <Typography variant="body2">{pr.advice}</Typography>
+            </Box>
+          )}
+        </Paper>
+      ))}
     </Box>
   );
 }
@@ -78,6 +144,7 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
         <Tab icon={<ReceiptOutlinedIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Billing" />
         <Tab icon={<MonitorHeartOutlinedIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Medical Info" />
         <Tab icon={<InsertDriveFileOutlinedIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Documents" />
+        <Tab icon={<MedicalServicesOutlinedIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Prescriptions" />
       </Tabs>
 
       <DialogContent sx={{ p: 0, minHeight: 320 }}>
@@ -207,6 +274,7 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
             )}
           </Box>
         )}
+        {tab === 4 && <PrescriptionsTab patientId={patient.id} />}
       </DialogContent>
 
       <Divider />

@@ -3,6 +3,7 @@ import { getPrisma } from '../database/client';
 export interface LabOrderInput {
   patientId: string;
   orderedById: string;
+  tokenId?: string | null;
   test: string;
   notes?: string | null;
 }
@@ -10,12 +11,14 @@ export interface LabOrderInput {
 const include = {
   patient: { select: { id: true, firstName: true, lastName: true } },
   orderedBy: { select: { id: true, firstName: true, lastName: true } },
+  token: { select: { id: true, tokenNumber: true } },
 } as const;
 
 type LabOrderWithRelations = {
   id: string;
   patientId: string;
   orderedById: string;
+  tokenId: string | null;
   test: string;
   status: string;
   result: string | null;
@@ -25,11 +28,13 @@ type LabOrderWithRelations = {
   updatedAt: Date;
   patient: { id: string; firstName: string; lastName: string };
   orderedBy: { id: string; firstName: string; lastName: string };
+  token: { id: string; tokenNumber: number } | null;
 };
 
 function serialize(order: LabOrderWithRelations) {
   return {
     ...order,
+    tokenNumber: order.token?.tokenNumber ?? null,
     patientName: `${order.patient.firstName} ${order.patient.lastName}`,
     orderedByName: `${order.orderedBy.firstName} ${order.orderedBy.lastName}`,
   };
@@ -43,11 +48,21 @@ export async function listLabOrders() {
   return orders.map(serialize);
 }
 
+export async function listLabOrdersByToken(tokenId: string) {
+  const orders = await getPrisma().labOrder.findMany({
+    where: { tokenId },
+    include,
+    orderBy: { orderedAt: 'asc' },
+  });
+  return orders.map(serialize);
+}
+
 export async function createLabOrder(input: LabOrderInput) {
   const order = await getPrisma().labOrder.create({
     data: {
       patientId: input.patientId,
       orderedById: input.orderedById,
+      tokenId: input.tokenId ?? null,
       test: input.test,
       notes: input.notes?.trim() || null,
       updatedAt: new Date(),

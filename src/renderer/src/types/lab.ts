@@ -4,6 +4,8 @@ export interface LabOrder {
   id: string;
   patientId: string;
   orderedById: string;
+  tokenId: string | null;
+  tokenNumber: number | null;
   test: string;
   status: LabOrderStatus;
   result: string | null;

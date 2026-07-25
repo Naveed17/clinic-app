@@ -43,9 +43,11 @@ interface Props {
   onStatusChange: (id: string, status: string) => void;
   onDateClick?: (date: string) => void;
   onAppointmentClick?: (appointment: Appointment) => void;
+  onDayContextMenu?: (date: string, anchor: { mouseX: number; mouseY: number }) => void;
+  onAppointmentContextMenu?: (appointment: Appointment, anchor: { mouseX: number; mouseY: number }) => void;
 }
 
-export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick }: Props): React.JSX.Element {
+export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu }: Props): React.JSX.Element {
   const theme = useTheme();
   const today = new Date();
 
@@ -84,7 +86,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
       sx={{
         display: 'flex',
         flexDirection: 'row',
-
+        height: '100%',
         borderRadius: 1,
         overflow: 'hidden',
         border: '1px solid',
@@ -130,7 +132,13 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                 key={i}
                 onClick={() => {
                   setSelected(day);
-                  onDateClick?.(day.toISOString().slice(0, 10));
+                  onDateClick?.(day.toLocaleDateString('en-CA'));
+                }}
+                onContextMenu={(e) => {
+                  if (!onDayContextMenu) return;
+                  e.preventDefault();
+                  setSelected(day);
+                  onDayContextMenu(day.toLocaleDateString('en-CA'), { mouseX: e.clientX, mouseY: e.clientY });
                 }}
                 sx={{
                   minHeight: 72,
@@ -184,6 +192,14 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                         }, 200);
                       }}
                       onClick={(e) => { e.stopPropagation(); onAppointmentClick?.(a); }}
+                      onContextMenu={(e) => {
+                        if (!onAppointmentContextMenu) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setHoveredAppt(null);
+                        setAnchorEl(null);
+                        onAppointmentContextMenu(a, { mouseX: e.clientX, mouseY: e.clientY });
+                      }}
                       sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}
                     >
                       <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: STATUS_COLOR[a.status], flexShrink: 0 }} />

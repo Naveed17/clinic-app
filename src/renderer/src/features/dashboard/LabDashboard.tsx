@@ -2,10 +2,13 @@ import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
 import PendingOutlinedIcon from '@mui/icons-material/PendingOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
-import { Box, Paper, Stack, Typography, Chip, Button } from '@mui/material';
+import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
+import { Box, Chip, Divider, Paper, Stack, Typography, Button } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/AuthContext';
+import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
 
 // Static demo lab orders — will be replaced when lab IPC is wired
 const DEMO_ORDERS = [
@@ -23,6 +26,45 @@ const statusColor: Record<string, 'default' | 'primary' | 'success' | 'warning'>
 const statusLabel: Record<string, string> = {
   PENDING: 'Pending', IN_PROGRESS: 'In Progress', COMPLETED: 'Completed',
 };
+
+function PrescriptionFeed(): React.JSX.Element {
+  const theme = useTheme();
+  const [feed, setFeed] = useState<{ id: string; message: string; time: string }[]>([]);
+
+  useEffect(() => {
+    const unsub = realtimeService.onNotification((n: RealtimeNotification) => {
+      if (n.payload?.entity === 'prescription') {
+        setFeed((prev) => [{ id: n.id, message: n.message, time: n.createdAt }, ...prev].slice(0, 20));
+      }
+    });
+    return unsub;
+  }, []);
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2.5 }}>
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+        <MedicalServicesOutlinedIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+        <Typography fontWeight={700} fontSize={14}>New Prescriptions</Typography>
+        {feed.length > 0 && <Chip label={feed.length} size="small" color="primary" sx={{ height: 18, fontSize: 10 }} />}
+      </Stack>
+      <Divider sx={{ mb: 1.5 }} />
+      {feed.length === 0 ? (
+        <Typography variant="caption" color="text.disabled">No prescriptions yet today.</Typography>
+      ) : (
+        <Stack spacing={1}>
+          {feed.map((item) => (
+            <Box key={item.id} sx={{ p: 1, borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, 0.05), border: '1px solid', borderColor: alpha(theme.palette.primary.main, 0.15) }}>
+              <Typography variant="caption" fontWeight={600} sx={{ display: 'block' }}>{item.message}</Typography>
+              <Typography variant="caption" color="text.disabled">
+                {new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Typography>
+            </Box>
+          ))}
+        </Stack>
+      )}
+    </Paper>
+  );
+}
 
 export function LabDashboard(): React.JSX.Element {
   const theme = useTheme();
@@ -99,6 +141,7 @@ export function LabDashboard(): React.JSX.Element {
           ))}
         </Stack>
       </Paper>
+      <PrescriptionFeed />
     </Stack>
   );
 }

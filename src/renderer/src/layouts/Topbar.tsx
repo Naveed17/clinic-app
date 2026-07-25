@@ -126,7 +126,8 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
           <Tabs
             value={activeIndex < 0 ? false : activeIndex}
             onChange={(_, i) => navigate(navItems[i].path)}
-            variant="scrollable"
+            variant={user?.role === 'admin' ? 'scrollable' : 'fullWidth'}
+            centered={user?.role !== 'admin'}
             scrollButtons={false}
 
             sx={{

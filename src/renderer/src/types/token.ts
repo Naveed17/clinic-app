@@ -17,6 +17,7 @@ export interface Token {
   createdAt: string;
   patient: TokenPerson;
   doctor: TokenPerson;
+  prescription: Prescription | null;
 }
 
 export interface TokenInput {
@@ -24,4 +25,28 @@ export interface TokenInput {
   doctorId: string;
   date: string;
   notes?: string | null;
+}
+
+export interface PrescriptionMedicine {
+  name: string;
+  dosage: string;
+  duration: string;
+  instructions: string;
+}
+
+export interface Prescription {
+  id: string;
+  tokenId: string;
+  diagnosis: string;
+  medicines: PrescriptionMedicine[];
+  tests: string[];
+  advice: string;
+  createdAt: string;
+}
+
+export interface PrescriptionInput {
+  diagnosis: string;
+  medicines: PrescriptionMedicine[];
+  tests: string[];
+  advice: string;
 }

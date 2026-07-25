@@ -5,6 +5,7 @@ export interface PatientListInput {
   page: number;
   pageSize: number;
   search: string;
+  providerId?: string;
 }
 
 export interface PatientInput {
@@ -37,21 +38,22 @@ function mapPatientInput(input: PatientInput): Prisma.PatientCreateInput {
   };
 }
 
-export async function listPatients({ page, pageSize, search }: PatientListInput): Promise<{
+export async function listPatients({ page, pageSize, search, providerId }: PatientListInput): Promise<{
   data: Patient[];
   total: number;
 }> {
   const prisma = getPrisma();
-  const where: Prisma.PatientWhereInput = search
-    ? {
-        OR: [
-          { firstName: { contains: search } },
-          { lastName: { contains: search } },
-          { phone: { contains: search } },
-          { email: { contains: search } },
-        ],
-      }
-    : {};
+  const where: Prisma.PatientWhereInput = {
+    ...(providerId ? { appointments: { some: { providerId } } } : {}),
+    ...(search ? {
+      OR: [
+        { firstName: { contains: search } },
+        { lastName: { contains: search } },
+        { phone: { contains: search } },
+        { email: { contains: search } },
+      ],
+    } : {}),
+  };
   const [data, total] = await prisma.$transaction([
     prisma.patient.findMany({
       where,

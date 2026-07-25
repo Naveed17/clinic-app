@@ -1,5 +1,6 @@
 import type { TokenStatus } from '@prisma/client';
 import { getPrisma } from '../database/client';
+import { randomUUID } from 'node:crypto';
 
 export interface TokenInput {
   patientId: string;
@@ -8,17 +9,48 @@ export interface TokenInput {
   notes?: string | null;
 }
 
+export interface PrescriptionInput {
+  diagnosis: string;
+  medicines: { name: string; dosage: string; duration: string; instructions: string }[];
+  tests: string[];
+  advice: string;
+}
+
 const tokenInclude = {
   patient: { select: { id: true, firstName: true, lastName: true } },
   doctor:  { select: { id: true, firstName: true, lastName: true } },
 };
 
+function parseRawToken(_row: Record<string, unknown>) { return _row; } // unused, kept for reference
+
 export async function listTokens(date: string) {
-  return getPrisma().token.findMany({
-    where: { date },
-    include: tokenInclude,
-    orderBy: { tokenNumber: 'asc' },
-  });
+  const db = getPrisma();
+  const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(`
+    SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName,
+           u.id as doctorObjId, u.firstName as doctorFirstName, u.lastName as doctorLastName,
+           pr.id as prescriptionId, pr.diagnosis, pr.medicines, pr.tests, pr.advice,
+           pr.createdAt as prescriptionCreatedAt,
+           CASE WHEN pr.id IS NOT NULL THEN 1 ELSE 0 END as prescriptionRaw
+    FROM "Token" t
+    JOIN "Patient" p ON p.id = t.patientId
+    JOIN "User" u ON u.id = t.doctorId
+    LEFT JOIN "Prescription" pr ON pr.tokenId = t.id
+    WHERE t.date = '${date}'
+    ORDER BY t.tokenNumber ASC
+  `);
+  return rows.map((r) => ({
+    id: r.id, tokenNumber: r.tokenNumber, date: r.date,
+    patientId: r.patientId, doctorId: r.doctorId,
+    status: r.status, notes: r.notes, createdAt: r.createdAt, updatedAt: r.updatedAt,
+    patient: { id: r.patientObjId, firstName: r.patientFirstName, lastName: r.patientLastName },
+    doctor:  { id: r.doctorObjId,  firstName: r.doctorFirstName,  lastName: r.doctorLastName },
+    prescription: r.prescriptionRaw
+      ? { id: r.prescriptionId, tokenId: r.id, diagnosis: r.diagnosis,
+          medicines: JSON.parse(r.medicines as string || '[]'),
+          tests: JSON.parse(r.tests as string || '[]'),
+          advice: r.advice, createdAt: r.prescriptionCreatedAt }
+      : null,
+  }));
 }
 
 export async function listTokenDoctors() {
@@ -43,7 +75,7 @@ export async function createToken(input: TokenInput) {
     select: { tokenNumber: true },
   });
   const tokenNumber = (last?.tokenNumber ?? 0) + 1;
-  return getPrisma().token.create({
+  const token = await getPrisma().token.create({
     data: {
       tokenNumber,
       date: input.date,
@@ -53,14 +85,51 @@ export async function createToken(input: TokenInput) {
     },
     include: tokenInclude,
   });
+  return { ...token, prescription: null };
 }
 
 export async function updateTokenStatus(id: string, status: TokenStatus) {
-  return getPrisma().token.update({
+  const token = await getPrisma().token.update({
     where: { id },
     data: { status },
     include: tokenInclude,
   });
+  const pr = await getPrisma().$queryRawUnsafe<Record<string, unknown>[]>(
+    `SELECT * FROM "Prescription" WHERE tokenId = '${id}' LIMIT 1`
+  );
+  return {
+    ...token,
+    prescription: pr[0]
+      ? { id: pr[0].id, tokenId: id, diagnosis: pr[0].diagnosis,
+          medicines: JSON.parse(pr[0].medicines as string || '[]'),
+          tests: JSON.parse(pr[0].tests as string || '[]'),
+          advice: pr[0].advice, createdAt: pr[0].createdAt }
+      : null,
+  };
+}
+
+export async function upsertPrescription(tokenId: string, input: PrescriptionInput) {
+  const db = getPrisma();
+  const existing = await db.$queryRawUnsafe<{ id: string }[]>(
+    `SELECT id FROM "Prescription" WHERE tokenId = '${tokenId}' LIMIT 1`
+  );
+  const now = new Date().toISOString();
+  const medicines = JSON.stringify(input.medicines);
+  const tests = JSON.stringify(input.tests);
+  if (existing.length > 0) {
+    await db.$executeRawUnsafe(
+      `UPDATE "Prescription" SET diagnosis=?, medicines=?, tests=?, advice=?, updatedAt=? WHERE tokenId=?`,
+      input.diagnosis, medicines, tests, input.advice, now, tokenId
+    );
+    return existing[0].id;
+  } else {
+    const id = randomUUID();
+    await db.$executeRawUnsafe(
+      `INSERT INTO "Prescription" (id, tokenId, diagnosis, medicines, tests, advice, createdAt, updatedAt) VALUES (?,?,?,?,?,?,?,?)`,
+      id, tokenId, input.diagnosis, medicines, tests, input.advice, now, now
+    );
+    return id;
+  }
 }
 
 export async function deleteToken(id: string) {

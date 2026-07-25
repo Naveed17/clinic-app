@@ -39,6 +39,7 @@ import { appointmentsService } from '@/services/appointments.service';
 import { patientsService } from '@/services/patients.service';
 import type { Appointment, AppointmentInput, AppointmentPerson } from '@/types/appointment';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import { useAuth } from '@/features/auth/AuthContext';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
 
@@ -94,11 +95,12 @@ function personLabel(person: AppointmentPerson): string {
   return `${person.firstName} ${person.lastName}`;
 }
 
-function AppointmentDialog({ appointment, open, onClose, defaultDate }: {
+export function AppointmentDialog({ appointment, open, onClose, defaultDate, defaultProviderId }: {
   appointment?: Appointment;
   open: boolean;
   onClose: () => void;
   defaultDate?: string;
+  defaultProviderId?: string;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: empty });
@@ -125,11 +127,12 @@ function AppointmentDialog({ appointment, open, onClose, defaultDate }: {
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
       const startsAt = new Date(`${values.date}T${values.time}:00`);
+      const tzOffset = startsAt.getTimezoneOffset() * 60000;
       const input: AppointmentInput = {
         patientId: values.patientId,
         providerId: values.providerId,
-        startsAt: startsAt.toISOString(),
-        endsAt: new Date(startsAt.getTime() + values.duration * 60000).toISOString(),
+        startsAt: new Date(startsAt.getTime() - tzOffset).toISOString(),
+        endsAt: new Date(startsAt.getTime() - tzOffset + values.duration * 60000).toISOString(),
         reason: values.reason || null,
         notes: values.notes || null,
         recurrenceRule: values.recurring ? `WEEKLY:${values.recurrenceCount}` : null,
@@ -143,8 +146,13 @@ function AppointmentDialog({ appointment, open, onClose, defaultDate }: {
   });
 
   useEffect(() => {
-    if (open) form.reset(appointmentValues(appointment) ?? { ...empty, date: defaultDate ?? empty.date });
-  }, [appointment, defaultDate, form, open]);
+    if (!open) return;
+    if (appointment) {
+      form.reset(appointmentValues(appointment));
+    } else {
+      form.reset({ ...empty, date: defaultDate ?? empty.date, providerId: defaultProviderId ?? empty.providerId });
+    }
+  }, [appointment, defaultDate, defaultProviderId, form, open]);
 
   const { errors } = form.formState;
 
@@ -215,7 +223,7 @@ function AppointmentDialog({ appointment, open, onClose, defaultDate }: {
                     <DatePicker
                       label="Date"
                       value={field.value ? new Date(field.value) : null}
-                      onChange={(value) => field.onChange(value ? value.toISOString().slice(0, 10) : '')}
+                      onChange={(value) => field.onChange(value ? value.toLocaleDateString('en-CA') : '')}
                       slotProps={{
                         textField: {
                           fullWidth: true,
@@ -313,6 +321,7 @@ export function AppointmentsPage(): React.JSX.Element {
   const [defaultDate, setDefaultDate] = useState<string | undefined>();
   const [view, setView] = useState<'table' | 'calendar'>('table');
   const [search, setSearch] = useState('');
+  const { user } = useAuth();
 
   const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const cancelMutation = useMutation({
@@ -325,7 +334,11 @@ export function AppointmentsPage(): React.JSX.Element {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['appointments'] }),
   });
 
-  const filtered = (appointments.data ?? []).filter((a) => {
+  const allData = user?.role === 'doctor'
+    ? (appointments.data ?? []).filter((a) => a.providerId === user.id)
+    : (appointments.data ?? []);
+
+  const filtered = allData.filter((a) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -380,7 +393,7 @@ export function AppointmentsPage(): React.JSX.Element {
             </Stack>
           </Box>
           <AppointmentCalendar
-            appointments={appointments.data ?? []}
+            appointments={allData}
             onStatusChange={(id, status) => statusMutation.mutate({ id, status })}
             onDateClick={(date) => { setActive(undefined); setDefaultDate(date); setOpen(true); }}
             onAppointmentClick={(appt) => { setActive(appt); setOpen(true); }}

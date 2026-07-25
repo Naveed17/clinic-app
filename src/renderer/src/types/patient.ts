@@ -33,4 +33,5 @@ export interface PatientListInput {
   page: number;
   pageSize: number;
   search: string;
+  providerId?: string;
 }

@@ -13,6 +13,7 @@ import { useDeferredValue, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tableSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { patientsService } from '@/services/patients.service';
+import { useAuth } from '@/features/auth/AuthContext';
 import type { Patient } from '@/types/patient';
 import { PatientDialog } from './PatientDialog';
 import { PatientHistoryDialog } from './PatientHistoryDialog';
@@ -20,6 +21,8 @@ import { PatientHistoryDialog } from './PatientHistoryDialog';
 export function PatientsPage(): React.JSX.Element {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isDoctor = user?.role === 'doctor';
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(0);
@@ -30,8 +33,8 @@ export function PatientsPage(): React.JSX.Element {
   const [historyPatient, setHistoryPatient] = useState<Patient | undefined>();
 
   const patientsQuery = useQuery({
-    queryKey: ['patients', { page, rowsPerPage, search: deferredSearch }],
-    queryFn: () => patientsService.list({ page: page + 1, pageSize: rowsPerPage, search: deferredSearch }),
+    queryKey: ['patients', { page, rowsPerPage, search: deferredSearch, providerId: isDoctor ? user?.id : undefined }],
+    queryFn: () => patientsService.list({ page: page + 1, pageSize: rowsPerPage, search: deferredSearch, providerId: isDoctor ? user?.id : undefined }),
     placeholderData: keepPreviousData,
   });
   const deleteMutation = useMutation({

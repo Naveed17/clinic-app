@@ -8,6 +8,7 @@ import {
   listTokenPatients,
   listTokens,
   updateTokenStatus,
+  upsertPrescription,
 } from './token.service';
 import { emitNotification } from '../backend/realtime';
 
@@ -22,4 +23,23 @@ export function registerTokenIpc(io?: SocketIOServer): void {
   });
   ipcMain.handle('tokens:update-status', (_, id: string, status: TokenStatus) => updateTokenStatus(id, status));
   ipcMain.handle('tokens:delete', (_, id: string) => deleteToken(id));
+  ipcMain.handle('tokens:upsert-prescription', async (_, tokenId: string, input) => {
+    const result = await upsertPrescription(tokenId, input);
+    if (io) {
+      const db = (await import('../database/client')).getPrisma();
+      const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(
+        `SELECT t.tokenNumber, p.firstName, p.lastName FROM "Token" t JOIN "Patient" p ON p.id = t.patientId WHERE t.id = '${tokenId}' LIMIT 1`
+      );
+      if (rows[0]) {
+        const r = rows[0];
+        emitNotification(io, {
+          kind: 'success',
+          title: 'Prescription Added',
+          message: `Prescription written for ${r.firstName} ${r.lastName} (Token #${String(r.tokenNumber).padStart(3, '0')}).`,
+          payload: { entity: 'prescription', tokenId },
+        });
+      }
+    }
+    return result;
+  });
 }

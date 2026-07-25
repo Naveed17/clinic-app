@@ -258,6 +258,24 @@ export async function initializeDatabase(): Promise<void> {
     'CREATE INDEX IF NOT EXISTS "DoctorSchedule_doctorId_idx" ON "DoctorSchedule"("doctorId")',
   );
 
+  // Prescription table
+  await database.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "Prescription" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "tokenId" TEXT NOT NULL UNIQUE,
+      "diagnosis" TEXT NOT NULL DEFAULT '',
+      "medicines" TEXT NOT NULL DEFAULT '[]',
+      "tests" TEXT NOT NULL DEFAULT '[]',
+      "advice" TEXT NOT NULL DEFAULT '',
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" DATETIME NOT NULL,
+      FOREIGN KEY ("tokenId") REFERENCES "Token"("id") ON DELETE CASCADE
+    )
+  `);
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Prescription_tokenId_idx" ON "Prescription"("tokenId")',
+  );
+
   const doctor = await database.user.findFirst({ where: { role: 'DOCTOR' } });
   if (!doctor) {
     await database.user.create({

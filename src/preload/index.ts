@@ -239,9 +239,12 @@ const api = {
         () => request(`/api/tokens/${id}`, { method: 'DELETE' }),
         'tokens:delete', id,
       ),
+    upsertPrescription: (tokenId: string, input: unknown) =>
+      ipc('tokens:upsert-prescription', tokenId, input),
   },
   lab: {
     list: () => call(() => request('/api/lab'), 'lab:list'),
+    listByToken: (tokenId: string) => ipc('lab:list-by-token', tokenId),
     patients: () => call(() => request('/api/lab/patients'), 'lab:patients'),
     create: (input: unknown) =>
       call(
