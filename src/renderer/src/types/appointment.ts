@@ -1,4 +1,5 @@
 export interface AppointmentPerson {
+  role: string;
   id: string;
   firstName: string;
   lastName: string;
