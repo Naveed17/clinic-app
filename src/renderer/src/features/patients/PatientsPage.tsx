@@ -23,6 +23,7 @@ export function PatientsPage(): React.JSX.Element {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isDoctor = user?.role === 'doctor';
+  const isLabTech = user?.role === 'lab_technician';
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(0);
@@ -69,11 +70,14 @@ export function PatientsPage(): React.JSX.Element {
       <TablePageShell
         title="Patients"
         subtitle="Manage patient records and contact details."
-        action={
-          <Button onClick={openCreate} startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }}>
-            Add patient
-          </Button>
-        }
+        {...(!isLabTech && {
+          action: (
+            <Button onClick={openCreate} startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }}>
+              Add patient
+            </Button>
+          )
+        })}
+
         toolbar={
           <SearchField
             value={search}
