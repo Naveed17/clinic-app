@@ -163,6 +163,13 @@ export async function initializeDatabase(): Promise<void> {
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "LabOrder_status_idx" ON "LabOrder"("status")',
   );
+  
+   const labOrderCols = (await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(LabOrder)')).map(r => r.name);
+  
+   if (!labOrderCols.includes('tokenId')) {
+    await database.$executeRawUnsafe('ALTER TABLE "LabOrder" ADD COLUMN "tokenId" TEXT');
+    await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "LabOrder_tokenId_idx" ON "LabOrder"("tokenId")');
+  }
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "PatientDocument" (
       "id" TEXT NOT NULL PRIMARY KEY,
