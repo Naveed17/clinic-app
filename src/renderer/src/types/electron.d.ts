@@ -15,6 +15,7 @@ declare global {
         delete: (id: string) => Promise<void>;
       };
       tokens: {
+        getForPatient: (patientId: string, date: string) => Promise<Token | null>;
         upsertPrescription: any;
         list: (date: string) => Promise<Token[]>;
         doctors: () => Promise<TokenPerson[]>;
@@ -99,7 +100,7 @@ declare global {
         listByToken: any;
         list: () => Promise<LabOrder[]>;
         patients: () => Promise<{ id: string; firstName: string; lastName: string }[]>;
-        create: (input: { patientId: string; orderedById: string; test: string; notes?: string }) => Promise<LabOrder>;
+        create: (input: { patientId: string; orderedById: string; test: string; tokenId?: string; notes?: string }) => Promise<LabOrder>;
         updateStatus: (id: string, status: string) => Promise<LabOrder>;
         saveResult: (id: string, result: string) => Promise<LabOrder>;
       };

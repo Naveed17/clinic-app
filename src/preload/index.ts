@@ -20,12 +20,10 @@ const settingsReady = ipcRenderer
 
 let socket: Socket | undefined;
 
-function getAuthContext(): { userId?: string; role?: string } {
+function getAuthContext(): { token?: string } {
   try {
-    const raw = window.localStorage.getItem('clinic-auth-user');
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as { id?: string; role?: string };
-    return { userId: parsed.id, role: parsed.role };
+    const token = window.localStorage.getItem('clinic-auth-token');
+    return token ? { token } : {};
   } catch {
     return {};
   }
@@ -43,15 +41,19 @@ function toQueryString(input: unknown): string {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   await settingsReady;
+  const { token } = getAuthContext();
   const response = await fetch(`${apiUrl}${path}`, {
     headers: {
       'Content-Type': 'application/json',
-      ...(getAuthContext().userId ? { 'X-User-Id': getAuthContext().userId } : {}),
-      ...(getAuthContext().role ? { 'X-User-Role': getAuthContext().role } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
     ...init,
   });
+  if (response.status === 401) {
+    window.dispatchEvent(new CustomEvent('clinic:session-expired'));
+    throw new Error('Session expired.');
+  }
   if (!response.ok) {
     const message = await response.text();
     throw new Error(message || `Request failed with status ${response.status}.`);
@@ -270,11 +272,8 @@ const api = {
   realtime: {
     connect: () => {
       const activeSocket = ensureSocket();
-      const auth = getAuthContext();
-      activeSocket.auth = {
-        ...(auth.userId ? { userId: auth.userId } : {}),
-        ...(auth.role ? { role: auth.role } : {}),
-      };
+      const { token } = getAuthContext();
+      activeSocket.auth = token ? { token } : {};
       if (!activeSocket.connected) activeSocket.connect();
       return Promise.resolve();
     },
@@ -332,7 +331,7 @@ const api = {
     login: async (email: string, password: string) => {
       await settingsReady;
       if (isLanClient) {
-        return request<{ id: string; name: string; email: string; role: string; avatar: string } | null>(
+        return request<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | null>(
           '/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }
         ).catch(() => null);
       }

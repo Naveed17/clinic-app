@@ -1,5 +1,6 @@
 import type { Server as SocketIOServer } from 'socket.io';
 import type { Express } from 'express';
+import { authenticate } from '../middleware/auth';
 import { createTokensRouter } from './tokens.routes';
 import { createLabRouter } from './lab.routes';
 import { createAuthRouter } from './auth.routes';
@@ -12,9 +13,10 @@ import { createReportsRouter } from './reports.routes';
 import { createScheduleRouter } from './schedule.routes';
 
 export function registerRoutes(app: Express, io: SocketIOServer): void {
+  app.use('/api/auth', createAuthRouter());
+  app.use(authenticate);
   app.use('/api/tokens', createTokensRouter(io));
   app.use('/api/lab', createLabRouter(io));
-  app.use('/api/auth', createAuthRouter());
   app.use('/api/patients', createPatientsRouter(io));
   app.use('/api/appointments', createAppointmentsRouter(io));
   app.use('/api/invoices', createInvoicesRouter(io));

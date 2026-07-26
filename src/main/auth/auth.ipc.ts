@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import { getPrisma } from '../database/client';
+import { signToken } from '../backend/middleware/auth';
 
 export function registerAuthIpc(): void {
   ipcMain.handle('auth:login', async (_e, email: string, password: string) => {
@@ -20,11 +21,14 @@ export function registerAuthIpc(): void {
     if (!user || !user.isActive) return null;
     const valid = bcrypt.compareSync(password, user.passwordHash);
     if (!valid) return null;
+    const role = user.role.toLowerCase() as import('../backend/types').AppRole;
+    const token = signToken({ userId: user.id, role });
     return {
+      token,
       id: user.id,
       name: `${user.firstName} ${user.lastName}`.trim(),
       email: user.email,
-      role: user.role.toLowerCase() as string,
+      role,
       avatar: `${user.firstName[0]}${user.lastName[0]}`.toUpperCase(),
     };
   });

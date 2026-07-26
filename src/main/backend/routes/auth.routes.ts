@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getPrisma } from '../../database/client';
 import { asyncHandler } from '../utils/async-handler';
+import { signToken } from '../middleware/auth';
 
 export function createAuthRouter(): Router {
   const router = Router();
@@ -22,11 +23,14 @@ export function createAuthRouter(): Router {
       res.status(401).json({ error: 'Invalid email or password.' });
       return;
     }
+    const role = user.role.toLowerCase() as import('../types').AppRole;
+    const token = signToken({ userId: user.id, role });
     res.json({
+      token,
       id: user.id,
       name: `${user.firstName} ${user.lastName}`.trim(),
       email: user.email,
-      role: user.role.toLowerCase(),
+      role,
       avatar: `${user.firstName[0]}${user.lastName[0]}`.toUpperCase(),
     });
   }));

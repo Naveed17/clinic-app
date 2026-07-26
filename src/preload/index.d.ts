@@ -40,6 +40,46 @@ declare global {
         update: (id: string, input: unknown) => Promise<unknown>;
         delete: (id: string) => Promise<unknown>;
       };
+      tokens: {
+        getForPatient: (patientId: string, date: string) => Promise<unknown>;
+        list: (date: string) => Promise<unknown>;
+        doctors: () => Promise<unknown>;
+        patients: () => Promise<unknown>;
+        create: (input: unknown) => Promise<unknown>;
+        updateStatus: (id: string, status: string) => Promise<unknown>;
+        delete: (id: string) => Promise<unknown>;
+        upsertPrescription: (tokenId: string, input: unknown) => Promise<unknown>;
+      };
+      lab: {
+        list: () => Promise<unknown>;
+        listByToken: (tokenId: string) => Promise<unknown>;
+        patients: () => Promise<unknown>;
+        create: (input: unknown) => Promise<unknown>;
+        updateStatus: (id: string, status: string) => Promise<unknown>;
+        saveResult: (id: string, result: string) => Promise<unknown>;
+      };
+      backup: {
+        create: () => Promise<unknown>;
+        restore: () => Promise<unknown>;
+      };
+      docs: {
+        patient: {
+          list: (patientId: string) => Promise<unknown>;
+          upload: (patientId: string) => Promise<unknown>;
+          delete: (id: string) => Promise<unknown>;
+          open: (id: string) => Promise<unknown>;
+        };
+        lab: {
+          list: (labOrderId: string) => Promise<unknown>;
+          upload: (labOrderId: string) => Promise<unknown>;
+          delete: (id: string) => Promise<unknown>;
+          open: (id: string) => Promise<unknown>;
+        };
+      };
+      schedule: {
+        get: (doctorId: string) => Promise<unknown>;
+        upsert: (doctorId: string, slots: unknown[]) => Promise<unknown>;
+      };
       realtime: {
         connect: () => Promise<void>;
         disconnect: () => void;
@@ -58,7 +98,7 @@ declare global {
         onServerFound: (handler: (server: { ip: string; port: number; name: string }) => void) => () => void;
       };
       auth: {
-        login: (email: string, password: string) => Promise<{ id: string; name: string; email: string; role: string; avatar: string } | null>;
+        login: (email: string, password: string) => Promise<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | null>;
         changePassword: (userId: string, current: string, next: string) => Promise<{ ok: boolean; error?: string }>;
       };
       print: {
