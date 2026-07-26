@@ -31,6 +31,7 @@ import { registerBackupIpc } from './backup/backup.ipc';
 import { registerDocumentsIpc } from './backup/documents.ipc';
 import { registerTokenIpc } from './tokens/token.ipc';
 import { registerLabIpc } from './lab/lab.ipc';
+import { registerLicenseIpc } from './license/license.ipc';
 import { registerAuthIpc } from './auth/auth.ipc';
 import { registerScheduleIpc } from './doctors/schedule.ipc';
 import { seedDefaultAdmin } from './auth/seed';
@@ -115,6 +116,7 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.error('Backend initialization failed:', error);
   }
+  registerLicenseIpc();
   registerBackupIpc();
   registerDocumentsIpc();
   registerTokenIpc(backendServer?.io);

@@ -3,6 +3,7 @@ import type { Server as SocketIOServer } from 'socket.io';
 import {
   cancelAppointment,
   createAppointment,
+  deleteAppointment,
   listAppointmentPatients,
   listAppointments,
   listDoctors,
@@ -46,13 +47,10 @@ export function createAppointmentsRouter(io: SocketIOServer): Router {
     requireRole(['admin', 'doctor', 'receptionist']),
     asyncHandler(async (req, res) => {
       const appointment = await createAppointment(req.body as AppointmentInput);
-      emitNotification(io, {
-        kind: 'success',
-        title: 'Appointment created',
-        message: 'A new appointment was scheduled.',
-        payload: { entity: 'appointment', id: appointment.id },
-      });
-      emitDataChange(io, 'appointment', 'created');
+      if (appointment) {
+        emitNotification(io, { kind: 'success', title: 'Appointment created', message: 'A new appointment was scheduled.', payload: { entity: 'appointment', id: appointment.id } });
+        emitDataChange(io, 'appointment', 'created');
+      }
       res.status(201).json(appointment);
     }),
   );
@@ -62,13 +60,10 @@ export function createAppointmentsRouter(io: SocketIOServer): Router {
     requireRole(['admin', 'doctor', 'receptionist']),
     asyncHandler(async (req, res) => {
       const appointment = await updateAppointment(String(req.params.id), req.body as AppointmentInput);
-      emitNotification(io, {
-        kind: 'info',
-        title: 'Appointment updated',
-        message: 'An appointment was updated.',
-        payload: { entity: 'appointment', id: appointment.id },
-      });
-      emitDataChange(io, 'appointment', 'updated');
+      if (appointment) {
+        emitNotification(io, { kind: 'info', title: 'Appointment updated', message: 'An appointment was updated.', payload: { entity: 'appointment', id: appointment.id } });
+        emitDataChange(io, 'appointment', 'updated');
+      }
       res.json(appointment);
     }),
   );
@@ -81,13 +76,10 @@ export function createAppointmentsRouter(io: SocketIOServer): Router {
         String(req.params.id),
         String((req.body as { status: string }).status) as Parameters<typeof updateAppointmentStatus>[1],
       );
-      emitNotification(io, {
-        kind: 'info',
-        title: 'Appointment updated',
-        message: `Appointment status changed to ${appointment.status}.`,
-        payload: { entity: 'appointment', id: appointment.id },
-      });
-      emitDataChange(io, 'appointment', 'updated');
+      if (appointment) {
+        emitNotification(io, { kind: 'info', title: 'Appointment updated', message: `Appointment status changed to ${appointment.status}.`, payload: { entity: 'appointment', id: appointment.id } });
+        emitDataChange(io, 'appointment', 'updated');
+      }
       res.json(appointment);
     }),
   );
@@ -97,14 +89,21 @@ export function createAppointmentsRouter(io: SocketIOServer): Router {
     requireRole(['admin', 'doctor', 'receptionist']),
     asyncHandler(async (req, res) => {
       const appointment = await cancelAppointment(String(req.params.id));
-      emitNotification(io, {
-        kind: 'warning',
-        title: 'Appointment cancelled',
-        message: 'An appointment was cancelled.',
-        payload: { entity: 'appointment', id: appointment.id },
-      });
-      emitDataChange(io, 'appointment', 'deleted');
+      if (appointment) {
+        emitNotification(io, { kind: 'warning', title: 'Appointment cancelled', message: 'An appointment was cancelled.', payload: { entity: 'appointment', id: appointment.id } });
+        emitDataChange(io, 'appointment', 'deleted');
+      }
       res.json(appointment);
+    }),
+  );
+
+  router.delete(
+    '/:id',
+    requireRole(['admin', 'receptionist']),
+    asyncHandler(async (req, res) => {
+      await deleteAppointment(String(req.params.id));
+      emitDataChange(io, 'appointment', 'deleted');
+      res.status(204).end();
     }),
   );
 

@@ -35,6 +35,7 @@ import { useMemo, useEffect, useState } from 'react';
 import { Document, Page, Text, View, StyleSheet, pdf, Font } from '@react-pdf/renderer';
 import type { Token, TokenInput, TokenPerson, TokenStatus, PrescriptionInput, PrescriptionMedicine } from '@/types/token';
 import { useAuth } from '@/features/auth/AuthContext';
+import { appointmentsService } from '@/services/appointments.service';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
   WAITING:     { label: 'Waiting',     color: 'warning' },
@@ -59,12 +60,14 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   const [patientId, setPatientId] = useState(defaultPatientId ?? '');
   const [doctorId, setDoctorId] = useState(defaultDoctorId ?? '');
   const [notes, setNotes] = useState('');
+  const [reason, setReason] = useState('');
 
   useEffect(() => {
     if (open) {
       setPatientId(defaultPatientId ?? '');
       setDoctorId(defaultDoctorId ?? '');
       setNotes('');
+      setReason('');
     }
   }, [open, defaultPatientId, defaultDoctorId]);
 
@@ -83,10 +86,24 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   );
 
   const mutation = useMutation({
-    mutationFn: () => window.clinic.tokens.create({ patientId, doctorId, date, notes }),
+    mutationFn: () => window.clinic.tokens.create({ patientId, doctorId, date, notes, reason }),
     onSuccess: async (token: Token) => {
+      // Auto-create appointment linked to this token
+      const tokenTime = new Date(token.createdAt);
+      const startsAt = tokenTime.toISOString();
+      const endsAt = new Date(tokenTime.getTime() + 30 * 60000).toISOString();
+      await appointmentsService.create({
+        patientId,
+        providerId: doctorId,
+        startsAt,
+        endsAt,
+        reason: reason || null,
+        notes: notes || null,
+        recurrenceRule: null,
+      });
       await qc.invalidateQueries({ queryKey: ['tokens'] });
-      setPatientId(''); setDoctorId(''); setNotes('');
+      await qc.invalidateQueries({ queryKey: ['appointments'] });
+      setPatientId(''); setDoctorId(''); setNotes(''); setReason('');
       onClose();
       onSuccess?.(token);
     },
@@ -112,6 +129,18 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
               {doctors.map((d) => (
                 <MenuItem key={d.id} value={d.id}>Dr. {d.firstName} {d.lastName}</MenuItem>
               ))}
+            </Select>
+          </FormControl>
+          <FormControl fullWidth>
+            <InputLabel>Reason (optional)</InputLabel>
+            <Select label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)}>
+              <MenuItem value="">— None —</MenuItem>
+              <MenuItem value="Checkup">Checkup</MenuItem>
+              <MenuItem value="Follow-up">Follow-up</MenuItem>
+              <MenuItem value="Urgent">Urgent</MenuItem>
+              <MenuItem value="Consultation">Consultation</MenuItem>
+              <MenuItem value="Lab Results">Lab Results</MenuItem>
+              <MenuItem value="Vaccination">Vaccination</MenuItem>
             </Select>
           </FormControl>
           <TextField
@@ -186,6 +215,7 @@ function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone }: {
         <View style={ts.row}><Text style={ts.lbl}>Date</Text><Text style={ts.val}>{date}</Text></View>
         <View style={ts.row}><Text style={ts.lbl}>Time</Text><Text style={ts.val}>{time}</Text></View>
         {token.notes ? <View style={ts.row}><Text style={ts.lbl}>Note</Text><Text style={ts.val}>{token.notes}</Text></View> : null}
+        {token.reason ? <View style={ts.row}><Text style={ts.lbl}>Reason</Text><Text style={ts.val}>{token.reason}</Text></View> : null}
         {pr && (
           <>
             <Text style={ts.stars}>{STAR_LINE}</Text>
@@ -495,8 +525,10 @@ export function TokensPage(): React.JSX.Element {
               <Typography variant="body2" color="text.secondary">
                 Dr. {currentToken.doctor.firstName} {currentToken.doctor.lastName}
               </Typography>
-              {currentToken.notes && (
-                <Typography variant="caption" color="text.secondary">{currentToken.notes}</Typography>
+              {(currentToken.reason || currentToken.notes) && (
+                <Typography variant="caption" color="text.secondary">
+                  {[currentToken.reason, currentToken.notes].filter(Boolean).join(' · ')}
+                </Typography>
               )}
             </Box>
             <Chip
@@ -578,6 +610,7 @@ export function TokensPage(): React.JSX.Element {
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       Dr. {token.doctor.firstName} {token.doctor.lastName}
+                      {token.reason ? ` · ${token.reason}` : ''}
                       {token.notes ? ` · ${token.notes}` : ''}
                     </Typography>
                   </Box>

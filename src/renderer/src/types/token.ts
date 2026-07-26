@@ -14,6 +14,7 @@ export interface Token {
   doctorId: string;
   status: TokenStatus;
   notes: string | null;
+  reason: string | null;
   createdAt: string;
   patient: TokenPerson;
   doctor: TokenPerson;
@@ -25,6 +26,7 @@ export interface TokenInput {
   doctorId: string;
   date: string;
   notes?: string | null;
+  reason?: string | null;
 }
 
 export interface PrescriptionMedicine {

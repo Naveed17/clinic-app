@@ -7,6 +7,7 @@ export interface TokenInput {
   doctorId: string;
   date: string;
   notes?: string | null;
+  reason?: string | null;
 }
 
 export interface PrescriptionInput {
@@ -41,7 +42,7 @@ export async function listTokens(date: string) {
   return rows.map((r) => ({
     id: r.id, tokenNumber: r.tokenNumber, date: r.date,
     patientId: r.patientId, doctorId: r.doctorId,
-    status: r.status, notes: r.notes, createdAt: r.createdAt, updatedAt: r.updatedAt,
+    status: r.status, notes: r.notes, reason: r.reason, createdAt: r.createdAt, updatedAt: r.updatedAt,
     patient: { id: r.patientObjId, firstName: r.patientFirstName, lastName: r.patientLastName },
     doctor:  { id: r.doctorObjId,  firstName: r.doctorFirstName,  lastName: r.doctorLastName },
     prescription: r.prescriptionRaw
@@ -87,6 +88,7 @@ export async function createToken(input: TokenInput) {
       patientId: input.patientId,
       doctorId: input.doctorId,
       notes: input.notes?.trim() ?? null,
+      reason: input.reason?.trim() ?? null,
     },
     include: tokenInclude,
   });
@@ -157,7 +159,7 @@ export async function getTokenForPatient(patientId: string, date: string) {
   return {
     id: r.id, tokenNumber: r.tokenNumber, date: r.date,
     patientId: r.patientId, doctorId: r.doctorId,
-    status: r.status, notes: r.notes, createdAt: r.createdAt, updatedAt: r.updatedAt,
+    status: r.status, notes: r.notes, reason: r.reason, createdAt: r.createdAt, updatedAt: r.updatedAt,
     patient: { id: r.patientObjId, firstName: r.patientFirstName, lastName: r.patientLastName },
     doctor:  { id: r.doctorObjId,  firstName: r.doctorFirstName,  lastName: r.doctorLastName },
     prescription: r.prescriptionRaw
@@ -170,5 +172,14 @@ export async function getTokenForPatient(patientId: string, date: string) {
 }
 
 export async function deleteToken(id: string) {
-  return getPrisma().token.delete({ where: { id } });
+  const db = getPrisma();
+  const token = await db.token.findUnique({ where: { id }, select: { patientId: true, doctorId: true, date: true } });
+  if (token) {
+    const dayStart = new Date(`${token.date}T00:00:00.000Z`);
+    const dayEnd   = new Date(`${token.date}T23:59:59.999Z`);
+    await db.appointment.deleteMany({
+      where: { patientId: token.patientId, providerId: token.doctorId, startsAt: { gte: dayStart, lte: dayEnd } },
+    });
+  }
+  return db.token.delete({ where: { id } });
 }

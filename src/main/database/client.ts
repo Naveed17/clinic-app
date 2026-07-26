@@ -221,6 +221,7 @@ export async function initializeDatabase(): Promise<void> {
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Payment_invoiceId_paidAt_idx" ON "Payment"("invoiceId", "paidAt")',
   );
+  // Token Table Creation with "reason"
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Token" (
       "id" TEXT NOT NULL PRIMARY KEY,
@@ -230,6 +231,7 @@ export async function initializeDatabase(): Promise<void> {
       "doctorId" TEXT NOT NULL,
       "status" TEXT NOT NULL DEFAULT 'WAITING',
       "notes" TEXT,
+      "reason" TEXT,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" DATETIME NOT NULL,
       FOREIGN KEY ("patientId") REFERENCES "Patient"("id") ON DELETE RESTRICT,
@@ -245,6 +247,12 @@ export async function initializeDatabase(): Promise<void> {
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Token_patientId_idx" ON "Token"("patientId")',
   );
+
+  // Runtime Migration for existing installations (CRUCIAL FIX)
+  const tokenCols = (await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Token)')).map(r => r.name);
+  if (!tokenCols.includes('reason')) {
+    await database.$executeRawUnsafe('ALTER TABLE "Token" ADD COLUMN "reason" TEXT');
+  }
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "DoctorSchedule" (
       "id" TEXT NOT NULL PRIMARY KEY,

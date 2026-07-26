@@ -1,4 +1,4 @@
-import type { AppointmentStatus, Prisma } from '@prisma/client';
+import type { AppointmentStatus } from '@prisma/client';
 import { getPrisma } from '../database/client';
 
 export interface AppointmentInput {
@@ -8,7 +8,8 @@ export interface AppointmentInput {
   endsAt: string;
   reason?: string | null;
   notes?: string | null;
-  recurrenceRule?: string | null; // e.g. "WEEKLY:4"
+  recurrenceRule?: string | null;
+  tokenId?: string | null;
 }
 
 function parseDate(value: unknown, name: string): Date {
@@ -18,7 +19,7 @@ function parseDate(value: unknown, name: string): Date {
   return d;
 }
 
-function toData(input: AppointmentInput): Prisma.AppointmentUncheckedCreateInput {
+function toData(input: AppointmentInput) {
   return {
     patientId: input.patientId,
     providerId: input.providerId,
@@ -30,15 +31,31 @@ function toData(input: AppointmentInput): Prisma.AppointmentUncheckedCreateInput
   };
 }
 
-const appointmentInclude = { patient: true, provider: true } satisfies Prisma.AppointmentInclude;
-
-export async function listAppointments(): Promise<
-  Prisma.AppointmentGetPayload<{ include: typeof appointmentInclude }>[]
-> {
-  return getPrisma().appointment.findMany({
-    include: appointmentInclude,
-    orderBy: { startsAt: 'asc' },
-  });
+export async function listAppointments() {
+  const db = getPrisma();
+  const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(`
+    SELECT a.id, a.patientId, a.providerId, a.startsAt, a.endsAt, a.status,
+      a.reason, a.notes, a.recurrenceRule, a.parentId,
+      pat.id as patId, pat.firstName as patFirst, pat.lastName as patLast, pat.phone as patPhone,
+      prov.id as provId, prov.firstName as provFirst, prov.lastName as provLast, prov.role as provRole,
+      (
+        SELECT t.tokenNumber FROM "Token" t
+        WHERE t.patientId = a.patientId AND t.doctorId = a.providerId
+        ORDER BY t.createdAt DESC LIMIT 1
+      ) as tokenNumber
+    FROM "Appointment" a
+    JOIN "Patient" pat ON pat.id = a.patientId
+    JOIN "User" prov ON prov.id = a.providerId
+    ORDER BY a.startsAt ASC
+  `);
+  return rows.map((r) => ({
+    id: r.id, patientId: r.patientId, providerId: r.providerId,
+    startsAt: r.startsAt, endsAt: r.endsAt, status: r.status,
+    reason: r.reason, notes: r.notes, recurrenceRule: r.recurrenceRule, parentId: r.parentId,
+    tokenNumber: r.tokenNumber ?? null,
+    patient: { id: r.patId, firstName: r.patFirst, lastName: r.patLast, role: '', phone: r.patPhone ?? null },
+    provider: { id: r.provId, firstName: r.provFirst, lastName: r.provLast, role: r.provRole },
+  }));
 }
 
 export async function listAppointmentPatients() {
@@ -56,10 +73,35 @@ export async function listDoctors() {
   });
 }
 
-export async function createAppointment(input: AppointmentInput) {
-  const first = await getPrisma().appointment.create({ data: toData(input), include: appointmentInclude });
+async function getAppointmentById(id: string) {
+  const db = getPrisma();
+  const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(`
+    SELECT a.id, a.patientId, a.providerId, a.startsAt, a.endsAt, a.status,
+      a.reason, a.notes, a.recurrenceRule, a.parentId,
+      pat.id as patId, pat.firstName as patFirst, pat.lastName as patLast, pat.phone as patPhone,
+      prov.id as provId, prov.firstName as provFirst, prov.lastName as provLast, prov.role as provRole,
+      (SELECT t.tokenNumber FROM "Token" t WHERE t.patientId = a.patientId AND t.doctorId = a.providerId ORDER BY t.createdAt DESC LIMIT 1) as tokenNumber
+    FROM "Appointment" a
+    JOIN "Patient" pat ON pat.id = a.patientId
+    JOIN "User" prov ON prov.id = a.providerId
+    WHERE a.id = '${id}'
+    LIMIT 1
+  `);
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.id, patientId: r.patientId, providerId: r.providerId,
+    startsAt: r.startsAt, endsAt: r.endsAt, status: r.status,
+    reason: r.reason, notes: r.notes, recurrenceRule: r.recurrenceRule, parentId: r.parentId,
+    tokenNumber: r.tokenNumber ?? null,
+    patient: { id: r.patId, firstName: r.patFirst, lastName: r.patLast, role: '', phone: r.patPhone ?? null },
+    provider: { id: r.provId, firstName: r.provFirst, lastName: r.provLast, role: r.provRole },
+  };
+}
 
-  // Handle recurrence
+export async function createAppointment(input: AppointmentInput) {
+  const first = await getPrisma().appointment.create({ data: toData(input) });
+
   if (input.recurrenceRule) {
     const [freq, countStr] = input.recurrenceRule.split(':');
     const count = parseInt(countStr ?? '1', 10);
@@ -73,35 +115,29 @@ export async function createAppointment(input: AppointmentInput) {
             parentId: first.id,
             recurrenceRule: null,
           },
-          include: appointmentInclude,
         });
       }
     }
   }
 
-  return first;
+  return getAppointmentById(first.id);
 }
 
 export async function updateAppointment(id: string, input: AppointmentInput) {
-  return getPrisma().appointment.update({
-    where: { id },
-    data: toData(input),
-    include: appointmentInclude,
-  });
+  await getPrisma().appointment.update({ where: { id }, data: toData(input) });
+  return getAppointmentById(id);
 }
 
 export async function cancelAppointment(id: string) {
-  return getPrisma().appointment.update({
-    where: { id },
-    data: { status: 'CANCELLED' satisfies AppointmentStatus },
-    include: appointmentInclude,
-  });
+  await getPrisma().appointment.update({ where: { id }, data: { status: 'CANCELLED' satisfies AppointmentStatus } });
+  return getAppointmentById(id);
 }
 
 export async function updateAppointmentStatus(id: string, status: AppointmentStatus) {
-  return getPrisma().appointment.update({
-    where: { id },
-    data: { status },
-    include: appointmentInclude,
-  });
+  await getPrisma().appointment.update({ where: { id }, data: { status } });
+  return getAppointmentById(id);
+}
+
+export async function deleteAppointment(id: string) {
+  return getPrisma().appointment.delete({ where: { id } });
 }

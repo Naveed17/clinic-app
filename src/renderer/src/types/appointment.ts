@@ -3,6 +3,7 @@ export interface AppointmentPerson {
   id: string;
   firstName: string;
   lastName: string;
+  phone?: string | null;
 }
 
 export interface Appointment {
@@ -16,6 +17,7 @@ export interface Appointment {
   notes: string | null;
   recurrenceRule: string | null;
   parentId: string | null;
+  tokenNumber: number | null;
   patient: AppointmentPerson;
   provider: AppointmentPerson;
 }
@@ -28,4 +30,5 @@ export interface AppointmentInput {
   reason?: string | null;
   notes?: string | null;
   recurrenceRule?: string | null;
+  tokenId?: string | null;
 }

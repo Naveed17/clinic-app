@@ -18,7 +18,8 @@ function RealtimeBootstrap({ children }: PropsWithChildren): React.JSX.Element {
 export function AppProviders({ children }: PropsWithChildren): React.JSX.Element {
   const [mode, setMode] = useState<ColorMode>(() => {
     const savedMode = window.localStorage.getItem('clinic-color-mode');
-    return savedMode === 'dark' ? 'dark' : 'light';
+    if (savedMode === 'dark' || savedMode === 'light') return savedMode;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
   const [queryClient] = useState(
     () =>

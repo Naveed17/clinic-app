@@ -16,6 +16,8 @@ import { TokensPage } from '@/features/tokens/TokensPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { RouteAccessGate } from '@/components/RouteAccessGate';
+import { LicensePage } from '@/features/auth/LicensePage';
+import { useState, useEffect } from 'react';
 
 const router = createHashRouter([
   { path: '/login', element: <LoginPage /> },
@@ -130,5 +132,14 @@ const router = createHashRouter([
 ]);
 
 export function AppRouter(): React.JSX.Element {
+  const [licensed, setLicensed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    window.clinic.license.status().then((ok) => setLicensed(ok));
+  }, []);
+
+  if (licensed === null) return <></>;
+  if (!licensed) return <LicensePage onActivated={() => setLicensed(true)} />;
+
   return <RouterProvider router={router} />;
 }

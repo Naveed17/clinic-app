@@ -11,6 +11,7 @@ export const appointmentsService = {
   create: (input: AppointmentInput) => clinic.appointments.create(input),
   update: (id: string, input: AppointmentInput) => clinic.appointments.update(id, input),
   updateStatus: (id: string, status: Appointment['status']) => clinic.appointments.updateStatus(id, status),
+  delete: (id: string) => clinic.appointments.delete(id),
   cancel: (id: string) => clinic.appointments.cancel(id),
 };
 

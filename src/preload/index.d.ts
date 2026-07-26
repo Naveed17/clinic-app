@@ -18,6 +18,7 @@ declare global {
         update: (id: string, input: unknown) => Promise<unknown>;
         updateStatus: (id: string, status: string) => Promise<unknown>;
         cancel: (id: string) => Promise<unknown>;
+        delete: (id: string) => Promise<unknown>;
       };
       invoices: {
         list: () => Promise<unknown>;
@@ -103,6 +104,10 @@ declare global {
       };
       print: {
         html: (html: string) => Promise<void>;
+      };
+      license: {
+        status: () => Promise<boolean>;
+        activate: (key: string) => Promise<{ ok: boolean; error?: string }>;
       };
     };
   }

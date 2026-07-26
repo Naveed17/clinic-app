@@ -1,3 +1,4 @@
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -38,6 +39,7 @@ import { AppointmentCalendar } from '@/components/AppointmentCalendar';
 import { appointmentsService } from '@/services/appointments.service';
 import { patientsService } from '@/services/patients.service';
 import type { Appointment, AppointmentInput, AppointmentPerson } from '@/types/appointment';
+import type { Token } from '@/types/token';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -51,21 +53,23 @@ const statusConfig: Record<string, { label: string; color: 'default' | 'primary'
   NO_SHOW: { label: 'No Show', color: 'error', hex: '#d32f2f' },
 };
 
-const schema = z.object({
-  patientId: z.string().min(1, 'Select a patient.'),
-  providerId: z.string().min(1, 'Select a doctor.'),
-  date: z.string().min(1, 'Select a date.'),
-  time: z.string().min(1, 'Select a time.'),
-  duration: z.number().min(15).max(240),
-  reason: z.string(),
-  notes: z.string(),
-  recurring: z.boolean(),
-  recurrenceCount: z.number().min(2).max(52),
-});
-type FormValues = z.infer<typeof schema>;
+type FormValues = {
+  patientId: string;
+  providerId: string;
+  tokenId: string;
+  date: string;
+  time: string;
+  duration: number;
+  reason: string;
+  notes: string;
+  recurring: boolean;
+  recurrenceCount: number;
+};
+
 const empty: FormValues = {
   patientId: '',
   providerId: '',
+  tokenId: '',
   date: new Date().toISOString().slice(0, 10),
   time: '09:00',
   duration: 30,
@@ -81,6 +85,7 @@ function appointmentValues(appointment?: Appointment): FormValues {
   return {
     patientId: appointment.patientId,
     providerId: appointment.providerId,
+    tokenId: '',
     date: startsAt.toLocaleDateString('en-CA'),
     time: startsAt.toTimeString().slice(0, 5),
     duration: Math.max(15, Math.round((new Date(appointment.endsAt).getTime() - startsAt.getTime()) / 60000)),
@@ -95,6 +100,54 @@ function personLabel(person: AppointmentPerson): string {
   return `${person.firstName} ${person.lastName}`;
 }
 
+function IssueTokenInline({ patientId, date, providerId, onIssued }: {
+  patientId: string;
+  date: string;
+  providerId: string;
+  onIssued: (token: Token) => void;
+}) {
+  const qc = useQueryClient();
+  const [reason, setReason] = useState('');
+  const mutation = useMutation({
+    mutationFn: () =>
+      window.clinic.tokens.create({ patientId, doctorId: providerId, date, reason: reason || null }) as Promise<Token>,
+    onSuccess: (token) => {
+      void qc.invalidateQueries({ queryKey: ['token-for-patient', patientId, date] });
+      void qc.invalidateQueries({ queryKey: ['tokens'] });
+      onIssued(token);
+    },
+  });
+  return (
+    <Box sx={{ mt: 1.5, p: 1.5, border: '1px dashed', borderColor: 'warning.main', borderRadius: 2, bgcolor: 'warning.50' }}>
+      <Typography variant="caption" color="warning.dark" fontWeight={600} sx={{ mb: 1, display: 'block' }}>
+        No token found — issue one now
+      </Typography>
+      <Stack direction="row" spacing={1}>
+        <TextField
+          select size="small" label="Reason (optional)" value={reason}
+          onChange={(e) => setReason(e.target.value)} sx={{ flex: 1 }}
+        >
+          <MenuItem value="">— None —</MenuItem>
+          <MenuItem value="Checkup">Checkup</MenuItem>
+          <MenuItem value="Follow-up">Follow-up</MenuItem>
+          <MenuItem value="Urgent">Urgent</MenuItem>
+          <MenuItem value="Consultation">Consultation</MenuItem>
+          <MenuItem value="Lab Results">Lab Results</MenuItem>
+          <MenuItem value="Vaccination">Vaccination</MenuItem>
+        </TextField>
+        <Button
+          variant="contained" color="warning" size="small"
+          disabled={!providerId || mutation.isPending}
+          onClick={() => mutation.mutate()}
+        >
+          Issue Token
+        </Button>
+      </Stack>
+      {mutation.isError && <Typography variant="caption" color="error">Failed to issue token.</Typography>}
+    </Box>
+  );
+}
+
 export function AppointmentDialog({ appointment, open, onClose, defaultDate, defaultProviderId }: {
   appointment?: Appointment;
   open: boolean;
@@ -103,6 +156,20 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   defaultProviderId?: string;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
+  const isEdit = !!appointment;
+  const schema = z.object({
+    patientId: z.string().min(1, 'Select a patient.'),
+    providerId: z.string().min(1, 'Select a doctor.'),
+    tokenId: isEdit ? z.string() : z.string().min(1, 'Token is required. Please issue a token first.'),
+    date: z.string().min(1, 'Select a date.'),
+    time: z.string().min(1, 'Select a time.'),
+    duration: z.number().min(15).max(240),
+    reason: z.string(),
+    notes: z.string(),
+    recurring: z.boolean(),
+    recurrenceCount: z.number().min(2).max(52),
+  });
+  type FormValues = z.infer<typeof schema>;
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: empty });
   const patients = useQuery({
     queryKey: ['patients', { page: 1, pageSize: 1000 }],
@@ -124,6 +191,19 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   }
   const patientOptions = asArray<AppointmentPerson>(patients.data);
   const doctorOptions = asArray<AppointmentPerson>(doctors.data);
+  const patientId = form.watch('patientId');
+  const date = form.watch('date');
+
+  const { data: tokenForPatient } = useQuery<Token | null>({
+    queryKey: ['token-for-patient', patientId, date],
+    queryFn: () => window.clinic.tokens.getForPatient(patientId, date) as Promise<Token | null>,
+    enabled: !appointment && !!patientId && !!date,
+  });
+
+  useEffect(() => {
+    if (!appointment) form.setValue('tokenId', tokenForPatient?.id ?? '');
+  }, [tokenForPatient, appointment, form]);
+
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
       const startsAt = new Date(`${values.date}T${values.time}:00`);
@@ -131,6 +211,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
       const input: AppointmentInput = {
         patientId: values.patientId,
         providerId: values.providerId,
+        tokenId: values.tokenId || null,
         startsAt: new Date(startsAt.getTime() - tzOffset).toISOString(),
         endsAt: new Date(startsAt.getTime() - tzOffset + values.duration * 60000).toISOString(),
         reason: values.reason || null,
@@ -213,6 +294,24 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
                 />
               )}
             />
+
+            {!appointment && (
+              <Box>
+                <TextField
+                  label="Token"
+                  fullWidth
+                  value={tokenForPatient ? `#${String(tokenForPatient.tokenNumber).padStart(3, '0')} — ${tokenForPatient.patient.firstName} ${tokenForPatient.patient.lastName}` : ''}
+                  placeholder={patientId && date ? 'No token found for this patient on selected date' : 'Select patient and date first'}
+                  InputProps={{ readOnly: true }}
+                  error={!!form.formState.errors.tokenId}
+                  helperText={form.formState.errors.tokenId?.message ?? (tokenForPatient ? 'Token auto-linked' : '')}
+                  color={tokenForPatient ? 'success' : undefined}
+                />
+                {patientId && date && !tokenForPatient && (
+                  <IssueTokenInline patientId={patientId} date={date} providerId={form.watch('providerId')} onIssued={(t) => form.setValue('tokenId', t.id)} />
+                )}
+              </Box>
+            )}
 
             <LocalizationProvider dateAdapter={AdapterDateFns}>
               <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
@@ -330,6 +429,10 @@ export function AppointmentsPage(): React.JSX.Element {
     mutationFn: appointmentsService.cancel,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['appointments'] }),
   });
+  const deleteMutation = useMutation({
+    mutationFn: appointmentsService.delete,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['appointments'] }),
+  });
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       appointmentsService.updateStatus(id, status as Appointment['status']),
@@ -339,7 +442,7 @@ export function AppointmentsPage(): React.JSX.Element {
   const allData = user?.role === 'doctor'
     ? (appointments.data ?? []).filter((a) => a.providerId === user.id)
     : (appointments.data ?? []);
-
+  console.log('allData', allData);
   const filtered = allData.filter((a) => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -350,6 +453,7 @@ export function AppointmentsPage(): React.JSX.Element {
     );
   });
   const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
 
   const viewToggle = (
     <ToggleButtonGroup
@@ -424,6 +528,7 @@ export function AppointmentsPage(): React.JSX.Element {
             <TableRow>
               <TableCell>Patient</TableCell>
               <TableCell>Doctor</TableCell>
+              <TableCell>Token</TableCell>
               <TableCell>Time</TableCell>
               <TableCell>Duration</TableCell>
               <TableCell>Status</TableCell>
@@ -433,9 +538,9 @@ export function AppointmentsPage(): React.JSX.Element {
           </TableHead>
           <TableBody>
             {appointments.isLoading ? (
-              <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>Loading appointments...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>Loading appointments...</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No appointments scheduled.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No appointments scheduled.</TableCell></TableRow>
             ) : (
               paginated.map((a) => (
                 <TableRow key={a.id} sx={tableSx.row}>
@@ -447,7 +552,7 @@ export function AppointmentsPage(): React.JSX.Element {
                       <Box>
                         <Typography fontSize={13.5} fontWeight={600}>{personLabel(a.patient)}</Typography>
                         <Typography fontSize={11.5} color="text.secondary">
-                          {new Date(a.startsAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} · {Math.round((new Date(a.endsAt).getTime() - new Date(a.startsAt).getTime()) / 60000)} min
+                          {a.patient.phone ?? '—'}
                         </Typography>
                       </Box>
                     </Box>
@@ -462,6 +567,11 @@ export function AppointmentsPage(): React.JSX.Element {
                         <Typography fontSize={11.5} color="text.secondary">{a.provider.role ?? 'Doctor'}</Typography>
                       </Box>
                     </Box>
+                  </TableCell>
+                  <TableCell>
+                    {a.tokenNumber ? (
+                      <Chip label={`#${String(a.tokenNumber).padStart(3, '0')}`} size="small" color="primary" variant="outlined" sx={{ fontWeight: 700, fontFamily: 'monospace' }} />
+                    ) : '—'}
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     {new Date(a.startsAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -492,6 +602,7 @@ export function AppointmentsPage(): React.JSX.Element {
                       {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
                         <Tooltip title="Cancel"><IconButton sx={actionBtnSx} onClick={() => cancelMutation.mutate(a.id)}><CancelOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                       )}
+                      <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => deleteMutation.mutate(a.id)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                     </Stack>
                   </TableCell>
                 </TableRow>

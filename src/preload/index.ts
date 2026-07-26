@@ -130,6 +130,11 @@ const api = {
         () => request(`/api/appointments/${id}/cancel`, { method: 'POST' }),
         'appointments:cancel', id,
       ),
+    delete: (id: string) =>
+      call(
+        () => request(`/api/appointments/${id}`, { method: 'DELETE' }),
+        'appointments:delete', id,
+      ),
   },
   invoices: {
     list: () => call(() => request('/api/invoices'), 'invoices:list'),
@@ -326,6 +331,10 @@ const api = {
   },
   print: {
     html: (html: string) => ipc('print:html', html),
+  },
+  license: {
+    status: () => ipc('license:status'),
+    activate: (key: string) => ipc('license:activate', key),
   },
   auth: {
     login: async (email: string, password: string) => {
