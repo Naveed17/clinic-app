@@ -293,10 +293,10 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
               <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>{user?.role}</Typography>
             </Box>
             <Divider />
-            <MenuItem onClick={() => { setAvatarAnchor(null); setPwDialogOpen(true); }}>
+            <MenuItem onClick={() => { setAvatarAnchor(null); setPwDialogOpen(true); }} sx={{ fontSize: 14, }}>
               <LockOutlinedIcon fontSize="small" sx={{ mr: 1 }} /> Change Password
             </MenuItem>
-            <MenuItem onClick={() => { setAvatarAnchor(null); handleLogout(); }} sx={{ color: 'error.main' }}>
+            <MenuItem onClick={() => { setAvatarAnchor(null); handleLogout(); }} sx={{ color: 'error.main', fontSize: 14, }}>
               <LogoutOutlinedIcon fontSize="small" sx={{ mr: 1 }} /> Logout
             </MenuItem>
           </Menu>
