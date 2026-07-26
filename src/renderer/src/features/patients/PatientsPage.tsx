@@ -86,6 +86,16 @@ export function PatientsPage(): React.JSX.Element {
             sx={{ flex: 1, maxWidth: 360 }}
           />
         }
+        pager={
+          (patientsQuery.data?.total ?? 0) > rowsPerPage ? (
+            <TablePager
+              page={page}
+              rowsPerPage={rowsPerPage}
+              total={patientsQuery.data?.total ?? 0}
+              onPageChange={setPage}
+            />
+          ) : undefined
+        }
         error={patientsQuery.isError && (
           <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load patients.</Alert>
         )}
@@ -214,13 +224,6 @@ export function PatientsPage(): React.JSX.Element {
           )}
         </TableBody>
       </TablePageShell>
-
-      <TablePager
-        page={page}
-        rowsPerPage={rowsPerPage}
-        total={patientsQuery.data?.total ?? 0}
-        onPageChange={setPage}
-      />
 
       <PatientDialog open={isDialogOpen} patient={dialogPatient} onClose={() => setDialogOpen(false)} />
       {historyPatient && <PatientHistoryDialog patient={historyPatient} onClose={() => setHistoryPatient(undefined)} />}

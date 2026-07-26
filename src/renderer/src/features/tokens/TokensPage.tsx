@@ -31,7 +31,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { Document, Page, Text, View, StyleSheet, pdf, Font } from '@react-pdf/renderer';
 import type { Token, TokenInput, TokenPerson, TokenStatus, PrescriptionInput, PrescriptionMedicine } from '@/types/token';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -47,27 +47,48 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function IssueTokenDialog({ open, onClose, date }: { open: boolean; onClose: () => void; date: string }) {
+export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaultDoctorId, onSuccess }: {
+  open: boolean;
+  onClose: () => void;
+  date: string;
+  defaultPatientId?: string;
+  defaultDoctorId?: string;
+  onSuccess?: (token: Token) => void;
+}) {
   const qc = useQueryClient();
-  const [form, setForm] = useState<TokenInput>({ patientId: '', doctorId: '', date, notes: '' });
+  const [patientId, setPatientId] = useState(defaultPatientId ?? '');
+  const [doctorId, setDoctorId] = useState(defaultDoctorId ?? '');
+  const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setPatientId(defaultPatientId ?? '');
+      setDoctorId(defaultDoctorId ?? '');
+      setNotes('');
+    }
+  }, [open, defaultPatientId, defaultDoctorId]);
 
   const { data: patients = [] } = useQuery<TokenPerson[]>({
     queryKey: ['token-patients'],
     queryFn: () => window.clinic.tokens.patients(),
-    enabled: open,
   });
   const { data: doctors = [] } = useQuery<TokenPerson[]>({
     queryKey: ['token-doctors'],
     queryFn: () => window.clinic.tokens.doctors(),
-    enabled: open,
   });
 
+  const selectedPatient = useMemo(
+    () => patients.find((p) => p.id === patientId) ?? null,
+    [patients, patientId]
+  );
+
   const mutation = useMutation({
-    mutationFn: () => window.clinic.tokens.create({ ...form, date }),
-    onSuccess: async () => {
+    mutationFn: () => window.clinic.tokens.create({ patientId, doctorId, date, notes }),
+    onSuccess: async (token: Token) => {
       await qc.invalidateQueries({ queryKey: ['tokens'] });
-      setForm({ patientId: '', doctorId: '', date, notes: '' });
+      setPatientId(''); setDoctorId(''); setNotes('');
       onClose();
+      onSuccess?.(token);
     },
   });
 
@@ -80,12 +101,14 @@ export function IssueTokenDialog({ open, onClose, date }: { open: boolean; onClo
           <Autocomplete
             options={patients}
             getOptionLabel={(p) => `${p.firstName} ${p.lastName}`}
-            onChange={(_, v) => setForm((f) => ({ ...f, patientId: v?.id ?? '' }))}
+            value={selectedPatient}
+            onChange={(_, v) => setPatientId(v?.id ?? '')}
+            isOptionEqualToValue={(o, v) => o.id === v.id}
             renderInput={(params) => <TextField {...params} label="Patient" fullWidth />}
           />
           <FormControl fullWidth>
             <InputLabel>Doctor</InputLabel>
-            <Select label="Doctor" value={form.doctorId} onChange={(e) => setForm((f) => ({ ...f, doctorId: e.target.value }))}>
+            <Select label="Doctor" value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
               {doctors.map((d) => (
                 <MenuItem key={d.id} value={d.id}>Dr. {d.firstName} {d.lastName}</MenuItem>
               ))}
@@ -94,8 +117,8 @@ export function IssueTokenDialog({ open, onClose, date }: { open: boolean; onClo
           <TextField
             label="Notes (optional)"
             fullWidth
-            value={form.notes ?? ''}
-            onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
           />
         </Stack>
       </DialogContent>
@@ -103,7 +126,7 @@ export function IssueTokenDialog({ open, onClose, date }: { open: boolean; onClo
         <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="contained"
-          disabled={!form.patientId || !form.doctorId || mutation.isPending}
+          disabled={!patientId || !doctorId || mutation.isPending}
           onClick={() => mutation.mutate()}
         >
           Issue Token

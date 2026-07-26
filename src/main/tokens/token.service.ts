@@ -69,6 +69,11 @@ export async function listTokenPatients() {
 }
 
 export async function createToken(input: TokenInput) {
+  const existing = await getPrisma().token.findFirst({
+    where: { patientId: input.patientId, date: input.date },
+    include: tokenInclude,
+  });
+  if (existing) return { ...existing, prescription: null };
   const last = await getPrisma().token.findFirst({
     where: { date: input.date, doctorId: input.doctorId },
     orderBy: { tokenNumber: 'desc' },
@@ -130,6 +135,38 @@ export async function upsertPrescription(tokenId: string, input: PrescriptionInp
     );
     return id;
   }
+}
+
+export async function getTokenForPatient(patientId: string, date: string) {
+  const db = getPrisma();
+  const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(`
+    SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName,
+           u.id as doctorObjId, u.firstName as doctorFirstName, u.lastName as doctorLastName,
+           pr.id as prescriptionId, pr.diagnosis, pr.medicines, pr.tests, pr.advice,
+           pr.createdAt as prescriptionCreatedAt,
+           CASE WHEN pr.id IS NOT NULL THEN 1 ELSE 0 END as prescriptionRaw
+    FROM "Token" t
+    JOIN "Patient" p ON p.id = t.patientId
+    JOIN "User" u ON u.id = t.doctorId
+    LEFT JOIN "Prescription" pr ON pr.tokenId = t.id
+    WHERE t.patientId = '${patientId}' AND t.date = '${date}'
+    LIMIT 1
+  `);
+  if (!rows[0]) return null;
+  const r = rows[0];
+  return {
+    id: r.id, tokenNumber: r.tokenNumber, date: r.date,
+    patientId: r.patientId, doctorId: r.doctorId,
+    status: r.status, notes: r.notes, createdAt: r.createdAt, updatedAt: r.updatedAt,
+    patient: { id: r.patientObjId, firstName: r.patientFirstName, lastName: r.patientLastName },
+    doctor:  { id: r.doctorObjId,  firstName: r.doctorFirstName,  lastName: r.doctorLastName },
+    prescription: r.prescriptionRaw
+      ? { id: r.prescriptionId, tokenId: r.id, diagnosis: r.diagnosis,
+          medicines: JSON.parse(r.medicines as string || '[]'),
+          tests: JSON.parse(r.tests as string || '[]'),
+          advice: r.advice, createdAt: r.prescriptionCreatedAt }
+      : null,
+  };
 }
 
 export async function deleteToken(id: string) {

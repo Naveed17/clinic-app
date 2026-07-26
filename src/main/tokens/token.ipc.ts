@@ -4,6 +4,7 @@ import type { TokenStatus } from '@prisma/client';
 import {
   createToken,
   deleteToken,
+  getTokenForPatient,
   listTokenDoctors,
   listTokenPatients,
   listTokens,
@@ -13,6 +14,9 @@ import {
 import { emitNotification } from '../backend/realtime';
 
 export function registerTokenIpc(io?: SocketIOServer): void {
+  ipcMain.handle('tokens:get-for-patient', (_, patientId: string, date: string) =>
+    getTokenForPatient(patientId, date)
+  );
   ipcMain.handle('tokens:list', (_, date: string) => listTokens(date));
   ipcMain.handle('tokens:doctors', () => listTokenDoctors());
   ipcMain.handle('tokens:patients', () => listTokenPatients());

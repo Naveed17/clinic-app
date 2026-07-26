@@ -193,7 +193,7 @@ export function DoctorsPage(): React.JSX.Element {
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage] = useState(10);
   const [dialogDoctor, setDialogDoctor] = useState<Doctor | undefined>();
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [deleteDoctor, setDeleteDoctor] = useState<Doctor | undefined>();
@@ -218,6 +218,11 @@ export function DoctorsPage(): React.JSX.Element {
           <Button onClick={() => { setDialogDoctor(undefined); setDialogOpen(true); }} startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }}>Add doctor</Button>
         }
         toolbar={<SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Search by name, email, or specialization" sx={{ flex: 1, maxWidth: 360 }} />}
+        pager={
+          (doctorsQuery.data?.total ?? 0) > rowsPerPage ? (
+            <TablePager page={page} rowsPerPage={rowsPerPage} total={doctorsQuery.data?.total ?? 0} onPageChange={setPage} />
+          ) : undefined
+        }
         error={doctorsQuery.isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load doctors.</Alert>}
       >
         <TableHead sx={tableSx.head}>
@@ -280,7 +285,6 @@ export function DoctorsPage(): React.JSX.Element {
           )}
         </TableBody>
       </TablePageShell>
-      <TablePager page={page} rowsPerPage={rowsPerPage} total={doctorsQuery.data?.total ?? 0} onPageChange={setPage} />
       <DoctorDialog open={isDialogOpen} doctor={dialogDoctor} onClose={() => setDialogOpen(false)} />
       <Dialog open={Boolean(deleteDoctor)} onClose={() => setDeleteDoctor(undefined)}>
         <DialogTitle>Delete doctor?</DialogTitle>

@@ -31,7 +31,7 @@ import { useEffect, useState } from 'react';
 import { invoicesService } from '@/services/invoices.service';
 import type { Invoice, InvoiceInput, InvoicePerson, Payment } from '@/types/invoice';
 import { InvoicePrintPreview } from './InvoicePrintPreview';
-import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 
 const statusConfig: Record<string, { label: string; color: 'default' | 'warning' | 'info' | 'success' | 'error' }> = {
   DRAFT:          { label: 'Draft',    color: 'default' },
@@ -243,6 +243,8 @@ export function InvoicesPage(): React.JSX.Element {
   const [historyInvoice, setHistoryInvoice] = useState<Invoice | undefined>();
   const [voidInvoice, setVoidInvoice] = useState<Invoice | undefined>();
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const rowsPerPage = 10;
   const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list });
 
   const filtered = (invoices.data ?? []).filter((inv) => {
@@ -253,6 +255,7 @@ export function InvoicesPage(): React.JSX.Element {
       `${inv.patient.firstName} ${inv.patient.lastName}`.toLowerCase().includes(q)
     );
   });
+  const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
     <>
@@ -262,7 +265,12 @@ export function InvoicesPage(): React.JSX.Element {
         action={
           <Button onClick={() => setOpen(true)} startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }}>Create invoice</Button>
         }
-        toolbar={<SearchField value={search} onChange={setSearch} placeholder="Search invoice or patient..." sx={{ flex: 1, maxWidth: 360 }} />}
+        toolbar={<SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Search invoice or patient..." sx={{ flex: 1, maxWidth: 360 }} />}
+        pager={
+          filtered.length > rowsPerPage ? (
+            <TablePager page={page} rowsPerPage={rowsPerPage} total={filtered.length} onPageChange={setPage} />
+          ) : undefined
+        }
         error={invoices.isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load invoices.</Alert>}
       >
         <TableHead sx={tableSx.head}>
@@ -282,7 +290,7 @@ export function InvoicesPage(): React.JSX.Element {
           ) : filtered.length === 0 ? (
             <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No invoices created.</TableCell></TableRow>
           ) : (
-            filtered.map((invoice) => {
+            paginated.map((invoice) => {
               const cfg = statusConfig[invoice.status] ?? { label: invoice.status, color: 'default' as const };
               const isPaid = invoice.status === 'PAID' || invoice.status === 'VOID';
               return (

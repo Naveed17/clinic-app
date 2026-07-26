@@ -237,7 +237,7 @@ export function UsersPage(): React.JSX.Element {
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage] = useState(10);
   const [dialogUser, setDialogUser] = useState<User | undefined>();
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [deleteUser, setDeleteUser] = useState<User | undefined>();
@@ -262,6 +262,11 @@ export function UsersPage(): React.JSX.Element {
           <Button onClick={() => { setDialogUser(undefined); setDialogOpen(true); }} startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }}>Add user</Button>
         }
         toolbar={<SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Search by name or email" sx={{ flex: 1, maxWidth: 360 }} />}
+        pager={
+          (usersQuery.data?.total ?? 0) > rowsPerPage ? (
+            <TablePager page={page} rowsPerPage={rowsPerPage} total={usersQuery.data?.total ?? 0} onPageChange={setPage} />
+          ) : undefined
+        }
         error={usersQuery.isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load users.</Alert>}
       >
         <TableHead sx={tableSx.head}>
@@ -323,7 +328,6 @@ export function UsersPage(): React.JSX.Element {
           )}
         </TableBody>
       </TablePageShell>
-      <TablePager page={page} rowsPerPage={rowsPerPage} total={usersQuery.data?.total ?? 0} onPageChange={setPage} />
       <UserDialog open={isDialogOpen} user={dialogUser} onClose={() => setDialogOpen(false)} />
       <Dialog open={Boolean(deleteUser)} onClose={() => setDeleteUser(undefined)}>
         <DialogTitle>Delete user?</DialogTitle>

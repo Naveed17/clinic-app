@@ -25,7 +25,7 @@ export const tableSx = {
       py: 1.5,
       px: 2,
       borderBottom: 'none',
-      bgcolor: 'transparent',
+      bgcolor: 'background.paper',
       whiteSpace: 'nowrap',
     },
   },
@@ -91,10 +91,11 @@ interface TablePageShellProps {
   toolbar?: ReactNode;
   children: ReactNode;
   error?: ReactNode;
+  pager?: ReactNode;
   sx?: SxProps<Theme>;
 }
 
-export function TablePageShell({ title, subtitle, action, toolbar, children, error, sx }: TablePageShellProps): React.JSX.Element {
+export function TablePageShell({ title, subtitle, action, toolbar, children, error, pager, sx }: TablePageShellProps): React.JSX.Element {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, ...sx }}>
       <Box sx={{ display: 'flex', alignItems: { sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between' }}>
@@ -125,11 +126,16 @@ export function TablePageShell({ title, subtitle, action, toolbar, children, err
           </Box>
         )}
         {error}
-        <TableContainer sx={{ px: 1.5, pb: 1.5 }}>
-          <Table sx={{ borderCollapse: 'separate', borderSpacing: '0 2px', '& tbody tr:last-child td': { borderBottom: 0 } }}>
+        <TableContainer sx={{ px: 1.5, pb: 1.5, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
+          <Table stickyHeader sx={{ borderCollapse: 'separate', borderSpacing: '0 2px', '& tbody tr:last-child td': { borderBottom: 0 } }}>
             {children}
           </Table>
         </TableContainer>
+        {pager && (
+          <Box sx={{ borderTop: '1px solid', borderTopColor: 'divider' }}>
+            {pager}
+          </Box>
+        )}
       </Paper>
     </Box>
   );
@@ -176,7 +182,7 @@ interface TablePagerProps {
 export function TablePager({ page, rowsPerPage, total, onPageChange }: TablePagerProps): React.JSX.Element {
   const totalPages = Math.max(1, Math.ceil(total / rowsPerPage));
   const currentPage = page + 1;
-  if (totalPages <= 1) return <></>;
+  if (total === 0) return <></>;
   return (
     <Box
       className="TablePager-root"

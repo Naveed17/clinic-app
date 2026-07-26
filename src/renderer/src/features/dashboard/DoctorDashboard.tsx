@@ -16,7 +16,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { appointmentsService } from '@/services/appointments.service';
 import { AppointmentDialog } from '@/features/appointments/AppointmentsPage';
 import { AppointmentCalendar } from '@/components/AppointmentCalendar';
-import { PrescriptionDialog, TokenPrintPreview } from '@/features/tokens/TokensPage';
+import { PrescriptionDialog, TokenPrintPreview, IssueTokenDialog } from '@/features/tokens/TokensPage';
 import type { Token } from '@/types/token';
 import type { Appointment } from '@/types/appointment';
 
@@ -41,7 +41,9 @@ export function DoctorDashboard(): React.JSX.Element {
 
   const [prescriptionToken, setPrescriptionToken] = useState<Token | null>(null);
   const [printToken, setPrintToken] = useState<Token | null>(null);
-  const [noTokenWarning, setNoTokenWarning] = useState(false);
+  const [noTokenPatient, setNoTokenPatient] = useState<{ patientId: string; patientName: string } | null>(null);
+  const [issueTokenOpen, setIssueTokenOpen] = useState(false);
+  const [issueTokenPatientId, setIssueTokenPatientId] = useState<string | undefined>();
   const [apptDialogOpen, setApptDialogOpen] = useState(false);
   const [editAppt, setEditAppt] = useState<Appointment | undefined>();
   const [contextDate, setContextDate] = useState<string | undefined>();
@@ -51,17 +53,13 @@ export function DoctorDashboard(): React.JSX.Element {
   const { data: raw = [] } = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const appointments = (raw as Appointment[]).filter((a) => a.providerId === user?.id);
 
-  const { data: todayTokens = [] } = useQuery<Token[]>({
-    queryKey: ['tokens', new Date().toLocaleDateString('en-CA')],
-    queryFn: () => window.clinic.tokens.list(new Date().toLocaleDateString('en-CA')),
-    refetchInterval: 15_000,
-    select: (all) => all.filter((t) => t.doctorId === user?.id),
-  });
-
-  function openPrescription(appt: Appointment) {
+  async function openPrescription(appt: Appointment) {
     const apptDate = new Date(appt.startsAt).toLocaleDateString('en-CA');
-    const token = todayTokens.find((t) => t.patientId === appt.patientId && t.date === apptDate);
-    if (!token) { setNoTokenWarning(true); return; }
+    const token = await window.clinic.tokens.getForPatient(appt.patientId, apptDate);
+    if (!token) {
+      setNoTokenPatient({ patientId: appt.patientId, patientName: `${appt.patient.firstName} ${appt.patient.lastName}` });
+      return;
+    }
     setPrescriptionToken(token);
   }
 
@@ -242,20 +240,32 @@ export function DoctorDashboard(): React.JSX.Element {
       {printToken && <TokenPrintPreview token={printToken} onClose={() => setPrintToken(null)} />}
 
       {/* No token warning */}
-      <Dialog open={noTokenWarning} onClose={() => setNoTokenWarning(false)} maxWidth="xs" fullWidth>
+      <Dialog open={Boolean(noTokenPatient)} onClose={() => setNoTokenPatient(null)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <WarningAmberOutlinedIcon color="warning" />
           Token Not Found
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            No token has been generated for this patient today. Please ask the receptionist to generate a token first before writing a prescription.
+            No token has been generated for <strong>{noTokenPatient?.patientName}</strong> today. You can issue one now or ask the receptionist.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button variant="contained" onClick={() => setNoTokenWarning(false)}>OK</Button>
+          <Button onClick={() => setNoTokenPatient(null)}>Cancel</Button>
+          <Button variant="contained" onClick={() => { setIssueTokenPatientId(noTokenPatient?.patientId); setIssueTokenOpen(true); setNoTokenPatient(null); }}>
+            Issue Token
+          </Button>
         </DialogActions>
       </Dialog>
+
+      <IssueTokenDialog
+        open={issueTokenOpen}
+        onClose={() => setIssueTokenOpen(false)}
+        date={new Date().toLocaleDateString('en-CA')}
+        defaultPatientId={issueTokenPatientId}
+        defaultDoctorId={user?.id}
+        onSuccess={(token) => setPrescriptionToken(token)}
+      />
 
       {/* Appointment right-click menu */}
       <Menu

@@ -38,7 +38,7 @@ import { AppointmentCalendar } from '@/components/AppointmentCalendar';
 import { appointmentsService } from '@/services/appointments.service';
 import { patientsService } from '@/services/patients.service';
 import type { Appointment, AppointmentInput, AppointmentPerson } from '@/types/appointment';
-import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
@@ -321,6 +321,8 @@ export function AppointmentsPage(): React.JSX.Element {
   const [defaultDate, setDefaultDate] = useState<string | undefined>();
   const [view, setView] = useState<'table' | 'calendar'>('table');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const rowsPerPage = 10;
   const { user } = useAuth();
 
   const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
@@ -347,6 +349,7 @@ export function AppointmentsPage(): React.JSX.Element {
       (a.reason ?? '').toLowerCase().includes(q)
     );
   });
+  const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   const viewToggle = (
     <ToggleButtonGroup
@@ -409,7 +412,12 @@ export function AppointmentsPage(): React.JSX.Element {
               <Button startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }} onClick={() => { setActive(undefined); setDefaultDate(undefined); setOpen(true); }}>Create appointment</Button>
             </Stack>
           }
-          toolbar={<SearchField value={search} onChange={setSearch} placeholder="Search patient, doctor, reason..." sx={{ flex: 1, maxWidth: 360 }} />}
+          toolbar={<SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Search patient, doctor, reason..." sx={{ flex: 1, maxWidth: 360 }} />}
+          pager={
+            filtered.length > rowsPerPage ? (
+              <TablePager page={page} rowsPerPage={rowsPerPage} total={filtered.length} onPageChange={setPage} />
+            ) : undefined
+          }
           error={appointments.isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load appointments.</Alert>}
         >
           <TableHead sx={tableSx.head}>
@@ -429,7 +437,7 @@ export function AppointmentsPage(): React.JSX.Element {
             ) : filtered.length === 0 ? (
               <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No appointments scheduled.</TableCell></TableRow>
             ) : (
-              filtered.map((a) => (
+              paginated.map((a) => (
                 <TableRow key={a.id} sx={tableSx.row}>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>

@@ -33,7 +33,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
 import type { LabOrder, LabOrderStatus } from '@/types/lab';
-import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { LabReportPrint } from './LabReportPrint';
 
 const LAB_TESTS = [
@@ -59,6 +59,8 @@ export function LabPage(): React.JSX.Element {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [tokenSearch, setTokenSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const rowsPerPage = 10;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [resultDialog, setResultDialog] = useState<LabOrder | null>(null);
   const [printOrder, setPrintOrder] = useState<LabOrder | null>(null);
@@ -132,6 +134,7 @@ export function LabPage(): React.JSX.Element {
     const matchToken = !tokenSearch.trim() || String(order.tokenNumber ?? '').includes(tokenSearch.trim());
     return matchSearch && matchStatus && matchToken;
   });
+  const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   const pending = orders.filter((o) => o.status === 'PENDING').length;
   const inProgress = orders.filter((o) => o.status === 'IN_PROGRESS').length;
@@ -149,7 +152,7 @@ export function LabPage(): React.JSX.Element {
         }
         toolbar={
           <>
-            <SearchField value={search} onChange={setSearch} placeholder="Search by patient or test" sx={{ flex: 1, maxWidth: 260 }} />
+            <SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Search by patient or test" sx={{ flex: 1, maxWidth: 260 }} />
             <TextField
               size="small"
               placeholder="Token #"
@@ -179,6 +182,11 @@ export function LabPage(): React.JSX.Element {
           </>
         }
         error={isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Failed to load lab orders.</Alert>}
+        pager={
+          filtered.length > rowsPerPage ? (
+            <TablePager page={page} rowsPerPage={rowsPerPage} total={filtered.length} onPageChange={setPage} />
+          ) : undefined
+        }
       >
         <TableHead sx={tableSx.head}>
           <TableRow>
@@ -198,7 +206,7 @@ export function LabPage(): React.JSX.Element {
           ) : filtered.length === 0 ? (
             <TableRow><TableCell colSpan={8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No lab orders found.</TableCell></TableRow>
           ) : (
-            filtered.map((order) => (
+            paginated.map((order) => (
               <TableRow key={order.id} sx={tableSx.row}>
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>

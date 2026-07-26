@@ -217,6 +217,11 @@ const api = {
     },
   },
   tokens: {
+    getForPatient: (patientId: string, date: string) =>
+      call(
+        () => request(`/api/tokens/for-patient?patientId=${patientId}&date=${date}`),
+        'tokens:get-for-patient', patientId, date,
+      ),
     list: (date: string) =>
       call(
         () => request(`/api/tokens?date=${date}`),
