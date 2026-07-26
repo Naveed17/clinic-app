@@ -8,6 +8,7 @@ import type { LabOrder } from './lab';
 declare global {
   interface Window {
     clinic: {
+      license: any;
       patients: {
         list: (input: PatientListInput) => Promise<{ data: Patient[]; total: number }>;
         create: (input: PatientInput) => Promise<Patient>;

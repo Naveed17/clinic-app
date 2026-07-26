@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import type { Server as SocketIOServer } from 'socket.io';
 import type { TokenStatus } from '@prisma/client';
+import { getPrisma } from '../database/client'; 
 import {
   createToken,
   deleteToken,
@@ -22,18 +23,33 @@ export function registerTokenIpc(io?: SocketIOServer): void {
   ipcMain.handle('tokens:patients', () => listTokenPatients());
   ipcMain.handle('tokens:create', async (_, input) => {
     const token = await createToken(input);
-    if (io) emitNotification(io, { kind: 'success', title: 'Token issued', message: `Token #${String(token.tokenNumber).padStart(3, '0')} issued for ${token.patient.firstName} ${token.patient.lastName}.`, payload: { entity: 'token', id: token.id } });
+    if (io)
+      emitNotification(io, {
+        kind: 'success',
+        title: 'Token issued',
+        message: `Token #${String(token.tokenNumber).padStart(3, '0')} issued for ${token.patient.firstName} ${token.patient.lastName}.`,
+        payload: { entity: 'token', id: token.id },
+      });
     return token;
   });
-  ipcMain.handle('tokens:update-status', (_, id: string, status: TokenStatus) => updateTokenStatus(id, status));
+  ipcMain.handle('tokens:update-status', (_, id: string, status: TokenStatus) =>
+    updateTokenStatus(id, status)
+  );
   ipcMain.handle('tokens:delete', (_, id: string) => deleteToken(id));
   ipcMain.handle('tokens:upsert-prescription', async (_, tokenId: string, input) => {
     const result = await upsertPrescription(tokenId, input);
     if (io) {
-      const db = (await import('../database/client')).getPrisma();
-      const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(
-        `SELECT t.tokenNumber, p.firstName, p.lastName FROM "Token" t JOIN "Patient" p ON p.id = t.patientId WHERE t.id = '${tokenId}' LIMIT 1`
-      );
+      const db = getPrisma();
+      const rows = await db.$queryRaw<
+        Array<{ tokenNumber: number; firstName: string; lastName: string }>
+      >`
+        SELECT t.tokenNumber, p.firstName, p.lastName 
+        FROM "Token" t 
+        JOIN "Patient" p ON p.id = t.patientId 
+        WHERE t.id = ${tokenId} 
+        LIMIT 1
+      `; 
+
       if (rows[0]) {
         const r = rows[0];
         emitNotification(io, {

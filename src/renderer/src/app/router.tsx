@@ -135,7 +135,7 @@ export function AppRouter(): React.JSX.Element {
   const [licensed, setLicensed] = useState<boolean | null>(null);
 
   useEffect(() => {
-    window.clinic.license.status().then((ok) => setLicensed(ok));
+    window.clinic.license.status().then((ok: boolean | ((prevState: boolean | null) => boolean | null) | null) => setLicensed(ok));
   }, []);
 
   if (licensed === null) return <></>;

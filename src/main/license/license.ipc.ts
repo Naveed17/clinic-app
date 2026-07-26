@@ -5,9 +5,12 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 // Add your valid license keys here (plain text — they are hashed at runtime)
 const VALID_KEYS = [
-  'CARE-1234-ABCD-5678',
-  'CARE-9999-WXYZ-0001',
-];
+  'CLINIC-9F8A-3E2B-7C4D-1A09',
+  'CLINIC-K82M-P7X9-W3Q1-V6Y4',
+  'CLINIC-E5T2-9A8U-3H7Z-B1C4',
+  'CLINIC-X9P4-Q2W8-R7T1-M5N3',
+  'CLINIC-7H1J-4K9L-2M3N-5P8Q',
+] as const;
 
 const VALID_HASHES = new Set(
   VALID_KEYS.map((k) => createHash('sha256').update(k.trim().toUpperCase()).digest('hex')),
