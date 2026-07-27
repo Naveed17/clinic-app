@@ -45,9 +45,11 @@ interface Props {
   onAppointmentClick?: (appointment: Appointment) => void;
   onDayContextMenu?: (date: string, anchor: { mouseX: number; mouseY: number }) => void;
   onAppointmentContextMenu?: (appointment: Appointment, anchor: { mouseX: number; mouseY: number }) => void;
+  readOnly?: boolean;
+  hideCheckIn?: boolean;
 }
 
-export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu }: Props): React.JSX.Element {
+export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu, readOnly = false, hideCheckIn = false }: Props): React.JSX.Element {
   const theme = useTheme();
   const today = new Date();
 
@@ -86,13 +88,12 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
       sx={{
         display: 'flex',
         flexDirection: 'row',
-        height: '100%',
-        borderRadius: 1,
+        flex: 1,
+        minHeight: 0,
+        borderRadius: 0,
         overflow: 'hidden',
-        border: '1px solid',
-        borderColor: 'divider',
-        backdropFilter: 'blur(12px)',
-        bgcolor: (t) => alpha(t.palette.background.paper, 0.72),
+        border: 'none',
+        bgcolor: 'transparent',
         backgroundImage: 'none',
       }}
     >
@@ -325,7 +326,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
       <Divider orientation="vertical" flexItem />
 
       {/* ── Right: Day schedule ── */}
-      <Box sx={{ width: 340, flexShrink: 0, p: 3, display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden', maxHeight: '75vh' }}>
+      <Box sx={{ width: 340, flexShrink: 0, p: 3, display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
         <Box>
           <Typography variant="subtitle1" fontWeight={700}>Scheduled</Typography>
           <Typography variant="caption" color="text.secondary">
@@ -393,13 +394,13 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                       <Chip size="small" label={a.status.replace('_', ' ')}
                         sx={{ bgcolor: alpha(color, 0.15), color, fontWeight: 600, borderRadius: 1, fontSize: '0.65rem' }} />
                       <Stack direction="row" gap={0.5}>
-                        {onAppointmentClick && (
+                        {!readOnly && onAppointmentClick && (
                           <IconButton size="small" onClick={() => onAppointmentClick(a)}
                             sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, p: 0.4 }}>
                             <EditOutlinedIcon sx={{ fontSize: 14 }} />
                           </IconButton>
                         )}
-                        {next && (
+                        {!readOnly && next && !(hideCheckIn && next === 'CHECKED_IN') && (
                           <Button
                             size="small"
                             variant="outlined"

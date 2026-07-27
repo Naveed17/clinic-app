@@ -32,6 +32,7 @@ import { invoicesService } from '@/services/invoices.service';
 import type { Invoice, InvoiceInput, InvoicePerson, Payment } from '@/types/invoice';
 import { InvoicePrintPreview } from './InvoicePrintPreview';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import { useAuth } from '@/features/auth/AuthContext';
 
 const statusConfig: Record<string, { label: string; color: 'default' | 'warning' | 'info' | 'success' | 'error' }> = {
   DRAFT:          { label: 'Draft',    color: 'default' },
@@ -237,6 +238,8 @@ function InvoiceDialog({ open, onClose }: { open: boolean; onClose: () => void }
 
 /* ── Invoices Page ── */
 export function InvoicesPage(): React.JSX.Element {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [open, setOpen] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | undefined>();
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | undefined>();
@@ -263,7 +266,7 @@ export function InvoicesPage(): React.JSX.Element {
         title="Invoices"
         subtitle="Create itemized invoices and track payments."
         action={
-          <Button onClick={() => setOpen(true)} startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }}>Create invoice</Button>
+          !isAdmin && <Button onClick={() => setOpen(true)} startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }}>Create invoice</Button>
         }
         toolbar={<SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Search invoice or patient..." sx={{ flex: 1, maxWidth: 360 }} />}
         pager={
@@ -315,7 +318,7 @@ export function InvoicesPage(): React.JSX.Element {
                   <TableCell align="right">{money(Number(invoice.amountPaid ?? 0))}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" gap={0.5} justifyContent="flex-end">
-                      {!isPaid && (
+                      {!isAdmin && !isPaid && (
                         <Tooltip title="Record Payment">
                           <IconButton sx={actionBtnSx} onClick={() => setPaymentInvoice(invoice)}><PaymentOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
                         </Tooltip>
@@ -326,7 +329,7 @@ export function InvoicesPage(): React.JSX.Element {
                       <Tooltip title="Print invoice">
                         <IconButton sx={actionBtnSx} onClick={() => setPreviewInvoice(invoice)}><PrintOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
                       </Tooltip>
-                      {invoice.status !== 'VOID' && invoice.status !== 'PAID' && (
+                      {!isAdmin && invoice.status !== 'VOID' && invoice.status !== 'PAID' && (
                         <Tooltip title="Void Invoice">
                           <IconButton sx={actionBtnSx} onClick={() => setVoidInvoice(invoice)}><BlockOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
                         </Tooltip>

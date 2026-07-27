@@ -2,21 +2,20 @@ import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
-import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
+import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
 import { Box, Paper, Stack, Typography, Chip, Avatar, LinearProgress } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { reportsService } from '@/services/reports.service';
 import { patientsService } from '@/services/patients.service';
 import { invoicesService } from '@/services/invoices.service';
 import { appointmentsService } from '@/services/appointments.service';
+import type { Token, TokenStatus } from '@/types/token';
 
 const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
 
 export function AdminDashboard(): React.JSX.Element {
   const theme = useTheme();
-  const navigate = useNavigate();
 
   const summary = useQuery({ queryKey: ['reports:summary'], queryFn: reportsService.summary, refetchInterval: 30_000 });
   const patients = useQuery({ queryKey: ['patients', { page: 1, pageSize: 1, search: '' }], queryFn: () => patientsService.list({ page: 1, pageSize: 1, search: '' }), refetchInterval: 30_000 });
@@ -120,35 +119,106 @@ export function AdminDashboard(): React.JSX.Element {
             </Stack>
           )}
         </Paper>
+
       </Box>
 
-      {/* Recent patients */}
-      <Paper sx={{ p: 3 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-          <Typography fontWeight={700}>Quick Actions</Typography>
-        </Stack>
-        <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: 'repeat(3,1fr)' } }}>
-          {[
-            { label: 'New Patient', icon: <PersonAddOutlinedIcon />, color: theme.palette.primary.main, path: '/patients' },
-            { label: 'New Appointment', icon: <CalendarMonthOutlinedIcon />, color: theme.palette.secondary.main, path: '/appointments' },
-            { label: 'New Invoice', icon: <PaymentsOutlinedIcon />, color: theme.palette.success.main, path: '/billing' },
-          ].map((action) => (
-            <Paper
-              key={action.label}
-              onClick={() => void navigate(action.path)}
-              sx={{
-                p: 2, display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer',
-                border: `1px solid ${alpha(action.color, 0.2)}`,
-                '&:hover': { bgcolor: alpha(action.color, 0.06), borderColor: alpha(action.color, 0.5), transform: 'translateY(-1px)', boxShadow: `0 4px 16px ${alpha(action.color, 0.15)}` },
-                transition: 'all 0.18s ease',
-              }}
-            >
-              <Box sx={{ color: action.color }}>{action.icon}</Box>
-              <Typography variant="body2" fontWeight={600}>{action.label}</Typography>
-            </Paper>
-          ))}
-        </Box>
-      </Paper>
+      {/* Token Queue */}
+      <TokenQueuePanel />
+
     </Stack>
+  );
+}
+
+const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'success' | 'default' }> = {
+  WAITING: { label: 'Waiting', color: 'warning' },
+  DONE:    { label: 'Done',    color: 'success' },
+  SKIPPED: { label: 'Skipped', color: 'default' },
+};
+
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+function TokenQueuePanel(): React.JSX.Element {
+  const theme = useTheme();
+  const { data: tokens = [], isLoading } = useQuery<Token[]>({
+    queryKey: ['tokens', todayStr()],
+    queryFn: () => window.clinic.tokens.list(todayStr()),
+    refetchInterval: 10_000,
+  });
+
+  const waiting = tokens.filter((t) => t.status === 'WAITING').length;
+  const done    = tokens.filter((t) => t.status === 'DONE').length;
+  const current = tokens.find((t) => t.status === 'WAITING');
+
+  return (
+    <Paper sx={{ p: 3 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+        <Typography fontWeight={700}>Today's Token Queue</Typography>
+        <Stack direction="row" gap={1}>
+          <Chip label={`${waiting} Waiting`} color="warning" size="small" variant="outlined" sx={{ borderRadius: 1, fontWeight: 600 }} />
+          <Chip label={`${done} Done`} color="success" size="small" variant="outlined" sx={{ borderRadius: 1, fontWeight: 600 }} />
+        </Stack>
+      </Stack>
+
+      {current && (
+        <Box sx={{ mb: 2, p: 2, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.06), border: `1.5px solid ${alpha(theme.palette.primary.main, 0.25)}`, display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ textAlign: 'center', minWidth: 64 }}>
+            <Typography variant="caption" color="text.secondary" fontWeight={600}>NOW SERVING</Typography>
+            <Typography sx={{ fontSize: 40, fontWeight: 900, color: 'primary.main', lineHeight: 1 }}>
+              {String(current.tokenNumber).padStart(3, '0')}
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography fontWeight={700}>{current.patient.firstName} {current.patient.lastName}</Typography>
+            <Typography variant="body2" color="text.secondary">Dr. {current.doctor.firstName} {current.doctor.lastName}</Typography>
+          </Box>
+          <Chip label={statusConfig[current.status].label} color={statusConfig[current.status].color} sx={{ fontWeight: 700 }} />
+        </Box>
+      )}
+
+      {isLoading ? (
+        <Typography variant="body2" color="text.secondary">Loading queue...</Typography>
+      ) : tokens.length === 0 ? (
+        <Box sx={{ py: 4, textAlign: 'center' }}>
+          <ConfirmationNumberOutlinedIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+          <Typography variant="body2" color="text.secondary">No tokens issued today.</Typography>
+        </Box>
+      ) : (
+        <Stack spacing={1}>
+          {tokens.map((token) => {
+            const cfg = statusConfig[token.status];
+            const isDone = token.status === 'DONE' || token.status === 'SKIPPED';
+            return (
+              <Box
+                key={token.id}
+                sx={{
+                  display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5,
+                  borderRadius: 1, border: '1px solid', borderColor: 'divider',
+                  opacity: isDone ? 0.5 : 1,
+                  borderLeft: '4px solid',
+                  borderLeftColor: token.status === 'WAITING' ? 'warning.main' : token.status === 'DONE' ? 'success.main' : 'divider',
+                }}
+              >
+                <Avatar
+                  sx={{
+                    width: 38, height: 38, fontWeight: 900, fontSize: 14,
+                    bgcolor: alpha(cfg.color === 'default' ? theme.palette.action.active : theme.palette[cfg.color].main, 0.12),
+                    color: cfg.color === 'default' ? 'text.secondary' : `${cfg.color}.main`,
+                  }}
+                >
+                  {String(token.tokenNumber).padStart(3, '0')}
+                </Avatar>
+                <Box sx={{ flex: 1 }}>
+                  <Typography fontSize={13.5} fontWeight={600}>{token.patient.firstName} {token.patient.lastName}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Dr. {token.doctor.firstName} {token.doctor.lastName}{token.reason ? ` · ${token.reason}` : ''}
+                  </Typography>
+                </Box>
+                <Chip label={cfg.label} color={cfg.color} size="small" sx={{ fontWeight: 600, minWidth: 88 }} />
+              </Box>
+            );
+          })}
+        </Stack>
+      )}
+    </Paper>
   );
 }

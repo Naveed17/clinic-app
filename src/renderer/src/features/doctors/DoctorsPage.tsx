@@ -1,6 +1,7 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -25,9 +26,11 @@ import {
 } from '@mui/material';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDeferredValue, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { doctorsService } from '@/services/doctors.service';
+import { useAuth } from '@/features/auth/AuthContext';
 import type { Doctor, DoctorInput, DoctorUpdateInput } from '@/types/doctor';
 import { tableSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 
@@ -190,6 +193,8 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
 
 export function DoctorsPage(): React.JSX.Element {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(0);
@@ -275,6 +280,7 @@ export function DoctorsPage(): React.JSX.Element {
                   </TableCell>
                   <TableCell align="right">
                     <Stack direction="row" gap={0.5} justifyContent="flex-end">
+                      <Tooltip title="View details"><IconButton sx={actionBtnSx} onClick={() => navigate(`/doctors/${doc.id}`)}><OpenInNewOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                       <Tooltip title="Edit"><IconButton sx={actionBtnSx} onClick={() => { setDialogDoctor(doc); setDialogOpen(true); }}><EditOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                       <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => setDeleteDoctor(doc)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                     </Stack>

@@ -1,50 +1,107 @@
 import { ipcMain, app } from 'electron';
-import { createHash } from 'node:crypto';
+import { machineIdSync } from 'node-machine-id';
 import { join } from 'node:path';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
+import os from 'node:os';
 
-// Add your valid license keys here (plain text — they are hashed at runtime)
-const VALID_KEYS = [
-  'CLINIC-9F8A-3E2B-7C4D-1A09',
-  'CLINIC-K82M-P7X9-W3Q1-V6Y4',
-  'CLINIC-E5T2-9A8U-3H7Z-B1C4',
-  'CLINIC-X9P4-Q2W8-R7T1-M5N3',
-  'CLINIC-7H1J-4K9L-2M3N-5P8Q',
-] as const;
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000/api';
 
-const VALID_HASHES = new Set(
-  VALID_KEYS.map((k) => createHash('sha256').update(k.trim().toUpperCase()).digest('hex')),
-);
-
-function licenseFile(): string {
+function getLicenseFilePath(): string {
   return join(app.getPath('userData'), 'license.dat');
 }
 
-function hashKey(key: string): string {
-  return createHash('sha256').update(key.trim().toUpperCase()).digest('hex');
-}
-
-export function isLicenseActivated(): boolean {
+// Computer ka Machine/Hardware ID
+function getHWID(): string {
   try {
-    const file = licenseFile();
-    if (!existsSync(file)) return false;
-    return VALID_HASHES.has(readFileSync(file, 'utf-8').trim());
+    return machineIdSync();
   } catch {
-    return false;
+    return 'UNKNOWN_HWID';
   }
 }
 
-export function registerLicenseIpc(): void {
-  ipcMain.handle('license:status', () => isLicenseActivated());
+function getDeviceName(): string {
+  try {
+    return os.hostname() || 'Unknown Device';
+  } catch {
+    return 'Unknown Device';
+  }
+}
 
-  ipcMain.handle('license:activate', (_e, key: string) => {
-    const hash = hashKey(key);
-    if (!VALID_HASHES.has(hash)) return { ok: false, error: 'Invalid license key.' };
+function getSavedKey(): string | null {
+  try {
+    const file = getLicenseFilePath();
+    if (!existsSync(file)) return null;
+    return readFileSync(file, 'utf-8').trim();
+  } catch {
+    return null;
+  }
+}
+
+// 1. App Startup Validation
+export async function isLicenseActivated(): Promise<boolean> {
+  const savedKey = getSavedKey();
+  if (!savedKey) return false;
+
+  try {
+    const hwid = getHWID();
+    const response = await fetch(`${API_BASE_URL}/license/validate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ key: savedKey, hwid }),
+    });
+
+    const data = (await response.json()) as { valid: boolean };
+
+    if (!data.valid) {
+      try {
+        unlinkSync(getLicenseFilePath());
+      } catch {}
+      return false;
+    }
+
+    return true;
+  } catch {
+    // Offline mode support: server drop hone par local key valid manna
+    return savedKey !== null;
+  }
+}
+
+// 2. IPC Communication Handlers
+export function registerLicenseIpc(): void {
+  // Status check IPC
+  ipcMain.handle('license:status', async () => {
+    return await isLicenseActivated();
+  });
+
+  // Activation IPC
+  ipcMain.handle('license:activate', async (_e, key: string) => {
+    const formattedKey = key.trim().toUpperCase();
+    if (!formattedKey) return { ok: false, error: 'Please enter a key.' };
+
     try {
-      writeFileSync(licenseFile(), hash, 'utf-8');
-      return { ok: true };
+      const hwid = getHWID();
+      const deviceName = getDeviceName();
+
+      const response = await fetch(`${API_BASE_URL}/license/activate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ key: formattedKey, hwid, deviceName }), 
+      });
+
+      const data = (await response.json()) as { ok: boolean; error?: string };
+
+      if (data.ok) {
+        writeFileSync(getLicenseFilePath(), formattedKey, 'utf-8');
+        return { ok: true };
+      }
+
+      return { ok: false, error: data.error || 'Activation failed.' };
     } catch {
-      return { ok: false, error: 'Could not save license.' };
+      return { ok: false, error: 'Cannot connect to server. Check your internet connection.' };
     }
   });
 }

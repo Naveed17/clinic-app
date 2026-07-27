@@ -54,6 +54,7 @@ model User {
   labOrders      LabOrder[]
   tokens         Token[]
   schedules      DoctorSchedule[]
+  attendance     DoctorAttendance[]
 
   @@index([lastName, firstName])
 }
@@ -244,6 +245,22 @@ model DoctorSchedule {
 
   @@unique([doctorId, dayOfWeek])
   @@index([doctorId])
+}
+
+model DoctorAttendance {
+  id          String    @id @default(uuid())
+  doctorId    String
+  date        String    // YYYY-MM-DD
+  checkInAt   DateTime
+  checkOutAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  doctor User @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, date])
+  @@index([doctorId])
+  @@index([date])
 }
 
 model LabOrder {

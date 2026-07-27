@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import type { Server as SocketIOServer } from 'socket.io';
-import { listDoctors, createDoctor, updateDoctor, deleteDoctor } from '../../doctors/doctor.service';
+import { listDoctors, createDoctor, updateDoctor, deleteDoctor, getDoctor } from '../../doctors/doctor.service';
 import type { DoctorInput, DoctorUpdateInput, DoctorListInput } from '../../doctors/doctor.service';
+import { getAttendance } from '../../doctors/attendance.service';
 import { asyncHandler } from '../utils/async-handler';
 import { requireRole } from '../middleware/auth';
 import { emitNotification } from '../realtime';
@@ -19,6 +20,26 @@ export function createDoctorsRouter(io: SocketIOServer): Router {
         search: typeof req.query.search === 'string' ? req.query.search : '',
       };
       res.json(await listDoctors(input));
+    }),
+  );
+
+  router.get(
+    '/:id',
+    requireRole(['admin', 'doctor', 'receptionist']),
+    asyncHandler(async (req, res) => {
+      const doctor = await getDoctor(String(req.params.id));
+      if (!doctor) return res.status(404).json({ message: 'Doctor not found.' });
+      res.json(doctor);
+    }),
+  );
+
+  router.get(
+    '/:id/attendance',
+    requireRole(['admin', 'doctor', 'receptionist']),
+    asyncHandler(async (req, res) => {
+      const year = Number(req.query.year ?? new Date().getFullYear());
+      const month = Number(req.query.month ?? new Date().getMonth() + 1);
+      res.json(await getAttendance(String(req.params.id), year, month));
     }),
   );
 

@@ -6,9 +6,10 @@ import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
 import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import ReceiptOutlinedIcon from '@mui/icons-material/ReceiptOutlined';
 import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import {
   Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions,
-  DialogContent, Divider, IconButton, Paper, Tab, Tabs, Tooltip, Typography,
+  DialogContent, Divider, IconButton, Paper, Snackbar, Alert, Tab, Tabs, Tooltip, Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -103,6 +104,8 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
   const [tab, setTab] = useState(0);
   const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
   const [viewerDoc, setViewerDoc] = useState<DocViewerData | null>(null);
+  const [waSnack, setWaSnack] = useState<{ open: boolean; success: boolean; msg: string }>({ open: false, success: true, msg: '' });
+  const [waSending, setWaSending] = useState<string | null>(null); // doc id being sent
 
   const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list });
@@ -257,6 +260,27 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
                             <FolderOpenOutlinedIcon sx={{ fontSize: 16 }} />
                           </IconButton>
                         </Tooltip>
+                        <Tooltip title="Share on WhatsApp">
+                          <IconButton
+                            size="small"
+                            disabled={waSending === doc.id}
+                            sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.15)', '&:hover': { bgcolor: 'rgba(37,211,102,0.8)' } }}
+                            onClick={async () => {
+                              setWaSending(doc.id);
+                              const res = await window.clinic.docs.patient.whatsapp(doc.id, patient.phone ?? '') as { success: boolean; error?: string };
+                              setWaSending(null);
+                              setWaSnack({
+                                open: true,
+                                success: res.success,
+                                msg: res.success ? 'Document sent on WhatsApp!' : (res.error as string) ?? 'Failed to send.',
+                              });
+                            }}
+                          >
+                            {waSending === doc.id
+                              ? <CircularProgress size={14} sx={{ color: '#fff' }} />
+                              : <WhatsAppIcon sx={{ fontSize: 16 }} />}
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Delete">
                           <IconButton size="small" sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.15)', '&:hover': { bgcolor: 'rgba(211,47,47,0.7)' } }} onClick={() => deleteMutation.mutate(doc.id)}>
                             <DeleteOutlineIcon sx={{ fontSize: 16 }} />
@@ -282,6 +306,16 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
         <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 2 }}>Close</Button>
       </DialogActions>
       {viewerDoc && <DocViewerDialog doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
+      <Snackbar
+        open={waSnack.open}
+        autoHideDuration={4000}
+        onClose={() => setWaSnack((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={waSnack.success ? 'success' : 'error'} onClose={() => setWaSnack((s) => ({ ...s, open: false }))}>
+          {waSnack.msg}
+        </Alert>
+      </Snackbar>
     </Dialog>
   );
 }

@@ -34,12 +34,12 @@ export interface DoctorInput {
 }
 
 export interface DoctorUpdateInput {
-  firstName: string;
-  lastName: string;
-  email: string;
-  isActive: boolean;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  isActive?: boolean;
   password?: string;
-  specialization: string;
+  specialization?: string;
   qualification?: string;
   experienceYears?: number;
   phone?: string;

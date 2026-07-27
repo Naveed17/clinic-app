@@ -8,7 +8,11 @@ import type { LabOrder } from './lab';
 declare global {
   interface Window {
     clinic: {
-      license: any;
+      license: {
+        status: () => Promise<boolean>;
+        // Activate route (returns object with ok and optional error string)
+        activate: (key: string) => Promise<{ ok: boolean; error?: string }>;
+      };
       patients: {
         list: (input: PatientListInput) => Promise<{ data: Patient[]; total: number }>;
         create: (input: PatientInput) => Promise<Patient>;

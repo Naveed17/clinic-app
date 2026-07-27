@@ -55,6 +55,7 @@ export function LabPage(): React.JSX.Element {
   const qc = useQueryClient();
   const isDoctor = user?.role === 'doctor';
   const isAdmin = user?.role === 'admin';
+  const isLabTech = user?.role === 'lab_technician';
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
@@ -146,7 +147,7 @@ export function LabPage(): React.JSX.Element {
         title="Lab Orders"
         subtitle="Manage lab test orders and results."
         action={
-          (isDoctor || isAdmin || user?.role === 'receptionist') && (
+          isLabTech && (
             <Button onClick={() => setDialogOpen(true)} startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }}>New order</Button>
           )
         }
@@ -254,15 +255,13 @@ export function LabPage(): React.JSX.Element {
                     {order.status === 'COMPLETED' && (
                       <Tooltip title="Print report"><IconButton sx={actionBtnSx} onClick={() => setPrintOrder(order)}><PrintOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                     )}
-                    {order.status === 'PENDING' && (
+                    {isLabTech && order.status === 'PENDING' && (
                       <Button size="small" variant="outlined" sx={{ borderRadius: 1.5, fontSize: 12, py: 0.25, px: 1.25 }} onClick={() => statusMutation.mutate({ id: order.id, status: 'IN_PROGRESS' })}>Start</Button>
                     )}
-                    {order.status === 'IN_PROGRESS' && (
+                    {isLabTech && order.status === 'IN_PROGRESS' && (
                       <Button size="small" color="success" variant="contained" sx={{ borderRadius: 1.5, fontSize: 12, py: 0.25, px: 1.25 }} onClick={() => { setResultDialog(order); setResultText(order.result ?? ''); }}>Add result</Button>
                     )}
-                    {(isDoctor || isAdmin) && order.status === 'PENDING' && (
-                      <Button size="small" color="error" variant="outlined" sx={{ borderRadius: 1.5, fontSize: 12, py: 0.25, px: 1.25 }} onClick={() => statusMutation.mutate({ id: order.id, status: 'CANCELLED' })}>Cancel</Button>
-                    )}
+
                   </Stack>
                 </TableCell>
               </TableRow>

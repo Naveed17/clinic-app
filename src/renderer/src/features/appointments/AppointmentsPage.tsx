@@ -423,6 +423,7 @@ export function AppointmentsPage(): React.JSX.Element {
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const cancelMutation = useMutation({
@@ -496,14 +497,16 @@ export function AppointmentsPage(): React.JSX.Element {
             </Box>
             <Stack direction="row" gap={1}>
               {viewToggle}
-              <Button startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }} onClick={() => { setActive(undefined); setDefaultDate(undefined); setOpen(true); }}>Create appointment</Button>
+              {!isAdmin && <Button startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }} onClick={() => { setActive(undefined); setDefaultDate(undefined); setOpen(true); }}>Create appointment</Button>}
             </Stack>
           </Box>
           <AppointmentCalendar
             appointments={allData}
             onStatusChange={(id, status) => statusMutation.mutate({ id, status })}
-            onDateClick={(date) => { setActive(undefined); setDefaultDate(date); setOpen(true); }}
-            onAppointmentClick={(appt) => { setActive(appt); setOpen(true); }}
+            onDateClick={isAdmin ? undefined : (date) => { setActive(undefined); setDefaultDate(date); setOpen(true); }}
+            onAppointmentClick={isAdmin ? undefined : (appt) => { setActive(appt); setOpen(true); }}
+            readOnly={isAdmin}
+            hideCheckIn={user?.role !== 'doctor'}
           />
         </Box>
       ) : (
@@ -513,7 +516,7 @@ export function AppointmentsPage(): React.JSX.Element {
           action={
             <Stack direction="row" gap={1}>
               {viewToggle}
-              <Button startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }} onClick={() => { setActive(undefined); setDefaultDate(undefined); setOpen(true); }}>Create appointment</Button>
+              {!isAdmin && <Button startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }} onClick={() => { setActive(undefined); setDefaultDate(undefined); setOpen(true); }}>Create appointment</Button>}
             </Stack>
           }
           toolbar={<SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Search patient, doctor, reason..." sx={{ flex: 1, maxWidth: 360 }} />}
@@ -533,14 +536,14 @@ export function AppointmentsPage(): React.JSX.Element {
               <TableCell>Duration</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Reason</TableCell>
-              <TableCell align="right">Actions</TableCell>
+              {!isAdmin && <TableCell align="right">Actions</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
             {appointments.isLoading ? (
-              <TableRow><TableCell colSpan={8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>Loading appointments...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={isAdmin ? 7 : 8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>Loading appointments...</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No appointments scheduled.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={isAdmin ? 7 : 8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No appointments scheduled.</TableCell></TableRow>
             ) : (
               paginated.map((a) => (
                 <TableRow key={a.id} sx={tableSx.row}>
@@ -583,6 +586,7 @@ export function AppointmentsPage(): React.JSX.Element {
                     <Chip color={statusConfig[a.status]?.color ?? 'default'} label={statusConfig[a.status]?.label ?? a.status} size="small" sx={chipSx} />
                   </TableCell>
                   <TableCell>{a.reason || '—'}</TableCell>
+                  {!isAdmin && (
                   <TableCell align="right">
                     <Stack direction="row" gap={0.5} justifyContent="flex-end">
                       <Tooltip title="Edit"><span>
@@ -605,6 +609,7 @@ export function AppointmentsPage(): React.JSX.Element {
                       <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => deleteMutation.mutate(a.id)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                     </Stack>
                   </TableCell>
+                  )}
                 </TableRow>
               ))
             )}

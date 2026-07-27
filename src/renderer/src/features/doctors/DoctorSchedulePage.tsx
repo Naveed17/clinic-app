@@ -1,9 +1,10 @@
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import {
-  Alert, Box, Button, Chip, CircularProgress, FormControl, InputLabel,
-  MenuItem, Paper, Select, Stack, Switch, TextField, Typography,
+  Alert, Box, Button, Chip, CircularProgress, FormControl, FormControlLabel,
+  InputLabel, MenuItem, Paper, Select, Stack, Switch, TextField, Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { doctorsService } from '@/services/doctors.service';
 import { useEffect, useState } from 'react';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -24,11 +25,21 @@ export function DoctorSchedulePage(): React.JSX.Element {
   const [slots, setSlots] = useState<SlotState[]>(defaultSlots());
   const [saved, setSaved] = useState(false);
 
-  const doctors = useQuery<{ id: string; firstName: string; lastName: string }[]>({
+  const doctors = useQuery<{ id: string; firstName: string; lastName: string; isActive: boolean }[]>({
     queryKey: ['schedule-doctors'],
     queryFn: async () => {
       const res = await window.clinic.doctors.list({ page: 1, pageSize: 100, search: '' });
-      return (res as { data: { id: string; firstName: string; lastName: string }[] }).data;
+      return (res as { data: { id: string; firstName: string; lastName: string; isActive: boolean }[] }).data;
+    },
+  });
+
+  const selectedDoctor = (doctors.data ?? []).find((d) => d.id === doctorId);
+
+  const statusMutation = useMutation({
+    mutationFn: (isActive: boolean) => doctorsService.update(doctorId, { isActive }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['schedule-doctors'] });
+      void qc.invalidateQueries({ queryKey: ['doctors'] });
     },
   });
 
@@ -60,7 +71,7 @@ export function DoctorSchedulePage(): React.JSX.Element {
   const updateSlot = (day: number, patch: Partial<SlotState>) =>
     setSlots((prev) => prev.map((s) => (s.dayOfWeek === day ? { ...s, ...patch } : s)));
 
-  const doctorList = (doctors.data ?? []) as { id: string; firstName: string; lastName: string }[];
+  const doctorList = (doctors.data ?? []) as { id: string; firstName: string; lastName: string; isActive: boolean }[];
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -72,19 +83,38 @@ export function DoctorSchedulePage(): React.JSX.Element {
       </Box>
 
       <Paper sx={{ p: 3 }}>
-        <FormControl sx={{ minWidth: 280 }}>
-          <InputLabel>Select Doctor</InputLabel>
-          <Select
-            label="Select Doctor"
-            value={doctorId}
-            onChange={(e) => { setDoctorId(e.target.value); setSlots(defaultSlots()); }}
-            sx={{ borderRadius: 1 }}
-          >
-            {doctorList.map((d) => (
-              <MenuItem key={d.id} value={d.id}>{d.firstName} {d.lastName}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <Stack direction="row" alignItems="center" gap={3} flexWrap="wrap">
+          <FormControl sx={{ minWidth: 280 }}>
+            <InputLabel>Select Doctor</InputLabel>
+            <Select
+              label="Select Doctor"
+              value={doctorId}
+              onChange={(e) => { setDoctorId(e.target.value); setSlots(defaultSlots()); }}
+              sx={{ borderRadius: 1 }}
+            >
+              {doctorList.map((d) => (
+                <MenuItem key={d.id} value={d.id}>{d.firstName} {d.lastName}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {selectedDoctor && (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={selectedDoctor.isActive}
+                  disabled={statusMutation.isPending}
+                  onChange={(e) => statusMutation.mutate(e.target.checked)}
+                  color="success"
+                />
+              }
+              label={
+                <Typography fontSize={13.5} fontWeight={600} color={selectedDoctor.isActive ? 'success.dark' : 'text.secondary'}>
+                  {selectedDoctor.isActive ? 'Active' : 'Inactive'}
+                </Typography>
+              }
+            />
+          )}
+        </Stack>
       </Paper>
 
       {doctorId && (

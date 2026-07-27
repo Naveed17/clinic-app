@@ -189,6 +189,16 @@ const api = {
         () => request(`/api/doctors?${toQueryString(input)}`),
         'doctors:list', input,
       ),
+    getOne: (id: string) =>
+      call(
+        () => request(`/api/doctors/${id}`),
+        'doctors:getOne', id,
+      ),
+    attendance: (id: string, year: number, month: number) =>
+      call(
+        () => request(`/api/doctors/${id}/attendance?year=${year}&month=${month}`),
+        'doctors:attendance', id, year, month,
+      ),
     create: (input: unknown) =>
       call(
         () => request('/api/doctors', { method: 'POST', body: JSON.stringify(input) }),
@@ -215,6 +225,7 @@ const api = {
       upload: (patientId: string) => ipc('docs:patient:upload', patientId),
       delete: (id: string) => ipc('docs:patient:delete', id),
       open: (id: string) => ipc('docs:patient:open', id),
+      whatsapp: (id: string, phone?: string) => ipc('docs:patient:whatsapp', id, phone),
     },
     lab: {
       list: (labOrderId: string) => ipc('docs:lab:list', labOrderId),

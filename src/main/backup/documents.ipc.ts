@@ -43,6 +43,89 @@ export function registerDocumentsIpc(): void {
     await getPrisma().patientDocument.delete({ where: { id } });
   });
 
+  ipcMain.handle('docs:patient:whatsapp', async (_e, id: string, phone?: string) => {
+    const doc = await getPrisma().patientDocument.findUnique({ where: { id } });
+    if (!doc || !existsSync(doc.filePath)) return { success: false, error: 'File not found.' };
+
+    const token = process.env.WHATSAPP_TOKEN;
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    if (!token || !phoneNumberId) return { success: false, error: 'WhatsApp API not configured.' };
+
+    const cleaned = (phone ?? '').replace(/\D/g, '');
+    if (!cleaned) return { success: false, error: 'No phone number.' };
+
+    const ext = extname(doc.filePath).toLowerCase();
+    const mimeMap: Record<string, string> = {
+      '.pdf': 'application/pdf',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    };
+    const mimeType = mimeMap[ext] ?? 'application/octet-stream';
+
+    // Step 1: Upload media
+    const fileBuffer = readFileSync(doc.filePath);
+    const boundary = `----FormBoundary${Date.now()}`;
+    const CRLF = '\r\n';
+    const bodyParts = [
+      `--${boundary}${CRLF}Content-Disposition: form-data; name="messaging_product"${CRLF}${CRLF}whatsapp`,
+      `--${boundary}${CRLF}Content-Disposition: form-data; name="type"${CRLF}${CRLF}${mimeType}`,
+      `--${boundary}${CRLF}Content-Disposition: form-data; name="file"; filename="${doc.name}"${CRLF}Content-Type: ${mimeType}${CRLF}${CRLF}`,
+    ];
+    const closing = `${CRLF}--${boundary}--${CRLF}`;
+    const textBuf = Buffer.from(bodyParts.join(CRLF) + CRLF);
+    const closingBuf = Buffer.from(closing);
+    const formBody = Buffer.concat([textBuf, fileBuffer, closingBuf]);
+
+    const uploadRes = await fetch(
+      `https://graph.facebook.com/v18.0/${phoneNumberId}/media`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        },
+        body: formBody,
+      },
+    );
+    const uploadJson = await uploadRes.json() as { id?: string; error?: { message?: string } | string };
+    if (!uploadRes.ok || !uploadJson.id) {
+      const err = uploadJson.error;
+      return { success: false, error: typeof err === 'object' && err !== null ? (err.message ?? 'Upload failed.') : (err ?? 'Upload failed.') };
+    }
+
+    // Step 2: Send document message
+    const sendRes = await fetch(
+      `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: cleaned,
+          type: 'document',
+          document: {
+            id: uploadJson.id,
+            filename: doc.name,
+            caption: 'Aap ki document attached hai.',
+          },
+        }),
+      },
+    );
+    const sendJson = await sendRes.json() as { messages?: unknown[]; error?: { message?: string } | string };
+    if (!sendRes.ok) {
+      const err = sendJson.error;
+      return { success: false, error: typeof err === 'object' && err !== null ? (err.message ?? 'Send failed.') : (err ?? 'Send failed.') };
+    }
+    return { success: true };
+  });
+
   ipcMain.handle('docs:patient:open', async (_e, id: string) => {
     const doc = await getPrisma().patientDocument.findUnique({ where: { id } });
     if (!doc || !existsSync(doc.filePath)) return null;

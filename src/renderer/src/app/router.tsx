@@ -10,6 +10,7 @@ import { StatisticsPage } from '@/features/statistics/StatisticsPage';
 import { LabPage } from '@/features/lab/LabPage';
 import { UsersPage } from '@/features/users/UsersPage';
 import { DoctorsPage } from '@/features/doctors/DoctorsPage';
+import { DoctorDetailPage } from '@/features/doctors/DoctorDetailPage';
 import { DoctorSchedulePage } from '@/features/doctors/DoctorSchedulePage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { TokensPage } from '@/features/tokens/TokensPage';
@@ -18,6 +19,8 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { RouteAccessGate } from '@/components/RouteAccessGate';
 import { LicensePage } from '@/features/auth/LicensePage';
 import { useState, useEffect } from 'react';
+import Box from '@mui/material/Box';
+import { CircularProgress } from '@mui/material';
 
 const router = createHashRouter([
   { path: '/login', element: <LoginPage /> },
@@ -101,6 +104,14 @@ const router = createHashRouter([
             ),
           },
           {
+            path: '/doctors/:id',
+            element: (
+              <RouteAccessGate route="/doctors">
+                <DoctorDetailPage />
+              </RouteAccessGate>
+            ),
+          },
+          {
             path: '/schedule',
             element: (
               <RouteAccessGate route="/schedule">
@@ -131,15 +142,38 @@ const router = createHashRouter([
   { path: '*', element: <NotFoundPage /> },
 ]);
 
+
 export function AppRouter(): React.JSX.Element {
   const [licensed, setLicensed] = useState<boolean | null>(null);
 
   useEffect(() => {
-    window.clinic.license.status().then((ok: boolean | ((prevState: boolean | null) => boolean | null) | null) => setLicensed(ok));
+    window.clinic.license.status()
+      .then((isOk) => setLicensed(Boolean(isOk)))
+      .catch(() => setLicensed(false));
   }, []);
 
-  if (licensed === null) return <></>;
-  if (!licensed) return <LicensePage onActivated={() => setLicensed(true)} />;
+  // 1. Initial State: Screen Load hotay waqt Spinner dikhana
+  if (licensed === null) {
+    return (
+      <Box
+        sx={{
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: 'background.default'
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
 
+
+  if (!licensed) {
+    return <LicensePage onActivated={() => setLicensed(true)} />;
+  }
+
+  // 3. Fully Activated State: Main App Router Open hona
   return <RouterProvider router={router} />;
 }

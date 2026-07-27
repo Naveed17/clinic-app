@@ -1,6 +1,7 @@
 import type { TokenStatus } from '@prisma/client';
 import { getPrisma } from '../database/client';
 import { randomUUID } from 'node:crypto';
+import { markCheckIn, markCheckOut } from '../doctors/attendance.service';
 
 export interface TokenInput {
   patientId: string;
@@ -101,6 +102,20 @@ export async function updateTokenStatus(id: string, status: TokenStatus) {
     data: { status },
     include: tokenInclude,
   });
+
+  // Auto attendance — check-in on first DONE/SKIPPED, check-out when all finished
+  if (status === 'DONE') {
+    const existing = await getPrisma().doctorAttendance.findUnique({
+      where: { doctorId_date: { doctorId: token.doctor.id, date: token.date } },
+    });
+    if (!existing) await markCheckIn(token.doctor.id, token.date);
+  }
+  if (status === 'DONE' || status === 'SKIPPED') {
+    const remaining = await getPrisma().token.count({
+      where: { doctorId: token.doctor.id, date: token.date, status: { in: ['WAITING'] } },
+    });
+    if (remaining === 0) await markCheckOut(token.doctor.id, token.date);
+  }
   const pr = await getPrisma().$queryRawUnsafe<Record<string, unknown>[]>(
     `SELECT * FROM "Prescription" WHERE tokenId = '${id}' LIMIT 1`
   );

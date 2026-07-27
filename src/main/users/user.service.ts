@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { getPrisma } from '../database/client';
+import { seedDefaultAdmin } from '../auth/seed';
 
 export interface UserListInput {
   page: number;
@@ -147,4 +148,5 @@ export async function updateUser(id: string, input: UserUpdateInput) {
 
 export async function deleteUser(id: string): Promise<void> {
   await getPrisma().user.delete({ where: { id } });
+  await seedDefaultAdmin();
 }

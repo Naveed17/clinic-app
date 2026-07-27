@@ -273,6 +273,29 @@ export async function initializeDatabase(): Promise<void> {
     'CREATE INDEX IF NOT EXISTS "DoctorSchedule_doctorId_idx" ON "DoctorSchedule"("doctorId")',
   );
 
+  // DoctorAttendance table
+  await database.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "DoctorAttendance" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "doctorId" TEXT NOT NULL,
+      "date" TEXT NOT NULL,
+      "checkInAt" DATETIME NOT NULL,
+      "checkOutAt" DATETIME,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY ("doctorId") REFERENCES "User"("id") ON DELETE CASCADE
+    )
+  `);
+  await database.$executeRawUnsafe(
+    'CREATE UNIQUE INDEX IF NOT EXISTS "DoctorAttendance_doctorId_date_key" ON "DoctorAttendance"("doctorId", "date")',
+  );
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "DoctorAttendance_doctorId_idx" ON "DoctorAttendance"("doctorId")',
+  );
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "DoctorAttendance_date_idx" ON "DoctorAttendance"("date")',
+  );
+
   // Prescription table
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Prescription" (

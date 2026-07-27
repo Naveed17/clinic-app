@@ -24,6 +24,7 @@ export function PatientsPage(): React.JSX.Element {
   const { user } = useAuth();
   const isDoctor = user?.role === 'doctor';
   const isLabTech = user?.role === 'lab_technician';
+  const isAdmin = user?.role === 'admin';
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(0);
@@ -70,7 +71,7 @@ export function PatientsPage(): React.JSX.Element {
       <TablePageShell
         title="Patients"
         subtitle="Manage patient records and contact details."
-        {...(!isLabTech && {
+        {...(!isLabTech && !isAdmin && {
           action: (
             <Button onClick={openCreate} startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }}>
               Add patient
@@ -210,12 +211,14 @@ export function PatientsPage(): React.JSX.Element {
                       <Tooltip title="View history">
                         <IconButton sx={actionBtnSx} onClick={() => setHistoryPatient(patient)}><HistoryOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
                       </Tooltip>
+                      {!isAdmin && (<>
                       <Tooltip title="Edit">
                         <IconButton sx={actionBtnSx} onClick={() => openEdit(patient)}><EditOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
                       </Tooltip>
                       <Tooltip title="Delete">
                         <IconButton sx={{ ...actionBtnSx, '&:hover': { bgcolor: 'error.lighter', color: 'error.main' } }} onClick={() => setDeletePatient(patient)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton>
                       </Tooltip>
+                      </>)}
                     </Stack>
                   </TableCell>
                 </TableRow>

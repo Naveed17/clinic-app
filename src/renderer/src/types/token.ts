@@ -1,4 +1,4 @@
-export type TokenStatus = 'WAITING' | 'IN_PROGRESS' | 'DONE' | 'SKIPPED';
+export type TokenStatus = 'WAITING' | 'DONE' | 'SKIPPED';
 
 export interface TokenPerson {
   id: string;

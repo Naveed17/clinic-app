@@ -1,6 +1,5 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import PlayArrowOutlinedIcon from '@mui/icons-material/PlayArrowOutlined';
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined';
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
@@ -38,10 +37,9 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { appointmentsService } from '@/services/appointments.service';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
-  WAITING:     { label: 'Waiting',     color: 'warning' },
-  IN_PROGRESS: { label: 'In Progress', color: 'primary' },
-  DONE:        { label: 'Done',        color: 'success' },
-  SKIPPED:     { label: 'Skipped',     color: 'default' },
+  WAITING: { label: 'Waiting', color: 'warning' },
+  DONE:    { label: 'Done',    color: 'success' },
+  SKIPPED: { label: 'Skipped', color: 'default' },
 };
 
 function todayStr(): string {
@@ -423,6 +421,7 @@ export function TokensPage(): React.JSX.Element {
   const qc = useQueryClient();
   const { user } = useAuth();
   const isDoctor = user?.role === 'doctor';
+  const isAdmin = user?.role === 'admin';
   const [date, setDate] = useState(todayStr());
   const [filterDoctor, setFilterDoctor] = useState('ALL');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -453,11 +452,10 @@ export function TokensPage(): React.JSX.Element {
   const roleFiltered = isDoctor ? tokens.filter((t) => t.doctorId === user?.id) : tokens;
   const filtered = filterDoctor === 'ALL' ? roleFiltered : roleFiltered.filter((t) => t.doctorId === filterDoctor);
 
-  const waiting = tokens.filter((t) => t.status === 'WAITING').length;
-  const inProgress = tokens.filter((t) => t.status === 'IN_PROGRESS').length;
-  const done = tokens.filter((t) => t.status === 'DONE').length;
+  const waiting    = tokens.filter((t) => t.status === 'WAITING').length;
+  const done       = tokens.filter((t) => t.status === 'DONE').length;
 
-  const currentToken = filtered.find((t) => t.status === 'IN_PROGRESS') ?? filtered.find((t) => t.status === 'WAITING');
+  const currentToken = filtered.find((t) => t.status === 'WAITING');
 
   return (
     <>
@@ -478,19 +476,20 @@ export function TokensPage(): React.JSX.Element {
                 slotProps={{ textField: { size: 'small', sx: { width: 160 } } }}
               />
             </LocalizationProvider>
-            <Button variant="contained" startIcon={<AddOutlinedIcon />} sx={{ borderRadius: 2, fontWeight: 600 }} onClick={() => setDialogOpen(true)}>
-              Issue Token
-            </Button>
+            {!isAdmin && (
+              <Button variant="contained" startIcon={<AddOutlinedIcon />} sx={{ borderRadius: 2, fontWeight: 600 }} onClick={() => setDialogOpen(true)}>
+                Issue Token
+              </Button>
+            )}
           </Stack>
         </Box>
 
         {/* Summary cards */}
-        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
+        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 1fr)' } }}>
           {[
-            { label: 'Total',       value: tokens.length, color: theme.palette.text.primary },
-            { label: 'Waiting',     value: waiting,       color: theme.palette.warning.main },
-            { label: 'In Progress', value: inProgress,    color: theme.palette.primary.main },
-            { label: 'Done',        value: done,          color: theme.palette.success.main },
+            { label: 'Total',   value: tokens.length, color: theme.palette.text.primary },
+            { label: 'Waiting', value: waiting,       color: theme.palette.warning.main },
+            { label: 'Done',    value: done,          color: theme.palette.success.main },
           ].map((c) => (
             <Paper key={c.label} variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
               <Typography sx={{ fontSize: 32, fontWeight: 800, color: c.color, lineHeight: 1 }}>{c.value}</Typography>
@@ -624,28 +623,21 @@ export function TokensPage(): React.JSX.Element {
                         <PrintOutlinedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                    {token.status === 'WAITING' && (
-                      <Tooltip title="Start">
-                        <IconButton size="small" color="primary" onClick={() => statusMutation.mutate({ id: token.id, status: 'IN_PROGRESS' })}>
-                          <PlayArrowOutlinedIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                    {token.status === 'IN_PROGRESS' && (
+                    {!isAdmin && token.status === 'WAITING' && (
                       <Tooltip title="Mark Done">
                         <IconButton size="small" color="success" onClick={() => statusMutation.mutate({ id: token.id, status: 'DONE' })}>
                           <CheckCircleOutlinedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     )}
-                    {(token.status === 'WAITING' || token.status === 'IN_PROGRESS') && (
+                    {!isAdmin && token.status === 'WAITING' && (
                       <Tooltip title="Skip">
                         <IconButton size="small" onClick={() => statusMutation.mutate({ id: token.id, status: 'SKIPPED' })}>
                           <SkipNextOutlinedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     )}
-                    {token.status === 'WAITING' && (
+                    {!isAdmin && token.status === 'WAITING' && (
                       <Tooltip title="Delete">
                         <IconButton size="small" color="error" onClick={() => deleteMutation.mutate(token.id)}>
                           <DeleteOutlineIcon fontSize="small" />

@@ -21,12 +21,12 @@ export interface DoctorInput {
 }
 
 export interface DoctorUpdateInput {
-  firstName: string;
-  lastName: string;
-  email: string;
-  isActive: boolean;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  isActive?: boolean;
   password?: string;
-  specialization: string;
+  specialization?: string;
   qualification?: string;
   experienceYears?: number;
   phone?: string;
@@ -44,6 +44,21 @@ const doctorSelect = {
   updatedAt: true,
   doctorProfile: true,
 } satisfies Prisma.UserSelect;
+
+export async function getDoctor(id: string) {
+  const prisma = getPrisma();
+  const doctor = await prisma.user.findUnique({
+    where: { id },
+    select: { ...doctorSelect, schedules: { orderBy: { dayOfWeek: 'asc' } } },
+  });
+  if (!doctor) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  const [totalAppointments, todayTokens] = await prisma.$transaction([
+    prisma.appointment.count({ where: { providerId: id } }),
+    prisma.token.count({ where: { doctorId: id, date: today } }),
+  ]);
+  return { ...doctor, totalAppointments, todayTokens };
+}
 
 export async function listDoctors({ page, pageSize, search }: DoctorListInput) {
   const prisma = getPrisma();
@@ -101,32 +116,35 @@ export async function createDoctor(input: DoctorInput) {
 export async function updateDoctor(id: string, input: DoctorUpdateInput) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const bcrypt = require('bcryptjs') as typeof import('bcryptjs');
+  const hasProfile = input.specialization !== undefined;
   return getPrisma().user.update({
     where: { id },
     data: {
-      firstName: input.firstName.trim(),
-      lastName: input.lastName.trim(),
-      email: input.email.trim().toLowerCase(),
-      isActive: input.isActive,
+      ...(input.firstName !== undefined ? { firstName: input.firstName.trim() } : {}),
+      ...(input.lastName !== undefined ? { lastName: input.lastName.trim() } : {}),
+      ...(input.email !== undefined ? { email: input.email.trim().toLowerCase() } : {}),
+      ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
       ...(input.password ? { passwordHash: bcrypt.hashSync(input.password, 10) } : {}),
-      doctorProfile: {
-        upsert: {
-          create: {
-            specialization: input.specialization.trim(),
-            qualification: input.qualification?.trim() || null,
-            experienceYears: input.experienceYears ?? 0,
-            phone: input.phone?.trim() || null,
-            bio: input.bio?.trim() || null,
-          },
-          update: {
-            specialization: input.specialization.trim(),
-            qualification: input.qualification?.trim() || null,
-            experienceYears: input.experienceYears ?? 0,
-            phone: input.phone?.trim() || null,
-            bio: input.bio?.trim() || null,
+      ...(hasProfile ? {
+        doctorProfile: {
+          upsert: {
+            create: {
+              specialization: input.specialization!.trim(),
+              qualification: input.qualification?.trim() || null,
+              experienceYears: input.experienceYears ?? 0,
+              phone: input.phone?.trim() || null,
+              bio: input.bio?.trim() || null,
+            },
+            update: {
+              specialization: input.specialization!.trim(),
+              qualification: input.qualification?.trim() || null,
+              experienceYears: input.experienceYears ?? 0,
+              phone: input.phone?.trim() || null,
+              bio: input.bio?.trim() || null,
+            },
           },
         },
-      },
+      } : {}),
     },
     select: doctorSelect,
   });
