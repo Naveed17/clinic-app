@@ -174,10 +174,11 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   const patients = useQuery({
     queryKey: ['patients', { page: 1, pageSize: 1000 }],
     queryFn: () => patientsService.list({ page: 1, pageSize: 1000, search: '' }),
-    staleTime: Infinity,
+    staleTime: 5 * 60 * 1000,
+    retry: 3,
   });
 
-  const doctors = useQuery({ queryKey: ['doctors'], queryFn: appointmentsService.doctors, staleTime: Infinity });
+  const doctors = useQuery({ queryKey: ['doctors'], queryFn: appointmentsService.doctors, staleTime: 5 * 60 * 1000, retry: 3 });
   function personLabel(person: AppointmentPerson): string {
     return `${person.firstName} ${person.lastName}`;
   }
@@ -207,13 +208,12 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
       const startsAt = new Date(`${values.date}T${values.time}:00`);
-      const tzOffset = startsAt.getTimezoneOffset() * 60000;
       const input: AppointmentInput = {
         patientId: values.patientId,
         providerId: values.providerId,
         tokenId: values.tokenId || null,
-        startsAt: new Date(startsAt.getTime() - tzOffset).toISOString(),
-        endsAt: new Date(startsAt.getTime() - tzOffset + values.duration * 60000).toISOString(),
+        startsAt: startsAt.toISOString(),
+        endsAt: new Date(startsAt.getTime() + values.duration * 60000).toISOString(),
         reason: values.reason || null,
         notes: values.notes || null,
         recurrenceRule: values.recurring ? `WEEKLY:${values.recurrenceCount}` : null,
@@ -616,7 +616,7 @@ export function AppointmentsPage(): React.JSX.Element {
           </TableBody>
         </TablePageShell>
       )}
-      <AppointmentDialog appointment={active} open={open} defaultDate={defaultDate} onClose={() => setOpen(false)} />
+      <AppointmentDialog appointment={active} open={open} defaultDate={defaultDate} defaultProviderId={user?.role === 'doctor' ? user.id : undefined} onClose={() => setOpen(false)} />
     </>
   );
 }
