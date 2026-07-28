@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import os from 'node:os';
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000/api';
+const API_BASE_URL = process.env.API_BASE_URL || 'https://clinic-license-six.vercel.app/api';
 
 function getLicenseFilePath(): string {
   return join(app.getPath('userData'), 'license.dat');

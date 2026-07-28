@@ -54,7 +54,7 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
   });
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(editSchema),
+    resolver: zodResolver(editSchema) as import('react-hook-form').Resolver<FormValues>,
     defaultValues: { firstName: '', lastName: '', email: '', password: '', isActive: true, specialization: '', qualification: '', experienceYears: 0, phone: '', bio: '' },
   });
 

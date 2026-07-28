@@ -66,6 +66,8 @@ declare global {
       };
       doctors: {
         list: (input: unknown) => Promise<unknown>;
+        getOne: (id: string) => Promise<import('./doctor').Doctor & { schedules: { dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }[]; totalAppointments: number; todayTokens: number }>;
+        attendance: (id: string, year: number, month: number) => Promise<{ date: string; checkInAt: string; checkOutAt: string | null }[]>;
         create: (input: unknown) => Promise<unknown>;
         update: (id: string, input: unknown) => Promise<unknown>;
         delete: (id: string) => Promise<unknown>;
@@ -93,6 +95,7 @@ declare global {
           upload: (patientId: string) => Promise<{ id: string; name: string }[]>;
           delete: (id: string) => Promise<void>;
           open: (id: string) => Promise<{ type: 'pdf' | 'image'; name: string; data: string } | null>;
+          whatsapp: (id: string, phone?: string) => Promise<{ success: boolean; error?: string }>;
         };
         lab: {
           list: (labOrderId: string) => Promise<{ id: string; name: string; filePath: string; uploadedAt: string }[]>;

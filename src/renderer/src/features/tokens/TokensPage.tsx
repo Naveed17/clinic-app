@@ -579,9 +579,7 @@ export function TokensPage(): React.JSX.Element {
                     gap: 2,
                     opacity: isDone ? 0.55 : 1,
                     borderLeft: `4px solid`,
-                    borderLeftColor: token.status === 'IN_PROGRESS'
-                      ? 'primary.main'
-                      : token.status === 'WAITING'
+                    borderLeftColor: token.status === 'WAITING'
                       ? 'warning.main'
                       : token.status === 'DONE'
                       ? 'success.main'

@@ -37,6 +37,8 @@ declare global {
       };
       doctors: {
         list: (input: unknown) => Promise<unknown>;
+        getOne: (id: string) => Promise<unknown>;
+        attendance: (id: string, year: number, month: number) => Promise<unknown>;
         create: (input: unknown) => Promise<unknown>;
         update: (id: string, input: unknown) => Promise<unknown>;
         delete: (id: string) => Promise<unknown>;
@@ -69,6 +71,7 @@ declare global {
           upload: (patientId: string) => Promise<unknown>;
           delete: (id: string) => Promise<unknown>;
           open: (id: string) => Promise<unknown>;
+          whatsapp: (id: string, phone?: string) => Promise<unknown>;
         };
         lab: {
           list: (labOrderId: string) => Promise<unknown>;
