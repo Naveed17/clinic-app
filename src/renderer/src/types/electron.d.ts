@@ -12,8 +12,8 @@ declare global {
       medicines: any;
       license: {
         status: () => Promise<boolean>;
-        // Activate route (returns object with ok and optional error string)
         activate: (key: string) => Promise<{ ok: boolean; error?: string }>;
+        modules: () => Promise<Record<string, boolean> | null>;
       };
       patients: {
         list: (input: PatientListInput) => Promise<{ data: Patient[]; total: number }>;
@@ -115,7 +115,7 @@ declare global {
         saveResult: (id: string, result: string) => Promise<LabOrder>;
       };
       auth: {
-        login: (email: string, password: string) => Promise<{ id: string; name: string; email: string; role: string; avatar: string } | null>;
+        login: (email: string, password: string) => Promise<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | { blocked: true; error?: string } | null>;
         changePassword: (userId: string, current: string, next: string) => Promise<{ ok: boolean; error?: string }>;
       };
       search: {

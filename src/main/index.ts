@@ -99,6 +99,7 @@ function createWindow(): void {
 
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.careflow.app');
+  app.setPath('userData', join(app.getPath('appData'), 'CareFlow'));
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window));
   try {
     const settings = getSettings();

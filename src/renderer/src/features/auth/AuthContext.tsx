@@ -85,7 +85,7 @@ export function AuthProvider({ children }: PropsWithChildren): React.JSX.Element
       const result = await window.clinic?.auth.login(email, password);
       if (!result) return false;
       // Blocked role (module disabled)
-      if ('blocked' in result && result.blocked) return (result.error as string) || 'Access denied.';
+      if ('blocked' in result) return (result as { blocked: true; error?: string }).error || 'Access denied.';
       const authUser: AuthUser = {
         id: result.id,
         name: result.name,

@@ -16,6 +16,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "node scripts/studio.js",
+    "db:reset": "del /f /q \"%APPDATA%\\CareFlow\\clinic.db\" && echo Database reset done!",
     "dist": "npm run prisma:generate && npm run build && electron-builder"
   },
   "build": {

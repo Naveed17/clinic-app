@@ -34,7 +34,7 @@ export function LicenseModulesProvider({ children }: PropsWithChildren): React.J
 
   useEffect(() => {
     window.clinic.license.modules()
-      .then((data) => {
+      .then((data: Record<string, boolean> | null) => {
         if (data) setModules({ ...ALL_ENABLED, ...data });
       })
       .catch(() => {}); // offline fallback: all enabled

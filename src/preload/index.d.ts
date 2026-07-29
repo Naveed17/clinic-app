@@ -24,10 +24,15 @@ declare global {
         list: () => Promise<unknown>;
         patients: () => Promise<unknown>;
         create: (input: unknown) => Promise<unknown>;
+        addPayment: (invoiceId: string, amount: number, method: string, reference?: string) => Promise<unknown>;
+        void: (id: string) => Promise<unknown>;
+        payments: (invoiceId: string) => Promise<unknown>;
         print: () => Promise<unknown>;
       };
       reports: {
         summary: () => Promise<unknown>;
+        detailed: (from: string, to: string) => Promise<unknown>;
+        doctorRevenue: (from: string, to: string) => Promise<unknown>;
       };
       users: {
         list: (input: unknown) => Promise<unknown>;
@@ -93,7 +98,7 @@ declare global {
         sendChatMessage: (message: unknown) => Promise<boolean>;
       };
       settings: {
-        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number }>;
+        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName?: string; clinicAddress?: string; clinicPhone?: string }>;
         save: (patch: unknown) => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number }>;
         lanIp: () => Promise<string>;
         discoveredServers: () => Promise<{ ip: string; port: number; name: string }[]>;
@@ -102,7 +107,7 @@ declare global {
         onServerFound: (handler: (server: { ip: string; port: number; name: string }) => void) => () => void;
       };
       auth: {
-        login: (email: string, password: string) => Promise<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | null>;
+        login: (email: string, password: string) => Promise<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | { blocked: true; error?: string } | null>;
         changePassword: (userId: string, current: string, next: string) => Promise<{ ok: boolean; error?: string }>;
       };
       print: {
@@ -111,6 +116,16 @@ declare global {
       license: {
         status: () => Promise<boolean>;
         activate: (key: string) => Promise<{ ok: boolean; error?: string }>;
+        modules: () => Promise<Record<string, boolean> | null>;
+      };
+      medicines: {
+        search: (query: string) => Promise<unknown>;
+        list: () => Promise<unknown>;
+        create: (name: string, price: number) => Promise<unknown>;
+        updatePrice: (id: string, price: number) => Promise<unknown>;
+      };
+      search: {
+        global: (query: string) => Promise<unknown>;
       };
     };
   }
