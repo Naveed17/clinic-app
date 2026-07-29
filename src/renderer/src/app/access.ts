@@ -57,8 +57,9 @@ export function canAccess(role: UserRole, route: AppRoute): boolean {
   return ROUTE_ACCESS[route]?.includes(role) ?? false;
 }
 
-export function isModuleEnabled(modules: LicenseModules, route: AppRoute): boolean {
+export function isModuleEnabled(modules: LicenseModules | undefined, route: AppRoute): boolean {
+  if (!modules) return true;
   const key = ROUTE_MODULE[route];
-  if (!key) return true; // no module gate
+  if (!key) return true;
   return modules[key] ?? true;
 }

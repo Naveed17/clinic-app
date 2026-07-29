@@ -39,6 +39,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import { useColorMode } from '@/app/colorMode';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
 import { getNavItems } from './navigation';
 import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
 import { GlobalSearchModal } from '@/components/GlobalSearchModal';
@@ -54,7 +55,8 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const navItems = user ? getNavItems(user.role) : [];
+  const modules = useLicenseModules();
+  const navItems = user ? getNavItems(user.role, modules) : [];
   const [notificationCount, setNotificationCount] = useState(0);
   const [notifications, setNotifications] = useState<RealtimeNotification[]>([]);
   const [bellAnchor, setBellAnchor] = useState<HTMLElement | null>(null);

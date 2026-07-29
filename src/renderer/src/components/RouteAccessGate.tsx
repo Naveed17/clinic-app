@@ -17,7 +17,7 @@ export function RouteAccessGate({
 
   if (!user) return <Navigate to="/login" replace />;
   if (!canAccess(user.role, route)) return <Navigate to={ROLE_HOME[user.role]} replace />;
-  if (user.role !== 'admin' && !isModuleEnabled(modules, route)) return <Navigate to={ROLE_HOME[user.role]} replace />;
+  if (!isModuleEnabled(modules, route)) return <Navigate to={ROLE_HOME[user.role]} replace />;
 
   return children ? <>{children}</> : <Outlet />;
 }

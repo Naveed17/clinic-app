@@ -384,7 +384,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
 
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '1fr auto' } }}>
         {/* Today's queue */}
-        <Paper variant="outlined" sx={{ p: 3 }}>
+        <Paper variant="outlined" sx={{ p: 3, display: 'flex', flexDirection: 'column' }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
             <Typography fontWeight={700}>Today's Queue</Typography>
             <Button size="small" variant="outlined" onClick={() => navigate('/appointments')} sx={{ borderRadius: 2 }}>
@@ -398,23 +398,37 @@ export function ReceptionistDashboard(): React.JSX.Element {
               <Typography variant="body2" color="text.secondary">No appointments today.</Typography>
             </Box>
           ) : (
-            <Stack spacing={1}>
-              {todaysAppts.map((a) => (
-                <Box key={a.id} sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.background.default, 0.6), border: `1px solid ${theme.palette.divider}` }}>
-                  <Avatar sx={{ width: 34, height: 34, bgcolor: alpha(theme.palette.primary.main, 0.12), color: 'primary.main', fontSize: 12, fontWeight: 700 }}>
-                    {a.patient.firstName[0]}{a.patient.lastName[0]}
-                  </Avatar>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" fontWeight={700}>{a.patient.firstName} {a.patient.lastName}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {new Date(a.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      {' · Dr. '}{a.provider.firstName} {a.provider.lastName}
-                    </Typography>
+            <>
+              <Stack spacing={1} sx={{ maxHeight: 340, overflowY: 'auto', pr: 0.5,
+                '&::-webkit-scrollbar': { width: 4 },
+                '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
+              }}>
+                {todaysAppts.map((a) => (
+                  <Box key={a.id} sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.background.default, 0.6), border: `1px solid ${theme.palette.divider}` }}>
+                    <Avatar sx={{ width: 34, height: 34, bgcolor: alpha(theme.palette.primary.main, 0.12), color: 'primary.main', fontSize: 12, fontWeight: 700 }}>
+                      {a.patient.firstName[0]}{a.patient.lastName[0]}
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body2" fontWeight={700}>{a.patient.firstName} {a.patient.lastName}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(a.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {' · Dr. '}{a.provider.firstName} {a.provider.lastName}
+                      </Typography>
+                    </Box>
+                    <Chip size="small" label={a.status.replace('_', ' ')} color={statusColor[a.status]} sx={{ borderRadius: 1, fontSize: 10 }} />
                   </Box>
-                  <Chip size="small" label={a.status.replace('_', ' ')} color={statusColor[a.status]} sx={{ borderRadius: 1, fontSize: 10 }} />
-                </Box>
-              ))}
-            </Stack>
+                ))}
+              </Stack>
+              {todaysAppts.length > 5 && (
+                <Button
+                  size="small"
+                  onClick={() => navigate('/appointments')}
+                  sx={{ mt: 1.5, alignSelf: 'center', borderRadius: 2, fontSize: 12 }}
+                >
+                  View All ({todaysAppts.length})
+                </Button>
+              )}
+            </>
           )}
         </Paper>
 

@@ -33,9 +33,9 @@ const ALL_NAV_ITEMS: NavigationItem[] = [
   { label: 'Users',        path: '/users',        icon: <ManageAccountsOutlinedIcon /> },
 ];
 
-export function getNavItems(role: UserRole, modules: LicenseModules): NavigationItem[] {
+export function getNavItems(role: UserRole, modules: LicenseModules | undefined): NavigationItem[] {
   return ALL_NAV_ITEMS.filter(
-    (item) => canAccess(role, item.path) && (role === 'admin' || isModuleEnabled(modules, item.path)),
+    (item) => canAccess(role, item.path) && isModuleEnabled(modules, item.path),
   );
 }
 
