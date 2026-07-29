@@ -114,6 +114,10 @@ declare global {
         updateStatus: (id: string, status: string) => Promise<LabOrder>;
         saveResult: (id: string, result: string) => Promise<LabOrder>;
       };
+      update: {
+        onReady: (handler: () => void) => () => void;
+        install: () => Promise<void>;
+      };
       auth: {
         login: (email: string, password: string) => Promise<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | { blocked: true; error?: string } | null>;
         changePassword: (userId: string, current: string, next: string) => Promise<{ ok: boolean; error?: string }>;

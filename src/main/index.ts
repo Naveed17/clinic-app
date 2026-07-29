@@ -37,6 +37,7 @@ import { registerSearchIpc } from './search/search.ipc';
 import { registerMedicineIpc } from './medicines/medicine.ipc';
 import { registerScheduleIpc } from './doctors/schedule.ipc';
 import { seedDefaultAdmin } from './auth/seed';
+import { initAutoUpdater } from './updater';
 
 let backendServer: BackendServer | undefined;
 
@@ -136,6 +137,7 @@ app.whenReady().then(async () => {
   registerSearchIpc();
   registerMedicineIpc();
   startDiscoveryListener(); // always listen so admin can also scan
+  initAutoUpdater();
   createWindow();
 
   app.on('activate', () => {

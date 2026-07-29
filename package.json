@@ -17,7 +17,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "node scripts/studio.js",
     "db:reset": "del /f /q \"%APPDATA%\\CareFlow\\clinic.db\" && echo Database reset done!",
-    "dist": "npm run prisma:generate && npm run build && electron-builder"
+    "dist": "npm run prisma:generate && npm run build && electron-builder",
+    "dist:publish": "npm run prisma:generate && npm run build && electron-builder --publish always"
   },
   "build": {
     "appId": "com.careflow.app",
@@ -53,6 +54,11 @@
     },
     "directories": {
       "output": "release"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Naveed17",
+      "repo": "clinic-app"
     }
   },
   "dependencies": {
@@ -76,6 +82,7 @@
     "bwip-js": "^4.11.2",
     "cors": "^2.8.6",
     "date-fns": "^4.4.0",
+    "electron-updater": "^6.8.9",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "node-machine-id": "^1.1.12",

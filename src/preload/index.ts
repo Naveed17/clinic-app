@@ -361,6 +361,13 @@ const api = {
         'search:global', query,
       ),
   },
+  update: {
+    onReady: (handler: () => void) => {
+      ipcRenderer.on('app:update-ready', handler);
+      return () => ipcRenderer.removeAllListeners('app:update-ready');
+    },
+    install: () => ipc('app:install-update'),
+  },
   auth: {
     login: async (email: string, password: string) => {
       await settingsReady;

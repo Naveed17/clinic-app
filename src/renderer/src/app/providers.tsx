@@ -9,11 +9,12 @@ import { AuthProvider } from '@/features/auth/AuthContext';
 import { LicenseModulesProvider } from '@/features/auth/LicenseModulesContext';
 import { useSocket, useRealtimeInvalidation } from '@/hooks';
 import { AppointmentToast } from '@/components/AppointmentToast';
+import { UpdateBanner } from '@/components/UpdateBanner';
 
 function RealtimeBootstrap({ children }: PropsWithChildren): React.JSX.Element {
   useSocket();
   useRealtimeInvalidation();
-  return <>{children}<AppointmentToast /></>;
+  return <>{children}<AppointmentToast /><UpdateBanner /></>;
 }
 
 export function AppProviders({ children }: PropsWithChildren): React.JSX.Element {
