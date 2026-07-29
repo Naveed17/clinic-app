@@ -1,7 +1,6 @@
 import { app } from 'electron';
 import { PrismaClient } from '@prisma/client';
 import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
 
 // Fix userData path so it never changes regardless of productName
 app.setName('clinic-management-system');
@@ -338,21 +337,6 @@ export async function initializeDatabase(): Promise<void> {
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Prescription_tokenId_idx" ON "Prescription"("tokenId")',
   );
-
-  const doctor = await database.user.findFirst({ where: { role: 'DOCTOR' } });
-  if (!doctor) {
-    await database.user.create({
-      data: {
-        id: randomUUID(),
-        firstName: 'Clinic',
-        lastName: 'Doctor',
-        email: 'doctor@local.invalid',
-        passwordHash: 'disabled',
-        role: 'DOCTOR',
-        updatedAt: new Date(),
-      },
-    });
-  }
 }
 
 export async function disconnectPrisma(): Promise<void> {

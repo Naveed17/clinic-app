@@ -36,6 +36,7 @@ import { z } from 'zod';
 import { usersService } from '@/services/users.service';
 import type { User, UserInput, UserUpdateInput } from '@/types/user';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
 
 const roleLabels: Record<string, string> = {
   ADMIN: 'Admin',
@@ -111,6 +112,7 @@ function toFormValues(user?: User): FormValues {
 function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClose: () => void }): React.JSX.Element {
   const queryClient = useQueryClient();
   const isEditing = Boolean(user);
+  const modules = useLicenseModules();
   const form = useForm<FormValues>({
     resolver: zodResolver(isEditing ? editSchema : createSchema),
     defaultValues: emptyFormValues,
@@ -185,7 +187,7 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
                       <MenuItem value="ADMIN">Admin</MenuItem>
                       <MenuItem value="DOCTOR">Doctor</MenuItem>
                       <MenuItem value="RECEPTIONIST">Receptionist</MenuItem>
-                      <MenuItem value="LAB_TECHNICIAN">Lab Technician</MenuItem>
+                      {modules.labDashboard && <MenuItem value="LAB_TECHNICIAN">Lab Technician</MenuItem>}
                     </Select>
                     {errors.role && <FormHelperText>{errors.role.message}</FormHelperText>}
                   </FormControl>
