@@ -3,6 +3,26 @@ import { getPrisma } from '../../database/client';
 import { asyncHandler } from '../utils/async-handler';
 import { signToken } from '../middleware/auth';
 
+const ROLE_MODULE: Record<string, string> = {
+  doctor:         'doctorDashboard',
+  lab_technician: 'labDashboard',
+};
+
+async function fetchLicenseModules(key: string): Promise<Record<string, boolean> | null> {
+  const API_BASE_URL = process.env.API_BASE_URL || 'https://clinic-license-six.vercel.app/api';
+  try {
+    const res = await fetch(`${API_BASE_URL}/license/modules`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+    const data = (await res.json()) as { ok: boolean; modules?: Record<string, boolean> };
+    return data.ok ? (data.modules ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function createAuthRouter(): Router {
   const router = Router();
 
@@ -24,6 +44,24 @@ export function createAuthRouter(): Router {
       return;
     }
     const role = user.role.toLowerCase() as import('../types').AppRole;
+
+    // Module check: block login if role's module is disabled
+    const moduleKey = ROLE_MODULE[role];
+    if (moduleKey) {
+      const { readFileSync, existsSync } = await import('node:fs');
+      const { join } = await import('node:path');
+      const { app } = await import('electron');
+      const filePath = join(app.getPath('userData'), 'license.dat');
+      if (existsSync(filePath)) {
+        const key = readFileSync(filePath, 'utf-8').trim();
+        const modules = await fetchLicenseModules(key);
+        if (modules && modules[moduleKey] === false) {
+          res.status(403).json({ error: 'This role is not enabled for this clinic.' });
+          return;
+        }
+      }
+    }
+
     const token = signToken({ userId: user.id, role });
     res.json({
       token,

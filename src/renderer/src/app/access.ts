@@ -1,4 +1,5 @@
 import type { UserRole } from '@/features/auth/AuthContext';
+import type { LicenseModules } from '@/features/auth/LicenseModulesContext';
 
 /** All app routes that have access control */
 export type AppRoute =
@@ -29,6 +30,21 @@ export const ROUTE_ACCESS: Record<AppRoute, UserRole[]> = {
   '/settings':     ['admin'],
 };
 
+/**
+ * Which module key gates each route.
+ * Routes not listed here are always accessible (no module gate).
+ */
+export const ROUTE_MODULE: Partial<Record<AppRoute, keyof LicenseModules>> = {
+  '/billing':    'billing',
+  '/lab':        'labDashboard',
+  '/statistics': 'statistics',
+  '/tokens':     'tokens',
+  '/doctors':    'manageDoctors',
+  '/schedule':   'manageDoctors',
+  '/users':      'manageUsers',
+  '/patients':   'managePatients',
+};
+
 /** First route a role lands on after login */
 export const ROLE_HOME: Record<UserRole, AppRoute> = {
   admin:          '/dashboard',
@@ -39,4 +55,10 @@ export const ROLE_HOME: Record<UserRole, AppRoute> = {
 
 export function canAccess(role: UserRole, route: AppRoute): boolean {
   return ROUTE_ACCESS[route]?.includes(role) ?? false;
+}
+
+export function isModuleEnabled(modules: LicenseModules, route: AppRoute): boolean {
+  const key = ROUTE_MODULE[route];
+  if (!key) return true; // no module gate
+  return modules[key] ?? true;
 }

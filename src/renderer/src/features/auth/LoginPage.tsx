@@ -157,10 +157,12 @@ export function LoginPage(): React.JSX.Element {
     }
     setLoading(true);
     setError('');
-    const ok = await login(email, password);
+    const result = await login(email, password);
     setLoading(false);
-    if (ok) {
+    if (result === true) {
       navigate('/dashboard', { replace: true });
+    } else if (typeof result === 'string') {
+      setError(result);
     } else {
       setError('Invalid email or password.');
     }

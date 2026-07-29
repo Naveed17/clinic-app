@@ -9,6 +9,7 @@ import type { GlobalSearchResult } from './search';
 declare global {
   interface Window {
     clinic: {
+      medicines: any;
       license: {
         status: () => Promise<boolean>;
         // Activate route (returns object with ok and optional error string)

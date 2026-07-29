@@ -153,6 +153,7 @@ export function PatientProfilePage(): React.JSX.Element {
               </Box>
               <Stack direction="row" gap={3} sx={{ mt: 1, flexWrap: 'wrap' }}>
                 {[
+                  { label: 'MR #', value: patient.mrNumber },
                   { label: 'Phone', value: patient.phone },
                   { label: 'Email', value: patient.email },
                   { label: 'DOB', value: patient.dateOfBirth ? new Date(patient.dateOfBirth).toLocaleDateString() : null },

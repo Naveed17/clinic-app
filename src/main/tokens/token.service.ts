@@ -19,7 +19,7 @@ export interface PrescriptionInput {
 }
 
 const tokenInclude = {
-  patient: { select: { id: true, firstName: true, lastName: true } },
+  patient: { select: { id: true, firstName: true, lastName: true, mrNumber: true } },
   doctor:  { select: { id: true, firstName: true, lastName: true } },
 };
 
@@ -28,7 +28,7 @@ function parseRawToken(_row: Record<string, unknown>) { return _row; } // unused
 export async function listTokens(date: string) {
   const db = getPrisma();
   const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(`
-    SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName,
+    SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
            u.id as doctorObjId, u.firstName as doctorFirstName, u.lastName as doctorLastName,
            pr.id as prescriptionId, pr.diagnosis, pr.medicines, pr.tests, pr.advice,
            pr.createdAt as prescriptionCreatedAt,
@@ -44,7 +44,7 @@ export async function listTokens(date: string) {
     id: r.id, tokenNumber: r.tokenNumber, date: r.date,
     patientId: r.patientId, doctorId: r.doctorId,
     status: r.status, notes: r.notes, reason: r.reason, createdAt: r.createdAt, updatedAt: r.updatedAt,
-    patient: { id: r.patientObjId, firstName: r.patientFirstName, lastName: r.patientLastName },
+    patient: { id: r.patientObjId, firstName: r.patientFirstName, lastName: r.patientLastName, mrNumber: r.patientMrNumber },
     doctor:  { id: r.doctorObjId,  firstName: r.doctorFirstName,  lastName: r.doctorLastName },
     prescription: r.prescriptionRaw
       ? { id: r.prescriptionId, tokenId: r.id, diagnosis: r.diagnosis,
@@ -65,7 +65,7 @@ export async function listTokenDoctors() {
 
 export async function listTokenPatients() {
   return getPrisma().patient.findMany({
-    select: { id: true, firstName: true, lastName: true },
+    select: { id: true, firstName: true, lastName: true, mrNumber: true },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
   });
 }
@@ -157,7 +157,7 @@ export async function upsertPrescription(tokenId: string, input: PrescriptionInp
 export async function getTokenForPatient(patientId: string, date: string) {
   const db = getPrisma();
   const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(`
-    SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName,
+    SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
            u.id as doctorObjId, u.firstName as doctorFirstName, u.lastName as doctorLastName,
            pr.id as prescriptionId, pr.diagnosis, pr.medicines, pr.tests, pr.advice,
            pr.createdAt as prescriptionCreatedAt,
@@ -175,7 +175,7 @@ export async function getTokenForPatient(patientId: string, date: string) {
     id: r.id, tokenNumber: r.tokenNumber, date: r.date,
     patientId: r.patientId, doctorId: r.doctorId,
     status: r.status, notes: r.notes, reason: r.reason, createdAt: r.createdAt, updatedAt: r.updatedAt,
-    patient: { id: r.patientObjId, firstName: r.patientFirstName, lastName: r.patientLastName },
+    patient: { id: r.patientObjId, firstName: r.patientFirstName, lastName: r.patientLastName, mrNumber: r.patientMrNumber },
     doctor:  { id: r.doctorObjId,  firstName: r.doctorFirstName,  lastName: r.doctorLastName },
     prescription: r.prescriptionRaw
       ? { id: r.prescriptionId, tokenId: r.id, diagnosis: r.diagnosis,

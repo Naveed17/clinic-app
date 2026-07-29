@@ -75,6 +75,23 @@ export function registerLicenseIpc(): void {
     return await isLicenseActivated();
   });
 
+  // Modules fetch IPC
+  ipcMain.handle('license:modules', async () => {
+    const savedKey = getSavedKey();
+    if (!savedKey) return null;
+    try {
+      const response = await fetch(`${API_BASE_URL}/license/modules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: savedKey }),
+      });
+      const data = (await response.json()) as { ok: boolean; modules?: Record<string, boolean> };
+      return data.ok ? data.modules ?? null : null;
+    } catch {
+      return null; // offline: null means all modules enabled (fallback)
+    }
+  });
+
   // Activation IPC
   ipcMain.handle('license:activate', async (_e, key: string) => {
     const formattedKey = key.trim().toUpperCase();

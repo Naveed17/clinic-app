@@ -157,6 +157,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       reason: reason || null,
     }),
     onSuccess: async (token: Token) => {
+      await window.clinic.tokens.updateStatus(token.id, 'DONE');
       const startsAt = new Date(token.createdAt).toISOString();
       const endsAt = new Date(new Date(token.createdAt).getTime() + 30 * 60000).toISOString();
       await appointmentsService.create({ patientId, providerId: doctorId, startsAt, endsAt, reason: reason || null, notes: null, recurrenceRule: null });

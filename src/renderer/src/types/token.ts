@@ -2,6 +2,7 @@ export type TokenStatus = 'WAITING' | 'DONE' | 'SKIPPED';
 
 export interface TokenPerson {
   id: string;
+  mrNumber?: string;
   firstName: string;
   lastName: string;
 }

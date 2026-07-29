@@ -346,6 +346,7 @@ const api = {
   license: {
     status: () => ipc('license:status'),
     activate: (key: string) => ipc('license:activate', key),
+    modules: () => ipc<Record<string, boolean>>('license:modules'),
   },
   medicines: {
     search: (query: string) => ipc('medicines:search', query),

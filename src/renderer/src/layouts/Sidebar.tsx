@@ -11,6 +11,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getNavItems } from './navigation';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
 
 export const drawerWidth = 60;
 
@@ -24,7 +25,8 @@ function SidebarContents(): React.JSX.Element {
   const navigate = useNavigate();
   const theme = useTheme();
   const { user, logout } = useAuth();
-  const navItems = user ? getNavItems(user.role) : [];
+  const modules = useLicenseModules();
+  const navItems = user ? getNavItems(user.role, modules) : [];
 
   const navBtnSx = (active: boolean) => ({
     width: 44,

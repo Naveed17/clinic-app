@@ -14,7 +14,7 @@ export interface AuthUser {
 
 interface AuthContextValue {
   user: AuthUser | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean | string>;
   logout: () => void;
 }
 
@@ -84,6 +84,8 @@ export function AuthProvider({ children }: PropsWithChildren): React.JSX.Element
     login: async (email, password) => {
       const result = await window.clinic?.auth.login(email, password);
       if (!result) return false;
+      // Blocked role (module disabled)
+      if ('blocked' in result && result.blocked) return (result.error as string) || 'Access denied.';
       const authUser: AuthUser = {
         id: result.id,
         name: result.name,

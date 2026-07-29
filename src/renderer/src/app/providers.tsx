@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { ColorModeContext, type ColorMode } from './colorMode';
 import { createAppTheme } from './theme';
 import { AuthProvider } from '@/features/auth/AuthContext';
+import { LicenseModulesProvider } from '@/features/auth/LicenseModulesContext';
 import { useSocket, useRealtimeInvalidation } from '@/hooks';
 import { AppointmentToast } from '@/components/AppointmentToast';
 
@@ -50,7 +51,9 @@ export function AppProviders({ children }: PropsWithChildren): React.JSX.Element
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <AuthProvider>
-            <RealtimeBootstrap>{children}</RealtimeBootstrap>
+              <LicenseModulesProvider>
+                <RealtimeBootstrap>{children}</RealtimeBootstrap>
+              </LicenseModulesProvider>
           </AuthProvider>
         </ThemeProvider>
       </ColorModeContext.Provider>

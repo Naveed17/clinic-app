@@ -11,7 +11,8 @@ import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlin
 import type { ReactNode } from 'react';
 import type { UserRole } from '@/features/auth/AuthContext';
 import type { AppRoute } from '@/app/access';
-import { canAccess } from '@/app/access';
+import { canAccess, isModuleEnabled } from '@/app/access';
+import type { LicenseModules } from '@/features/auth/LicenseModulesContext';
 
 export interface NavigationItem {
   label: string;
@@ -32,8 +33,10 @@ const ALL_NAV_ITEMS: NavigationItem[] = [
   { label: 'Users',        path: '/users',        icon: <ManageAccountsOutlinedIcon /> },
 ];
 
-export function getNavItems(role: UserRole): NavigationItem[] {
-  return ALL_NAV_ITEMS.filter((item) => canAccess(role, item.path));
+export function getNavItems(role: UserRole, modules: LicenseModules): NavigationItem[] {
+  return ALL_NAV_ITEMS.filter(
+    (item) => canAccess(role, item.path) && (role === 'admin' || isModuleEnabled(modules, item.path)),
+  );
 }
 
 // kept for non-role contexts (topbar indicator count etc.)
