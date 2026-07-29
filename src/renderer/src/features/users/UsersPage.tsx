@@ -215,7 +215,7 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
                 />
                 <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
                   <TextField fullWidth label="Qualification (e.g. MBBS, MD)" {...form.register('doctorProfile.qualification')} />
-                  <TextField fullWidth label="Experience (years)" type="number" slotProps={{ htmlInput: { min: 0, max: 60 } }} {...form.register('doctorProfile.experienceYears')} />
+                  <TextField fullWidth label="Experience (years)" type="number" slotProps={{ htmlInput: { min: 0, max: 60 } }} {...form.register('doctorProfile.experienceYears', { valueAsNumber: true })} />
                 </Box>
                 <TextField fullWidth label="Contact phone" {...form.register('doctorProfile.phone')} />
                 <TextField fullWidth label="Bio" multiline minRows={2} {...form.register('doctorProfile.bio')} />
