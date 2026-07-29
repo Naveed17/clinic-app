@@ -20,6 +20,7 @@ import LaptopOutlinedIcon from '@mui/icons-material/LaptopOutlined';
 import DevicesOutlinedIcon from '@mui/icons-material/DevicesOutlined';
 import BackupOutlinedIcon from '@mui/icons-material/BackupOutlined';
 import RestoreOutlinedIcon from '@mui/icons-material/RestoreOutlined';
+import SystemUpdateAltOutlinedIcon from '@mui/icons-material/SystemUpdateAltOutlined';
 import WifiTetheringOutlinedIcon from '@mui/icons-material/WifiTetheringOutlined';
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
@@ -42,6 +43,14 @@ export function SettingsPage(): React.JSX.Element {
   const [backupStatus, setBackupStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'latest' | 'error'>('idle');
+
+  useEffect(() => {
+    if (updateStatus === 'latest' || updateStatus === 'error') {
+      const t = setTimeout(() => setUpdateStatus('idle'), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [updateStatus]);
   const [prevMode, setPrevMode] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [discovered, setDiscovered] = useState<{ ip: string; port: number; name: string }[]>([]);
@@ -62,6 +71,12 @@ export function SettingsPage(): React.JSX.Element {
     setRestoreLoading(false);
     if (result?.canceled) return;
     setBackupStatus(result?.ok ? { type: 'success', msg: 'Restore successful! Please restart the app.' } : { type: 'error', msg: result?.error ?? 'Restore failed.' });
+  }
+
+  async function handleCheckUpdate() {
+    setUpdateStatus('checking');
+    const result = await window.clinic?.update.check();
+    setUpdateStatus(result ?? 'error');
   }
 
   useEffect(() => {
@@ -159,6 +174,32 @@ export function SettingsPage(): React.JSX.Element {
               </Button>
             </Stack>
             {backupStatus && <Alert severity={backupStatus.type} sx={{ mt: 2 }}>{backupStatus.msg}</Alert>}
+
+            <Divider sx={{ my: 2 }} />
+
+            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>App Update</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Check if a newer version is available.</Typography>
+            <Box sx={{ position: 'relative' }}>
+            <Button
+              variant="outlined"
+              startIcon={updateStatus === 'checking' ? <CircularProgress size={16} /> : <SystemUpdateAltOutlinedIcon />}
+              disabled={updateStatus === 'checking'}
+              onClick={() => void handleCheckUpdate()}
+            >
+              Check for Updates
+            </Button>
+            <Box sx={{ position: 'absolute', top: '100%', left: 0, mt: 1, '& .MuiAlert-message': { whiteSpace: 'nowrap' } }}>
+            {updateStatus === 'available' && (
+              <Alert severity="info">Update downloading in background. You'll be notified when ready.</Alert>
+            )}
+            {updateStatus === 'latest' && (
+              <Alert severity="success">You're on the latest version.</Alert>
+            )}
+            {updateStatus === 'error' && (
+              <Alert severity="warning">Could not check for updates. Check your internet connection.</Alert>
+            )}
+            </Box>
+            </Box>
           </Box>
 
           <Divider orientation="vertical" flexItem />

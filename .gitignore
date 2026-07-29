@@ -7,6 +7,9 @@ release/
 !.env.example
 prisma/*.db
 prisma/*.db-journal
+prisma/*.db-wal
+prisma/*.db-shm
+dev-app-update.yml
 *.log
 .DS_Store
 Thumbs.db

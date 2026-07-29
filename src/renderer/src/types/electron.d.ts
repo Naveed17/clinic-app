@@ -117,6 +117,7 @@ declare global {
       update: {
         onReady: (handler: () => void) => () => void;
         install: () => Promise<void>;
+        check: () => Promise<'available' | 'latest' | 'error'>;
       };
       auth: {
         login: (email: string, password: string) => Promise<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | { blocked: true; error?: string } | null>;

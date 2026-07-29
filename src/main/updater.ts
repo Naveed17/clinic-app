@@ -3,7 +3,21 @@ import { ipcMain, BrowserWindow } from 'electron';
 import { is } from '@electron-toolkit/utils';
 
 export function initAutoUpdater(): void {
-  if (is.dev) return; // skip in dev
+  ipcMain.handle('app:install-update', () => {
+    autoUpdater.quitAndInstall();
+  });
+
+  ipcMain.handle('app:check-for-updates', async () => {
+    if (is.dev) return 'latest';
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      return result ? 'available' : 'latest';
+    } catch {
+      return 'error';
+    }
+  });
+
+  if (is.dev) return;
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
@@ -14,14 +28,8 @@ export function initAutoUpdater(): void {
     );
   });
 
-  // Silently ignore errors (no crash if offline / no release yet)
   autoUpdater.on('error', () => {});
 
-  // Check on startup, then every 4 hours
   void autoUpdater.checkForUpdates();
   setInterval(() => void autoUpdater.checkForUpdates(), 4 * 60 * 60 * 1000);
-
-  ipcMain.handle('app:install-update', () => {
-    autoUpdater.quitAndInstall();
-  });
 }

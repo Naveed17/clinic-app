@@ -367,6 +367,7 @@ const api = {
       return () => ipcRenderer.removeAllListeners('app:update-ready');
     },
     install: () => ipc('app:install-update'),
+    check: () => ipc<'available' | 'latest' | 'error'>('app:check-for-updates'),
   },
   auth: {
     login: async (email: string, password: string) => {
