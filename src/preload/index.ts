@@ -347,6 +347,19 @@ const api = {
     status: () => ipc('license:status'),
     activate: (key: string) => ipc('license:activate', key),
   },
+  medicines: {
+    search: (query: string) => ipc('medicines:search', query),
+    list: () => ipc('medicines:list'),
+    create: (name: string, price: number) => ipc('medicines:create', name, price),
+    updatePrice: (id: string, price: number) => ipc('medicines:update-price', id, price),
+  },
+  search: {
+    global: (query: string) =>
+      call(
+        () => request(`/api/search?q=${encodeURIComponent(query)}`),
+        'search:global', query,
+      ),
+  },
   auth: {
     login: async (email: string, password: string) => {
       await settingsReady;

@@ -35,6 +35,7 @@ import { Document, Page, Text, View, StyleSheet, pdf, Font } from '@react-pdf/re
 import type { Token, TokenInput, TokenPerson, TokenStatus, PrescriptionInput, PrescriptionMedicine } from '@/types/token';
 import { useAuth } from '@/features/auth/AuthContext';
 import { appointmentsService } from '@/services/appointments.service';
+import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
   WAITING: { label: 'Waiting', color: 'warning' },
@@ -278,6 +279,7 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
     setMedicines((prev) => prev.map((m, idx) => idx === i ? { ...m, [field]: val } : m));
 
   return (
+    <>
     <Dialog open onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         Prescription — Token #{String(token.tokenNumber).padStart(3, '0')}
@@ -295,7 +297,11 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
               {medicines.map((m, i) => (
                 <Paper key={i} variant="outlined" sx={{ p: 1.5 }}>
                   <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: 1 }}>
-                    <TextField size="small" label="Medicine" value={m.name} onChange={(e) => updateMed(i, 'name', e.target.value)} />
+                    <MedicineAutocomplete
+                      value={m.name}
+                      onChange={(name) => updateMed(i, 'name', name)}
+                      size="small"
+                    />
                     <TextField size="small" label="Dosage" value={m.dosage} onChange={(e) => updateMed(i, 'dosage', e.target.value)} />
                     <TextField size="small" label="Duration" value={m.duration} onChange={(e) => updateMed(i, 'duration', e.target.value)} />
                     <TextField size="small" label="Instructions" value={m.instructions} onChange={(e) => updateMed(i, 'instructions', e.target.value)} />
@@ -372,6 +378,7 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
         <Button variant="contained" disabled={mutation.isPending} onClick={() => mutation.mutate()}>Save Prescription</Button>
       </DialogActions>
     </Dialog>
+    </>
   );
 }
 

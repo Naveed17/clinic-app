@@ -15,7 +15,7 @@ export function AppShell(): React.JSX.Element {
           component="main"
           sx={{
             flexGrow: 1,
-            overflowY: 'auto',
+            overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
             minHeight: 0,
@@ -24,10 +24,14 @@ export function AppShell(): React.JSX.Element {
             '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,0,0,0.15)', borderRadius: 99 },
           }}
         >
-          <Box sx={{ px: 2, pt: 2, position: 'sticky', top: 0, zIndex: 10 }}>
+          <Box sx={{ px: 2, pt: 2, position: 'sticky', top: 0, zIndex: 10, flexShrink: 0 }}>
             <Topbar onMenuClick={() => setMobileOpen(true)} />
           </Box>
-          <Box sx={{ flexGrow: 1, px: { xs: 2, sm: 3, lg: 3 }, py: { xs: 2.5, md: 3 }, display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ flexGrow: 1, px: { xs: 2, sm: 3, lg: 3 }, py: { xs: 2.5, md: 3 }, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'auto',
+            '&::-webkit-scrollbar': { width: 6 },
+            '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
+            '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,0,0,0.15)', borderRadius: 99 },
+          }}>
             <Outlet />
           </Box>
         </Box>

@@ -4,6 +4,7 @@ import type { Appointment, AppointmentInput, AppointmentPerson } from './appoint
 import type { Invoice, InvoiceInput, InvoicePerson } from './invoice';
 import type { ReportSummary } from './report';
 import type { LabOrder } from './lab';
+import type { GlobalSearchResult } from './search';
 
 declare global {
   interface Window {
@@ -115,6 +116,9 @@ declare global {
       auth: {
         login: (email: string, password: string) => Promise<{ id: string; name: string; email: string; role: string; avatar: string } | null>;
         changePassword: (userId: string, current: string, next: string) => Promise<{ ok: boolean; error?: string }>;
+      };
+      search: {
+        global: (query: string) => Promise<GlobalSearchResult>;
       };
     };
   }

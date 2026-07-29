@@ -22,7 +22,17 @@ export interface PatientInput {
   chronicConditions?: string | null;
 }
 
-function mapPatientInput(input: PatientInput): Prisma.PatientCreateInput {
+async function generateMrNumber(): Promise<string> {
+  const prisma = getPrisma();
+  const last = await prisma.patient.findFirst({
+    orderBy: { mrNumber: 'desc' },
+    select: { mrNumber: true },
+  });
+  const lastNum = last ? parseInt(last.mrNumber.replace('MR-', ''), 10) : 0;
+  return `MR-${String(lastNum + 1).padStart(5, '0')}`;
+}
+
+function mapPatientInput(input: PatientInput): Omit<Prisma.PatientCreateInput, 'mrNumber'> {
   return {
     firstName: input.firstName.trim(),
     lastName: input.lastName.trim(),
@@ -51,6 +61,7 @@ export async function listPatients({ page, pageSize, search, providerId }: Patie
         { lastName: { contains: search } },
         { phone: { contains: search } },
         { email: { contains: search } },
+        { mrNumber: { contains: search } },
       ],
     } : {}),
   };
@@ -68,7 +79,8 @@ export async function listPatients({ page, pageSize, search, providerId }: Patie
 }
 
 export async function createPatient(input: PatientInput): Promise<Patient> {
-  return getPrisma().patient.create({ data: mapPatientInput(input) });
+  const mrNumber = await generateMrNumber();
+  return getPrisma().patient.create({ data: { ...mapPatientInput(input), mrNumber } });
 }
 
 export async function updatePatient(id: string, input: PatientInput): Promise<Patient> {

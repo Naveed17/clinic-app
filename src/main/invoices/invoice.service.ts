@@ -9,6 +9,7 @@ export interface InvoiceItemInput {
 }
 export interface InvoiceInput {
   patientId: string;
+  drFee: number;
   discount: number;
   notes?: string | null;
   items: InvoiceItemInput[];
@@ -34,8 +35,9 @@ function serializeInvoice(invoice: Prisma.InvoiceGetPayload<{ include: typeof in
 
 function toInvoiceData(input: InvoiceInput): Omit<Prisma.InvoiceUncheckedCreateInput, 'id'> {
   const subtotal = input.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-  const discount = Math.max(0, Math.min(input.discount, subtotal));
-  const total = subtotal - discount;
+  const drFee = Math.max(0, input.drFee || 0);
+  const discount = Math.max(0, Math.min(input.discount, subtotal + drFee));
+  const total = subtotal + drFee - discount;
   return {
     patientId: input.patientId,
     invoiceNumber: `INV-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${randomUUID().slice(0, 6).toUpperCase()}`,

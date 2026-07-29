@@ -20,7 +20,6 @@ import {
   DialogTitle,
   Divider,
   IconButton,
-  InputAdornment,
   List,
   ListItem,
   ListItemText,
@@ -37,11 +36,12 @@ import {
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useColorMode } from '@/app/colorMode';
 import { useAuth } from '@/features/auth/AuthContext';
 import { getNavItems } from './navigation';
 import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
+import { GlobalSearchModal } from '@/components/GlobalSearchModal';
 
 interface TopbarProps {
   onMenuClick: () => void;
@@ -66,6 +66,20 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        openSearch();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [openSearch]);
 
   async function handleChangePassword() {
     if (!pwNew || pwNew.length < 6) { setPwError('New password must be at least 6 characters.'); return; }
@@ -171,29 +185,27 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
 
         {/* Right actions */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
-          <TextField
-            size="small"
-            placeholder="Search…"
-            variant="outlined"
+          <Box
+            onClick={openSearch}
             sx={{
               display: { xs: 'none', lg: 'flex' },
-              width: 180,
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 99,
-                bgcolor: alpha(theme.palette.text.primary, 0.05),
-                '& fieldset': { border: 'none' },
-              },
+              alignItems: 'center',
+              gap: 1,
+              width: 200,
+              px: 1.5,
+              py: 1.2,
+              borderRadius: 99,
+              bgcolor: alpha(theme.palette.text.primary, 0.05),
+              cursor: 'pointer',
+              '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.09) },
+              transition: 'background 0.15s',
             }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
+          >
+            <SearchOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+            <Typography variant="body2" color="text.disabled" sx={{ flex: 1, fontSize: 13 }}>Search…</Typography>
+            <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10, bgcolor: alpha(theme.palette.text.primary, 0.08), px: 0.7, py: 0.2, borderRadius: 1 }}>Ctrl K</Typography>
+          </Box>
+          <GlobalSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
           <Tooltip title={isDarkMode ? 'Light mode' : 'Dark mode'}>
             <IconButton onClick={toggleColorMode} size="small">
               {isDarkMode ? <LightModeOutlinedIcon fontSize="small" /> : <DarkModeOutlinedIcon fontSize="small" />}

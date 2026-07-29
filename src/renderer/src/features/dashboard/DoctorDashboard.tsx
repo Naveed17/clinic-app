@@ -23,15 +23,15 @@ import type { Token } from '@/types/token';
 import type { Appointment } from '@/types/appointment';
 
 const STATUS_COLOR: Record<string, string> = {
-  SCHEDULED:  '#1976d2',
+  SCHEDULED: '#1976d2',
   CHECKED_IN: '#ed6c02',
-  COMPLETED:  '#2e7d32',
-  CANCELLED:  '#9e9e9e',
-  NO_SHOW:    '#d32f2f',
+  COMPLETED: '#2e7d32',
+  CANCELLED: '#9e9e9e',
+  NO_SHOW: '#d32f2f',
 };
 
 const NEXT_STATUS: Partial<Record<string, string>> = {
-  SCHEDULED:  'CHECKED_IN',
+  SCHEDULED: 'CHECKED_IN',
   CHECKED_IN: 'COMPLETED',
 };
 
@@ -93,11 +93,11 @@ export function DoctorDashboard(): React.JSX.Element {
         {/* Stats pills */}
         <Stack direction="row" spacing={1}>
           {[
-            { label: 'Scheduled',  value: appointments.filter((a) => a.status === 'SCHEDULED').length,  color: theme.palette.primary.main },
+            { label: 'Scheduled', value: appointments.filter((a) => a.status === 'SCHEDULED').length, color: theme.palette.primary.main },
             { label: 'Checked In', value: appointments.filter((a) => a.status === 'CHECKED_IN').length, color: theme.palette.warning.main },
-            { label: 'Completed',  value: appointments.filter((a) => a.status === 'COMPLETED').length,  color: theme.palette.success.main },
+            { label: 'Completed', value: appointments.filter((a) => a.status === 'COMPLETED').length, color: theme.palette.success.main },
           ].map((c) => (
-            <Box key={c.label} sx={{ px: 1.5, py: 0.5, borderRadius: 2, bgcolor: alpha(c.color, 0.1), border: '1px solid', borderColor: alpha(c.color, 0.25), textAlign: 'center' }}>
+            <Box key={c.label} sx={{ px: 1.5, py: 0.5, borderRadius: 0.5, bgcolor: alpha(c.color, 0.1), border: '1px solid', borderColor: alpha(c.color, 0.25), textAlign: 'center' }}>
               <Typography sx={{ fontSize: 16, fontWeight: 800, color: c.color, lineHeight: 1 }}>{c.value}</Typography>
               <Typography variant="caption" sx={{ fontSize: 10, color: c.color, opacity: 0.8 }}>{c.label}</Typography>
             </Box>
@@ -188,6 +188,7 @@ export function DoctorDashboard(): React.JSX.Element {
             onDayContextMenu={(date, anchor) => { setContextDate(date); setCtxMenu(anchor); }}
             onAppointmentContextMenu={(appt, anchor) => setApptCtxMenu({ ...anchor, appointment: appt })}
             onAppointmentClick={(appt) => { setEditAppt(appt); setApptDialogOpen(true); }}
+            onPrescriptionClick={(appt) => openPrescription(appt)}
           />
         </Box>
 

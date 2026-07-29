@@ -45,6 +45,7 @@ export interface Invoice {
 }
 export interface InvoiceInput {
   patientId: string;
+  drFee: number;
   discount: number;
   notes?: string | null;
   items: Array<{ description: string; quantity: number; unitPrice: number }>;

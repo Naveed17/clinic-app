@@ -29,6 +29,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { useEffect, useState } from 'react';
 import { invoicesService } from '@/services/invoices.service';
+import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
 import type { Invoice, InvoiceInput, InvoicePerson, Payment } from '@/types/invoice';
 import { InvoicePrintPreview } from './InvoicePrintPreview';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
@@ -168,12 +169,13 @@ const itemSchema = z.object({
 });
 const schema = z.object({
   patientId: z.string().min(1, 'Select a patient.'),
+  drFee: z.number().min(0),
   discount: z.number().min(0),
   notes: z.string(),
   items: z.array(itemSchema).min(1, 'Add at least one item.'),
 });
 type FormValues = z.infer<typeof schema>;
-const defaults: FormValues = { patientId: '', discount: 0, notes: '', items: [{ description: '', quantity: 1, unitPrice: 0 }] };
+const defaults: FormValues = { patientId: '', drFee: 0, discount: 0, notes: '', items: [{ description: '', quantity: 1, unitPrice: 0 }] };
 
 function InvoiceDialog({ open, onClose }: { open: boolean; onClose: () => void }): React.JSX.Element {
   const client = useQueryClient();
@@ -187,10 +189,13 @@ function InvoiceDialog({ open, onClose }: { open: boolean; onClose: () => void }
   useEffect(() => { if (open) form.reset(defaults); }, [form, open]);
   const items = form.watch('items');
   const discount = form.watch('discount');
+  const drFee = form.watch('drFee');
   const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
-  const total = Math.max(0, subtotal - (Number(discount) || 0));
+  const total = Math.max(0, subtotal + (Number(drFee) || 0) - (Number(discount) || 0));
   const errors = form.formState.errors;
+
   return (
+    <>
     <Dialog fullWidth maxWidth="md" open={open} onClose={onClose}>
       <DialogTitle>Create invoice</DialogTitle>
       <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
@@ -205,7 +210,14 @@ function InvoiceDialog({ open, onClose }: { open: boolean; onClose: () => void }
             <Typography fontWeight={700} variant="subtitle2">Items</Typography>
             {fields.fields.map((field, index) => (
               <Box key={field.id} sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) 90px 120px 40px' } }}>
-                <TextField label="Description" {...form.register(`items.${index}.description`)} />
+                <MedicineAutocomplete
+                  label="Description / Medicine"
+                  value={form.watch(`items.${index}.description`)}
+                  onChange={(name, price) => {
+                    form.setValue(`items.${index}.description`, name);
+                    form.setValue(`items.${index}.unitPrice`, price);
+                  }}
+                />
                 <TextField label="Qty" type="number" {...form.register(`items.${index}.quantity`, { valueAsNumber: true })} />
                 <TextField label="Unit price" type="number" {...form.register(`items.${index}.unitPrice`, { valueAsNumber: true })} />
                 <IconButton aria-label="Remove item" disabled={fields.fields.length === 1} onClick={() => fields.remove(index)}>
@@ -216,12 +228,14 @@ function InvoiceDialog({ open, onClose }: { open: boolean; onClose: () => void }
             <Button onClick={() => fields.append({ description: '', quantity: 1, unitPrice: 0 })} startIcon={<AddOutlinedIcon />} sx={{ alignSelf: 'flex-start' }}>
               Add item
             </Button>
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' } }}>
+              <TextField label="Doctor Fee" type="number" {...form.register('drFee', { valueAsNumber: true })} />
               <TextField label="Discount" type="number" {...form.register('discount', { valueAsNumber: true })} />
               <TextField label="Notes" {...form.register('notes')} />
             </Box>
             <Paper variant="outlined" sx={{ p: 2, textAlign: 'right' }}>
-              <Typography color="text.secondary" variant="body2">Subtotal: {money(subtotal)}</Typography>
+              <Typography color="text.secondary" variant="body2">Subtotal (medicines): {money(subtotal)}</Typography>
+              <Typography color="text.secondary" variant="body2">Doctor Fee: {money(Number(drFee) || 0)}</Typography>
               <Typography color="text.secondary" variant="body2">Discount: {money(Number(discount) || 0)}</Typography>
               <Typography fontWeight={700} sx={{ mt: 0.5 }}>Total: {money(total)}</Typography>
             </Paper>
@@ -233,6 +247,7 @@ function InvoiceDialog({ open, onClose }: { open: boolean; onClose: () => void }
         </DialogActions>
       </Box>
     </Dialog>
+    </>
   );
 }
 

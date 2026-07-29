@@ -22,6 +22,7 @@ import {
   FormControlLabel,
   IconButton,
   MenuItem,
+  Paper,
   Stack,
   Switch,
   TextField,
@@ -71,7 +72,7 @@ const empty: FormValues = {
   providerId: '',
   tokenId: '',
   date: new Date().toISOString().slice(0, 10),
-  time: '09:00',
+  time: new Date().toTimeString().slice(0, 5),
   duration: 30,
   reason: '',
   notes: '',
@@ -487,9 +488,9 @@ export function AppointmentsPage(): React.JSX.Element {
   );
 
   return (
-    <>
+    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {view === 'calendar' ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, flex: 1, minHeight: 0 }}>
           <Box sx={{ display: 'flex', alignItems: { sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between' }}>
             <Box>
               <Typography variant="h5" fontWeight={700}>Appointments</Typography>
@@ -500,14 +501,16 @@ export function AppointmentsPage(): React.JSX.Element {
               {!isAdmin && <Button startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }} onClick={() => { setActive(undefined); setDefaultDate(undefined); setOpen(true); }}>Create appointment</Button>}
             </Stack>
           </Box>
-          <AppointmentCalendar
-            appointments={allData}
-            onStatusChange={(id, status) => statusMutation.mutate({ id, status })}
-            onDateClick={isAdmin ? undefined : (date) => { setActive(undefined); setDefaultDate(date); setOpen(true); }}
-            onAppointmentClick={isAdmin ? undefined : (appt) => { setActive(appt); setOpen(true); }}
-            readOnly={isAdmin}
-            hideCheckIn={user?.role !== 'doctor'}
-          />
+          <Paper variant="outlined" sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <AppointmentCalendar
+              appointments={allData}
+              onStatusChange={(id, status) => statusMutation.mutate({ id, status })}
+              onDateClick={isAdmin ? undefined : (date) => { setActive(undefined); setDefaultDate(date); setOpen(true); }}
+              onAppointmentClick={isAdmin ? undefined : (appt) => { setActive(appt); setOpen(true); }}
+              readOnly={isAdmin}
+              hideCheckIn={user?.role !== 'doctor'}
+            />
+          </Paper>
         </Box>
       ) : (
         <TablePageShell
@@ -617,7 +620,7 @@ export function AppointmentsPage(): React.JSX.Element {
         </TablePageShell>
       )}
       <AppointmentDialog appointment={active} open={open} defaultDate={defaultDate} defaultProviderId={user?.role === 'doctor' ? user.id : undefined} onClose={() => setOpen(false)} />
-    </>
+    </Box>
   );
 }
 

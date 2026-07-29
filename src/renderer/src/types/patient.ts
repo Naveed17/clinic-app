@@ -1,5 +1,6 @@
 export interface Patient {
   id: string;
+  mrNumber: string;
   firstName: string;
   lastName: string;
   dateOfBirth: Date | string | null;

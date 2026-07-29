@@ -75,6 +75,7 @@ model DoctorProfile {
 
 model Patient {
   id           String   @id @default(uuid())
+  mrNumber     String   @unique
   firstName    String
   lastName     String
   dateOfBirth  DateTime?
@@ -97,6 +98,7 @@ model Patient {
 
   @@index([lastName, firstName])
   @@index([phone])
+  @@index([mrNumber])
 }
 
 model PatientDocument {
@@ -285,6 +287,16 @@ model LabOrder {
   @@index([orderedById])
   @@index([tokenId])
   @@index([status])
+}
+
+model Medicine {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  price     Decimal  @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
 }
 
 model LabReport {

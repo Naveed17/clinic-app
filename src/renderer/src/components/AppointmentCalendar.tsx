@@ -8,6 +8,7 @@ import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
 import {
   alpha, Avatar, Box, Button, Chip, Divider, Fade, IconButton,
   Paper, Popper, Stack, Typography, useTheme,
@@ -45,11 +46,12 @@ interface Props {
   onAppointmentClick?: (appointment: Appointment) => void;
   onDayContextMenu?: (date: string, anchor: { mouseX: number; mouseY: number }) => void;
   onAppointmentContextMenu?: (appointment: Appointment, anchor: { mouseX: number; mouseY: number }) => void;
+  onPrescriptionClick?: (appointment: Appointment) => void;
   readOnly?: boolean;
   hideCheckIn?: boolean;
 }
 
-export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu, readOnly = false, hideCheckIn = false }: Props): React.JSX.Element {
+export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu, onPrescriptionClick, readOnly = false, hideCheckIn = false }: Props): React.JSX.Element {
   const theme = useTheme();
   const today = new Date();
 
@@ -98,7 +100,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
       }}
     >
       {/* ── Left: Calendar grid ── */}
-      <Box sx={{ flex: 1, p: 3, overflow: 'auto', minWidth: 0 }}>
+      <Box sx={{ flex: 1, p: 3, overflow: 'auto', minWidth: 0, minHeight: 0 }}>
         {/* Month nav */}
         <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2.5 }}>
           <Typography variant="h6" fontWeight={700}>{MONTHS[cursor.getMonth()]}</Typography>
@@ -326,7 +328,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
       <Divider orientation="vertical" flexItem />
 
       {/* ── Right: Day schedule ── */}
-      <Box sx={{ width: 340, flexShrink: 0, p: 3, display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden' }}>
+      <Box sx={{ width: 340, flexShrink: 0, p: 3, display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden', minHeight: 0, alignSelf: 'stretch' }}>
         <Box>
           <Typography variant="subtitle1" fontWeight={700}>Scheduled</Typography>
           <Typography variant="caption" color="text.secondary">
@@ -398,6 +400,12 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                           <IconButton size="small" onClick={() => onAppointmentClick(a)}
                             sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, p: 0.4 }}>
                             <EditOutlinedIcon sx={{ fontSize: 14 }} />
+                          </IconButton>
+                        )}
+                        {onPrescriptionClick && a.status === 'COMPLETED' && (
+                          <IconButton size="small" onClick={() => onPrescriptionClick(a)}
+                            sx={{ border: '1px solid', borderColor: 'success.main', borderRadius: 1.5, p: 0.4, color: 'success.main' }}>
+                            <MedicalServicesOutlinedIcon sx={{ fontSize: 14 }} />
                           </IconButton>
                         )}
                         {!readOnly && next && !(hideCheckIn && next === 'CHECKED_IN') && (

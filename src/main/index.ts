@@ -33,6 +33,8 @@ import { registerTokenIpc } from './tokens/token.ipc';
 import { registerLabIpc } from './lab/lab.ipc';
 import { registerLicenseIpc } from './license/license.ipc';
 import { registerAuthIpc } from './auth/auth.ipc';
+import { registerSearchIpc } from './search/search.ipc';
+import { registerMedicineIpc } from './medicines/medicine.ipc';
 import { registerScheduleIpc } from './doctors/schedule.ipc';
 import { seedDefaultAdmin } from './auth/seed';
 
@@ -130,6 +132,8 @@ app.whenReady().then(async () => {
   registerUserIpc();
   registerDoctorIpc();
   registerSettingsIpc();
+  registerSearchIpc();
+  registerMedicineIpc();
   startDiscoveryListener(); // always listen so admin can also scan
   createWindow();
 

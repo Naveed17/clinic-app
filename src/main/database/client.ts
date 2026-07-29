@@ -62,6 +62,17 @@ export async function initializeDatabase(): Promise<void> {
   if (!patientCols.includes('bloodGroup')) await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "bloodGroup" TEXT');
   if (!patientCols.includes('allergies')) await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "allergies" TEXT');
   if (!patientCols.includes('chronicConditions')) await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "chronicConditions" TEXT');
+  if (!patientCols.includes('mrNumber')) {
+    await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "mrNumber" TEXT NOT NULL DEFAULT \'\'');
+    // Backfill existing rows with unique MR numbers
+    const existing = await database.$queryRawUnsafe<{ id: string }[]>('SELECT id FROM "Patient" WHERE "mrNumber" = \'\'  ORDER BY "createdAt" ASC');
+    for (let i = 0; i < existing.length; i++) {
+      const num = String(i + 1).padStart(5, '0');
+      await database.$executeRawUnsafe(`UPDATE "Patient" SET "mrNumber" = 'MR-${num}' WHERE "id" = '${existing[i].id}'`);
+    }
+    await database.$executeRawUnsafe('CREATE UNIQUE INDEX IF NOT EXISTS "Patient_mrNumber_key" ON "Patient"("mrNumber")');
+    await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "Patient_mrNumber_idx" ON "Patient"("mrNumber")');
+  }
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Appointment" (
       "id" TEXT NOT NULL PRIMARY KEY,
@@ -294,6 +305,20 @@ export async function initializeDatabase(): Promise<void> {
   );
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "DoctorAttendance_date_idx" ON "DoctorAttendance"("date")',
+  );
+
+  // Medicine table
+  await database.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "Medicine" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "name" TEXT NOT NULL UNIQUE,
+      "price" DECIMAL NOT NULL DEFAULT 0,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" DATETIME NOT NULL
+    )
+  `);
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Medicine_name_idx" ON "Medicine"("name")',
   );
 
   // Prescription table
