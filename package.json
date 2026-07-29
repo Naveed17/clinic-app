@@ -1,8 +1,9 @@
 {
   "name": "care-flow",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "private": true,
   "description": "CareFlow desktop application",
+  "author": "Naveed17",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -17,8 +18,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "node scripts/studio.js",
     "db:reset": "del /f /q \"%APPDATA%\\CareFlow\\clinic.db\" && echo Database reset done!",
-    "dist": "npm run prisma:generate && npm run build && electron-builder",
-    "dist:publish": "npm run prisma:generate && npm run build && electron-builder --publish always"
+    "dist": "npm run prisma:generate && npm run build && npx electron-builder",
+    "dist:publish": "npm run prisma:generate && npm run build && npx electron-builder --publish always"
   },
   "build": {
     "appId": "com.careflow.app",
