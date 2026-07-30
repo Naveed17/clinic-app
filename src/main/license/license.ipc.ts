@@ -10,6 +10,16 @@ function getLicenseFilePath(): string {
   return join(app.getPath('userData'), 'license.dat');
 }
 
+function getModulesCacheFilePath(): string {
+  return join(app.getPath('userData'), 'license-modules.json');
+}
+
+type ModulesCache = {
+  key: string;
+  modules: Record<string, boolean>;
+  updatedAt: string;
+};
+
 // Computer ka Machine/Hardware ID
 function getHWID(): string {
   try {
@@ -34,6 +44,52 @@ function getSavedKey(): string | null {
     return readFileSync(file, 'utf-8').trim();
   } catch {
     return null;
+  }
+}
+
+function getCachedModules(key: string): Record<string, boolean> | null {
+  try {
+    const file = getModulesCacheFilePath();
+    if (!existsSync(file)) return null;
+    const cache = JSON.parse(readFileSync(file, 'utf-8')) as ModulesCache;
+    if (cache.key !== key || !cache.modules || typeof cache.modules !== 'object') return null;
+    if (!Object.values(cache.modules).every((value) => typeof value === 'boolean')) return null;
+    return cache.modules;
+  } catch {
+    return null;
+  }
+}
+
+function saveModulesCache(key: string, modules: Record<string, boolean>): void {
+  try {
+    const cache: ModulesCache = { key, modules, updatedAt: new Date().toISOString() };
+    writeFileSync(getModulesCacheFilePath(), JSON.stringify(cache), 'utf-8');
+  } catch {
+    // A cache write failure must not prevent a valid online response from being used.
+  }
+}
+
+/**
+ * Gets the latest module permissions when online and falls back to the last
+ * successful response for the currently activated license when offline.
+ */
+export async function getLicenseModules(): Promise<Record<string, boolean> | null> {
+  const savedKey = getSavedKey();
+  if (!savedKey) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/license/modules`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: savedKey }),
+    });
+    const data = (await response.json()) as { ok: boolean; modules?: Record<string, boolean> };
+    if (!data.ok || !data.modules) return getCachedModules(savedKey);
+
+    saveModulesCache(savedKey, data.modules);
+    return data.modules;
+  } catch {
+    return getCachedModules(savedKey);
   }
 }
 
@@ -77,19 +133,7 @@ export function registerLicenseIpc(): void {
 
   // Modules fetch IPC
   ipcMain.handle('license:modules', async () => {
-    const savedKey = getSavedKey();
-    if (!savedKey) return null;
-    try {
-      const response = await fetch(`${API_BASE_URL}/license/modules`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: savedKey }),
-      });
-      const data = (await response.json()) as { ok: boolean; modules?: Record<string, boolean> };
-      return data.ok ? data.modules ?? null : null;
-    } catch {
-      return null; // offline: null means all modules enabled (fallback)
-    }
+    return await getLicenseModules();
   });
 
   // Activation IPC
@@ -113,6 +157,9 @@ export function registerLicenseIpc(): void {
 
       if (data.ok) {
         writeFileSync(getLicenseFilePath(), formattedKey, 'utf-8');
+        try {
+          unlinkSync(getModulesCacheFilePath());
+        } catch {}
         return { ok: true };
       }
 

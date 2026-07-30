@@ -132,6 +132,7 @@ declare global {
         install: () => Promise<void>;
         onProgress: (handler: (percent: number) => void) => () => void;
         onReady: (handler: () => void) => () => void;
+        getVersion: () => Promise<string>;
       };
     };
   }

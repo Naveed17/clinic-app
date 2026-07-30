@@ -62,10 +62,17 @@ export function AuthProvider({ children }: PropsWithChildren): React.JSX.Element
   useEffect(() => {
     globalLogout = logout;
     const handler = () => logout();
+    const permissionRevokedHandler = (event: Event) => {
+      const message = (event as CustomEvent<string>).detail || 'This role is not enabled for this clinic.';
+      sessionStorage.setItem('clinic-auth-error', message);
+      logout();
+    };
     window.addEventListener('clinic:session-expired', handler);
+    window.addEventListener('clinic:permission-revoked', permissionRevokedHandler);
     return () => {
       globalLogout = null;
       window.removeEventListener('clinic:session-expired', handler);
+      window.removeEventListener('clinic:permission-revoked', permissionRevokedHandler);
     };
   }, [logout]);
 

@@ -119,6 +119,7 @@ declare global {
         install: () => Promise<void>;
         onProgress: (handler: (percent: number) => void) => () => void;
         onReady: (handler: () => void) => () => void;
+        getVersion: () => Promise<string>;
       };
       auth: {
         login: (email: string, password: string) => Promise<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | { blocked: true; error?: string } | null>;

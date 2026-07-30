@@ -45,14 +45,18 @@ export function SettingsPage(): React.JSX.Element {
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'latest' | 'error'>('idle');
-
+  const [currentVersion, setCurrentVersion] = useState<string>('1.0.0');
   useEffect(() => {
     if (updateStatus === 'latest' || updateStatus === 'error') {
       const t = setTimeout(() => setUpdateStatus('idle'), 3000);
       return () => clearTimeout(t);
     }
   }, [updateStatus]);
-
+  useEffect(() => {
+    void window.clinic?.update?.getVersion?.().then((ver: string) => {
+      if (ver) setCurrentVersion(ver);
+    });
+  }, []);
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
   useEffect(() => {
     const cleanupProgress = window.clinic?.update?.onProgress?.((percent: number) => {
@@ -218,6 +222,12 @@ export function SettingsPage(): React.JSX.Element {
 
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>App Update</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Check if a newer version is available.</Typography>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Current Version:
+              </Typography>
+              <Chip label={`v${currentVersion}`} size="small" variant="outlined" color="primary" sx={{ fontWeight: 600, height: 20 }} />
+            </Stack>
             <Box sx={{ position: 'relative' }}>
               {/* Update Button State */}
               {updateStatus === 'ready' ? (

@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState, useMemo, type PropsWithChildren } from 'react';
+import { useAuth, type UserRole } from './AuthContext';
 
 export interface LicenseModules {
   doctorDashboard: boolean;
@@ -14,33 +15,67 @@ export interface LicenseModules {
   manageUsers: boolean;
 }
 
-const ALL_ENABLED: LicenseModules = {
-  doctorDashboard: true,
-  labDashboard: true,
-  billing: true,
-  reports: true,
-  statistics: true,
-  tokens: true,
-  manageDoctors: true,
-  managePatients: true,
-  manageMedicines: true,
-  manageUsers: true,
+const NO_MODULES_ENABLED: LicenseModules = {
+  doctorDashboard: false,
+  labDashboard: false,
+  billing: false,
+  reports: false,
+  statistics: false,
+  tokens: false,
+  manageDoctors: false,
+  managePatients: false,
+  manageMedicines: false,
+  manageUsers: false,
 };
 
-const LicenseModulesContext = createContext<LicenseModules>(ALL_ENABLED);
+interface LicenseModulesContextValue {
+  modules: LicenseModules;
+  loaded: boolean;
+}
+
+const LicenseModulesContext = createContext<LicenseModulesContextValue>({
+  modules: NO_MODULES_ENABLED,
+  loaded: false,
+});
+
+function isRoleDisabled(role: UserRole | undefined, modules: LicenseModules): boolean {
+  const roleModule: Partial<Record<UserRole, keyof LicenseModules>> = {
+    doctor: 'doctorDashboard',
+    lab_technician: 'labDashboard',
+  };
+  const moduleKey = role ? roleModule[role] : undefined;
+  return Boolean(moduleKey && !modules[moduleKey]);
+}
 
 export function LicenseModulesProvider({ children }: PropsWithChildren): React.JSX.Element {
-  const [modules, setModules] = useState<LicenseModules>(ALL_ENABLED);
+  const { user, logout } = useAuth();
+  const [modules, setModules] = useState<LicenseModules>(NO_MODULES_ENABLED);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    window.clinic.license.modules()
+    const refreshModules = () => window.clinic.license.modules()
       .then((data: Record<string, boolean> | null) => {
-        if (data) setModules({ ...ALL_ENABLED, ...data });
+        const nextModules = { ...NO_MODULES_ENABLED, ...data };
+        setModules(nextModules);
+        if (isRoleDisabled(user?.role, nextModules)) {
+          sessionStorage.setItem('clinic-auth-error', 'This role is not enabled for this clinic.');
+          logout();
+        }
       })
-      .catch(() => {}); // offline fallback: all enabled
-  }, []);
+      .catch(() => {
+        if (isRoleDisabled(user?.role, NO_MODULES_ENABLED)) {
+          sessionStorage.setItem('clinic-auth-error', 'This role is not enabled for this clinic.');
+          logout();
+        }
+      }) // Without a verified cache, gated modules remain locked.
+      .finally(() => setLoaded(true));
 
-  const value = useMemo(() => modules, [modules]);
+    void refreshModules();
+    window.addEventListener('online', refreshModules);
+    return () => window.removeEventListener('online', refreshModules);
+  }, [logout, user?.role]);
+
+  const value = useMemo(() => ({ modules, loaded }), [loaded, modules]);
 
   return (
     <LicenseModulesContext.Provider value={value}>
@@ -50,5 +85,9 @@ export function LicenseModulesProvider({ children }: PropsWithChildren): React.J
 }
 
 export function useLicenseModules(): LicenseModules {
-  return useContext(LicenseModulesContext);
+  return useContext(LicenseModulesContext).modules;
+}
+
+export function useLicenseModulesLoaded(): boolean {
+  return useContext(LicenseModulesContext).loaded;
 }

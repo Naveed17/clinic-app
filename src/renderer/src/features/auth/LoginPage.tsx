@@ -104,7 +104,11 @@ export function LoginPage(): React.JSX.Element {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(() => {
+    const message = sessionStorage.getItem('clinic-auth-error') || '';
+    sessionStorage.removeItem('clinic-auth-error');
+    return message;
+  });
   const [loading, setLoading] = useState(false);
 
   // Server discovery

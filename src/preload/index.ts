@@ -362,9 +362,10 @@ const api = {
       ),
   },
  update: {
-  check: () => ipc<'available' | 'latest' | 'error'>('app:check-for-updates'),
-  install: () => ipc('app:install-update'),
-  
+  getVersion: () => ipcRenderer.invoke('app:get-version'),
+  check: () => ipcRenderer.invoke('app:check-for-updates'),
+  install: () => ipcRenderer.invoke('app:install-update'),
+
   onProgress: (handler: (percent: number) => void) => {
     const listener = (_: unknown, percent: number) => handler(percent);
     ipcRenderer.on('app:update-progress', listener);
@@ -372,6 +373,7 @@ const api = {
       ipcRenderer.removeListener('app:update-progress', listener);
     };
   },
+
   onReady: (handler: () => void) => {
     const listener = () => handler();
     ipcRenderer.on('app:update-ready', listener);

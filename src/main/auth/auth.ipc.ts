@@ -1,29 +1,7 @@
 import { ipcMain } from 'electron';
 import { getPrisma } from '../database/client';
 import { signToken } from '../backend/middleware/auth';
-import { isLicenseActivated } from '../license/license.ipc';
-
-// Fetch modules from license server
-async function fetchLicenseModules(): Promise<Record<string, boolean> | null> {
-  const { readFileSync, existsSync } = await import('node:fs');
-  const { join } = await import('node:path');
-  const { app } = await import('electron');
-  const filePath = join(app.getPath('userData'), 'license.dat');
-  if (!existsSync(filePath)) return null;
-  const key = readFileSync(filePath, 'utf-8').trim();
-  const API_BASE_URL = process.env.API_BASE_URL || 'https://clinic-license-six.vercel.app/api';
-  try {
-    const res = await fetch(`${API_BASE_URL}/license/modules`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key }),
-    });
-    const data = (await res.json()) as { ok: boolean; modules?: Record<string, boolean> };
-    return data.ok ? (data.modules ?? null) : null;
-  } catch {
-    return null; // offline: no restriction
-  }
-}
+import { getLicenseModules } from '../license/license.ipc';
 
 const ROLE_MODULE: Record<string, string> = {
   doctor:         'doctorDashboard',
@@ -54,8 +32,9 @@ export function registerAuthIpc(): void {
     // Module check: block login if role's module is disabled
     const moduleKey = ROLE_MODULE[role];
     if (moduleKey) {
-      const modules = await fetchLicenseModules();
-      if (modules && modules[moduleKey] === false) {
+      const modules = await getLicenseModules();
+      // No verified permissions available (e.g. first run while offline) is denied.
+      if (!modules || modules[moduleKey] !== true) {
         return { blocked: true, error: 'This role is not enabled for this clinic.' };
       }
     }
