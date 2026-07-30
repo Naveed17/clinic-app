@@ -19,7 +19,7 @@
     "prisma:studio": "node scripts/studio.js",
     "db:reset": "del /f /q \"%APPDATA%\\CareFlow\\clinic.db\" && echo Database reset done!",
     "dist": "npm run prisma:generate && npm run build && npx electron-builder",
-    "dist:publish": "npm run prisma:generate && npm run build && npx electron-builder --publish always"
+    "dist:publish": "npm run prisma:generate && npm run build && npx electron-builder --win --publish always"
   },
   "build": {
     "appId": "com.careflow.app",
@@ -44,7 +44,9 @@
       }
     ],
     "win": {
-      "target": "nsis",
+      "target": [
+        "nsis"
+      ],
       "icon": "src/main/assets/icons/icon.ico"
     },
     "mac": {
@@ -56,11 +58,13 @@
     "directories": {
       "output": "release"
     },
-    "publish": {
-      "provider": "github",
-      "owner": "Naveed17",
-      "repo": "clinic-app"
-    }
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Naveed17",
+        "repo": "clinic-app"
+      }
+    ]
   },
   "dependencies": {
     "@date-io/date-fns": "^3.2.1",
