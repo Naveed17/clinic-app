@@ -14,6 +14,7 @@ import {
   Typography,
   useTheme,
   alpha,
+  LinearProgress,
 } from '@mui/material';
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import LaptopOutlinedIcon from '@mui/icons-material/LaptopOutlined';
@@ -43,7 +44,7 @@ export function SettingsPage(): React.JSX.Element {
   const [backupStatus, setBackupStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
-  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'latest' | 'error'>('idle');
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'latest' | 'error'>('idle');
 
   useEffect(() => {
     if (updateStatus === 'latest' || updateStatus === 'error') {
@@ -51,6 +52,23 @@ export function SettingsPage(): React.JSX.Element {
       return () => clearTimeout(t);
     }
   }, [updateStatus]);
+
+  const [downloadProgress, setDownloadProgress] = useState<number>(0);
+  useEffect(() => {
+    const cleanupProgress = window.clinic?.update?.onProgress?.((percent: number) => {
+      setUpdateStatus('downloading');
+      setDownloadProgress(percent);
+    });
+
+    const cleanupReady = window.clinic?.update?.onReady?.(() => {
+      setUpdateStatus('ready');
+    });
+
+    return () => {
+      cleanupProgress?.();
+      cleanupReady?.();
+    };
+  }, []);
   const [prevMode, setPrevMode] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [discovered, setDiscovered] = useState<{ ip: string; port: number; name: string }[]>([]);
@@ -76,8 +94,8 @@ export function SettingsPage(): React.JSX.Element {
   async function handleCheckUpdate() {
     try {
       setUpdateStatus('checking');
+      setDownloadProgress(0);
 
-      // Safety check ke IPC API expose hui hai ya nahi
       if (!window.clinic?.update?.check) {
         console.error('Update IPC API not found');
         setUpdateStatus('error');
@@ -85,11 +103,19 @@ export function SettingsPage(): React.JSX.Element {
       }
 
       const result = await window.clinic.update.check();
-      setUpdateStatus(result || 'error');
+      if (result === 'available') {
+        setUpdateStatus('downloading');
+      } else {
+        setUpdateStatus(result || 'error');
+      }
     } catch (err) {
       console.error('Failed to check for updates:', err);
       setUpdateStatus('error');
     }
+  }
+
+  function handleInstallUpdate() {
+    void window.clinic?.update?.install();
   }
 
   useEffect(() => {
@@ -193,23 +219,59 @@ export function SettingsPage(): React.JSX.Element {
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>App Update</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Check if a newer version is available.</Typography>
             <Box sx={{ position: 'relative' }}>
-              <Button
-                variant="outlined"
-                startIcon={updateStatus === 'checking' ? <CircularProgress size={16} /> : <SystemUpdateAltOutlinedIcon />}
-                disabled={updateStatus === 'checking'}
-                onClick={() => void handleCheckUpdate()}
-              >
-                Check for Updates
-              </Button>
-              <Box sx={{ position: 'absolute', top: '100%', left: 0, mt: 1, '& .MuiAlert-message': { whiteSpace: 'nowrap' } }}>
-                {updateStatus === 'available' && (
-                  <Alert severity="info">Update downloading in background. You'll be notified when ready.</Alert>
+              {/* Update Button State */}
+              {updateStatus === 'ready' ? (
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={<SystemUpdateAltOutlinedIcon />}
+                  onClick={handleInstallUpdate}
+                >
+                  Restart & Install Update
+                </Button>
+              ) : (
+                <Button
+                  variant="outlined"
+                  startIcon={updateStatus === 'checking' ? <CircularProgress size={16} /> : <SystemUpdateAltOutlinedIcon />}
+                  disabled={updateStatus === 'checking' || updateStatus === 'downloading'}
+                  onClick={() => void handleCheckUpdate()}
+                >
+                  Check for Updates
+                </Button>
+              )}
+
+              {/* Progress Bar & Status Messages */}
+              <Box sx={{ mt: 1.5 }}>
+                {updateStatus === 'downloading' && (
+                  <Box sx={{ width: '100%' }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                        Downloading update...
+                      </Typography>
+                      <Typography variant="caption" color="primary.main" fontWeight={700}>
+                        {downloadProgress}%
+                      </Typography>
+                    </Stack>
+                    <LinearProgress variant="determinate" value={downloadProgress} sx={{ height: 6, borderRadius: 3 }} />
+                  </Box>
                 )}
+
+                {updateStatus === 'ready' && (
+                  <Alert severity="success" sx={{ py: 0.5 }}>
+                    Update downloaded! Click restart to apply.
+                  </Alert>
+                )}
+
                 {updateStatus === 'latest' && (
-                  <Alert severity="success">You're on the latest version.</Alert>
+                  <Alert severity="success" sx={{ py: 0.5 }}>
+                    You're on the latest version.
+                  </Alert>
                 )}
+
                 {updateStatus === 'error' && (
-                  <Alert severity="warning">Could not check for updates. Check your internet connection.</Alert>
+                  <Alert severity="warning" sx={{ py: 0.5 }}>
+                    Could not check for updates. Check internet connection.
+                  </Alert>
                 )}
               </Box>
             </Box>

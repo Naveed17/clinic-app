@@ -127,6 +127,12 @@ declare global {
       search: {
         global: (query: string) => Promise<unknown>;
       };
+      update: {
+        check: () => Promise<'available' | 'latest' | 'error'>;
+        install: () => Promise<void>;
+        onProgress: (handler: (percent: number) => void) => () => void;
+        onReady: (handler: () => void) => () => void;
+      };
     };
   }
 }

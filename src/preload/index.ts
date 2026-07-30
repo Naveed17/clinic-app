@@ -361,14 +361,25 @@ const api = {
         'search:global', query,
       ),
   },
-  update: {
-    onReady: (handler: () => void) => {
-      ipcRenderer.on('app:update-ready', handler);
-      return () => ipcRenderer.removeAllListeners('app:update-ready');
-    },
-    install: () => ipc('app:install-update'),
-    check: () => ipc<'available' | 'latest' | 'error'>('app:check-for-updates'),
+ update: {
+  check: () => ipc<'available' | 'latest' | 'error'>('app:check-for-updates'),
+  install: () => ipc('app:install-update'),
+  
+  onProgress: (handler: (percent: number) => void) => {
+    const listener = (_: unknown, percent: number) => handler(percent);
+    ipcRenderer.on('app:update-progress', listener);
+    return () => {
+      ipcRenderer.removeListener('app:update-progress', listener);
+    };
   },
+  onReady: (handler: () => void) => {
+    const listener = () => handler();
+    ipcRenderer.on('app:update-ready', listener);
+    return () => {
+      ipcRenderer.removeListener('app:update-ready', listener);
+    };
+  },
+},
   auth: {
     login: async (email: string, password: string) => {
       await settingsReady;

@@ -41,6 +41,12 @@ autoUpdater.setFeedURL({
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  
+  autoUpdater.on('download-progress', (progressObj) => {
+    BrowserWindow.getAllWindows().forEach((w) =>
+      w.webContents.send('app:update-progress', Math.round(progressObj.percent))
+    );
+  });
 
   autoUpdater.on('update-downloaded', () => {
     BrowserWindow.getAllWindows().forEach((w) =>
