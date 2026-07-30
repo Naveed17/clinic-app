@@ -25,6 +25,7 @@ declare global {
         getForPatient: (patientId: string, date: string) => Promise<Token | null>;
         upsertPrescription: any;
         list: (date: string) => Promise<Token[]>;
+        listPrescriptions: (date: string) => Promise<import('./token').PrescriptionFeedItem[]>;
         doctors: () => Promise<TokenPerson[]>;
         patients: () => Promise<TokenPerson[]>;
         create: (input: TokenInput) => Promise<Token>;

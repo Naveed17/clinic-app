@@ -18,6 +18,15 @@ export interface PrescriptionInput {
   advice: string;
 }
 
+export interface PrescriptionFeedItem {
+  id: string;
+  tokenId: string;
+  tokenNumber: number;
+  patientName: string;
+  doctorName: string;
+  createdAt: string;
+}
+
 const tokenInclude = {
   patient: { select: { id: true, firstName: true, lastName: true, mrNumber: true } },
   doctor:  { select: { id: true, firstName: true, lastName: true } },
@@ -53,6 +62,23 @@ export async function listTokens(date: string) {
           advice: r.advice, createdAt: r.prescriptionCreatedAt }
       : null,
   }));
+}
+
+export async function listPrescriptionFeed(date: string): Promise<PrescriptionFeedItem[]> {
+  const db = getPrisma();
+  const rows = await db.$queryRawUnsafe<PrescriptionFeedItem[]>(`
+    SELECT pr.id, pr.tokenId, t.tokenNumber,
+           p.firstName || ' ' || p.lastName AS patientName,
+           u.firstName || ' ' || u.lastName AS doctorName,
+           pr.createdAt
+    FROM "Prescription" pr
+    JOIN "Token" t ON t.id = pr.tokenId
+    JOIN "Patient" p ON p.id = t.patientId
+    JOIN "User" u ON u.id = t.doctorId
+    WHERE t.date = '${date}'
+    ORDER BY pr.createdAt DESC
+  `);
+  return rows;
 }
 
 export async function listTokenDoctors() {

@@ -245,6 +245,11 @@ const api = {
         () => request(`/api/tokens?date=${date}`),
         'tokens:list', date,
       ),
+    listPrescriptions: (date: string) =>
+      call(
+        () => request(`/api/tokens/prescriptions?date=${date}`),
+        'tokens:list-prescriptions', date,
+      ),
     doctors: () => call(() => request('/api/tokens/doctors'), 'tokens:doctors'),
     patients: () => call(() => request('/api/tokens/patients'), 'tokens:patients'),
     create: (input: unknown) =>
@@ -263,7 +268,10 @@ const api = {
         'tokens:delete', id,
       ),
     upsertPrescription: (tokenId: string, input: unknown) =>
-      ipc('tokens:upsert-prescription', tokenId, input),
+      call(
+        () => request(`/api/tokens/${tokenId}/prescription`, { method: 'PUT', body: JSON.stringify(input) }),
+        'tokens:upsert-prescription', tokenId, input,
+      ),
   },
   lab: {
     list: () => call(() => request('/api/lab'), 'lab:list'),

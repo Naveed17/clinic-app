@@ -76,6 +76,10 @@ function ReceiptDocument({ invoice, clinicName, clinicAddress, clinicPhone }: {
   clinicAddress: string;
   clinicPhone: string;
 }) {
+  // Doctor fee is included in the invoice total but is not stored as a separate
+  // database column. Derive it from the medicines subtotal, discount, and total.
+  const doctorFee = Math.max(0, invoice.total + invoice.discount - invoice.subtotal);
+
   return (
     <Document>
       <Page size={[226, 720]} style={styles.page} wrap={false}>
@@ -127,6 +131,13 @@ function ReceiptDocument({ invoice, clinicName, clinicAddress, clinicPhone }: {
             <Text style={styles.itemPrice}>{money(item.lineTotal)}</Text>
           </View>
         ))}
+        {doctorFee > 0 && (
+          <View style={styles.row}>
+            <Text style={styles.itemLabel}>Doctor Fee</Text>
+            <Text style={styles.itemQty}>-</Text>
+            <Text style={styles.itemPrice}>{money(doctorFee)}</Text>
+          </View>
+        )}
 
         <Text style={styles.stars}>{STAR_LINE}</Text>
 
@@ -141,10 +152,6 @@ function ReceiptDocument({ invoice, clinicName, clinicAddress, clinicPhone }: {
             <Text style={styles.subValue}>- {money(invoice.discount)}</Text>
           </View>
         )}
-        <View style={styles.row}>
-          <Text style={styles.subLabel}>Subtotal</Text>
-          <Text style={styles.subValue}>{money(invoice.subtotal)}</Text>
-        </View>
 
         {invoice.notes ? (
           <>

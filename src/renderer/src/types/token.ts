@@ -53,3 +53,12 @@ export interface PrescriptionInput {
   tests: string[];
   advice: string;
 }
+
+export interface PrescriptionFeedItem {
+  id: string;
+  tokenId: string;
+  tokenNumber: number;
+  patientName: string;
+  doctorName: string;
+  createdAt: string;
+}

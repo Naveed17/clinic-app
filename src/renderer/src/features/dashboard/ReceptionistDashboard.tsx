@@ -24,8 +24,9 @@ import { appointmentsService } from '@/services/appointments.service';
 import { patientsService } from '@/services/patients.service';
 import { invoicesService } from '@/services/invoices.service';
 import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
+import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
 import { useNavigate } from 'react-router-dom';
-import type { TokenPerson, Token } from '@/types/token';
+import type { TokenPerson, Token, PrescriptionFeedItem } from '@/types/token';
 import type { PatientInput } from '@/types/patient';
 
 const statusColor: Record<string, 'default' | 'primary' | 'success' | 'error' | 'warning'> = {
@@ -301,16 +302,28 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
 
 function PrescriptionFeed(): React.JSX.Element {
   const theme = useTheme();
-  const [feed, setFeed] = useState<{ id: string; message: string; time: string }[]>([]);
+  const queryClient = useQueryClient();
+  const date = new Date().toISOString().slice(0, 10);
+  const [selectedToken, setSelectedToken] = useState<Token | null>(null);
+  const { data: feed = [] } = useQuery<PrescriptionFeedItem[]>({
+    queryKey: ['prescription-feed', date],
+    queryFn: () => window.clinic.tokens.listPrescriptions(date),
+    refetchInterval: 30_000,
+  });
+  const { data: tokens = [] } = useQuery<Token[]>({
+    queryKey: ['tokens', date],
+    queryFn: () => window.clinic.tokens.list(date) as Promise<Token[]>,
+    refetchInterval: 30_000,
+  });
 
   useEffect(() => {
     const unsub = realtimeService.onNotification((n: RealtimeNotification) => {
       if (n.payload?.entity === 'prescription') {
-        setFeed((prev) => [{ id: n.id, message: n.message, time: n.createdAt }, ...prev].slice(0, 20));
+        void queryClient.invalidateQueries({ queryKey: ['prescription-feed', date] });
       }
     });
     return unsub;
-  }, []);
+  }, [date, queryClient]);
 
   return (
     <Paper variant="outlined" sx={{ p: 2.5, minWidth: 200 }}>
@@ -326,14 +339,28 @@ function PrescriptionFeed(): React.JSX.Element {
         <Stack spacing={1}>
           {feed.map((item) => (
             <Box key={item.id} sx={{ p: 1, borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, 0.05), border: '1px solid', borderColor: alpha(theme.palette.primary.main, 0.15) }}>
-              <Typography variant="caption" fontWeight={600} sx={{ display: 'block' }}>{item.message}</Typography>
-              <Typography variant="caption" color="text.disabled">
-                {new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              <Typography variant="caption" fontWeight={600} sx={{ display: 'block' }}>
+                {item.patientName} — Dr. {item.doctorName} (Token #{String(item.tokenNumber).padStart(3, '0')})
               </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.25 }}>
+                <Typography variant="caption" color="text.disabled">
+                  {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Typography>
+                <Button
+                  size="small"
+                  startIcon={<PrintOutlinedIcon sx={{ fontSize: 14 }} />}
+                  onClick={() => setSelectedToken(tokens.find((token) => token.id === item.tokenId) ?? null)}
+                  disabled={!tokens.some((token) => token.id === item.tokenId)}
+                  sx={{ px: 0, minWidth: 0, fontSize: 11 }}
+                >
+                  View PDF
+                </Button>
+              </Box>
             </Box>
           ))}
         </Stack>
       )}
+      {selectedToken && <PrescriptionPrintPreview token={selectedToken} onClose={() => setSelectedToken(null)} />}
     </Paper>
   );
 }

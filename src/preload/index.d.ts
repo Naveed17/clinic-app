@@ -51,6 +51,7 @@ declare global {
       tokens: {
         getForPatient: (patientId: string, date: string) => Promise<unknown>;
         list: (date: string) => Promise<unknown>;
+        listPrescriptions: (date: string) => Promise<unknown>;
         doctors: () => Promise<unknown>;
         patients: () => Promise<unknown>;
         create: (input: unknown) => Promise<unknown>;
