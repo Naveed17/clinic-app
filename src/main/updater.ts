@@ -9,8 +9,6 @@ autoUpdater.setFeedURL({
   provider: 'github',
   owner: 'Naveed17',
   repo: 'clinic-app',
-  // Agar Public Repo hai toh token zaroori nahi hota, 
-  // lekin Private Repo ke liye yeh help karta hai:
   ...(githubToken && { token: githubToken })
 });
 
