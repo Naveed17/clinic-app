@@ -17,7 +17,6 @@ autoUpdater.setFeedURL({
     autoUpdater.quitAndInstall();
   });
 
-  // Manual Check Trigger from Frontend
   ipcMain.handle('app:check-for-updates', async () => {
     if (is.dev) return 'latest';
     try {
