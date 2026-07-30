@@ -3,13 +3,13 @@ import { ipcMain, BrowserWindow } from 'electron';
 import { is } from '@electron-toolkit/utils';
 
 export function initAutoUpdater(): void {
-  
-  autoUpdater.logger = console; 
-  
+  autoUpdater.logger = console;
+
   autoUpdater.setFeedURL({
     provider: 'github',
     owner: 'Naveed17',
-    repo: 'clinic-app'
+    repo: 'clinic-app',
+    releaseType: 'release'
   });
 
   // Manual Install Trigger
@@ -23,19 +23,17 @@ export function initAutoUpdater(): void {
     try {
       const result = await autoUpdater.checkForUpdates();
       
-      // Update info check karein
       if (result && result.updateInfo) {
         const currentVersion = autoUpdater.currentVersion.version;
         const latestVersion = result.updateInfo.version;
         
-        // Agar latest version naya hai toh 'available' return karein
         if (latestVersion !== currentVersion) {
           return 'available';
         }
       }
       return 'latest';
     } catch (error) {
-      console.error('Auto-updater error:', error);
+      console.error('AutoUpdater Error:', error);
       return 'error';
     }
   });
@@ -55,7 +53,8 @@ export function initAutoUpdater(): void {
     console.error('AutoUpdater Event Error:', err);
   });
 
-  // Initial Check & Interval
+  // 1. Initial check jab app start ho
   void autoUpdater.checkForUpdates();
+
   setInterval(() => void autoUpdater.checkForUpdates(), 4 * 60 * 60 * 1000);
 }
