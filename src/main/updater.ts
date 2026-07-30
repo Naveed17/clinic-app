@@ -4,13 +4,15 @@ import { is } from '@electron-toolkit/utils';
 
 export function initAutoUpdater(): void {
   autoUpdater.logger = console;
-
-  autoUpdater.setFeedURL({
-    provider: 'github',
-    owner: 'Naveed17',
-    repo: 'clinic-app',
-    releaseType: 'release'
-  });
+const githubToken = process.env.GH_TOKEN;
+autoUpdater.setFeedURL({
+  provider: 'github',
+  owner: 'Naveed17',
+  repo: 'clinic-app',
+  // Agar Public Repo hai toh token zaroori nahi hota, 
+  // lekin Private Repo ke liye yeh help karta hai:
+  ...(githubToken && { token: githubToken })
+});
 
   // Manual Install Trigger
   ipcMain.handle('app:install-update', () => {
