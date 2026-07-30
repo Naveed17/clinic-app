@@ -74,9 +74,22 @@ export function SettingsPage(): React.JSX.Element {
   }
 
   async function handleCheckUpdate() {
-    setUpdateStatus('checking');
-    const result = await window.clinic?.update.check();
-    setUpdateStatus(result ?? 'error');
+    try {
+      setUpdateStatus('checking');
+
+      // Safety check ke IPC API expose hui hai ya nahi
+      if (!window.clinic?.update?.check) {
+        console.error('Update IPC API not found');
+        setUpdateStatus('error');
+        return;
+      }
+
+      const result = await window.clinic.update.check();
+      setUpdateStatus(result || 'error');
+    } catch (err) {
+      console.error('Failed to check for updates:', err);
+      setUpdateStatus('error');
+    }
   }
 
   useEffect(() => {
@@ -180,25 +193,25 @@ export function SettingsPage(): React.JSX.Element {
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>App Update</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Check if a newer version is available.</Typography>
             <Box sx={{ position: 'relative' }}>
-            <Button
-              variant="outlined"
-              startIcon={updateStatus === 'checking' ? <CircularProgress size={16} /> : <SystemUpdateAltOutlinedIcon />}
-              disabled={updateStatus === 'checking'}
-              onClick={() => void handleCheckUpdate()}
-            >
-              Check for Updates
-            </Button>
-            <Box sx={{ position: 'absolute', top: '100%', left: 0, mt: 1, '& .MuiAlert-message': { whiteSpace: 'nowrap' } }}>
-            {updateStatus === 'available' && (
-              <Alert severity="info">Update downloading in background. You'll be notified when ready.</Alert>
-            )}
-            {updateStatus === 'latest' && (
-              <Alert severity="success">You're on the latest version.</Alert>
-            )}
-            {updateStatus === 'error' && (
-              <Alert severity="warning">Could not check for updates. Check your internet connection.</Alert>
-            )}
-            </Box>
+              <Button
+                variant="outlined"
+                startIcon={updateStatus === 'checking' ? <CircularProgress size={16} /> : <SystemUpdateAltOutlinedIcon />}
+                disabled={updateStatus === 'checking'}
+                onClick={() => void handleCheckUpdate()}
+              >
+                Check for Updates
+              </Button>
+              <Box sx={{ position: 'absolute', top: '100%', left: 0, mt: 1, '& .MuiAlert-message': { whiteSpace: 'nowrap' } }}>
+                {updateStatus === 'available' && (
+                  <Alert severity="info">Update downloading in background. You'll be notified when ready.</Alert>
+                )}
+                {updateStatus === 'latest' && (
+                  <Alert severity="success">You're on the latest version.</Alert>
+                )}
+                {updateStatus === 'error' && (
+                  <Alert severity="warning">Could not check for updates. Check your internet connection.</Alert>
+                )}
+              </Box>
             </Box>
           </Box>
 

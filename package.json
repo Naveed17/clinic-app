@@ -1,6 +1,10 @@
 {
   "name": "care-flow",
-  "version": "0.1.4",
+  "version": "0.1.5",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Naveed17/clinic-app.git"
+  },
   "private": true,
   "description": "CareFlow desktop application",
   "author": "Naveed17",
@@ -87,6 +91,7 @@
     "bwip-js": "^4.11.2",
     "cors": "^2.8.6",
     "date-fns": "^4.4.0",
+    "electron-log": "^5.4.4",
     "electron-updater": "^6.8.9",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
