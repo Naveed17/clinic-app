@@ -18,6 +18,7 @@ import { SettingsPage } from '@/features/settings/SettingsPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { RouteAccessGate } from '@/components/RouteAccessGate';
 import { LicensePage } from '@/features/auth/LicensePage';
+import { SetupWizard } from '@/features/auth/SetupWizard';
 import { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import { CircularProgress } from '@mui/material';
@@ -145,35 +146,37 @@ const router = createHashRouter([
 
 export function AppRouter(): React.JSX.Element {
   const [licensed, setLicensed] = useState<boolean | null>(null);
+  const [setupDone, setSetupDone] = useState<boolean | null>(null);
 
   useEffect(() => {
     window.clinic.license.status()
-      .then((isOk) => setLicensed(Boolean(isOk)))
+      .then((isOk) => {
+        setLicensed(Boolean(isOk));
+        if (isOk) {
+          void window.clinic.settings.get().then((s) => setSetupDone(Boolean(s.setupDone)));
+        }
+      })
       .catch(() => setLicensed(false));
   }, []);
 
-  // 1. Initial State: Screen Load hotay waqt Spinner dikhana
-  if (licensed === null) {
+  if (licensed === null || (licensed && setupDone === null)) {
     return (
-      <Box
-        sx={{
-          height: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          bgcolor: 'background.default'
-        }}
-      >
+      <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default' }}>
         <CircularProgress />
       </Box>
     );
   }
 
-
   if (!licensed) {
-    return <LicensePage onActivated={() => setLicensed(true)} />;
+    return <LicensePage onActivated={() => {
+      setLicensed(true);
+      void window.clinic.settings.get().then((s) => setSetupDone(Boolean(s.setupDone)));
+    }} />;
   }
 
-  // 3. Fully Activated State: Main App Router Open hona
+  if (!setupDone) {
+    return <SetupWizard onDone={() => setSetupDone(true)} />;
+  }
+
   return <RouterProvider router={router} />;
 }

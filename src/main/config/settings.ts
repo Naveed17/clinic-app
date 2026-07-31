@@ -9,6 +9,7 @@ export interface AppSettings {
   clinicName: string;
   clinicAddress: string;
   clinicPhone: string;
+  setupDone: boolean;
 }
 
 const DEFAULTS: AppSettings = {
@@ -18,6 +19,7 @@ const DEFAULTS: AppSettings = {
   clinicName: 'CLINIC MANAGEMENT',
   clinicAddress: '',
   clinicPhone: '',
+  setupDone: false,
 };
 
 function getPath(): string {

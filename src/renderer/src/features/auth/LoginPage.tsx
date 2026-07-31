@@ -2,6 +2,7 @@ import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import LocalHospitalOutlinedIcon from '@mui/icons-material/LocalHospitalOutlined';
+import LaptopOutlinedIcon from '@mui/icons-material/LaptopOutlined';
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import WifiTetheringIcon from '@mui/icons-material/WifiTethering';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -119,9 +120,11 @@ export function LoginPage(): React.JSX.Element {
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState('');
   const [connected, setConnected] = useState(false);
+  const [serverMode, setServerMode] = useState<string>('local');
 
   useEffect(() => {
     void window.clinic?.settings.get().then((s) => {
+      setServerMode(s.serverMode);
       if (s.serverMode === 'lan-client' && s.clientApiUrl) setConnected(true);
     });
     const unsub = window.clinic?.settings.onServerFound((server) => {
@@ -145,11 +148,10 @@ export function LoginPage(): React.JSX.Element {
     setConnectError('');
     try {
       await window.clinic?.settings.save({ serverMode: 'lan-client', clientApiUrl: selectedUrl });
-      setConnected(true);
-      setServerPanelOpen(false);
+      // Reload so preload re-initializes apiUrl with the new server
+      window.location.reload();
     } catch {
       setConnectError('Could not save settings.');
-    } finally {
       setConnecting(false);
     }
   }
@@ -219,6 +221,40 @@ export function LoginPage(): React.JSX.Element {
           },
         }}
       >
+        {/* Machine Role Badge */}
+        {serverMode && (
+          <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1.5 }}>
+            {serverMode === 'lan-server' && (
+              <Stack direction="row" alignItems="center" spacing={0.6}
+                sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(15,118,110,0.25)', border: '1px solid rgba(15,118,110,0.5)' }}>
+                <DnsOutlinedIcon sx={{ fontSize: 13, color: '#4ade80' }} />
+                <Typography variant="caption" sx={{ color: '#4ade80', fontWeight: 700, fontSize: 11 }}>LAN Server</Typography>
+              </Stack>
+            )}
+            {serverMode === 'local' && (
+              <Stack direction="row" alignItems="center" spacing={0.6}
+                sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                <LaptopOutlinedIcon sx={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }} />
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, fontSize: 11 }}>Standalone</Typography>
+              </Stack>
+            )}
+            {serverMode === 'lan-client' && connected && (
+              <Stack direction="row" alignItems="center" spacing={0.6}
+                sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.4)' }}>
+                <CheckCircleOutlineIcon sx={{ fontSize: 13, color: '#60a5fa' }} />
+                <Typography variant="caption" sx={{ color: '#60a5fa', fontWeight: 700, fontSize: 11 }}>LAN Client — Connected</Typography>
+              </Stack>
+            )}
+            {serverMode === 'lan-client' && !connected && (
+              <Stack direction="row" alignItems="center" spacing={0.6}
+                sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)' }}>
+                <WifiTetheringIcon sx={{ fontSize: 13, color: '#f87171' }} />
+                <Typography variant="caption" sx={{ color: '#f87171', fontWeight: 700, fontSize: 11 }}>LAN Client — Not Connected</Typography>
+              </Stack>
+            )}
+          </Stack>
+        )}
+
         {/* Logo */}
         <Stack direction="row" alignItems="center" gap={1.5} sx={{ mb: 3 }}>
           <Box sx={{ width: 42, height: 42, borderRadius: 2.5, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(15,118,110,0.6)' }}>
@@ -303,76 +339,78 @@ export function LoginPage(): React.JSX.Element {
           </Button>
         </Stack>
 
-        {/* Connect to LAN Server */}
-        <Box sx={{ mt: 3 }}>
-          <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', mb: 2 }} />
-          {connected ? (
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <CheckCircleOutlineIcon sx={{ color: '#4ade80', fontSize: 18 }} />
-              <Typography variant="caption" sx={{ color: '#4ade80' }}>Connected to clinic server</Typography>
-              <Button size="small" sx={{ ml: 'auto !important', color: 'rgba(255,255,255,0.4)', fontSize: 11 }} onClick={() => { setConnected(false); setServerPanelOpen(true); }}>
-                Change
-              </Button>
-            </Stack>
-          ) : (
-            <Button
-              fullWidth
-              variant="outlined"
-              size="small"
-              startIcon={<WifiTetheringIcon />}
-              onClick={() => setServerPanelOpen((v) => !v)}
-              sx={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.6)', borderRadius: 2, '&:hover': { borderColor: 'rgba(255,255,255,0.4)', bgcolor: 'rgba(255,255,255,0.05)' } }}
-            >
-              Connect to Clinic Server (LAN)
-            </Button>
-          )}
-
-          <Collapse in={serverPanelOpen}>
-            <Stack spacing={1.5} sx={{ mt: 2 }}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>Available servers on network:</Typography>
-                <Button size="small" startIcon={scanning ? <CircularProgress size={12} sx={{ color: 'inherit' }} /> : <WifiTetheringIcon />} onClick={handleScan} disabled={scanning} sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
-                  {scanning ? 'Scanning...' : 'Scan'}
+        {/* Connect to LAN Server — only shown on lan-client machines */}
+        {serverMode === 'lan-client' && (
+          <Box sx={{ mt: 3 }}>
+            <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', mb: 2 }} />
+            {connected ? (
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <CheckCircleOutlineIcon sx={{ color: '#4ade80', fontSize: 18 }} />
+                <Typography variant="caption" sx={{ color: '#4ade80' }}>Connected to clinic server</Typography>
+                <Button size="small" sx={{ ml: 'auto !important', color: 'rgba(255,255,255,0.4)', fontSize: 11 }} onClick={() => { setConnected(false); setServerPanelOpen(true); }}>
+                  Change
                 </Button>
               </Stack>
-
-              {discovered.length > 0 ? (
-                <List disablePadding sx={{ borderRadius: 2, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.12)' }}>
-                  {discovered.map((server) => {
-                    const url = `http://${server.ip}:${server.port}`;
-                    const sel = selectedUrl === url;
-                    return (
-                      <ListItemButton key={server.ip} selected={sel} onClick={() => setSelectedUrl(url)} sx={{ py: 1, bgcolor: sel ? 'rgba(15,118,110,0.25)' : 'rgba(255,255,255,0.04)', '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' }, '&.Mui-selected': { bgcolor: 'rgba(15,118,110,0.25)' } }}>
-                        <DnsOutlinedIcon sx={{ color: sel ? '#4ade80' : 'rgba(255,255,255,0.3)', fontSize: 18, mr: 1.5 }} />
-                        <ListItemText
-                          primary={server.name}
-                          secondary={url}
-                          primaryTypographyProps={{ color: '#fff', fontSize: 13, fontWeight: sel ? 700 : 400 }}
-                          secondaryTypographyProps={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: 'monospace' }}
-                        />
-                        {sel && <CheckCircleOutlineIcon sx={{ color: '#4ade80', fontSize: 18 }} />}
-                      </ListItemButton>
-                    );
-                  })}
-                </List>
-              ) : (
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.35)', textAlign: 'center', display: 'block', py: 1 }}>
-                  {scanning ? 'Looking for servers...' : 'No servers found. Click Scan.'}
-                </Typography>
-              )}
-
-              {connectError && (
-                <Alert severity="error" sx={{ bgcolor: 'rgba(211,47,47,0.2)', color: '#ff8a80', border: '1px solid rgba(211,47,47,0.35)', '& .MuiAlert-icon': { color: '#ff8a80' }, py: 0.5 }}>
-                  {connectError}
-                </Alert>
-              )}
-
-              <Button fullWidth variant="contained" size="small" disabled={!selectedUrl || connecting} onClick={() => void handleConnect()} sx={{ borderRadius: 2, background: 'linear-gradient(90deg,#0f766e,#16a34a)', fontWeight: 700 }}>
-                {connecting ? 'Connecting...' : 'Connect & Save'}
+            ) : (
+              <Button
+                fullWidth
+                variant="outlined"
+                size="small"
+                startIcon={<WifiTetheringIcon />}
+                onClick={() => setServerPanelOpen((v) => !v)}
+                sx={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.6)', borderRadius: 2, '&:hover': { borderColor: 'rgba(255,255,255,0.4)', bgcolor: 'rgba(255,255,255,0.05)' } }}
+              >
+                Connect to Clinic Server (LAN)
               </Button>
-            </Stack>
-          </Collapse>
-        </Box>
+            )}
+
+            <Collapse in={serverPanelOpen}>
+              <Stack spacing={1.5} sx={{ mt: 2 }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>Available servers on network:</Typography>
+                  <Button size="small" startIcon={scanning ? <CircularProgress size={12} sx={{ color: 'inherit' }} /> : <WifiTetheringIcon />} onClick={handleScan} disabled={scanning} sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
+                    {scanning ? 'Scanning...' : 'Scan'}
+                  </Button>
+                </Stack>
+
+                {discovered.length > 0 ? (
+                  <List disablePadding sx={{ borderRadius: 2, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.12)' }}>
+                    {discovered.map((server) => {
+                      const url = `http://${server.ip}:${server.port}`;
+                      const sel = selectedUrl === url;
+                      return (
+                        <ListItemButton key={server.ip} selected={sel} onClick={() => setSelectedUrl(url)} sx={{ py: 1, bgcolor: sel ? 'rgba(15,118,110,0.25)' : 'rgba(255,255,255,0.04)', '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' }, '&.Mui-selected': { bgcolor: 'rgba(15,118,110,0.25)' } }}>
+                          <DnsOutlinedIcon sx={{ color: sel ? '#4ade80' : 'rgba(255,255,255,0.3)', fontSize: 18, mr: 1.5 }} />
+                          <ListItemText
+                            primary={server.name}
+                            secondary={url}
+                            primaryTypographyProps={{ color: '#fff', fontSize: 13, fontWeight: sel ? 700 : 400 }}
+                            secondaryTypographyProps={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: 'monospace' }}
+                          />
+                          {sel && <CheckCircleOutlineIcon sx={{ color: '#4ade80', fontSize: 18 }} />}
+                        </ListItemButton>
+                      );
+                    })}
+                  </List>
+                ) : (
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.35)', textAlign: 'center', display: 'block', py: 1 }}>
+                    {scanning ? 'Looking for servers...' : 'No servers found. Click Scan.'}
+                  </Typography>
+                )}
+
+                {connectError && (
+                  <Alert severity="error" sx={{ bgcolor: 'rgba(211,47,47,0.2)', color: '#ff8a80', border: '1px solid rgba(211,47,47,0.35)', '& .MuiAlert-icon': { color: '#ff8a80' }, py: 0.5 }}>
+                    {connectError}
+                  </Alert>
+                )}
+
+                <Button fullWidth variant="contained" size="small" disabled={!selectedUrl || connecting} onClick={() => void handleConnect()} sx={{ borderRadius: 2, background: 'linear-gradient(90deg,#0f766e,#16a34a)', fontWeight: 700 }}>
+                  {connecting ? 'Connecting...' : 'Connect & Save'}
+                </Button>
+              </Stack>
+            </Collapse>
+          </Box>
+        )}
       </Box>
     </Box>
   );

@@ -24,7 +24,7 @@ import { registerReportIpc } from './reports/report.ipc';
 import { registerUserIpc } from './users/user.ipc';
 import { registerDoctorIpc } from './doctors/doctor.ipc';
 import { registerSettingsIpc } from './settings/settings.ipc';
-import { getSettings } from './config/settings';
+import { getSettings, saveSettings } from './config/settings';
 import { startDiscoveryBroadcast, stopDiscoveryBroadcast } from './discovery/discovery.server';
 import { startDiscoveryListener, stopDiscoveryListener } from './discovery/discovery.client';
 import { registerBackupIpc } from './backup/backup.ipc';
@@ -105,8 +105,34 @@ app.whenReady().then(async () => {
   try {
     const settings = getSettings();
     if (settings.serverMode === 'lan-client' && settings.clientApiUrl) {
-      // Client mode — point to remote server, skip local DB + backend
-      process.env.CLINIC_API_URL = settings.clientApiUrl;
+      // Verify remote server is reachable before committing to client mode
+      const reachable = await new Promise<boolean>((resolve) => {
+        const { request } = require('node:http') as typeof import('node:http');
+        const req = request(`${settings.clientApiUrl}/health`, { timeout: 5000 }, (res) => {
+          let data = '';
+          res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+          res.on('end', () => {
+            try { resolve((JSON.parse(data) as { ok: boolean }).ok === true); }
+            catch { resolve(false); }
+          });
+        });
+        req.on('error', () => resolve(false));
+        req.on('timeout', () => { req.destroy(); resolve(false); });
+        req.end();
+      });
+
+      if (reachable) {
+        // Client mode — point to remote server, skip local DB + backend
+        process.env.CLINIC_API_URL = settings.clientApiUrl;
+      } else {
+        // Server unreachable — fall back to local mode so app doesn't break
+        console.warn('LAN server unreachable, falling back to local mode');
+        saveSettings({ serverMode: 'local' });
+        await initializeDatabase();
+        await seedDefaultAdmin();
+        backendServer = await startBackendServer(environment.apiPort);
+        process.env.CLINIC_API_URL = backendServer.url;
+      }
     } else {
       // Server or local mode — start local backend
       await initializeDatabase();

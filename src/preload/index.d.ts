@@ -99,7 +99,7 @@ declare global {
         sendChatMessage: (message: unknown) => Promise<boolean>;
       };
       settings: {
-        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName?: string; clinicAddress?: string; clinicPhone?: string }>;
+        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName?: string; clinicAddress?: string; clinicPhone?: string; setupDone?: boolean }>;
         save: (patch: unknown) => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number }>;
         lanIp: () => Promise<string>;
         discoveredServers: () => Promise<{ ip: string; port: number; name: string }[]>;

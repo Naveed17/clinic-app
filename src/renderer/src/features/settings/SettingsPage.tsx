@@ -73,6 +73,7 @@ export function SettingsPage(): React.JSX.Element {
       cleanupReady?.();
     };
   }, []);
+  const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   const [prevMode, setPrevMode] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [discovered, setDiscovered] = useState<{ ip: string; port: number; name: string }[]>([]);
@@ -123,7 +124,14 @@ export function SettingsPage(): React.JSX.Element {
   }
 
   useEffect(() => {
-    void window.clinic?.settings.get().then((s) => { setSettings(s); setPrevMode(s.serverMode); }).catch(() => {
+    void window.clinic?.settings.get().then((s) => {
+      setSettings(s);
+      setPrevMode(s.serverMode);
+      // Check if current lan-client connection is alive
+      if (s.serverMode === 'lan-client' && s.clientApiUrl) {
+        void window.clinic?.settings.testConnection(s.clientApiUrl).then((ok) => setConnectionOk(ok ?? false));
+      }
+    }).catch(() => {
       setSettings({ serverMode: 'local', clientApiUrl: '', lanPort: 3333, clinicName: '', clinicAddress: '', clinicPhone: '' });
     });
     void window.clinic?.settings.lanIp().then((ip) => setLanIp(ip));
@@ -296,6 +304,11 @@ export function SettingsPage(): React.JSX.Element {
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                 Configure how this machine connects to the clinic network.
               </Typography>
+              {settings.serverMode === 'lan-client' && connectionOk === false && (
+                <Alert severity="error" sx={{ mt: 1.5 }}>
+                  LAN server unreachable. App has fallen back to local mode. Please check the server URL and save again.
+                </Alert>
+              )}
             </Box>
 
             <Divider />

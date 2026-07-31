@@ -80,8 +80,8 @@ declare global {
         upsert: (doctorId: string, slots: { dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }[]) => Promise<{ id: string; doctorId: string; dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }[]>;
       };
       settings: {
-        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string }>;
-        save: (patch: unknown) => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string }>;
+        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean }>;
+        save: (patch: unknown) => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean }>;
         lanIp: () => Promise<string>;
         discoveredServers: () => Promise<{ ip: string; port: number; name: string }[]>;
         testConnection: (url: string) => Promise<boolean>;
