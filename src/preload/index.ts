@@ -381,11 +381,6 @@ const api = {
       lowStock:     () => ipc('pharmacy:medicines:low-stock'),
       delete:       (id: string) => ipc('pharmacy:medicines:delete', id),
     },
-    sales: {
-      create: (input: unknown) => ipc('pharmacy:sales:create', input),
-      list:   (filters?: unknown) => ipc('pharmacy:sales:list', filters),
-      get:    (id: string) => ipc('pharmacy:sales:get', id),
-    },
   },
   search: {
     global: (query: string) =>

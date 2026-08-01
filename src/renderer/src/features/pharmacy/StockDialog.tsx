@@ -1,6 +1,6 @@
 import {
-  Button, Dialog, DialogActions, DialogContent, DialogTitle,
-  Grid, MenuItem, Stack, TextField, Typography,
+  Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
+  MenuItem, Stack, TextField, Typography,
 } from '@mui/material';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -31,7 +31,7 @@ export function StockDialog({ medicine, onClose }: Props): React.JSX.Element {
   const isEdit = Boolean(medicine?.id);
 
   const { control, handleSubmit, formState: { errors } } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       name:         medicine?.name         ?? '',
       price:        medicine?.price        ?? 0,
@@ -47,6 +47,7 @@ export function StockDialog({ medicine, onClose }: Props): React.JSX.Element {
       window.clinic.pharmacy.medicines.upsert({ id: medicine?.id, ...data }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['pharmacy-medicines'] });
+      void qc.invalidateQueries({ queryKey: ['pharmacy-low-stock'] });
       onClose();
     },
   });
@@ -60,45 +61,39 @@ export function StockDialog({ medicine, onClose }: Props): React.JSX.Element {
             <TextField {...field} label="Medicine Name" error={!!errors.name} helperText={errors.name?.message} fullWidth autoFocus />
           )} />
 
-          <Grid container spacing={2}>
-            <Grid item xs={6}>
-              <Controller name="category" control={control} render={({ field }) => (
-                <TextField {...field} select label="Category" fullWidth>
-                  {CATEGORIES.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-                </TextField>
-              )} />
-            </Grid>
-            <Grid item xs={6}>
-              <Controller name="unit" control={control} render={({ field }) => (
-                <TextField {...field} select label="Unit" fullWidth>
-                  {UNITS.map(u => <MenuItem key={u} value={u}>{u}</MenuItem>)}
-                </TextField>
-              )} />
-            </Grid>
-          </Grid>
+          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
+            <Controller name="category" control={control} render={({ field }) => (
+              <TextField {...field} select label="Category" fullWidth>
+                {CATEGORIES.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+              </TextField>
+            )} />
+            <Controller name="unit" control={control} render={({ field }) => (
+              <TextField {...field} select label="Unit" fullWidth>
+                {UNITS.map(u => <MenuItem key={u} value={u}>{u}</MenuItem>)}
+              </TextField>
+            )} />
+          </Box>
 
-          <Grid container spacing={2}>
-            <Grid item xs={4}>
-              <Controller name="price" control={control} render={({ field }) => (
-                <TextField {...field} label="Price (Rs.)" type="number" error={!!errors.price} helperText={errors.price?.message} fullWidth inputProps={{ min: 0, step: 0.5 }} />
-              )} />
-            </Grid>
-            <Grid item xs={4}>
-              <Controller name="stock" control={control} render={({ field }) => (
-                <TextField {...field} label="Current Stock" type="number" error={!!errors.stock} helperText={errors.stock?.message} fullWidth inputProps={{ min: 0 }} />
-              )} />
-            </Grid>
-            <Grid item xs={4}>
-              <Controller name="reorderLevel" control={control} render={({ field }) => (
-                <TextField {...field} label="Reorder Level" type="number" error={!!errors.reorderLevel} helperText={errors.reorderLevel?.message} fullWidth inputProps={{ min: 0 }} />
-              )} />
-            </Grid>
-          </Grid>
+          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr 1fr' }}>
+            <Controller name="price" control={control} render={({ field }) => (
+              <TextField {...field} label="Price (Rs.)" type="number"
+                error={!!errors.price} helperText={errors.price?.message}
+                fullWidth inputProps={{ min: 0, step: 0.5 }} />
+            )} />
+            <Controller name="stock" control={control} render={({ field }) => (
+              <TextField {...field} label="Current Stock" type="number"
+                error={!!errors.stock} helperText={errors.stock?.message}
+                fullWidth inputProps={{ min: 0 }} />
+            )} />
+            <Controller name="reorderLevel" control={control} render={({ field }) => (
+              <TextField {...field} label="Reorder Level" type="number"
+                error={!!errors.reorderLevel} helperText={errors.reorderLevel?.message}
+                fullWidth inputProps={{ min: 0 }} />
+            )} />
+          </Box>
 
           {mutation.isError && (
-            <Typography color="error" variant="caption">
-              Failed to save. Please try again.
-            </Typography>
+            <Typography color="error" variant="caption">Failed to save. Please try again.</Typography>
           )}
         </Stack>
       </DialogContent>
@@ -106,7 +101,7 @@ export function StockDialog({ medicine, onClose }: Props): React.JSX.Element {
         <Button onClick={onClose} color="inherit">Cancel</Button>
         <Button
           variant="contained"
-          loading={mutation.isPending}
+          disabled={mutation.isPending}
           onClick={handleSubmit(d => mutation.mutate(d))}
         >
           {isEdit ? 'Save Changes' : 'Add Medicine'}

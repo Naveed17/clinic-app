@@ -6,6 +6,20 @@ import type { ReportSummary } from './report';
 import type { LabOrder } from './lab';
 import type { GlobalSearchResult } from './search';
 
+// ── Pharmacy types ────────────────────────────────────────────────────────────
+interface PharmacyMedicine {
+  id: string; name: string; price: number;
+  category: string; unit: string;
+  stock: number; reorderLevel: number;
+  createdAt: string; updatedAt: string;
+}
+interface PharmacyMedicineInput {
+  id?: string; name: string; price: number;
+  category: string; unit: string;
+  stock: number; reorderLevel: number;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 declare global {
   interface Window {
     clinic: {
@@ -14,6 +28,7 @@ declare global {
         status: () => Promise<boolean>;
         activate: (key: string) => Promise<{ ok: boolean; error?: string }>;
         modules: () => Promise<Record<string, boolean> | null>;
+        info: () => Promise<{ key: string; expiresAt: string | null; activatedAt: string; updatedAt: string } | null>;
       };
       patients: {
         list: (input: PatientListInput) => Promise<{ data: Patient[]; total: number }>;
@@ -87,6 +102,7 @@ declare global {
         testConnection: (url: string) => Promise<boolean>;
         scan: () => Promise<{ ip: string; port: number; name: string }[]>;
         onServerFound: (handler: (server: { ip: string; port: number; name: string }) => void) => () => void;
+        onLanReconnected: (handler: (url: string) => void) => () => void;
       };
       backup: {
         create: () => Promise<{ ok: boolean; canceled?: boolean; path?: string; error?: string }>;
@@ -114,6 +130,18 @@ declare global {
         create: (input: { patientId: string; orderedById: string; test: string; tokenId?: string; notes?: string }) => Promise<LabOrder>;
         updateStatus: (id: string, status: string) => Promise<LabOrder>;
         saveResult: (id: string, result: string) => Promise<LabOrder>;
+      };
+      print: {
+        html: (html: string) => Promise<void>;
+      };
+      pharmacy: {
+        medicines: {
+          list:        (search?: string) => Promise<PharmacyMedicine[]>;
+          upsert:      (data: PharmacyMedicineInput) => Promise<PharmacyMedicine>;
+          adjustStock: (id: string, delta: number) => Promise<PharmacyMedicine>;
+          lowStock:    () => Promise<PharmacyMedicine[]>;
+          delete:      (id: string) => Promise<void>;
+        };
       };
       update: {
         check: () => Promise<'available' | 'latest' | 'error'>;

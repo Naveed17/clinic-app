@@ -1,38 +1,30 @@
 import type { ElectronAPI } from '@electron-toolkit/preload';
 
-// ── Pharmacy shared types ────────────────────────────────────────────────────
-interface PharmacyMedicine {
-  id: string; name: string; price: number;
-  category: string; unit: string;
-  stock: number; reorderLevel: number;
-  createdAt: string; updatedAt: string;
-}
-interface PharmacyMedicineInput {
-  id?: string; name: string; price: number;
-  category: string; unit: string;
-  stock: number; reorderLevel: number;
-}
-interface PharmacySaleItem {
-  id: string; medicineId: string; medicineName: string;
-  quantity: number; unitPrice: number; lineTotal: number;
-}
-interface PharmacySaleInput {
-  patientId?: string | null; tokenId?: string | null;
-  soldById: string; saleDate: string;
-  notes?: string | null;
-  items: { medicineId: string; medicineName: string; quantity: number; unitPrice: number }[];
-}
-interface PharmacySale {
-  id: string; patientId: string | null; tokenId: string | null;
-  soldById: string; saleDate: string; total: number;
-  notes: string | null; createdAt: string; updatedAt: string;
-  patientName: string | null; soldByName: string;
-  tokenNumber: number | null;
-  items: PharmacySaleItem[];
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
 declare global {
+  // ── Pharmacy shared types ──────────────────────────────────────────────────
+  interface PharmacyMedicine {
+    id: string;
+    name: string;
+    price: number;
+    category: string;
+    unit: string;
+    stock: number;
+    reorderLevel: number;
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  interface PharmacyMedicineInput {
+    id?: string;
+    name: string;
+    price: number;
+    category: string;
+    unit: string;
+    stock: number;
+    reorderLevel: number;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
   interface Window {
     electron: ElectronAPI;
     clinic: {
@@ -131,8 +123,20 @@ declare global {
         sendChatMessage: (message: unknown) => Promise<boolean>;
       };
       settings: {
-        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName?: string; clinicAddress?: string; clinicPhone?: string; setupDone?: boolean }>;
-        save: (patch: unknown) => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number }>;
+        get: () => Promise<{
+          serverMode: 'local' | 'lan-server' | 'lan-client';
+          clientApiUrl: string;
+          lanPort: number;
+          clinicName?: string;
+          clinicAddress?: string;
+          clinicPhone?: string;
+          setupDone?: boolean;
+        }>;
+        save: (patch: unknown) => Promise<{
+          serverMode: 'local' | 'lan-server' | 'lan-client';
+          clientApiUrl: string;
+          lanPort: number;
+        }>;
         lanIp: () => Promise<string>;
         discoveredServers: () => Promise<{ ip: string; port: number; name: string }[]>;
         testConnection: (url: string) => Promise<boolean>;
@@ -141,7 +145,10 @@ declare global {
         onLanReconnected: (handler: (url: string) => void) => () => void;
       };
       auth: {
-        login: (email: string, password: string) => Promise<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | { blocked: true; error?: string } | null>;
+        login: (
+          email: string,
+          password: string
+        ) => Promise<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | { blocked: true; error?: string } | null>;
         changePassword: (userId: string, current: string, next: string) => Promise<{ ok: boolean; error?: string }>;
       };
       print: {
@@ -161,16 +168,11 @@ declare global {
       };
       pharmacy: {
         medicines: {
-          list:        (search?: string) => Promise<PharmacyMedicine[]>;
-          upsert:      (data: PharmacyMedicineInput) => Promise<PharmacyMedicine>;
+          list: (search?: string) => Promise<PharmacyMedicine[]>;
+          upsert: (data: PharmacyMedicineInput) => Promise<PharmacyMedicine>;
           adjustStock: (id: string, delta: number) => Promise<PharmacyMedicine>;
-          lowStock:    () => Promise<PharmacyMedicine[]>;
-          delete:      (id: string) => Promise<void>;
-        };
-        sales: {
-          create: (input: PharmacySaleInput) => Promise<PharmacySale>;
-          list:   (filters?: { from?: string; to?: string; patientId?: string }) => Promise<PharmacySale[]>;
-          get:    (id: string) => Promise<PharmacySale | null>;
+          lowStock: () => Promise<PharmacyMedicine[]>;
+          delete: (id: string) => Promise<void>;
         };
       };
       search: {
@@ -186,3 +188,5 @@ declare global {
     };
   }
 }
+
+export {};
