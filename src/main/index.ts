@@ -47,6 +47,51 @@ ipcMain.handle('app:get-api-url', () => {
   return backendServer.url.replace(/\/\/[^:]+:/, '//127.0.0.1:');
 });
 
+// ─── LAN-client background retry ────────────────────────────────────────────
+// Agar startup pe server nahi mila toh yeh function background mein retry
+// karta rehta hai (har 5 seconds). Jab server mil jaye toh:
+//  1. CLINIC_API_URL update kar deta hai
+//  2. Renderer ko 'lan:server-reconnected' event bhejta hai taake woh reload ho
+let _lanRetryTimer: ReturnType<typeof setInterval> | undefined;
+
+function startLanRetry(serverUrl: string): void {
+  if (_lanRetryTimer) return; // already running
+  console.log('[LAN] Server unreachable at startup — retrying every 5s...');
+
+  _lanRetryTimer = setInterval(() => {
+    const { request } = require('node:http') as typeof import('node:http');
+    const req = request(`${serverUrl}/health`, { timeout: 4000 }, (res) => {
+      let data = '';
+      res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+      res.on('end', () => {
+        try {
+          if ((JSON.parse(data) as { ok: boolean }).ok === true) {
+            console.log('[LAN] Server found! Switching to LAN mode.');
+            clearInterval(_lanRetryTimer);
+            _lanRetryTimer = undefined;
+            process.env.CLINIC_API_URL = serverUrl;
+            // Renderer ko notify karo — woh page reload karega
+            BrowserWindow.getAllWindows().forEach((win) => {
+              win.webContents.send('lan:server-reconnected', serverUrl);
+            });
+          }
+        } catch { /* ignore */ }
+      });
+    });
+    req.on('error', () => { /* still unreachable, try next interval */ });
+    req.on('timeout', () => { req.destroy(); });
+    req.end();
+  }, 5000);
+}
+
+function stopLanRetry(): void {
+  if (_lanRetryTimer) {
+    clearInterval(_lanRetryTimer);
+    _lanRetryTimer = undefined;
+  }
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 ipcMain.handle('print:html', async (_e, html: string) => {
   const { writeFileSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
@@ -126,12 +171,15 @@ app.whenReady().then(async () => {
         process.env.CLINIC_API_URL = settings.clientApiUrl;
       } else {
         // Server unreachable — fall back to local mode so app doesn't break
-        console.warn('LAN server unreachable, falling back to local mode');
-        saveSettings({ serverMode: 'local' });
+        // NOTE: saveSettings intentionally NOT called here so lan-client setting
+        // is preserved — next restart will retry the remote server automatically
+        console.warn('LAN server unreachable, falling back to local mode (settings kept)');
         await initializeDatabase();
         await seedDefaultAdmin();
         backendServer = await startBackendServer(environment.apiPort);
         process.env.CLINIC_API_URL = backendServer.url;
+        // Background mein retry karta raho — jab server mile toh renderer reload hoga
+        startLanRetry(settings.clientApiUrl);
       }
     } else {
       // Server or local mode — start local backend
@@ -178,6 +226,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   stopDiscoveryBroadcast();
   stopDiscoveryListener();
+  stopLanRetry();
   void backendServer?.close();
   void disconnectPrisma();
 });

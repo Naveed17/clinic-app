@@ -29,8 +29,13 @@ export function registerSettingsIpc(): void {
   ipcMain.handle('settings:scan', () => {
     discoveredServers.clear();
     sendProbe();
+    // Retry probe after 1.5s in case first packet was lost on the network
+    const retryTimer = setTimeout(() => sendProbe(), 1500);
     return new Promise<DiscoveredServer[]>((resolve) => {
-      setTimeout(() => resolve(Array.from(discoveredServers.values())), 3000);
+      setTimeout(() => {
+        clearTimeout(retryTimer);
+        resolve(Array.from(discoveredServers.values()));
+      }, 5000);
     });
   });
   ipcMain.handle('settings:test-connection', (_e, url: string) =>

@@ -347,6 +347,16 @@ const api = {
       ipcRenderer.on('discovery:server-found', (_e, server) => handler(server));
       return () => ipcRenderer.removeAllListeners('discovery:server-found');
     },
+    onLanReconnected: (handler: (url: string) => void) => {
+      const listener = (_e: unknown, url: string) => {
+        // apiUrl update karo taake nayi requests seedha server ko jayein
+        apiUrl = url;
+        isLanClient = true;
+        handler(url);
+      };
+      ipcRenderer.on('lan:server-reconnected', listener);
+      return () => ipcRenderer.removeListener('lan:server-reconnected', listener);
+    },
   },
   print: {
     html: (html: string) => ipc('print:html', html),

@@ -106,6 +106,7 @@ declare global {
         testConnection: (url: string) => Promise<boolean>;
         scan: () => Promise<{ ip: string; port: number; name: string }[]>;
         onServerFound: (handler: (server: { ip: string; port: number; name: string }) => void) => () => void;
+        onLanReconnected: (handler: (url: string) => void) => () => void;
       };
       auth: {
         login: (email: string, password: string) => Promise<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | { blocked: true; error?: string } | null>;

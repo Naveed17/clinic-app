@@ -42,7 +42,7 @@ export function startDiscoveryBroadcast(port: number): void {
 
   intervalId = setInterval(() => {
     udpSocket?.send(payload, 0, payload.length, DISCOVERY_PORT, '255.255.255.255');
-  }, 3000);
+  }, 1000);
 }
 
 export function stopDiscoveryBroadcast(): void {
