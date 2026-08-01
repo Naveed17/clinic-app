@@ -67,7 +67,7 @@ export async function initializeDatabase(): Promise<void> {
     const existing = await database.$queryRawUnsafe<{ id: string }[]>('SELECT id FROM "Patient" WHERE "mrNumber" = \'\'  ORDER BY "createdAt" ASC');
     for (let i = 0; i < existing.length; i++) {
       const num = String(i + 1).padStart(5, '0');
-      await database.$executeRawUnsafe(`UPDATE "Patient" SET "mrNumber" = 'MR-${num}' WHERE "id" = '${existing[i].id}'`);
+      await database.$executeRawUnsafe(`UPDATE "Patient" SET "mrNumber" = ? WHERE "id" = ?`, `MR-${num}`, existing[i].id);
     }
     await database.$executeRawUnsafe('CREATE UNIQUE INDEX IF NOT EXISTS "Patient_mrNumber_key" ON "Patient"("mrNumber")');
     await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "Patient_mrNumber_idx" ON "Patient"("mrNumber")');
@@ -312,6 +312,10 @@ export async function initializeDatabase(): Promise<void> {
       "id" TEXT NOT NULL PRIMARY KEY,
       "name" TEXT NOT NULL UNIQUE,
       "price" DECIMAL NOT NULL DEFAULT 0,
+      "category" TEXT NOT NULL DEFAULT 'General',
+      "unit" TEXT NOT NULL DEFAULT 'Piece',
+      "stock" INTEGER NOT NULL DEFAULT 0,
+      "reorderLevel" INTEGER NOT NULL DEFAULT 10,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" DATETIME NOT NULL
     )
@@ -319,6 +323,51 @@ export async function initializeDatabase(): Promise<void> {
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Medicine_name_idx" ON "Medicine"("name")',
   );
+  // Runtime migrations for existing Medicine rows
+  const medCols = (await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Medicine)')).map(r => r.name);
+  if (!medCols.includes('category'))     await database.$executeRawUnsafe('ALTER TABLE "Medicine" ADD COLUMN "category" TEXT NOT NULL DEFAULT \'General\'');
+  if (!medCols.includes('unit'))         await database.$executeRawUnsafe('ALTER TABLE "Medicine" ADD COLUMN "unit" TEXT NOT NULL DEFAULT \'Piece\'');
+  if (!medCols.includes('stock'))        await database.$executeRawUnsafe('ALTER TABLE "Medicine" ADD COLUMN "stock" INTEGER NOT NULL DEFAULT 0');
+  if (!medCols.includes('reorderLevel')) await database.$executeRawUnsafe('ALTER TABLE "Medicine" ADD COLUMN "reorderLevel" INTEGER NOT NULL DEFAULT 10');
+
+  // PharmacySale table
+  await database.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "PharmacySale" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "patientId" TEXT,
+      "tokenId" TEXT,
+      "soldById" TEXT NOT NULL,
+      "saleDate" TEXT NOT NULL,
+      "total" DECIMAL NOT NULL DEFAULT 0,
+      "notes" TEXT,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" DATETIME NOT NULL,
+      FOREIGN KEY ("patientId") REFERENCES "Patient"("id") ON DELETE SET NULL,
+      FOREIGN KEY ("tokenId") REFERENCES "Token"("id") ON DELETE SET NULL,
+      FOREIGN KEY ("soldById") REFERENCES "User"("id") ON DELETE RESTRICT
+    )
+  `);
+  await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PharmacySale_saleDate_idx" ON "PharmacySale"("saleDate")');
+  await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PharmacySale_patientId_idx" ON "PharmacySale"("patientId")');
+  await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PharmacySale_soldById_idx" ON "PharmacySale"("soldById")');
+
+  // PharmacySaleItem table
+  await database.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "PharmacySaleItem" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "saleId" TEXT NOT NULL,
+      "medicineId" TEXT NOT NULL,
+      "medicineName" TEXT NOT NULL,
+      "quantity" INTEGER NOT NULL DEFAULT 1,
+      "unitPrice" DECIMAL NOT NULL DEFAULT 0,
+      "lineTotal" DECIMAL NOT NULL DEFAULT 0,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY ("saleId") REFERENCES "PharmacySale"("id") ON DELETE CASCADE,
+      FOREIGN KEY ("medicineId") REFERENCES "Medicine"("id") ON DELETE RESTRICT
+    )
+  `);
+  await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PharmacySaleItem_saleId_idx" ON "PharmacySaleItem"("saleId")');
+  await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "PharmacySaleItem_medicineId_idx" ON "PharmacySaleItem"("medicineId")');
 
   // Prescription table
   await database.$executeRawUnsafe(`

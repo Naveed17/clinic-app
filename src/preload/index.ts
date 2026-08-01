@@ -365,12 +365,27 @@ const api = {
     status: () => ipc('license:status'),
     activate: (key: string) => ipc('license:activate', key),
     modules: () => ipc<Record<string, boolean>>('license:modules'),
+    info: () => ipc<{ key: string; expiresAt: string | null; activatedAt: string; updatedAt: string } | null>('license:info'),
   },
   medicines: {
     search: (query: string) => ipc('medicines:search', query),
     list: () => ipc('medicines:list'),
     create: (name: string, price: number) => ipc('medicines:create', name, price),
     updatePrice: (id: string, price: number) => ipc('medicines:update-price', id, price),
+  },
+  pharmacy: {
+    medicines: {
+      list:         (search?: string) => ipc('pharmacy:medicines:list', search),
+      upsert:       (data: unknown)   => ipc('pharmacy:medicines:upsert', data),
+      adjustStock:  (id: string, delta: number) => ipc('pharmacy:medicines:adjust-stock', id, delta),
+      lowStock:     () => ipc('pharmacy:medicines:low-stock'),
+      delete:       (id: string) => ipc('pharmacy:medicines:delete', id),
+    },
+    sales: {
+      create: (input: unknown) => ipc('pharmacy:sales:create', input),
+      list:   (filters?: unknown) => ipc('pharmacy:sales:list', filters),
+      get:    (id: string) => ipc('pharmacy:sales:get', id),
+    },
   },
   search: {
     global: (query: string) =>

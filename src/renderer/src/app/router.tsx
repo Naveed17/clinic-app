@@ -15,6 +15,7 @@ import { DoctorSchedulePage } from '@/features/doctors/DoctorSchedulePage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { TokensPage } from '@/features/tokens/TokensPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
+import { PharmacyPage } from '@/features/pharmacy/PharmacyPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { RouteAccessGate } from '@/components/RouteAccessGate';
 import { LicensePage } from '@/features/auth/LicensePage';
@@ -133,6 +134,14 @@ const router = createHashRouter([
             element: (
               <RouteAccessGate route="/settings">
                 <SettingsPage />
+              </RouteAccessGate>
+            ),
+          },
+          {
+            path: '/pharmacy',
+            element: (
+              <RouteAccessGate route="/pharmacy">
+                <PharmacyPage />
               </RouteAccessGate>
             ),
           },

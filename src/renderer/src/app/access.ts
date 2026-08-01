@@ -13,7 +13,8 @@ export type AppRoute =
   | '/users'
   | '/doctors'
   | '/schedule'
-  | '/settings';
+  | '/settings'
+  | '/pharmacy';
 
 /** Which roles can access each route */
 export const ROUTE_ACCESS: Record<AppRoute, UserRole[]> = {
@@ -28,6 +29,7 @@ export const ROUTE_ACCESS: Record<AppRoute, UserRole[]> = {
   '/doctors':      ['admin'],
   '/schedule':     ['admin'],
   '/settings':     ['admin'],
+  '/pharmacy':     ['admin', 'receptionist'],
 };
 
 /**
@@ -43,6 +45,7 @@ export const ROUTE_MODULE: Partial<Record<AppRoute, keyof LicenseModules>> = {
   '/schedule':   'manageDoctors',
   '/users':      'manageUsers',
   '/patients':   'managePatients',
+  '/pharmacy':   'pharmacy',
 };
 
 /** First route a role lands on after login */

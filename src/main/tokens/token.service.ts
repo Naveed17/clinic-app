@@ -46,9 +46,9 @@ export async function listTokens(date: string) {
     JOIN "Patient" p ON p.id = t.patientId
     JOIN "User" u ON u.id = t.doctorId
     LEFT JOIN "Prescription" pr ON pr.tokenId = t.id
-    WHERE t.date = '${date}'
+    WHERE t.date = ?
     ORDER BY t.tokenNumber ASC
-  `);
+  `, date);
   return rows.map((r) => ({
     id: r.id, tokenNumber: r.tokenNumber, date: r.date,
     patientId: r.patientId, doctorId: r.doctorId,
@@ -75,9 +75,9 @@ export async function listPrescriptionFeed(date: string): Promise<PrescriptionFe
     JOIN "Token" t ON t.id = pr.tokenId
     JOIN "Patient" p ON p.id = t.patientId
     JOIN "User" u ON u.id = t.doctorId
-    WHERE t.date = '${date}'
+    WHERE t.date = ?
     ORDER BY pr.createdAt DESC
-  `);
+  `, date);
   return rows;
 }
 
@@ -143,7 +143,7 @@ export async function updateTokenStatus(id: string, status: TokenStatus) {
     if (remaining === 0) await markCheckOut(token.doctor.id, token.date);
   }
   const pr = await getPrisma().$queryRawUnsafe<Record<string, unknown>[]>(
-    `SELECT * FROM "Prescription" WHERE tokenId = '${id}' LIMIT 1`
+    `SELECT * FROM "Prescription" WHERE tokenId = ? LIMIT 1`, id
   );
   return {
     ...token,
@@ -159,7 +159,7 @@ export async function updateTokenStatus(id: string, status: TokenStatus) {
 export async function upsertPrescription(tokenId: string, input: PrescriptionInput) {
   const db = getPrisma();
   const existing = await db.$queryRawUnsafe<{ id: string }[]>(
-    `SELECT id FROM "Prescription" WHERE tokenId = '${tokenId}' LIMIT 1`
+    `SELECT id FROM "Prescription" WHERE tokenId = ? LIMIT 1`, tokenId
   );
   const now = new Date().toISOString();
   const medicines = JSON.stringify(input.medicines);
@@ -192,9 +192,9 @@ export async function getTokenForPatient(patientId: string, date: string) {
     JOIN "Patient" p ON p.id = t.patientId
     JOIN "User" u ON u.id = t.doctorId
     LEFT JOIN "Prescription" pr ON pr.tokenId = t.id
-    WHERE t.patientId = '${patientId}' AND t.date = '${date}'
+    WHERE t.patientId = ? AND t.date = ?
     LIMIT 1
-  `);
+  `, patientId, date);
   if (!rows[0]) return null;
   const r = rows[0];
   return {

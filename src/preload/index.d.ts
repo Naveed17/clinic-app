@@ -1,5 +1,37 @@
 import type { ElectronAPI } from '@electron-toolkit/preload';
 
+// ── Pharmacy shared types ────────────────────────────────────────────────────
+interface PharmacyMedicine {
+  id: string; name: string; price: number;
+  category: string; unit: string;
+  stock: number; reorderLevel: number;
+  createdAt: string; updatedAt: string;
+}
+interface PharmacyMedicineInput {
+  id?: string; name: string; price: number;
+  category: string; unit: string;
+  stock: number; reorderLevel: number;
+}
+interface PharmacySaleItem {
+  id: string; medicineId: string; medicineName: string;
+  quantity: number; unitPrice: number; lineTotal: number;
+}
+interface PharmacySaleInput {
+  patientId?: string | null; tokenId?: string | null;
+  soldById: string; saleDate: string;
+  notes?: string | null;
+  items: { medicineId: string; medicineName: string; quantity: number; unitPrice: number }[];
+}
+interface PharmacySale {
+  id: string; patientId: string | null; tokenId: string | null;
+  soldById: string; saleDate: string; total: number;
+  notes: string | null; createdAt: string; updatedAt: string;
+  patientName: string | null; soldByName: string;
+  tokenNumber: number | null;
+  items: PharmacySaleItem[];
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 declare global {
   interface Window {
     electron: ElectronAPI;
@@ -119,12 +151,27 @@ declare global {
         status: () => Promise<boolean>;
         activate: (key: string) => Promise<{ ok: boolean; error?: string }>;
         modules: () => Promise<Record<string, boolean> | null>;
+        info: () => Promise<{ key: string; expiresAt: string | null; activatedAt: string; updatedAt: string } | null>;
       };
       medicines: {
         search: (query: string) => Promise<unknown>;
         list: () => Promise<unknown>;
         create: (name: string, price: number) => Promise<unknown>;
         updatePrice: (id: string, price: number) => Promise<unknown>;
+      };
+      pharmacy: {
+        medicines: {
+          list:        (search?: string) => Promise<PharmacyMedicine[]>;
+          upsert:      (data: PharmacyMedicineInput) => Promise<PharmacyMedicine>;
+          adjustStock: (id: string, delta: number) => Promise<PharmacyMedicine>;
+          lowStock:    () => Promise<PharmacyMedicine[]>;
+          delete:      (id: string) => Promise<void>;
+        };
+        sales: {
+          create: (input: PharmacySaleInput) => Promise<PharmacySale>;
+          list:   (filters?: { from?: string; to?: string; patientId?: string }) => Promise<PharmacySale[]>;
+          get:    (id: string) => Promise<PharmacySale | null>;
+        };
       };
       search: {
         global: (query: string) => Promise<unknown>;

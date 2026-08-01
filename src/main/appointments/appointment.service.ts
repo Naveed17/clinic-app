@@ -84,9 +84,9 @@ async function getAppointmentById(id: string) {
     FROM "Appointment" a
     JOIN "Patient" pat ON pat.id = a.patientId
     JOIN "User" prov ON prov.id = a.providerId
-    WHERE a.id = '${id}'
+    WHERE a.id = ?
     LIMIT 1
-  `);
+  `, id);
   const r = rows[0];
   if (!r) return null;
   return {

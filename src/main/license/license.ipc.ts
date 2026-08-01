@@ -14,9 +14,22 @@ function getModulesCacheFilePath(): string {
   return join(app.getPath('userData'), 'license-modules.json');
 }
 
+// Expiry date locally save karne ke liye alag file
+function getLicenseCacheFilePath(): string {
+  return join(app.getPath('userData'), 'license-cache.json');
+}
+
 type ModulesCache = {
   key: string;
   modules: Record<string, boolean>;
+  updatedAt: string;
+};
+
+// License cache — key + expiry date locally save hoti hai
+type LicenseCache = {
+  key: string;
+  expiresAt: string | null; // ISO date string, null = lifetime/unknown
+  activatedAt: string;
   updatedAt: string;
 };
 
@@ -47,6 +60,33 @@ function getSavedKey(): string | null {
   }
 }
 
+function getLicenseCache(key: string): LicenseCache | null {
+  try {
+    const file = getLicenseCacheFilePath();
+    if (!existsSync(file)) return null;
+    const cache = JSON.parse(readFileSync(file, 'utf-8')) as LicenseCache;
+    if (cache.key !== key) return null;
+    return cache;
+  } catch {
+    return null;
+  }
+}
+
+function saveLicenseCache(key: string, expiresAt: string | null): void {
+  try {
+    const existing = getLicenseCache(key);
+    const cache: LicenseCache = {
+      key,
+      expiresAt,
+      activatedAt: existing?.activatedAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    writeFileSync(getLicenseCacheFilePath(), JSON.stringify(cache, null, 2), 'utf-8');
+  } catch {
+    // cache write failure nahi rokni chahiye valid response ko
+  }
+}
+
 function getCachedModules(key: string): Record<string, boolean> | null {
   try {
     const file = getModulesCacheFilePath();
@@ -70,6 +110,36 @@ function saveModulesCache(key: string, modules: Record<string, boolean>): void {
 }
 
 /**
+ * Locally cached expiry date se check karta hai ke license expire hui ya nahi.
+ * Offline mode mein yahi use hoti hai.
+ * Returns: true = expired, false = valid ya unknown
+ */
+function isLocallyExpired(key: string): boolean {
+  const cache = getLicenseCache(key);
+  if (!cache || !cache.expiresAt) return false; // no expiry info = assume valid
+  return new Date() > new Date(cache.expiresAt);
+}
+
+// Actual API se aane wala license object shape
+type ApiLicenseData = {
+  key: string;
+  isEnabled: boolean;
+  expiresAt: string | null;
+  modules: Record<string, boolean>;
+  licenseType: string;
+  maxDevices: number;
+  activeDevices: { hwid: string; deviceName: string; activatedAt: string }[];
+};
+
+// Validate, modules, activate — sab ka wrapper response
+type ApiResponse<T> = {
+  success: boolean;
+  data?: T[];
+  error?: string;
+  message?: string;
+};
+
+/**
  * Gets the latest module permissions when online and falls back to the last
  * successful response for the currently activated license when offline.
  */
@@ -83,11 +153,14 @@ export async function getLicenseModules(): Promise<Record<string, boolean> | nul
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: savedKey }),
     });
-    const data = (await response.json()) as { ok: boolean; modules?: Record<string, boolean> };
-    if (!data.ok || !data.modules) return getCachedModules(savedKey);
+    const res = (await response.json()) as ApiResponse<ApiLicenseData>;
+    const licenseData = res.success && res.data?.[0];
+    if (!licenseData || !licenseData.modules) return getCachedModules(savedKey);
 
-    saveModulesCache(savedKey, data.modules);
-    return data.modules;
+    // expiresAt aur modules dono locally save karo
+    saveLicenseCache(savedKey, licenseData.expiresAt ?? null);
+    saveModulesCache(savedKey, licenseData.modules);
+    return licenseData.modules;
   } catch {
     return getCachedModules(savedKey);
   }
@@ -102,25 +175,30 @@ export async function isLicenseActivated(): Promise<boolean> {
     const hwid = getHWID();
     const response = await fetch(`${API_BASE_URL}/license/validate`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: savedKey, hwid }),
     });
 
-    const data = (await response.json()) as { valid: boolean };
+    const res = (await response.json()) as ApiResponse<ApiLicenseData>;
+    const licenseData = res.success && res.data?.[0];
 
-    if (!data.valid) {
-      try {
-        unlinkSync(getLicenseFilePath());
-      } catch {}
+    if (!licenseData || !licenseData.isEnabled) {
+      try { unlinkSync(getLicenseFilePath()); } catch {}
       return false;
     }
 
+    // Online validate ke waqt expiresAt aur modules locally save kar lo
+    saveLicenseCache(savedKey, licenseData.expiresAt ?? null);
+    if (licenseData.modules) saveModulesCache(savedKey, licenseData.modules);
+
     return true;
   } catch {
-    // Offline mode support: server drop hone par local key valid manna
-    return savedKey !== null;
+    // Offline mode: local key hai toh valid mano — LEKIN local expiry check karo
+    if (isLocallyExpired(savedKey)) {
+      console.warn('[License] Offline — locally cached expiry date guzar chuki hai. Access denied.');
+      return false;
+    }
+    return true;
   }
 }
 
@@ -147,25 +225,36 @@ export function registerLicenseIpc(): void {
 
       const response = await fetch(`${API_BASE_URL}/license/activate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ key: formattedKey, hwid, deviceName }), 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: formattedKey, hwid, deviceName }),
       });
 
-      const data = (await response.json()) as { ok: boolean; error?: string };
+      const res = (await response.json()) as ApiResponse<ApiLicenseData> & { ok?: boolean; error?: string };
 
-      if (data.ok) {
+      // API ya toh { success: true, data: [...] } ya { ok: true } bhejta hai — dono handle karo
+      const activated = res.success === true || res.ok === true;
+      const licenseData = res.data?.[0];
+
+      if (activated) {
         writeFileSync(getLicenseFilePath(), formattedKey, 'utf-8');
-        try {
-          unlinkSync(getModulesCacheFilePath());
-        } catch {}
+        // Activation ke waqt expiresAt aur modules locally save karo
+        const expiresAt = licenseData?.expiresAt ?? null;
+        saveLicenseCache(formattedKey, expiresAt);
+        if (licenseData?.modules) saveModulesCache(formattedKey, licenseData.modules);
+        try { unlinkSync(getModulesCacheFilePath()); } catch {}
         return { ok: true };
       }
 
-      return { ok: false, error: data.error || 'Activation failed.' };
+      return { ok: false, error: res.error || res.message || 'Activation failed.' };
     } catch {
       return { ok: false, error: 'Cannot connect to server. Check your internet connection.' };
     }
+  });
+
+  // License info IPC — renderer expiry date dikhane ke liye
+  ipcMain.handle('license:info', () => {
+    const key = getSavedKey();
+    if (!key) return null;
+    return getLicenseCache(key);
   });
 }

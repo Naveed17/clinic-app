@@ -35,6 +35,7 @@ import { registerLicenseIpc } from './license/license.ipc';
 import { registerAuthIpc } from './auth/auth.ipc';
 import { registerSearchIpc } from './search/search.ipc';
 import { registerMedicineIpc } from './medicines/medicine.ipc';
+import { registerPharmacyIpc } from './pharmacy/pharmacy.ipc';
 import { registerScheduleIpc } from './doctors/schedule.ipc';
 import { seedDefaultAdmin } from './auth/seed';
 import { initAutoUpdater } from './updater';
@@ -210,6 +211,7 @@ app.whenReady().then(async () => {
   registerSettingsIpc();
   registerSearchIpc();
   registerMedicineIpc();
+  registerPharmacyIpc();
   startDiscoveryListener(); // always listen so admin can also scan
   initAutoUpdater();
   createWindow();

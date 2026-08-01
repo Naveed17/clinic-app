@@ -8,6 +8,7 @@ import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
 import LocalHospitalOutlinedIcon from '@mui/icons-material/LocalHospitalOutlined';
 import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined';
+import LocalPharmacyOutlinedIcon from '@mui/icons-material/LocalPharmacyOutlined';
 import type { ReactNode } from 'react';
 import type { UserRole } from '@/features/auth/AuthContext';
 import type { AppRoute } from '@/app/access';
@@ -26,6 +27,7 @@ const ALL_NAV_ITEMS: NavigationItem[] = [
   { label: 'Appointments', path: '/appointments', icon: <CalendarMonthOutlinedIcon /> },
   { label: 'Tokens',       path: '/tokens',       icon: <ConfirmationNumberOutlinedIcon /> },
   { label: 'Billing',      path: '/billing',      icon: <PaymentsOutlinedIcon /> },
+  { label: 'Pharmacy',     path: '/pharmacy',     icon: <LocalPharmacyOutlinedIcon /> },
   { label: 'Lab',          path: '/lab',          icon: <BiotechOutlinedIcon /> },
   { label: 'Statistics',   path: '/statistics',   icon: <BarChartOutlinedIcon /> },
   { label: 'Doctors',      path: '/doctors',      icon: <LocalHospitalOutlinedIcon /> },
