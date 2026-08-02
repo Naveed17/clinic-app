@@ -15,6 +15,7 @@ import {
   useTheme,
   alpha,
   LinearProgress,
+  Snackbar,
 } from '@mui/material';
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import LaptopOutlinedIcon from '@mui/icons-material/LaptopOutlined';
@@ -23,7 +24,7 @@ import BackupOutlinedIcon from '@mui/icons-material/BackupOutlined';
 import RestoreOutlinedIcon from '@mui/icons-material/RestoreOutlined';
 import SystemUpdateAltOutlinedIcon from '@mui/icons-material/SystemUpdateAltOutlined';
 import WifiTetheringOutlinedIcon from '@mui/icons-material/WifiTetheringOutlined';
-import { useUpdate } from '@/context/updateProvider'; // Ensure exact import path for your UpdateContext
+import { useUpdate } from '@/context/updateProvider';
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
 
@@ -54,21 +55,27 @@ export function SettingsPage(): React.JSX.Element {
   const [backupStatus, setBackupStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
+
+  // Update States & Notifications
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'latest' | 'error'>('idle');
   const [currentVersion, setCurrentVersion] = useState<string>('1.0.0');
-
-  useEffect(() => {
-    if (updateStatus === 'latest' || updateStatus === 'error') {
-      const t = setTimeout(() => setUpdateStatus('idle'), 3000);
-      return () => clearTimeout(t);
-    }
-  }, [updateStatus]);
+  const [toastMessage, setToastMessage] = useState<{ msg: string; severity: 'info' | 'success' | 'error' | 'warning' } | null>(null);
 
   useEffect(() => {
     void window.clinic?.update?.getVersion?.().then((ver: string) => {
       if (ver) setCurrentVersion(ver);
     });
   }, []);
+
+  // Listen to Context downloading & error state changes dynamically
+  useEffect(() => {
+    if (isUpdateReady) {
+      setToastMessage({
+        msg: 'Update downloaded successfully! Click "Restart & Install Update".',
+        severity: 'success',
+      });
+    }
+  }, [isUpdateReady]);
 
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   const [prevMode, setPrevMode] = useState<string | null>(null);
@@ -93,18 +100,33 @@ export function SettingsPage(): React.JSX.Element {
     setBackupStatus(result?.ok ? { type: 'success', msg: 'Restore successful! Please restart the app.' } : { type: 'error', msg: result?.error ?? 'Restore failed.' });
   }
 
+  // Update Check & Download Handlers
   async function handleCheckUpdate() {
     try {
       setUpdateStatus('checking');
-      const result = await checkForUpdates();
-      if (result === 'available') {
+      setToastMessage({ msg: 'Checking for updates...', severity: 'info' });
+
+      const res = await checkForUpdates();
+
+      if (res === 'available' || (typeof res === 'object' && res?.updateInfo)) {
         setUpdateStatus('available');
+        setToastMessage({ msg: 'New update found! Starting download...', severity: 'info' });
+      } else if (res === 'latest' || res === false) {
+        setUpdateStatus('latest');
+        setToastMessage({ msg: 'You are using the latest version.', severity: 'info' });
       } else {
-        setUpdateStatus(result || 'latest');
+        setUpdateStatus('latest');
+        setToastMessage({ msg: 'No updates available at this moment.', severity: 'info' });
       }
-    } catch (err) {
-      console.error('Failed to check for updates:', err);
+    } catch (err: any) {
+      console.error('Failed to check or download update:', err);
       setUpdateStatus('error');
+      setToastMessage({
+        msg: err?.message || 'Error occurred while checking/downloading update. Check internet connection.',
+        severity: 'error'
+      });
+    } finally {
+      setUpdateStatus('idle');
     }
   }
 
@@ -168,8 +190,8 @@ export function SettingsPage(): React.JSX.Element {
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
       ) : (
         <Stack direction="row" spacing={4} alignItems="flex-start">
-          {/* Left: Backup & Restore + Clinic Info */}
-          <Box sx={{ width: 260, flexShrink: 0 }}>
+          {/* Left Side: Clinic Info, Backup & App Update */}
+          <Box sx={{ width: 280, flexShrink: 0 }}>
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>Clinic Information</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Shown on printed receipts and invoices.</Typography>
             <Stack spacing={1.5} sx={{ mb: 3 }}>
@@ -200,11 +222,11 @@ export function SettingsPage(): React.JSX.Element {
 
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>Backup & Restore</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Save a copy of the database or restore from a previous backup.</Typography>
-            <Stack direction="row" gap={2} flexWrap="wrap">
-              <Button variant="outlined" startIcon={backupLoading ? <CircularProgress size={16} /> : <BackupOutlinedIcon />} disabled={backupLoading} onClick={() => void handleBackup()}>
+            <Stack direction="row" gap={1.5} flexWrap="wrap">
+              <Button variant="outlined" size="small" startIcon={backupLoading ? <CircularProgress size={14} /> : <BackupOutlinedIcon />} disabled={backupLoading} onClick={() => void handleBackup()}>
                 Create Backup
               </Button>
-              <Button variant="outlined" color="warning" startIcon={restoreLoading ? <CircularProgress size={16} /> : <RestoreOutlinedIcon />} disabled={restoreLoading} onClick={() => void handleRestore()}>
+              <Button variant="outlined" size="small" color="warning" startIcon={restoreLoading ? <CircularProgress size={14} /> : <RestoreOutlinedIcon />} disabled={restoreLoading} onClick={() => void handleRestore()}>
                 Restore Backup
               </Button>
             </Stack>
@@ -212,20 +234,21 @@ export function SettingsPage(): React.JSX.Element {
 
             <Divider sx={{ my: 2 }} />
 
+            {/* App Update Section */}
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>App Update</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Check if a newer version is available.</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Check if a newer version is available on GitHub.</Typography>
+
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                Current Version:
-              </Typography>
-              <Chip label={`v${currentVersion}`} size="small" variant="outlined" color="primary" sx={{ fontWeight: 600, height: 20 }} />
+              <Typography variant="body2" color="text.secondary">Current Version:</Typography>
+              <Chip label={`v${currentVersion}`} size="small" variant="outlined" color="primary" sx={{ fontWeight: 600, height: 22 }} />
             </Stack>
-            <Box sx={{ position: 'relative' }}>
-              {/* Update Button State */}
+
+            <Box sx={{ width: '100%' }}>
               {isUpdateReady ? (
                 <Button
                   variant="contained"
                   color="success"
+                  fullWidth
                   startIcon={<SystemUpdateAltOutlinedIcon />}
                   onClick={installUpdate}
                 >
@@ -234,54 +257,35 @@ export function SettingsPage(): React.JSX.Element {
               ) : (
                 <Button
                   variant="outlined"
+                  fullWidth
                   startIcon={updateStatus === 'checking' ? <CircularProgress size={16} /> : <SystemUpdateAltOutlinedIcon />}
                   disabled={updateStatus === 'checking' || isDownloading}
                   onClick={() => void handleCheckUpdate()}
                 >
-                  Check for Updates
+                  {updateStatus === 'checking' ? 'Checking...' : 'Check for Updates'}
                 </Button>
               )}
 
-              {/* Progress Bar & Status Messages */}
-              <Box sx={{ mt: 1.5 }}>
-                {isDownloading && (
-                  <Box sx={{ width: '100%' }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                        Downloading update...
-                      </Typography>
-                      <Typography variant="caption" color="primary.main" fontWeight={700}>
-                        {downloadProgress}%
-                      </Typography>
-                    </Stack>
-                    <LinearProgress variant="determinate" value={downloadProgress} sx={{ height: 6, borderRadius: 3 }} />
-                  </Box>
-                )}
-
-                {isUpdateReady && (
-                  <Alert severity="success" sx={{ py: 0.5 }}>
-                    Update downloaded! Click restart to apply.
-                  </Alert>
-                )}
-
-                {updateStatus === 'latest' && !isDownloading && !isUpdateReady && (
-                  <Alert severity="success" sx={{ py: 0.5 }}>
-                    You're on the latest version.
-                  </Alert>
-                )}
-
-                {updateStatus === 'error' && !isDownloading && !isUpdateReady && (
-                  <Alert severity="warning" sx={{ py: 0.5 }}>
-                    Could not check for updates. Check internet connection.
-                  </Alert>
-                )}
-              </Box>
+              {/* Downloading Linear Progress */}
+              {isDownloading && (
+                <Box sx={{ width: '100%', mt: 2 }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                      Downloading update...
+                    </Typography>
+                    <Typography variant="caption" color="primary.main" fontWeight={700}>
+                      {downloadProgress}%
+                    </Typography>
+                  </Stack>
+                  <LinearProgress variant="determinate" value={downloadProgress} sx={{ height: 6, borderRadius: 3 }} />
+                </Box>
+              )}
             </Box>
           </Box>
 
           <Divider orientation="vertical" flexItem />
 
-          {/* Right: Network Settings */}
+          {/* Right Side: Network Settings */}
           <Stack spacing={3} flex={1}>
             <Box>
               <Typography variant="h6" fontWeight={700}>Network Settings</Typography>
@@ -298,9 +302,7 @@ export function SettingsPage(): React.JSX.Element {
             <Divider />
 
             <Box>
-              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
-                Machine Role
-              </Typography>
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>Machine Role</Typography>
               <ToggleButtonGroup
                 value={settings.serverMode}
                 exclusive
@@ -452,6 +454,20 @@ export function SettingsPage(): React.JSX.Element {
           </Stack>
         </Stack>
       )}
+
+      {/* Primary Notification Toast / Snackbar for Updates & Dynamic Errors */}
+      <Snackbar
+        open={Boolean(toastMessage)}
+        autoHideDuration={4000}
+        onClose={() => setToastMessage(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        {toastMessage ? (
+          <Alert severity={toastMessage.severity} onClose={() => setToastMessage(null)} >
+            {toastMessage.msg}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
     </Paper>
   );
 }
