@@ -11,7 +11,7 @@ export async function searchMedicines(query: string) {
   const db = getPrisma();
   const rows = query
     ? await db.$queryRawUnsafe<MedRow[]>(`SELECT * FROM "Medicine" WHERE name LIKE ? ORDER BY name ASC LIMIT 20`, `%${query}%`)
-    : await db.$queryRawUnsafe<MedRow[]>(`SELECT * FROM "Medicine" ORDER BY name ASC LIMIT 20`);
+    : await db.$queryRawUnsafe<MedRow[]>(`SELECT * FROM "Medicine" ORDER BY createdAt DESC LIMIT 20`);
   return rows.map(toPlain);
 }
 
@@ -49,6 +49,6 @@ export async function updateMedicinePrice(id: string, price: number) {
 }
 
 export async function listMedicines() {
-  const rows = await getPrisma().$queryRawUnsafe<MedRow[]>(`SELECT * FROM "Medicine" ORDER BY name ASC`);
+  const rows = await getPrisma().$queryRawUnsafe<MedRow[]>(`SELECT * FROM "Medicine" ORDER BY createdAt DESC`);
   return rows.map(toPlain);
 }

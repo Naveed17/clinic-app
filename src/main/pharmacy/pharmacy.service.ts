@@ -31,10 +31,10 @@ export async function listMedicines(search?: string): Promise<MedicineRow[]> {
   const db = getPrisma();
   const rows = search
     ? await db.$queryRawUnsafe<MedicineRow[]>(
-        `SELECT * FROM "Medicine" WHERE name LIKE ? ORDER BY name ASC`, `%${search}%`
+        `SELECT * FROM "Medicine" WHERE name LIKE ? ORDER BY createdAt DESC`, `%${search}%`
       )
     : await db.$queryRawUnsafe<MedicineRow[]>(
-        `SELECT * FROM "Medicine" ORDER BY name ASC`
+        `SELECT * FROM "Medicine" ORDER BY createdAt DESC`
       );
   return rows.map(toMedicine);
 }

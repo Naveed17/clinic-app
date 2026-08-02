@@ -63,7 +63,7 @@ export async function listUsers({ page, pageSize, search }: UserListInput) {
     prisma.user.findMany({
       where,
       select: userSelect,
-      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      orderBy: { createdAt: 'desc' }, // Latest added user top par aayega
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),

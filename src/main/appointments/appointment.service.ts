@@ -46,7 +46,7 @@ export async function listAppointments() {
     FROM "Appointment" a
     JOIN "Patient" pat ON pat.id = a.patientId
     JOIN "User" prov ON prov.id = a.providerId
-    ORDER BY a.startsAt ASC
+    ORDER BY a.createdAt DESC
   `);
   return rows.map((r) => ({
     id: r.id, patientId: r.patientId, providerId: r.providerId,
@@ -61,7 +61,7 @@ export async function listAppointments() {
 export async function listAppointmentPatients() {
   return getPrisma().patient.findMany({
     select: { id: true, firstName: true, lastName: true },
-    orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    orderBy: { createdAt: 'desc' },
   });
 }
 
@@ -69,7 +69,7 @@ export async function listDoctors() {
   return getPrisma().user.findMany({
     where: { role: 'DOCTOR', isActive: true },
     select: { id: true, firstName: true, lastName: true },
-    orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    orderBy: { createdAt: 'desc' },
   });
 }
 

@@ -68,7 +68,7 @@ export async function listPatients({ page, pageSize, search, providerId }: Patie
   const [data, total] = await prisma.$transaction([
     prisma.patient.findMany({
       where,
-      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),

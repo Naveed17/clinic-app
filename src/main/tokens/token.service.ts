@@ -32,7 +32,7 @@ const tokenInclude = {
   doctor:  { select: { id: true, firstName: true, lastName: true } },
 };
 
-function parseRawToken(_row: Record<string, unknown>) { return _row; } // unused, kept for reference
+function parseRawToken(_row: Record<string, unknown>) { return _row; } 
 
 export async function listTokens(date: string) {
   const db = getPrisma();
@@ -85,14 +85,14 @@ export async function listTokenDoctors() {
   return getPrisma().user.findMany({
     where: { role: 'DOCTOR', isActive: true },
     select: { id: true, firstName: true, lastName: true },
-    orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    orderBy: { createdAt: 'desc' }, // Latest added doctors top par
   });
 }
 
 export async function listTokenPatients() {
   return getPrisma().patient.findMany({
     select: { id: true, firstName: true, lastName: true, mrNumber: true },
-    orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    orderBy: { createdAt: 'desc' }, // Naye patients dropdown mein pehle aayenge
   });
 }
 
@@ -129,7 +129,6 @@ export async function updateTokenStatus(id: string, status: TokenStatus) {
     include: tokenInclude,
   });
 
-  // Auto attendance — check-in on first DONE/SKIPPED, check-out when all finished
   if (status === 'DONE') {
     const existing = await getPrisma().doctorAttendance.findUnique({
       where: { doctorId_date: { doctorId: token.doctor.id, date: token.date } },

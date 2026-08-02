@@ -52,12 +52,14 @@ export async function listInvoices() {
   const invoices = await getPrisma().invoice.findMany({ include, orderBy: { createdAt: 'desc' } });
   return invoices.map(serializeInvoice);
 }
+
 export async function invoicePatients() {
   return getPrisma().patient.findMany({
     select: { id: true, firstName: true, lastName: true },
-    orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    orderBy: { createdAt: 'desc' }, 
   });
 }
+
 export async function addPayment(invoiceId: string, amount: number, method: string, reference?: string) {
   const database = getPrisma();
   return database.$transaction(async (tx) => {
@@ -95,7 +97,7 @@ export async function voidInvoice(id: string) {
 export async function getPayments(invoiceId: string) {
   return getPrisma().payment.findMany({
     where: { invoiceId },
-    orderBy: { paidAt: 'asc' },
+    orderBy: { paidAt: 'desc' }, 
   });
 }
 

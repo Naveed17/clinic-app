@@ -21,6 +21,6 @@ export async function getAttendance(doctorId: string, year: number, month: numbe
   const to = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
   return getPrisma().doctorAttendance.findMany({
     where: { doctorId, date: { gte: from, lte: to } },
-    orderBy: { date: 'asc' },
+    orderBy: { date: 'desc' },
   });
 }

@@ -56,6 +56,11 @@ export async function initializeDatabase(): Promise<void> {
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Patient_phone_idx" ON "Patient"("phone")',
   );
+  // Index for fast sorting on Patients
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Patient_createdAt_idx" ON "Patient"("createdAt")',
+  );
+
   // Migrations: add columns if they don't exist yet
   const patientCols = (await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Patient)')).map(r => r.name);
   if (!patientCols.includes('bloodGroup')) await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "bloodGroup" TEXT');
@@ -64,7 +69,7 @@ export async function initializeDatabase(): Promise<void> {
   if (!patientCols.includes('mrNumber')) {
     await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "mrNumber" TEXT NOT NULL DEFAULT \'\'');
     // Backfill existing rows with unique MR numbers
-    const existing = await database.$queryRawUnsafe<{ id: string }[]>('SELECT id FROM "Patient" WHERE "mrNumber" = \'\'  ORDER BY "createdAt" ASC');
+    const existing = await database.$queryRawUnsafe<{ id: string }[]>('SELECT id FROM "Patient" WHERE "mrNumber" = \'\' ORDER BY "createdAt" ASC');
     for (let i = 0; i < existing.length; i++) {
       const num = String(i + 1).padStart(5, '0');
       await database.$executeRawUnsafe(`UPDATE "Patient" SET "mrNumber" = ? WHERE "id" = ?`, `MR-${num}`, existing[i].id);
@@ -91,6 +96,11 @@ export async function initializeDatabase(): Promise<void> {
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Appointment_patientId_startsAt_idx" ON "Appointment"("patientId", "startsAt")',
   );
+  // Index for fast sorting on Appointments
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Appointment_createdAt_idx" ON "Appointment"("createdAt")',
+  );
+
   const apptCols = (await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Appointment)')).map(r => r.name);
   if (!apptCols.includes('recurrenceRule')) await database.$executeRawUnsafe('ALTER TABLE "Appointment" ADD COLUMN "recurrenceRule" TEXT');
   if (!apptCols.includes('parentId')) await database.$executeRawUnsafe('ALTER TABLE "Appointment" ADD COLUMN "parentId" TEXT');
@@ -134,6 +144,9 @@ export async function initializeDatabase(): Promise<void> {
     'CREATE INDEX IF NOT EXISTS "Invoice_patientId_createdAt_idx" ON "Invoice"("patientId", "createdAt")',
   );
   await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Invoice_createdAt_idx" ON "Invoice"("createdAt")',
+  );
+  await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "InvoiceItem_invoiceId_idx" ON "InvoiceItem"("invoiceId")',
   );
   await database.$executeRawUnsafe(`
@@ -174,9 +187,9 @@ export async function initializeDatabase(): Promise<void> {
     'CREATE INDEX IF NOT EXISTS "LabOrder_status_idx" ON "LabOrder"("status")',
   );
   
-   const labOrderCols = (await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(LabOrder)')).map(r => r.name);
+  const labOrderCols = (await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(LabOrder)')).map(r => r.name);
   
-   if (!labOrderCols.includes('tokenId')) {
+  if (!labOrderCols.includes('tokenId')) {
     await database.$executeRawUnsafe('ALTER TABLE "LabOrder" ADD COLUMN "tokenId" TEXT');
     await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "LabOrder_tokenId_idx" ON "LabOrder"("tokenId")');
   }

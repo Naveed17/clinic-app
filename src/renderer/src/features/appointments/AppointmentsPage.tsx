@@ -444,7 +444,6 @@ export function AppointmentsPage(): React.JSX.Element {
   const allData = user?.role === 'doctor'
     ? (appointments.data ?? []).filter((a) => a.providerId === user.id)
     : (appointments.data ?? []);
-  console.log('allData', allData);
   const filtered = allData.filter((a) => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -590,28 +589,28 @@ export function AppointmentsPage(): React.JSX.Element {
                   </TableCell>
                   <TableCell>{a.reason || '—'}</TableCell>
                   {!isAdmin && (
-                  <TableCell align="right">
-                    <Stack direction="row" gap={0.5} justifyContent="flex-end">
-                      <Tooltip title="Edit"><span>
-                        <IconButton sx={actionBtnSx} disabled={['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status)} onClick={() => { setActive(a); setOpen(true); }}>
-                          <EditOutlinedIcon sx={{ fontSize: 17 }} />
-                        </IconButton>
-                      </span></Tooltip>
-                      {a.status === 'SCHEDULED' && (
-                        <Tooltip title="Check In"><IconButton sx={actionBtnSx} onClick={() => statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' })}><LoginOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                      )}
-                      {a.status === 'CHECKED_IN' && (
-                        <Tooltip title="Mark Completed"><IconButton sx={actionBtnSx} onClick={() => statusMutation.mutate({ id: a.id, status: 'COMPLETED' })}><CheckCircleOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                      )}
-                      {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
-                        <Tooltip title="No Show"><IconButton sx={actionBtnSx} onClick={() => statusMutation.mutate({ id: a.id, status: 'NO_SHOW' })}><PersonOffOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                      )}
-                      {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
-                        <Tooltip title="Cancel"><IconButton sx={actionBtnSx} onClick={() => cancelMutation.mutate(a.id)}><CancelOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                      )}
-                      <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => deleteMutation.mutate(a.id)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                    </Stack>
-                  </TableCell>
+                    <TableCell align="right">
+                      <Stack direction="row" gap={0.5} justifyContent="flex-end">
+                        <Tooltip title="Edit"><span>
+                          <IconButton sx={actionBtnSx} disabled={['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status)} onClick={() => { setActive(a); setOpen(true); }}>
+                            <EditOutlinedIcon sx={{ fontSize: 17 }} />
+                          </IconButton>
+                        </span></Tooltip>
+                        {a.status === 'SCHEDULED' && (
+                          <Tooltip title="Check In"><IconButton sx={actionBtnSx} onClick={() => statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' })}><LoginOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                        )}
+                        {a.status === 'CHECKED_IN' && (
+                          <Tooltip title="Mark Completed"><IconButton sx={actionBtnSx} onClick={() => statusMutation.mutate({ id: a.id, status: 'COMPLETED' })}><CheckCircleOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                        )}
+                        {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
+                          <Tooltip title="No Show"><IconButton sx={actionBtnSx} onClick={() => statusMutation.mutate({ id: a.id, status: 'NO_SHOW' })}><PersonOffOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                        )}
+                        {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
+                          <Tooltip title="Cancel"><IconButton sx={actionBtnSx} onClick={() => cancelMutation.mutate(a.id)}><CancelOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                        )}
+                        <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => deleteMutation.mutate(a.id)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                      </Stack>
+                    </TableCell>
                   )}
                 </TableRow>
               ))

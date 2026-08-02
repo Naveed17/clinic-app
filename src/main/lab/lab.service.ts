@@ -43,7 +43,7 @@ function serialize(order: LabOrderWithRelations) {
 export async function listLabOrders() {
   const orders = await getPrisma().labOrder.findMany({
     include,
-    orderBy: { orderedAt: 'desc' },
+    orderBy: { orderedAt: 'desc' }, // Latest order sab se top par
   });
   return orders.map(serialize);
 }
@@ -52,7 +52,7 @@ export async function listLabOrdersByToken(tokenId: string) {
   const orders = await getPrisma().labOrder.findMany({
     where: { tokenId },
     include,
-    orderBy: { orderedAt: 'asc' },
+    orderBy: { createdAt: 'desc' },
   });
   return orders.map(serialize);
 }
@@ -93,6 +93,6 @@ export async function saveLabResult(id: string, result: string) {
 export async function labPatients() {
   return getPrisma().patient.findMany({
     select: { id: true, firstName: true, lastName: true },
-    orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    orderBy: { createdAt: 'desc' }, 
   });
 }

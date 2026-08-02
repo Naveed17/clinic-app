@@ -4,6 +4,14 @@ function atStartOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+function toLocalDateKey(d: Date): string {
+  const date = new Date(d);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export async function getReportSummary(): Promise<{
   todaysPatients: number;
   todaysRevenue: number;
@@ -68,29 +76,31 @@ export async function getDetailedReport(from: string, to: string): Promise<Detai
 
   const cursor = new Date(fromDate);
   while (cursor < toDate) {
-    const key = cursor.toISOString().slice(0, 10);
+    const key = toLocalDateKey(cursor);
     map.set(key, { patientIds: new Set(), appointments: 0, revenue: 0, invoices: 0 });
     cursor.setDate(cursor.getDate() + 1);
   }
 
   for (const appt of appointments) {
-    const key = new Date(appt.startsAt).toISOString().slice(0, 10);
+    const key = toLocalDateKey(appt.startsAt);
     const row = map.get(key);
     if (row) { row.patientIds.add(appt.patientId); row.appointments += 1; }
   }
   for (const inv of invoices) {
-    const key = new Date(inv.createdAt).toISOString().slice(0, 10);
+    const key = toLocalDateKey(inv.createdAt);
     const row = map.get(key);
     if (row) { row.revenue += Number(inv.total); row.invoices += 1; }
   }
 
-  return Array.from(map.entries()).map(([date, row]) => ({
-    date,
-    patients: row.patientIds.size,
-    appointments: row.appointments,
-    revenue: row.revenue,
-    invoices: row.invoices,
-  }));
+  return Array.from(map.entries())
+    .map(([date, row]) => ({
+      date,
+      patients: row.patientIds.size,
+      appointments: row.appointments,
+      revenue: row.revenue,
+      invoices: row.invoices,
+    }))
+    .reverse();
 }
 
 export interface DoctorRevenueRow {
