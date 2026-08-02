@@ -10,6 +10,7 @@ import { LicenseModulesProvider } from '@/features/auth/LicenseModulesContext';
 import { useSocket, useRealtimeInvalidation } from '@/hooks';
 import { AppointmentToast } from '@/components/AppointmentToast';
 import { UpdateBanner } from '@/components/UpdateBanner';
+import { UpdateProvider } from '@/context/updateProvider';
 
 function RealtimeBootstrap({ children }: PropsWithChildren): React.JSX.Element {
   useSocket();
@@ -62,9 +63,11 @@ export function AppProviders({ children }: PropsWithChildren): React.JSX.Element
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <AuthProvider>
-              <LicenseModulesProvider>
+            <LicenseModulesProvider>
+              <UpdateProvider>
                 <RealtimeBootstrap>{children}</RealtimeBootstrap>
-              </LicenseModulesProvider>
+              </UpdateProvider>
+            </LicenseModulesProvider>
           </AuthProvider>
         </ThemeProvider>
       </ColorModeContext.Provider>

@@ -5,19 +5,36 @@ export function UpdateBanner(): React.JSX.Element | null {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!window.clinic?.update) return;
-    const unsub = window.clinic.update.onReady(() => setReady(true));
-    return unsub;
+
+    const updateApi = window.clinic?.update;
+    if (!updateApi) return;
+    const unSub = updateApi.onReady(() => {
+      setReady(true);
+    });
+
+    return () => {
+      if (typeof unSub === 'function') unSub();
+    };
   }, []);
 
   if (!ready) return null;
 
   return (
-    <Snackbar open anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+    <Snackbar
+      open={ready}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      sx={{ zIndex: 99999 }}
+    >
       <Alert
         severity="info"
+        variant="filled"
         action={
-          <Button color="inherit" size="small" onClick={() => window.clinic.update.install()}>
+          <Button
+            color="inherit"
+            size="small"
+            onClick={() => window.clinic?.update?.install()}
+            sx={{ fontWeight: 'bold' }}
+          >
             Restart & Update
           </Button>
         }

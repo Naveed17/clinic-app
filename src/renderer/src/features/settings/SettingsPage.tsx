@@ -23,6 +23,7 @@ import BackupOutlinedIcon from '@mui/icons-material/BackupOutlined';
 import RestoreOutlinedIcon from '@mui/icons-material/RestoreOutlined';
 import SystemUpdateAltOutlinedIcon from '@mui/icons-material/SystemUpdateAltOutlined';
 import WifiTetheringOutlinedIcon from '@mui/icons-material/WifiTetheringOutlined';
+import { useUpdate } from '@/context/updateProvider'; // Ensure exact import path for your UpdateContext
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
 
@@ -38,41 +39,37 @@ interface Settings {
 export function SettingsPage(): React.JSX.Element {
   const theme = useTheme();
 
+  // Context Hook Integration for Global Auto-Updater State
+  const {
+    progress: downloadProgress,
+    isDownloading,
+    isReady: isUpdateReady,
+    checkForUpdates,
+    installUpdate
+  } = useUpdate();
+
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saved, setSaved] = useState(false);
   const [lanIp, setLanIp] = useState<string>('...');
   const [backupStatus, setBackupStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
-  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'latest' | 'error'>('idle');
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'latest' | 'error'>('idle');
   const [currentVersion, setCurrentVersion] = useState<string>('1.0.0');
+
   useEffect(() => {
     if (updateStatus === 'latest' || updateStatus === 'error') {
       const t = setTimeout(() => setUpdateStatus('idle'), 3000);
       return () => clearTimeout(t);
     }
   }, [updateStatus]);
+
   useEffect(() => {
     void window.clinic?.update?.getVersion?.().then((ver: string) => {
       if (ver) setCurrentVersion(ver);
     });
   }, []);
-  const [downloadProgress, setDownloadProgress] = useState<number>(0);
-  useEffect(() => {
-    const cleanupProgress = window.clinic?.update?.onProgress?.((percent: number) => {
-      setUpdateStatus('downloading');
-      setDownloadProgress(percent);
-    });
 
-    const cleanupReady = window.clinic?.update?.onReady?.(() => {
-      setUpdateStatus('ready');
-    });
-
-    return () => {
-      cleanupProgress?.();
-      cleanupReady?.();
-    };
-  }, []);
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   const [prevMode, setPrevMode] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -99,19 +96,11 @@ export function SettingsPage(): React.JSX.Element {
   async function handleCheckUpdate() {
     try {
       setUpdateStatus('checking');
-      setDownloadProgress(0);
-
-      if (!window.clinic?.update?.check) {
-        console.error('Update IPC API not found');
-        setUpdateStatus('error');
-        return;
-      }
-
-      const result = await window.clinic.update.check();
+      const result = await checkForUpdates();
       if (result === 'available') {
-        setUpdateStatus('downloading');
+        setUpdateStatus('available');
       } else {
-        setUpdateStatus(result || 'error');
+        setUpdateStatus(result || 'latest');
       }
     } catch (err) {
       console.error('Failed to check for updates:', err);
@@ -119,15 +108,10 @@ export function SettingsPage(): React.JSX.Element {
     }
   }
 
-  function handleInstallUpdate() {
-    void window.clinic?.update?.install();
-  }
-
   useEffect(() => {
     void window.clinic?.settings.get().then((s) => {
       setSettings(s);
       setPrevMode(s.serverMode);
-      // Check if current lan-client connection is alive
       if (s.serverMode === 'lan-client' && s.clientApiUrl) {
         void window.clinic?.settings.testConnection(s.clientApiUrl).then((ok) => setConnectionOk(ok ?? false));
       }
@@ -238,12 +222,12 @@ export function SettingsPage(): React.JSX.Element {
             </Stack>
             <Box sx={{ position: 'relative' }}>
               {/* Update Button State */}
-              {updateStatus === 'ready' ? (
+              {isUpdateReady ? (
                 <Button
                   variant="contained"
                   color="success"
                   startIcon={<SystemUpdateAltOutlinedIcon />}
-                  onClick={handleInstallUpdate}
+                  onClick={installUpdate}
                 >
                   Restart & Install Update
                 </Button>
@@ -251,7 +235,7 @@ export function SettingsPage(): React.JSX.Element {
                 <Button
                   variant="outlined"
                   startIcon={updateStatus === 'checking' ? <CircularProgress size={16} /> : <SystemUpdateAltOutlinedIcon />}
-                  disabled={updateStatus === 'checking' || updateStatus === 'downloading'}
+                  disabled={updateStatus === 'checking' || isDownloading}
                   onClick={() => void handleCheckUpdate()}
                 >
                   Check for Updates
@@ -260,7 +244,7 @@ export function SettingsPage(): React.JSX.Element {
 
               {/* Progress Bar & Status Messages */}
               <Box sx={{ mt: 1.5 }}>
-                {updateStatus === 'downloading' && (
+                {isDownloading && (
                   <Box sx={{ width: '100%' }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                       <Typography variant="caption" color="text.secondary" fontWeight={600}>
@@ -274,19 +258,19 @@ export function SettingsPage(): React.JSX.Element {
                   </Box>
                 )}
 
-                {updateStatus === 'ready' && (
+                {isUpdateReady && (
                   <Alert severity="success" sx={{ py: 0.5 }}>
                     Update downloaded! Click restart to apply.
                   </Alert>
                 )}
 
-                {updateStatus === 'latest' && (
+                {updateStatus === 'latest' && !isDownloading && !isUpdateReady && (
                   <Alert severity="success" sx={{ py: 0.5 }}>
                     You're on the latest version.
                   </Alert>
                 )}
 
-                {updateStatus === 'error' && (
+                {updateStatus === 'error' && !isDownloading && !isUpdateReady && (
                   <Alert severity="warning" sx={{ py: 0.5 }}>
                     Could not check for updates. Check internet connection.
                   </Alert>
