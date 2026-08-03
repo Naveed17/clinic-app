@@ -149,12 +149,13 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
   );
 }
 
-export function AppointmentDialog({ appointment, open, onClose, defaultDate, defaultProviderId }: {
+export function AppointmentDialog({ appointment, open, onClose, defaultDate, defaultProviderId, onSuccess }: {
   appointment?: Appointment;
   open: boolean;
   onClose: () => void;
   defaultDate?: string;
   defaultProviderId?: string;
+  onSuccess?: () => void;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const isEdit = !!appointment;
@@ -224,6 +225,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['appointments'] });
       onClose();
+      onSuccess?.();
     },
   });
 

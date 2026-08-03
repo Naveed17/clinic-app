@@ -25,6 +25,8 @@ import { patientsService } from '@/services/patients.service';
 import { invoicesService } from '@/services/invoices.service';
 import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
+import { AppointmentDialog } from '@/features/appointments/AppointmentsPage';
+import { InvoiceDialog } from '@/features/billing/InvoicesPage';
 import { useNavigate } from 'react-router-dom';
 import type { TokenPerson, Token, PrescriptionFeedItem } from '@/types/token';
 import type { PatientInput } from '@/types/patient';
@@ -369,6 +371,8 @@ export function ReceptionistDashboard(): React.JSX.Element {
   const theme = useTheme();
   const navigate = useNavigate();
   const [walkInOpen, setWalkInOpen] = useState(false);
+  const [apptDialogOpen, setApptDialogOpen] = useState(false);
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
 
   const { data: appointments = [], isLoading } = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list, refetchInterval: 15_000 });
   const { data: patientsData } = useQuery({ queryKey: ['patients', { page: 1, pageSize: 1, search: '' }], queryFn: () => patientsService.list({ page: 1, pageSize: 1, search: '' }), refetchInterval: 30_000 });
@@ -414,8 +418,8 @@ export function ReceptionistDashboard(): React.JSX.Element {
           <Paper variant="outlined" sx={{ p: 3, display: 'flex', flexDirection: 'column' }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
               <Typography fontWeight={700}>Today's Queue</Typography>
-              <Button size="small" variant="outlined" onClick={() => navigate('/appointments')} sx={{ borderRadius: 2 }}>
-                Manage
+              <Button size="small" variant="outlined" onClick={() => setApptDialogOpen(true)} sx={{ borderRadius: 2 }}>
+                + Book Appointment
               </Button>
             </Stack>
             {isLoading ? (
@@ -432,7 +436,20 @@ export function ReceptionistDashboard(): React.JSX.Element {
                   '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
                 }}>
                   {todaysAppts.map((a) => (
-                    <Box key={a.id} sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, borderRadius: 2, bgcolor: alpha(theme.palette.background.default, 0.6), border: `1px solid ${theme.palette.divider}` }}>
+                    <Box
+                      key={a.id}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2,
+                        p: 1.5,
+                        borderRadius: 1,
+                        bgcolor: alpha(theme.palette.background.default, 0.6),
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderLeft: '4px solid',
+                        borderLeftColor: statusColor[a.status] && statusColor[a.status] !== 'default' ? `${statusColor[a.status]}.main` : 'divider',
+                      }}
+                    >
                       <Avatar sx={{ width: 34, height: 34, bgcolor: alpha(theme.palette.primary.main, 0.12), color: 'primary.main', fontSize: 12, fontWeight: 700 }}>
                         {a.patient.firstName[0]}{a.patient.lastName[0]}
                       </Avatar>
@@ -476,8 +493,21 @@ export function ReceptionistDashboard(): React.JSX.Element {
                 </Button>
                 <Button
                   variant="outlined"
+                  startIcon={<CalendarMonthOutlinedIcon />}
+                  onClick={() => setApptDialogOpen(true)}
+                  fullWidth
+                  sx={{
+                    justifyContent: 'flex-start', borderRadius: 2, py: 1.2,
+                    borderColor: alpha(theme.palette.primary.main, 0.4), color: theme.palette.primary.main,
+                    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06), borderColor: theme.palette.primary.main },
+                  }}
+                >
+                  Book Appointment
+                </Button>
+                <Button
+                  variant="outlined"
                   startIcon={<PaymentsOutlinedIcon />}
-                  onClick={() => navigate('/billing')}
+                  onClick={() => setInvoiceDialogOpen(true)}
                   fullWidth
                   sx={{
                     justifyContent: 'flex-start', borderRadius: 2, py: 1.2,
@@ -494,6 +524,16 @@ export function ReceptionistDashboard(): React.JSX.Element {
         </Box>
       </Stack>
       <WalkInModal open={walkInOpen} onClose={() => setWalkInOpen(false)} />
+      <AppointmentDialog
+        open={apptDialogOpen}
+        onClose={() => setApptDialogOpen(false)}
+        onSuccess={() => navigate('/appointments')}
+      />
+      <InvoiceDialog
+        open={invoiceDialogOpen}
+        onClose={() => setInvoiceDialogOpen(false)}
+        onSuccess={() => navigate('/billing')}
+      />
     </>
   );
 }

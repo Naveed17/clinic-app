@@ -177,14 +177,14 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 const defaults: FormValues = { patientId: '', drFee: 0, discount: 0, notes: '', items: [{ description: '', quantity: 1, unitPrice: 0 }] };
 
-function InvoiceDialog({ open, onClose }: { open: boolean; onClose: () => void }): React.JSX.Element {
+export function InvoiceDialog({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess?: () => void }): React.JSX.Element {
   const client = useQueryClient();
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: defaults });
   const fields = useFieldArray({ control: form.control, name: 'items' });
   const patients = useQuery({ queryKey: ['invoice-patients'], queryFn: invoicesService.patients });
   const mutation = useMutation({
     mutationFn: (values: FormValues) => invoicesService.create(values as InvoiceInput),
-    onSuccess: async () => { await client.invalidateQueries({ queryKey: ['invoices'] }); onClose(); },
+    onSuccess: async () => { await client.invalidateQueries({ queryKey: ['invoices'] }); onClose(); onSuccess?.(); },
   });
   useEffect(() => { if (open) form.reset(defaults); }, [form, open]);
   const items = form.watch('items');
