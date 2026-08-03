@@ -5,6 +5,7 @@ import { getPrisma } from '../database/client';
 import {
   createToken,
   deleteToken,
+  getTokenById,
   getTokenForPatient,
   listTokenDoctors,
   listTokenPatients,
@@ -20,6 +21,7 @@ export function registerTokenIpc(io?: SocketIOServer): void {
     getTokenForPatient(patientId, date)
   );
   ipcMain.handle('tokens:list', (_, date: string) => listTokens(date));
+  ipcMain.handle('tokens:get-by-id', (_, tokenId: string) => getTokenById(tokenId));
   ipcMain.handle('tokens:list-prescriptions', (_, date: string) => listPrescriptionFeed(date));
   ipcMain.handle('tokens:doctors', () => listTokenDoctors());
   ipcMain.handle('tokens:patients', () => listTokenPatients());

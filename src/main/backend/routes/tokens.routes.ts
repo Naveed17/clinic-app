@@ -6,6 +6,7 @@ import { getPrisma } from '../../database/client';
 import {
   createToken,
   deleteToken,
+  getTokenById,
   listTokenDoctors,
   listTokenPatients,
   listPrescriptionFeed,
@@ -26,6 +27,15 @@ export function createTokensRouter(io: SocketIOServer): Router {
   router.get('/prescriptions', asyncHandler(async (req, res) => {
     const date = String(req.query.date ?? new Date().toISOString().slice(0, 10));
     res.json(await listPrescriptionFeed(date));
+  }));
+  router.get('/for-patient', asyncHandler(async (req, res) => {
+    const { patientId, date } = req.query as { patientId: string; date: string };
+    res.json(await import('../../tokens/token.service').then((m) => m.getTokenForPatient(patientId, date)));
+  }));
+  router.get('/:id', asyncHandler(async (req, res) => {
+    const token = await getTokenById(String(req.params.id));
+    if (!token) return res.status(404).json({ error: 'Token not found' });
+    res.json(token);
   }));
   router.post('/', asyncHandler(async (req, res) => {
     const token = await createToken(req.body);

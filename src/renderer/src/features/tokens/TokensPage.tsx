@@ -194,10 +194,9 @@ function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone }: {
 }) {
   const date = new Date(token.createdAt).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
   const time = new Date(token.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const pr = token.prescription;
   return (
     <Document>
-      <Page size={[226, pr ? 700 : 480]} style={ts.page} wrap={false}>
+      <Page size={[226, 400]} style={ts.page} wrap={false}>
         <Text style={ts.shopName}>{clinicName || 'CLINIC'}</Text>
         {clinicAddress ? <Text style={ts.shopSub}>{clinicAddress}</Text> : null}
         {clinicPhone ? <Text style={ts.shopSub}>Tel: {clinicPhone}</Text> : null}
@@ -216,31 +215,6 @@ function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone }: {
         <View style={ts.row}><Text style={ts.lbl}>Time</Text><Text style={ts.val}>{time}</Text></View>
         {token.notes ? <View style={ts.row}><Text style={ts.lbl}>Note</Text><Text style={ts.val}>{token.notes}</Text></View> : null}
         {token.reason ? <View style={ts.row}><Text style={ts.lbl}>Reason</Text><Text style={ts.val}>{token.reason}</Text></View> : null}
-        {pr && (
-          <>
-            <Text style={ts.stars}>{STAR_LINE}</Text>
-            <Text style={[ts.title, { marginBottom: 4 }]}>PRESCRIPTION</Text>
-            {pr.diagnosis ? <View style={ts.row}><Text style={ts.lbl}>Diagnosis</Text><Text style={ts.val}>{pr.diagnosis}</Text></View> : null}
-            {pr.medicines.length > 0 && (
-              <>
-                <Text style={[ts.lbl, { marginTop: 4, marginBottom: 2 }]}>Medicines:</Text>
-                {pr.medicines.map((m, i) => (
-                  <View key={i} style={{ marginBottom: 3 }}>
-                    <Text style={[ts.val, { fontWeight: 'bold' }]}>{i + 1}. {m.name}</Text>
-                    <Text style={ts.lbl}>   {m.dosage} · {m.duration}{m.instructions ? ` · ${m.instructions}` : ''}</Text>
-                  </View>
-                ))}
-              </>
-            )}
-            {pr.tests.length > 0 && (
-              <>
-                <Text style={[ts.lbl, { marginTop: 4, marginBottom: 2 }]}>Lab Tests:</Text>
-                {pr.tests.map((t, i) => <Text key={i} style={ts.val}>  • {t}</Text>)}
-              </>
-            )}
-            {pr.advice ? <><Text style={[ts.lbl, { marginTop: 4 }]}>Advice:</Text><Text style={ts.val}>{pr.advice}</Text></> : null}
-          </>
-        )}
         <Text style={ts.stars}>{STAR_LINE}</Text>
         <Text style={ts.footer}>Please wait for your token to be called.{`\n`}Thank you for your visit.</Text>
       </Page>
@@ -386,6 +360,7 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
 
 export function TokenPrintPreview({ token, onClose }: { token: Token; onClose: () => void }) {
   const [clinic, setClinic] = useState<{ clinicName: string; clinicAddress: string; clinicPhone: string } | null>(null);
+  const [freshToken, setFreshToken] = useState<Token>(token);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -394,17 +369,21 @@ export function TokenPrintPreview({ token, onClose }: { token: Token; onClose: (
       clinicAddress: s.clinicAddress ?? '',
       clinicPhone: s.clinicPhone ?? '',
     }));
-  }, []);
+    // Always fetch fresh token data from DB so prescription is always included
+    void window.clinic?.tokens?.getById?.(token.id).then((fresh) => {
+      if (fresh) setFreshToken(fresh as Token);
+    });
+  }, [token.id]);
 
   useEffect(() => {
     if (!clinic) return;
     let url: string;
-    void pdf(<TokenSlipDocument token={token} {...clinic} />).toBlob().then((blob) => {
+    void pdf(<TokenSlipDocument token={freshToken} {...clinic} />).toBlob().then((blob) => {
       url = URL.createObjectURL(blob);
       setBlobUrl(url);
     });
     return () => { if (url) URL.revokeObjectURL(url); };
-  }, [clinic, token]);
+  }, [clinic, freshToken]);
 
   return (
     <Dialog open onClose={onClose} maxWidth="xs" fullWidth>

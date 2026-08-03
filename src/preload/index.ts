@@ -250,6 +250,11 @@ const api = {
         () => request(`/api/tokens/prescriptions?date=${date}`),
         'tokens:list-prescriptions', date,
       ),
+    getById: (tokenId: string) =>
+      call(
+        () => request(`/api/tokens/${tokenId}`),
+        'tokens:get-by-id', tokenId,
+      ),
     doctors: () => call(() => request('/api/tokens/doctors'), 'tokens:doctors'),
     patients: () => call(() => request('/api/tokens/patients'), 'tokens:patients'),
     create: (input: unknown) =>
