@@ -7,6 +7,7 @@ import {
   createToken,
   deleteToken,
   getTokenById,
+  getTokenForPatient,
   listTokenDoctors,
   listTokenPatients,
   listPrescriptionFeed,
@@ -30,7 +31,7 @@ export function createTokensRouter(io: SocketIOServer): Router {
   }));
   router.get('/for-patient', asyncHandler(async (req, res) => {
     const { patientId, date } = req.query as { patientId: string; date: string };
-    res.json(await import('../../tokens/token.service').then((m) => m.getTokenForPatient(patientId, date)));
+    res.json(await getTokenForPatient(patientId, date));
   }));
   router.get('/:id', asyncHandler(async (req, res) => {
     const token = await getTokenById(String(req.params.id));

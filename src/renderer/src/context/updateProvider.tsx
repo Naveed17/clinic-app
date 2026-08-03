@@ -48,6 +48,7 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // 3. Error handler
         const unsubError = updateApi.onError?.((errMessage: string) => {
             setIsDownloading(false);
+            setProgress(0);
             setError(errMessage || 'An error occurred during update download.');
         });
 
@@ -66,6 +67,9 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 setIsDownloading(true);
                 setIsReady(false);
                 setError(null);
+            } else {
+                setIsDownloading(false);
+                setProgress(0);
             }
             return res;
         }

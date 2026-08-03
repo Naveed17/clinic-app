@@ -1,63 +1,64 @@
-import { Snackbar, Button, Alert, Box, LinearProgress, Typography, Stack } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Snackbar, Button, Alert, IconButton } from '@mui/material';
 import SystemUpdateAltIcon from '@mui/icons-material/SystemUpdateAlt';
+import CloseIcon from '@mui/icons-material/Close';
 import { useUpdate } from '@/context/updateProvider';
 
 export function UpdateBanner(): React.JSX.Element | null {
-  const { isReady, isDownloading, progress, installUpdate } = useUpdate();
+  const { isReady, isDownloading, installUpdate } = useUpdate();
+  const [dismissed, setDismissed] = useState(false);
 
-  if (!isReady && !isDownloading) return null;
+  useEffect(() => {
+    if (isReady) {
+      setDismissed(false);
+    }
+  }, [isReady]);
 
-  if (isDownloading) {
-    return (
-      <Snackbar
-        open={isDownloading}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        sx={{ zIndex: 99999 }}
-      >
-        <Alert
-          severity="info"
-          variant="filled"
-          icon={<SystemUpdateAltIcon fontSize="inherit" />}
-          sx={{ width: '100%', minWidth: 320 }}
-        >
-          <Box sx={{ width: '100%' }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-              <Typography variant="body2" fontWeight={600}>
-                Downloading software update...
-              </Typography>
-              <Typography variant="caption" fontWeight={700}>
-                {progress}%
-              </Typography>
-            </Stack>
-            <LinearProgress variant="determinate" value={progress} color="inherit" sx={{ height: 4, borderRadius: 2 }} />
-          </Box>
-        </Alert>
-      </Snackbar>
-    );
-  }
+  if (dismissed || (!isReady && !isDownloading)) return null;
 
   return (
     <Snackbar
-      open={isReady}
+      open={!dismissed && (isReady || isDownloading)}
       anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       sx={{ zIndex: 99999 }}
     >
       <Alert
-        severity="success"
+        severity={isReady ? 'success' : 'info'}
         variant="filled"
         icon={<SystemUpdateAltIcon fontSize="inherit" />}
         action={
-          <Button
-            color="inherit"
-            size="small"
-            onClick={installUpdate}
-            sx={{ fontWeight: 'bold', textTransform: 'none', bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}
-          >
-            Restart & Update
-          </Button>
+          <>
+            {isReady && (
+              <Button
+                color="inherit"
+                size="small"
+                onClick={installUpdate}
+                sx={{
+                  fontWeight: 'bold',
+                  textTransform: 'none',
+                  mr: 1,
+                  bgcolor: 'rgba(255,255,255,0.2)',
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' }
+                }}
+              >
+                Restart & Update
+              </Button>
+            )}
+            <IconButton
+              size="small"
+              aria-label="close"
+              color="inherit"
+              onClick={() => setDismissed(true)}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </>
         }
+        sx={{ alignItems: 'center' }}
       >
-        A new update is downloaded and ready to install!
+        {isReady
+          ? 'A new software update is ready to install!'
+          : 'A new update is available.'}
       </Alert>
     </Snackbar>
   );

@@ -35,7 +35,6 @@ export function initAutoUpdater(): void {
         const latestVersion = result.updateInfo.version;
 
         if (latestVersion !== currentVersion) {
-          void autoUpdater.downloadUpdate();
           return 'available';
         }
       }
