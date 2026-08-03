@@ -3,7 +3,6 @@ import { Box } from '@mui/material';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
-import { UpdateBanner } from '../components/UpdateBanner';
 
 export function AppShell(): React.JSX.Element {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -37,7 +36,6 @@ export function AppShell(): React.JSX.Element {
           </Box>
         </Box>
       </Box>
-      <UpdateBanner />
     </Box>
   );
 }

@@ -4,9 +4,10 @@ interface UpdateContextType {
     progress: number;
     isDownloading: boolean;
     isReady: boolean;
-    // Type void ki jagah Promise<any> ya Promise<string | undefined> karein:
+    error: string | null;
     checkForUpdates: () => Promise<any>;
     installUpdate: () => void;
+    clearError: () => void;
 }
 
 const checkForUpdates = async () => {
@@ -21,6 +22,7 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [progress, setProgress] = useState<number>(0);
     const [isDownloading, setIsDownloading] = useState<boolean>(false);
     const [isReady, setIsReady] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const updateApi = window.clinic?.update;
@@ -29,6 +31,7 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // 1. Download progress update handler
         const unsubProgress = updateApi.onProgress((percent: number) => {
             setIsDownloading(true);
+            setError(null);
             setProgress(Math.round(percent));
         });
 
@@ -36,22 +39,32 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const unsubReady = updateApi.onReady(() => {
             setIsDownloading(false);
             setIsReady(true);
+            setError(null);
+        });
+
+        // 3. Error handler
+        const unsubError = updateApi.onError?.((errMessage: string) => {
+            setIsDownloading(false);
+            setError(errMessage || 'An error occurred during update download.');
         });
 
         return () => {
             if (typeof unsubProgress === 'function') unsubProgress();
             if (typeof unsubReady === 'function') unsubReady();
+            if (typeof unsubError === 'function') unsubError();
         };
     }, []);
-
-
 
     const installUpdate = () => {
         window.clinic?.update?.install();
     };
 
+    const clearError = () => {
+        setError(null);
+    };
+
     return (
-        <UpdateContext.Provider value={{ progress, isDownloading, isReady, checkForUpdates, installUpdate }}>
+        <UpdateContext.Provider value={{ progress, isDownloading, isReady, error, checkForUpdates, installUpdate, clearError }}>
             {children}
         </UpdateContext.Provider>
     );

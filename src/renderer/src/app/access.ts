@@ -28,7 +28,7 @@ export const ROUTE_ACCESS: Record<AppRoute, UserRole[]> = {
   '/users':        ['admin'],
   '/doctors':      ['admin'],
   '/schedule':     ['admin'],
-  '/settings':     ['admin'],
+  '/settings':     ['admin', 'doctor', 'receptionist', 'lab_technician'],
   '/pharmacy':     ['admin', 'receptionist'],
 };
 

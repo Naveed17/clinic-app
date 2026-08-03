@@ -25,6 +25,7 @@ import RestoreOutlinedIcon from '@mui/icons-material/RestoreOutlined';
 import SystemUpdateAltOutlinedIcon from '@mui/icons-material/SystemUpdateAltOutlined';
 import WifiTetheringOutlinedIcon from '@mui/icons-material/WifiTetheringOutlined';
 import { useUpdate } from '@/context/updateProvider';
+import { useAuth } from '@/features/auth/AuthContext';
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
 
@@ -39,12 +40,15 @@ interface Settings {
 
 export function SettingsPage(): React.JSX.Element {
   const theme = useTheme();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   // Context Hook Integration for Global Auto-Updater State
   const {
     progress: downloadProgress,
     isDownloading,
     isReady: isUpdateReady,
+    error: updateError,
     checkForUpdates,
     installUpdate
   } = useUpdate();
@@ -77,6 +81,16 @@ export function SettingsPage(): React.JSX.Element {
     }
   }, [isUpdateReady]);
 
+  useEffect(() => {
+    if (updateError) {
+      setToastMessage({
+        msg: `Update Error: ${updateError}`,
+        severity: 'error',
+      });
+      setUpdateStatus('error');
+    }
+  }, [updateError]);
+
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   const [prevMode, setPrevMode] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -104,29 +118,34 @@ export function SettingsPage(): React.JSX.Element {
   async function handleCheckUpdate() {
     try {
       setUpdateStatus('checking');
-      setToastMessage({ msg: 'Checking for updates...', severity: 'info' });
+      setToastMessage({ msg: 'Checking for updates on GitHub...', severity: 'info' });
 
       const res = await checkForUpdates();
 
       if (res === 'available' || (typeof res === 'object' && res?.updateInfo)) {
         setUpdateStatus('available');
-        setToastMessage({ msg: 'New update found! Starting download...', severity: 'info' });
-      } else if (res === 'latest' || res === false) {
+        setToastMessage({ msg: 'New update found! Downloading in background...', severity: 'info' });
+      } else if (res === 'latest') {
         setUpdateStatus('latest');
-        setToastMessage({ msg: 'You are using the latest version.', severity: 'info' });
+        setToastMessage({ msg: `You are on the latest version (v${currentVersion}).`, severity: 'success' });
+      } else if (typeof res === 'object' && res?.error) {
+        setUpdateStatus('error');
+        setToastMessage({ msg: `Update check failed: ${res.error}`, severity: 'error' });
       } else {
         setUpdateStatus('latest');
-        setToastMessage({ msg: 'No updates available at this moment.', severity: 'info' });
+        setToastMessage({ msg: `App is up to date (v${currentVersion}).`, severity: 'info' });
       }
     } catch (err: any) {
       console.error('Failed to check or download update:', err);
       setUpdateStatus('error');
       setToastMessage({
-        msg: err?.message || 'Error occurred while checking/downloading update. Check internet connection.',
+        msg: err?.message || 'Error occurred while checking update.',
         severity: 'error'
       });
     } finally {
-      setUpdateStatus('idle');
+      setTimeout(() => {
+        setUpdateStatus((current) => (current === 'checking' ? 'idle' : current));
+      }, 4000);
     }
   }
 
@@ -170,6 +189,101 @@ export function SettingsPage(): React.JSX.Element {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     }
+  }
+
+  if (!isAdmin) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '75vh',
+          width: '100%',
+        }}
+      >
+        <Paper
+          elevation={0}
+          sx={{
+            p: 4,
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+            maxWidth: 480,
+            width: '100%',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.04)',
+          }}
+        >
+          <Typography variant="h6" fontWeight={700} textAlign="center" sx={{ mb: 0.5 }}>
+            Software Update
+          </Typography>
+          <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mb: 3 }}>
+            Check for software updates and install the latest version of CareFlow.
+          </Typography>
+
+          <Stack direction="row" alignItems="center" justifyContent="center" spacing={1} sx={{ mb: 3 }}>
+            <Typography variant="body2" color="text.secondary">Current Version:</Typography>
+            <Chip label={`v${currentVersion}`} size="small" variant="outlined" color="primary" sx={{ fontWeight: 600, height: 22 }} />
+          </Stack>
+
+          <Box sx={{ width: '100%' }}>
+            {isUpdateReady ? (
+              <Button
+                variant="contained"
+                color="success"
+                fullWidth
+                size="large"
+                startIcon={<SystemUpdateAltOutlinedIcon />}
+                onClick={installUpdate}
+              >
+                Restart & Install Update
+              </Button>
+            ) : (
+              <Button
+                variant="outlined"
+                fullWidth
+                size="large"
+                startIcon={updateStatus === 'checking' ? <CircularProgress size={16} /> : <SystemUpdateAltOutlinedIcon />}
+                disabled={updateStatus === 'checking' || isDownloading}
+                onClick={() => void handleCheckUpdate()}
+              >
+                {updateStatus === 'checking' ? 'Checking...' : 'Check for Updates'}
+              </Button>
+            )}
+
+            {/* Downloading Linear Progress */}
+            {isDownloading && (
+              <Box sx={{ width: '100%', mt: 2.5 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                    Downloading update...
+                  </Typography>
+                  <Typography variant="caption" color="primary.main" fontWeight={700}>
+                    {downloadProgress}%
+                  </Typography>
+                </Stack>
+                <LinearProgress variant="determinate" value={downloadProgress} sx={{ height: 6, borderRadius: 3 }} />
+              </Box>
+            )}
+          </Box>
+
+          {/* Primary Notification Toast / Snackbar for Updates & Dynamic Errors */}
+          <Snackbar
+            open={Boolean(toastMessage)}
+            autoHideDuration={4000}
+            onClose={() => setToastMessage(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          >
+            {toastMessage ? (
+              <Alert severity={toastMessage.severity} onClose={() => setToastMessage(null)}>
+                {toastMessage.msg}
+              </Alert>
+            ) : undefined}
+          </Snackbar>
+        </Paper>
+      </Box>
+    );
   }
 
   return (

@@ -389,27 +389,35 @@ const api = {
         'search:global', query,
       ),
   },
- update: {
-  getVersion: () => ipcRenderer.invoke('app:get-version'),
-  check: () => ipcRenderer.invoke('app:check-for-updates'),
-  install: () => ipcRenderer.invoke('app:install-update'),
+  update: {
+    getVersion: () => ipcRenderer.invoke('app:get-version'),
+    check: () => ipcRenderer.invoke('app:check-for-updates'),
+    install: () => ipcRenderer.invoke('app:install-update'),
 
-  onProgress: (handler: (percent: number) => void) => {
-    const listener = (_: unknown, percent: number) => handler(percent);
-    ipcRenderer.on('app:update-progress', listener);
-    return () => {
-      ipcRenderer.removeListener('app:update-progress', listener);
-    };
-  },
+    onProgress: (handler: (percent: number) => void) => {
+      const listener = (_: unknown, percent: number) => handler(percent);
+      ipcRenderer.on('app:update-progress', listener);
+      return () => {
+        ipcRenderer.removeListener('app:update-progress', listener);
+      };
+    },
 
-  onReady: (handler: () => void) => {
-    const listener = () => handler();
-    ipcRenderer.on('app:update-ready', listener);
-    return () => {
-      ipcRenderer.removeListener('app:update-ready', listener);
-    };
+    onReady: (handler: () => void) => {
+      const listener = () => handler();
+      ipcRenderer.on('app:update-ready', listener);
+      return () => {
+        ipcRenderer.removeListener('app:update-ready', listener);
+      };
+    },
+
+    onError: (handler: (err: string) => void) => {
+      const listener = (_: unknown, err: string) => handler(err);
+      ipcRenderer.on('app:update-error', listener);
+      return () => {
+        ipcRenderer.removeListener('app:update-error', listener);
+      };
+    },
   },
-},
   auth: {
     login: async (email: string, password: string) => {
       await settingsReady;

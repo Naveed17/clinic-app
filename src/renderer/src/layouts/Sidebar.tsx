@@ -88,13 +88,11 @@ function SidebarContents(): React.JSX.Element {
 
       {/* Bottom icons */}
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75 }}>
-        {user?.role === 'admin' && (
-          <Tooltip title="Settings" placement="right">
-            <IconButton onClick={() => navigate('/settings')} sx={navBtnSx(location.pathname === '/settings')}>
-              <SettingsOutlinedIcon />
-            </IconButton>
-          </Tooltip>
-        )}
+        <Tooltip title="Settings" placement="right">
+          <IconButton onClick={() => navigate('/settings')} sx={navBtnSx(location.pathname === '/settings')}>
+            <SettingsOutlinedIcon />
+          </IconButton>
+        </Tooltip>
         <Tooltip title="Logout" placement="right">
           <IconButton
             onClick={() => { logout(); navigate('/login', { replace: true }); }}

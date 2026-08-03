@@ -39,7 +39,7 @@ import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
   WAITING: { label: 'Waiting', color: 'warning' },
-  DONE:    { label: 'Done',    color: 'success' },
+  DONE: { label: 'Done', color: 'success' },
   SKIPPED: { label: 'Skipped', color: 'default' },
 };
 
@@ -281,104 +281,104 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
 
   return (
     <>
-    <Dialog open onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        Prescription — Token #{String(token.tokenNumber).padStart(3, '0')}
-        <Typography variant="body2" color="text.secondary">
-          {token.patient.firstName} {token.patient.lastName} · Dr. {token.doctor.firstName} {token.doctor.lastName}
-        </Typography>
-      </DialogTitle>
-      <DialogContent>
-        <Stack spacing={2.5} sx={{ mt: 1 }}>
-          <TextField label="Diagnosis" fullWidth value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} />
+      <Dialog open onClose={onClose} maxWidth="md" fullWidth>
+        <DialogTitle>
+          Prescription — Token #{String(token.tokenNumber).padStart(3, '0')}
+          <Typography variant="body2" color="text.secondary">
+            {token.patient.firstName} {token.patient.lastName} · Dr. {token.doctor.firstName} {token.doctor.lastName}
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2.5} sx={{ mt: 1 }}>
+            <TextField label="Diagnosis" fullWidth value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} />
 
-          <Box>
-            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Medicines</Typography>
-            <Stack spacing={1.5}>
-              {medicines.map((m, i) => (
-                <Paper key={i} variant="outlined" sx={{ p: 1.5 }}>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: 1 }}>
-                    <MedicineAutocomplete
-                      value={m.name}
-                      onChange={(name) => updateMed(i, 'name', name)}
-                      size="small"
-                    />
-                    <TextField size="small" label="Dosage" value={m.dosage} onChange={(e) => updateMed(i, 'dosage', e.target.value)} />
-                    <TextField size="small" label="Duration" value={m.duration} onChange={(e) => updateMed(i, 'duration', e.target.value)} />
-                    <TextField size="small" label="Instructions" value={m.instructions} onChange={(e) => updateMed(i, 'instructions', e.target.value)} />
-                    <IconButton size="small" color="error" onClick={() => setMedicines((p) => p.filter((_, idx) => idx !== i))} disabled={medicines.length === 1}>
-                      <DeleteOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                </Paper>
-              ))}
-              <Button size="small" startIcon={<AddOutlinedIcon />} onClick={() => setMedicines((p) => [...p, emptyMed()])} sx={{ alignSelf: 'flex-start' }}>
-                Add Medicine
-              </Button>
-            </Stack>
-          </Box>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Medicines</Typography>
+              <Stack spacing={1.5}>
+                {medicines.map((m, i) => (
+                  <Paper key={i} variant="outlined" sx={{ p: 1.5 }}>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: 1 }}>
+                      <MedicineAutocomplete
+                        value={m.name}
+                        onChange={(name) => updateMed(i, 'name', name)}
+                        size="small"
+                      />
+                      <TextField size="small" label="Dosage" value={m.dosage} onChange={(e) => updateMed(i, 'dosage', e.target.value)} />
+                      <TextField size="small" label="Duration" value={m.duration} onChange={(e) => updateMed(i, 'duration', e.target.value)} />
+                      <TextField size="small" label="Instructions" value={m.instructions} onChange={(e) => updateMed(i, 'instructions', e.target.value)} />
+                      <IconButton size="small" color="error" onClick={() => setMedicines((p) => p.filter((_, idx) => idx !== i))} disabled={medicines.length === 1}>
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </Paper>
+                ))}
+                <Button size="small" startIcon={<AddOutlinedIcon />} onClick={() => setMedicines((p) => [...p, emptyMed()])} sx={{ alignSelf: 'flex-start' }}>
+                  Add Medicine
+                </Button>
+              </Stack>
+            </Box>
 
-          <Box>
-            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Lab Orders</Typography>
-            <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
-              <TextField
-                size="small"
-                label="Test name"
-                value={labTest}
-                onChange={(e) => setLabTest(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && labTest.trim()) createLabOrderMutation.mutate(labTest.trim()); }}
-                sx={{ flex: 1 }}
-              />
-              <Button
-                size="small"
-                variant="outlined"
-                disabled={!labTest.trim() || createLabOrderMutation.isPending}
-                onClick={() => createLabOrderMutation.mutate(labTest.trim())}
-              >
-                Order
-              </Button>
-            </Stack>
-            {labOrders.length > 0 && (
-              <Stack spacing={0.5}>
-                {labOrders.map((o) => (
-                  <Box key={o.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Chip
-                      label={o.test}
-                      size="small"
-                      color={o.status === 'COMPLETED' ? 'success' : o.status === 'CANCELLED' ? 'error' : 'warning'}
-                      variant="outlined"
-                    />
-                    <Typography variant="caption" color="text.secondary">{o.status.replace('_', ' ')}</Typography>
-                    {o.result && <Typography variant="caption" color="text.secondary">— {o.result}</Typography>}
-                  </Box>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Lab Orders</Typography>
+              <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+                <TextField
+                  size="small"
+                  label="Test name"
+                  value={labTest}
+                  onChange={(e) => setLabTest(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && labTest.trim()) createLabOrderMutation.mutate(labTest.trim()); }}
+                  sx={{ flex: 1 }}
+                />
+                <Button
+                  size="small"
+                  variant="outlined"
+                  disabled={!labTest.trim() || createLabOrderMutation.isPending}
+                  onClick={() => createLabOrderMutation.mutate(labTest.trim())}
+                >
+                  Order
+                </Button>
+              </Stack>
+              {labOrders.length > 0 && (
+                <Stack spacing={0.5}>
+                  {labOrders.map((o) => (
+                    <Box key={o.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Chip
+                        label={o.test}
+                        size="small"
+                        color={o.status === 'COMPLETED' ? 'success' : o.status === 'CANCELLED' ? 'error' : 'warning'}
+                        variant="outlined"
+                      />
+                      <Typography variant="caption" color="text.secondary">{o.status.replace('_', ' ')}</Typography>
+                      {o.result && <Typography variant="caption" color="text.secondary">— {o.result}</Typography>}
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Notes / Tests (text)</Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
+                {tests.map((t, i) => (
+                  <Chip key={i} label={t} onDelete={() => setTests((p) => p.filter((_, idx) => idx !== i))} size="small" />
                 ))}
               </Stack>
-            )}
-          </Box>
+              <Stack direction="row" spacing={1}>
+                <TextField size="small" label="Add note" value={testInput} onChange={(e) => setTestInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && testInput.trim()) { setTests((p) => [...p, testInput.trim()]); setTestInput(''); } }}
+                />
+                <Button size="small" onClick={() => { if (testInput.trim()) { setTests((p) => [...p, testInput.trim()]); setTestInput(''); } }}>Add</Button>
+              </Stack>
+            </Box>
 
-          <Box>
-            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Notes / Tests (text)</Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
-              {tests.map((t, i) => (
-                <Chip key={i} label={t} onDelete={() => setTests((p) => p.filter((_, idx) => idx !== i))} size="small" />
-              ))}
-            </Stack>
-            <Stack direction="row" spacing={1}>
-              <TextField size="small" label="Add note" value={testInput} onChange={(e) => setTestInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && testInput.trim()) { setTests((p) => [...p, testInput.trim()]); setTestInput(''); } }}
-              />
-              <Button size="small" onClick={() => { if (testInput.trim()) { setTests((p) => [...p, testInput.trim()]); setTestInput(''); } }}>Add</Button>
-            </Stack>
-          </Box>
-
-          <TextField label="Advice / Notes" fullWidth multiline rows={2} value={advice} onChange={(e) => setAdvice(e.target.value)} />
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2.5 }}>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" disabled={mutation.isPending} onClick={() => mutation.mutate()}>Save Prescription</Button>
-      </DialogActions>
-    </Dialog>
+            <TextField label="Advice / Notes" fullWidth multiline rows={2} value={advice} onChange={(e) => setAdvice(e.target.value)} />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="contained" disabled={mutation.isPending} onClick={() => mutation.mutate()}>Save Prescription</Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }
@@ -460,8 +460,8 @@ export function TokensPage(): React.JSX.Element {
   const roleFiltered = isDoctor ? tokens.filter((t) => t.doctorId === user?.id) : tokens;
   const filtered = filterDoctor === 'ALL' ? roleFiltered : roleFiltered.filter((t) => t.doctorId === filterDoctor);
 
-  const waiting    = tokens.filter((t) => t.status === 'WAITING').length;
-  const done       = tokens.filter((t) => t.status === 'DONE').length;
+  const waiting = tokens.filter((t) => t.status === 'WAITING').length;
+  const done = tokens.filter((t) => t.status === 'DONE').length;
 
   const currentToken = filtered.find((t) => t.status === 'WAITING');
 
@@ -495,9 +495,9 @@ export function TokensPage(): React.JSX.Element {
         {/* Summary cards */}
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 1fr)' } }}>
           {[
-            { label: 'Total',   value: tokens.length, color: theme.palette.text.primary },
-            { label: 'Waiting', value: waiting,       color: theme.palette.warning.main },
-            { label: 'Done',    value: done,          color: theme.palette.success.main },
+            { label: 'Total', value: tokens.length, color: theme.palette.text.primary },
+            { label: 'Waiting', value: waiting, color: theme.palette.warning.main },
+            { label: 'Done', value: done, color: theme.palette.success.main },
           ].map((c) => (
             <Paper key={c.label} variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
               <Typography sx={{ fontSize: 32, fontWeight: 800, color: c.color, lineHeight: 1 }}>{c.value}</Typography>
@@ -513,7 +513,7 @@ export function TokensPage(): React.JSX.Element {
               p: 3,
               bgcolor: alpha(theme.palette.primary.main, 0.06),
               border: `2px solid ${alpha(theme.palette.primary.main, 0.3)}`,
-              borderRadius: 3,
+              borderRadius: 1,
               display: 'flex',
               alignItems: 'center',
               gap: 3,
@@ -590,8 +590,8 @@ export function TokensPage(): React.JSX.Element {
                     borderLeftColor: token.status === 'WAITING'
                       ? 'warning.main'
                       : token.status === 'DONE'
-                      ? 'success.main'
-                      : 'divider',
+                        ? 'success.main'
+                        : 'divider',
                   }}
                 >
                   {/* Token number */}

@@ -144,10 +144,11 @@ declare global {
         };
       };
       update: {
-        check: () => Promise<'available' | 'latest' | 'error'>;
+        check: () => Promise<'available' | 'latest' | 'error' | { error?: string }>;
         install: () => Promise<void>;
         onProgress: (handler: (percent: number) => void) => () => void;
         onReady: (handler: () => void) => () => void;
+        onError?: (handler: (err: string) => void) => () => void;
         getVersion: () => Promise<string>;
       };
       auth: {
