@@ -46,6 +46,16 @@ export function initAutoUpdater(): void {
     }
   });
 
+  // Update Available Listener
+  autoUpdater.on('update-available', (info) => {
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach((w) => {
+      if (!w.isDestroyed()) {
+        w.webContents.send('app:update-available', info?.version || true);
+      }
+    });
+  });
+
   // Download Progress Listener
   autoUpdater.on('download-progress', (progressObj) => {
     const percent = Math.floor(progressObj.percent);

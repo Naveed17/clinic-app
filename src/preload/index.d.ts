@@ -181,6 +181,7 @@ declare global {
       update: {
         check: () => Promise<'available' | 'latest' | 'error' | { error?: string }>;
         install: () => Promise<void>;
+        onAvailable?: (handler: (version?: string) => void) => () => void;
         onProgress: (handler: (percent: number) => void) => () => void;
         onReady: (handler: () => void) => () => void;
         onError?: (handler: (err: string) => void) => () => void;

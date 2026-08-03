@@ -10,12 +10,6 @@ interface UpdateContextType {
     clearError: () => void;
 }
 
-const checkForUpdates = async () => {
-    if (window.clinic?.update?.check) {
-        return await window.clinic.update.check();
-    }
-};
-
 const UpdateContext = createContext<UpdateContextType | undefined>(undefined);
 
 export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -28,6 +22,14 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const updateApi = window.clinic?.update;
         if (!updateApi) return;
 
+        // 0. Update available event handler
+        const unsubAvailable = updateApi.onAvailable?.(() => {
+            setIsDownloading(true);
+            setIsReady(false);
+            setError(null);
+            setProgress(0);
+        });
+
         // 1. Download progress update handler
         const unsubProgress = updateApi.onProgress((percent: number) => {
             setIsDownloading(true);
@@ -39,6 +41,7 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const unsubReady = updateApi.onReady(() => {
             setIsDownloading(false);
             setIsReady(true);
+            setProgress(100);
             setError(null);
         });
 
@@ -49,11 +52,24 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
 
         return () => {
+            if (typeof unsubAvailable === 'function') unsubAvailable();
             if (typeof unsubProgress === 'function') unsubProgress();
             if (typeof unsubReady === 'function') unsubReady();
             if (typeof unsubError === 'function') unsubError();
         };
     }, []);
+
+    const checkForUpdates = async () => {
+        if (window.clinic?.update?.check) {
+            const res = await window.clinic.update.check();
+            if (res === 'available' || (typeof res === 'object' && (res as any)?.updateInfo)) {
+                setIsDownloading(true);
+                setIsReady(false);
+                setError(null);
+            }
+            return res;
+        }
+    };
 
     const installUpdate = () => {
         window.clinic?.update?.install();

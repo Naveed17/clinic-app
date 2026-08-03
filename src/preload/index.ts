@@ -394,6 +394,14 @@ const api = {
     check: () => ipcRenderer.invoke('app:check-for-updates'),
     install: () => ipcRenderer.invoke('app:install-update'),
 
+    onAvailable: (handler: (version?: string) => void) => {
+      const listener = (_: unknown, version?: string) => handler(version);
+      ipcRenderer.on('app:update-available', listener);
+      return () => {
+        ipcRenderer.removeListener('app:update-available', listener);
+      };
+    },
+
     onProgress: (handler: (percent: number) => void) => {
       const listener = (_: unknown, percent: number) => handler(percent);
       ipcRenderer.on('app:update-progress', listener);
