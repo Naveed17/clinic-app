@@ -157,17 +157,42 @@ export async function updateTokenStatus(id: string, status: TokenStatus) {
 
 export async function upsertPrescription(tokenId: string, input: PrescriptionInput) {
   const db = getPrisma();
-  const existing = await db.$queryRawUnsafe<{ id: string }[]>(
-    `SELECT id FROM "Prescription" WHERE tokenId = ? LIMIT 1`, tokenId
+  const existing = await db.$queryRawUnsafe<{ id: string; medicines: string }[]>(
+    `SELECT id, medicines FROM "Prescription" WHERE tokenId = ? LIMIT 1`, tokenId
   );
   const now = new Date().toISOString();
   const medicines = JSON.stringify(input.medicines);
   const tests = JSON.stringify(input.tests);
+
   if (existing.length > 0) {
+    // Restore stock for old medicines before applying new ones
+    try {
+      const oldMeds: { name: string }[] = JSON.parse(existing[0].medicines || '[]');
+      for (const med of oldMeds) {
+        if (med.name?.trim()) {
+          await db.$executeRawUnsafe(
+            `UPDATE "Medicine" SET stock = stock + 1, updatedAt = ? WHERE LOWER(name) = LOWER(?)`,
+            now, med.name.trim()
+          );
+        }
+      }
+    } catch { /* ignore parse errors from old data */ }
+
     await db.$executeRawUnsafe(
       `UPDATE "Prescription" SET diagnosis=?, medicines=?, tests=?, advice=?, updatedAt=? WHERE tokenId=?`,
       input.diagnosis, medicines, tests, input.advice, now, tokenId
     );
+
+    // Deduct stock for new medicines
+    for (const med of input.medicines) {
+      if (med.name?.trim()) {
+        await db.$executeRawUnsafe(
+          `UPDATE "Medicine" SET stock = MAX(0, stock - 1), updatedAt = ? WHERE LOWER(name) = LOWER(?)`,
+          now, med.name.trim()
+        );
+      }
+    }
+
     return existing[0].id;
   } else {
     const id = randomUUID();
@@ -175,6 +200,17 @@ export async function upsertPrescription(tokenId: string, input: PrescriptionInp
       `INSERT INTO "Prescription" (id, tokenId, diagnosis, medicines, tests, advice, createdAt, updatedAt) VALUES (?,?,?,?,?,?,?,?)`,
       id, tokenId, input.diagnosis, medicines, tests, input.advice, now, now
     );
+
+    // Deduct stock for prescribed medicines
+    for (const med of input.medicines) {
+      if (med.name?.trim()) {
+        await db.$executeRawUnsafe(
+          `UPDATE "Medicine" SET stock = MAX(0, stock - 1), updatedAt = ? WHERE LOWER(name) = LOWER(?)`,
+          now, med.name.trim()
+        );
+      }
+    }
+
     return id;
   }
 }

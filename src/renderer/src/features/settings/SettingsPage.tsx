@@ -118,7 +118,7 @@ export function SettingsPage(): React.JSX.Element {
   async function handleCheckUpdate() {
     try {
       setUpdateStatus('checking');
-      setToastMessage({ msg: 'Checking for updates on GitHub...', severity: 'info' });
+      setToastMessage({ msg: 'Checking for updates...', severity: 'info' });
 
       const res = await checkForUpdates();
 

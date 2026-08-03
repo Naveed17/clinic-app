@@ -6,19 +6,23 @@ import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
 import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import ReceiptOutlinedIcon from '@mui/icons-material/ReceiptOutlined';
 import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
+import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import {
   Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions,
-  DialogContent, Divider, IconButton, Paper, Snackbar, Alert, Tab, Tabs, Tooltip, Typography,
+  DialogContent, Divider, IconButton, Paper, Snackbar, Alert, Stack, Tab, Tabs, TableContainer, Tooltip, Typography,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { Prescription } from '@/types/token';
-import { Table, TableBody, TableCell, TableHead, TableRow } from '@/components/TableUI';
+import { tableSx, chipSx, Table, TableBody, TableCell, TableHead, TableRow } from '@/components/TableUI';
 import { appointmentsService } from '@/services/appointments.service';
 import { invoicesService } from '@/services/invoices.service';
 import type { Patient } from '@/types/patient';
+import { useAuth } from '@/features/auth/AuthContext';
 import { DocViewerDialog, type DocViewerData } from './DocViewerDialog';
+import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
 
 type DocItem = { id: string; name: string; filePath: string; uploadedAt: string };
 
@@ -35,7 +39,8 @@ function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }): Re
   );
 }
 
-function PrescriptionsTab({ patientId }: { patientId: string }): React.JSX.Element {
+function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?: Patient }): React.JSX.Element {
+  const [printPrescription, setPrintPrescription] = useState<Prescription | null>(null);
   const { data: tokens = [], isLoading } = useQuery({
     queryKey: ['tokens-all-prescriptions', patientId],
     queryFn: async () => {
@@ -59,6 +64,7 @@ function PrescriptionsTab({ patientId }: { patientId: string }): React.JSX.Eleme
   if (tokens.length === 0) return <EmptyState icon={<MedicalServicesOutlinedIcon sx={{ fontSize: 40 }} />} text="No prescriptions found." />;
 
   return (
+    <>
     <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
       {(tokens as (Prescription & { _token?: { tokenNumber?: number; date?: string; doctor?: { firstName: string; lastName: string } } })[]).map((pr) => (
         <Paper key={pr.id} variant="outlined" sx={{ p: 2, borderRadius: 1 }}>
@@ -69,7 +75,14 @@ function PrescriptionsTab({ patientId }: { patientId: string }): React.JSX.Eleme
                 {new Date(pr.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}
               </Typography>
             </Box>
-            <Chip label="Prescription" size="small" color="primary" variant="outlined" sx={{ fontSize: 10, height: 20 }} />
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Tooltip title="Print Prescription">
+                <IconButton size="small" onClick={() => setPrintPrescription(pr)} sx={{ border: '1px solid', borderColor: 'divider' }}>
+                  <PrintOutlinedIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+              <Chip label="Prescription" size="small" color="primary" variant="outlined" sx={{ fontSize: 10, height: 20 }} />
+            </Stack>
           </Box>
           {pr.medicines.length > 0 && (
             <Box sx={{ mb: 1 }}>
@@ -96,10 +109,20 @@ function PrescriptionsTab({ patientId }: { patientId: string }): React.JSX.Eleme
         </Paper>
       ))}
     </Box>
+    {printPrescription && (
+      <PrescriptionPrintPreview
+        prescription={printPrescription}
+        patient={patient}
+        onClose={() => setPrintPrescription(null)}
+      />
+    )}
+    </>
   );
 }
 
 export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; onClose: () => void }): React.JSX.Element {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const qc = useQueryClient();
   const [tab, setTab] = useState(0);
   const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
@@ -127,12 +150,17 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
   const initials = `${patient.firstName[0]}${patient.lastName[0]}`.toUpperCase();
 
   return (
-    <Dialog open fullWidth maxWidth="md" onClose={onClose} PaperProps={{ sx: { borderRadius: 1 } }}>
-      <Box sx={{ px: 3, pt: 3, pb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Avatar sx={{ width: 48, height: 48, bgcolor: 'primary.main', fontSize: 18, fontWeight: 700 }}>{initials}</Avatar>
-        <Box>
-          <Typography variant="h6" fontWeight={700}>{patient.firstName} {patient.lastName}</Typography>
-          <Typography variant="body2" color="text.secondary">Medical History</Typography>
+    <Dialog open fullWidth maxWidth="md" onClose={onClose} PaperProps={{ sx: { borderRadius: 1, overflow: 'hidden' } }}>
+      <Box sx={{ px: 3, pt: 2.5, pb: 2, display: 'flex', alignItems: 'center', gap: 2, bgcolor: (theme) => alpha(theme.palette.primary.main, 0.03) }}>
+        <Avatar sx={{ width: 52, height: 52, bgcolor: 'primary.main', fontSize: 20, fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>{initials}</Avatar>
+        <Box sx={{ flex: 1 }}>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Typography variant="h6" fontWeight={700}>{patient.firstName} {patient.lastName}</Typography>
+            {patient.mrNumber && (
+              <Chip label={`MR# ${patient.mrNumber}`} size="small" color="primary" variant="outlined" sx={{ fontWeight: 700, fontSize: 10.5, height: 20 }} />
+            )}
+          </Stack>
+          <Typography variant="body2" color="text.secondary">Medical & Treatment History</Typography>
         </Box>
       </Box>
       <Divider />
@@ -154,58 +182,61 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
         {tab === 0 && (
           patientAppointments.length === 0
             ? <EmptyState icon={<CalendarMonthOutlinedIcon sx={{ fontSize: 40 }} />} text="No appointments found." />
-            : <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    {['Date & Time', 'Doctor', 'Reason', 'Status', 'Notes'].map((h) => (
-                      <TableCell key={h} sx={{ fontSize: 11.5, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.04em', bgcolor: 'background.default', py: 1.25, px: 2.5 }}>{h}</TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {patientAppointments.map((a) => (
-                    <TableRow key={a.id} sx={{ '&:hover': { bgcolor: 'action.hover' }, '& td': { px: 2.5, py: 1.5, fontSize: 13.5, borderBottom: '1px solid', borderColor: 'divider' } }}>
-                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(a.startsAt).toLocaleString()}</TableCell>
-                      <TableCell>Dr. {a.provider.firstName} {a.provider.lastName}</TableCell>
-                      <TableCell>{a.reason ?? '—'}</TableCell>
-                      <TableCell>
-                        <Chip label={a.status.replace('_', ' ')} size="small" color={apptStatusColor[a.status] ?? 'default'}
-                          sx={{ borderRadius: '6px', fontWeight: 600, fontSize: 11.5, height: 22, border: '1px solid', '& .MuiChip-label': { px: 1 } }} />
-                      </TableCell>
-                      <TableCell sx={{ color: 'text.secondary' }}>{a.notes ?? '—'}</TableCell>
+            : <TableContainer sx={{ px: 1.5, pb: 1.5 }}>
+                <Table sx={{ borderCollapse: 'separate', borderSpacing: '0 2px', '& tbody tr:last-child td': { borderBottom: 0 } }}>
+                  <TableHead sx={tableSx.head}>
+                    <TableRow>
+                      {['Date & Time', 'Doctor', 'Reason', 'Status', 'Notes'].map((h) => (
+                        <TableCell key={h}>{h}</TableCell>
+                      ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHead>
+                  <TableBody>
+                    {patientAppointments.map((a) => (
+                      <TableRow key={a.id} sx={tableSx.row}>
+                        <TableCell sx={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{new Date(a.startsAt).toLocaleString()}</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Dr. {a.provider.firstName} {a.provider.lastName}</TableCell>
+                        <TableCell>{a.reason ?? '—'}</TableCell>
+                        <TableCell>
+                          <Chip label={a.status.replace('_', ' ')} size="small" color={apptStatusColor[a.status] ?? 'default'} sx={chipSx} />
+                        </TableCell>
+                        <TableCell sx={{ color: 'text.secondary' }}>{a.notes ?? '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
         )}
 
         {tab === 1 && (
           patientInvoices.length === 0
             ? <EmptyState icon={<ReceiptOutlinedIcon sx={{ fontSize: 40 }} />} text="No invoices found." />
-            : <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    {['Invoice', 'Date', 'Status', 'Total', 'Paid'].map((h, i) => (
-                      <TableCell key={h} align={i >= 3 ? 'right' : 'left'} sx={{ fontSize: 11.5, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.04em', bgcolor: 'background.default', py: 1.25, px: 2.5 }}>{h}</TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {patientInvoices.map((inv) => (
-                    <TableRow key={inv.id} sx={{ '&:hover': { bgcolor: 'action.hover' }, '& td': { px: 2.5, py: 1.5, fontSize: 13.5, borderBottom: '1px solid', borderColor: 'divider' } }}>
-                      <TableCell><Typography fontSize={13.5} fontWeight={600}>{inv.invoiceNumber}</Typography></TableCell>
-                      <TableCell>{new Date(inv.createdAt).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Chip label={inv.status.replace('_', ' ')} size="small"
-                          color={inv.status === 'PAID' ? 'success' : inv.status === 'PARTIALLY_PAID' ? 'warning' : 'default'}
-                          sx={{ borderRadius: '6px', fontWeight: 600, fontSize: 11.5, height: 22, border: '1px solid', '& .MuiChip-label': { px: 1 } }} />
-                      </TableCell>
-                      <TableCell align="right"><Typography fontSize={13.5} fontWeight={700}>{money(Number(inv.total))}</Typography></TableCell>
-                      <TableCell align="right" sx={{ color: 'text.secondary' }}>{money(Number(inv.amountPaid ?? 0))}</TableCell>
+            : <TableContainer sx={{ px: 1.5, pb: 1.5 }}>
+                <Table sx={{ borderCollapse: 'separate', borderSpacing: '0 2px', '& tbody tr:last-child td': { borderBottom: 0 } }}>
+                  <TableHead sx={tableSx.head}>
+                    <TableRow>
+                      {['Invoice', 'Date', 'Status', 'Total', 'Paid'].map((h, i) => (
+                        <TableCell key={h} align={i >= 3 ? 'right' : 'left'}>{h}</TableCell>
+                      ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHead>
+                  <TableBody>
+                    {patientInvoices.map((inv) => (
+                      <TableRow key={inv.id} sx={tableSx.row}>
+                        <TableCell><Typography fontSize={12.5} fontWeight={700} color="primary.main">{inv.invoiceNumber}</Typography></TableCell>
+                        <TableCell>{new Date(inv.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <Chip label={inv.status.replace('_', ' ')} size="small"
+                            color={inv.status === 'PAID' ? 'success' : inv.status === 'PARTIALLY_PAID' ? 'warning' : 'default'}
+                            sx={chipSx} />
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700 }}>{money(Number(inv.total))}</TableCell>
+                        <TableCell align="right" sx={{ color: 'success.main', fontWeight: 700 }}>{money(Number(inv.amountPaid ?? 0))}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
         )}
 
         {tab === 2 && (
@@ -229,18 +260,20 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
 
         {tab === 3 && (
           <Box sx={{ p: 2.5 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-              <Button
-                startIcon={uploadMutation.isPending ? <CircularProgress size={14} /> : <AttachFileOutlinedIcon />}
-                disabled={uploadMutation.isPending}
-                onClick={() => uploadMutation.mutate()}
-                variant="outlined"
-                size="small"
-                sx={{ borderRadius: 2 }}
-              >
-                Upload file
-              </Button>
-            </Box>
+            {!isAdmin && (
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                <Button
+                  startIcon={uploadMutation.isPending ? <CircularProgress size={14} /> : <AttachFileOutlinedIcon />}
+                  disabled={uploadMutation.isPending}
+                  onClick={() => uploadMutation.mutate()}
+                  variant="outlined"
+                  size="small"
+                  sx={{ borderRadius: 1 }}
+                >
+                  Upload file
+                </Button>
+              </Box>
+            )}
             {docs.isLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
             ) : (docs.data ?? []).length === 0 ? (
@@ -281,11 +314,13 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
                               : <WhatsAppIcon sx={{ fontSize: 16 }} />}
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton size="small" sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.15)', '&:hover': { bgcolor: 'rgba(211,47,47,0.7)' } }} onClick={() => deleteMutation.mutate(doc.id)}>
-                            <DeleteOutlineIcon sx={{ fontSize: 16 }} />
-                          </IconButton>
-                        </Tooltip>
+                        {!isAdmin && (
+                          <Tooltip title="Delete">
+                            <IconButton size="small" sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.15)', '&:hover': { bgcolor: 'rgba(211,47,47,0.7)' } }} onClick={() => deleteMutation.mutate(doc.id)}>
+                              <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </Box>
                     </Box>
                     <Box sx={{ px: 1.25, py: 1 }}>
@@ -298,12 +333,12 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
             )}
           </Box>
         )}
-        {tab === 4 && <PrescriptionsTab patientId={patient.id} />}
+        {tab === 4 && <PrescriptionsTab patientId={patient.id} patient={patient} />}
       </DialogContent>
 
       <Divider />
       <DialogActions sx={{ px: 3, py: 1.75 }}>
-        <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 2 }}>Close</Button>
+        <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 1 }}>Close</Button>
       </DialogActions>
       {viewerDoc && <DocViewerDialog doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
       <Snackbar
