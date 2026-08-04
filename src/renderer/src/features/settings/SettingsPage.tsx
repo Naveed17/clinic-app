@@ -46,6 +46,7 @@ export function SettingsPage(): React.JSX.Element {
   // Context Hook Integration for Global Auto-Updater State
   const {
     progress: downloadProgress,
+    isChecking,
     isDownloading,
     isReady: isUpdateReady,
     error: updateError,
@@ -244,11 +245,11 @@ export function SettingsPage(): React.JSX.Element {
                 variant="outlined"
                 fullWidth
                 size="large"
-                startIcon={updateStatus === 'checking' ? <CircularProgress size={16} /> : <SystemUpdateAltOutlinedIcon />}
-                disabled={updateStatus === 'checking' || isDownloading}
+                startIcon={(updateStatus === 'checking' || isChecking) ? <CircularProgress size={16} /> : <SystemUpdateAltOutlinedIcon />}
+                disabled={updateStatus === 'checking' || isChecking || isDownloading}
                 onClick={() => void handleCheckUpdate()}
               >
-                {updateStatus === 'checking' ? 'Checking...' : 'Check for Updates'}
+                {(updateStatus === 'checking' || isChecking) ? 'Checking...' : 'Check for Updates'}
               </Button>
             )}
 
@@ -372,11 +373,11 @@ export function SettingsPage(): React.JSX.Element {
                 <Button
                   variant="outlined"
                   fullWidth
-                  startIcon={updateStatus === 'checking' ? <CircularProgress size={16} /> : <SystemUpdateAltOutlinedIcon />}
-                  disabled={updateStatus === 'checking' || isDownloading}
+                  startIcon={(updateStatus === 'checking' || isChecking) ? <CircularProgress size={16} /> : <SystemUpdateAltOutlinedIcon />}
+                  disabled={updateStatus === 'checking' || isChecking || isDownloading}
                   onClick={() => void handleCheckUpdate()}
                 >
-                  {updateStatus === 'checking' ? 'Checking...' : 'Check for Updates'}
+                  {(updateStatus === 'checking' || isChecking) ? 'Checking...' : 'Check for Updates'}
                 </Button>
               )}
 
