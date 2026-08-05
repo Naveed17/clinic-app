@@ -20,27 +20,26 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [isReady, setIsReady] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Prevent duplicate in-flight checks from renderer side
     const checkInFlight = useRef(false);
 
     useEffect(() => {
         const updateApi = window.clinic?.update;
         if (!updateApi) return;
 
-        // 0. Update available — download has started in main process
+        // 0. Update available
         const unsubAvailable = updateApi.onAvailable?.(() => {
             setIsChecking(false);
             setIsDownloading(true);
             setIsReady(false);
             setError(null);
-            setProgress(0);
         });
 
         // 1. Download progress
         const unsubProgress = updateApi.onProgress((percent: number) => {
+            setIsChecking(false);
             setIsDownloading(true);
             setError(null);
-            setProgress(Math.round(percent));
+            setProgress(percent);
         });
 
         // 2. Download complete
@@ -71,7 +70,6 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const checkForUpdates = async () => {
         if (!window.clinic?.update?.check) return;
 
-        // Agar pehle se check chal rahi hai toh dobara mat karo
         if (checkInFlight.current || isDownloading) return;
 
         checkInFlight.current = true;
@@ -80,16 +78,19 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         try {
             const res = await window.clinic.update.check();
-            // 'available' ya 'checking' (jab main process mein pehle se chal raha ho)
+
             if (res === 'available' || (typeof res === 'object' && (res as any)?.updateInfo)) {
                 setIsDownloading(true);
                 setIsReady(false);
+                // Show immediate visual feedback
+                setProgress((prev) => (prev === 0 ? 1 : prev));
             } else {
-                // latest version — reset
                 setIsDownloading(false);
                 setProgress(0);
             }
             return res;
+        } catch (err: any) {
+            setError(err?.message || 'Failed to check updates');
         } finally {
             checkInFlight.current = false;
             setIsChecking(false);

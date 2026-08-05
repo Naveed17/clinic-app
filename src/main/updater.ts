@@ -2,7 +2,6 @@ import { autoUpdater } from 'electron-updater';
 import { ipcMain, BrowserWindow, app } from 'electron';
 import { is } from '@electron-toolkit/utils';
 
-// Guard: ek waqt mein sirf ek check/download chalti rahe
 let _isChecking = false;
 let _isDownloading = false;
 
@@ -23,8 +22,7 @@ export function initAutoUpdater(): void {
     ...(githubToken && { token: githubToken })
   });
 
-  // autoDownload false rakho — hum manually control karein ge
-  // taake background silent download aur manual check conflict na karein
+  // Manual download control active
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
 
@@ -36,13 +34,12 @@ export function initAutoUpdater(): void {
 
   ipcMain.handle('app:check-for-updates', async () => {
     if (is.dev) {
-      console.log('[AutoUpdater] Dev mode update check requested. Current version:', app.getVersion());
+      console.log('[AutoUpdater] Dev mode check requested. Version:', app.getVersion());
       return 'latest';
     }
 
-    // Agar pehle se check ya download chal rahi hai toh duplicate request ignore karo
     if (_isChecking || _isDownloading) {
-      console.log('[AutoUpdater] Check already in progress — ignoring duplicate request.');
+      console.log('[AutoUpdater] Check/Download already in progress.');
       return _isDownloading ? 'available' : 'checking';
     }
 
@@ -55,10 +52,14 @@ export function initAutoUpdater(): void {
         const latestVersion = result.updateInfo.version;
 
         if (latestVersion !== currentVersion) {
-          // Naya version mila — ab download shuru karo
+          // Trigger download directly from here ONLY if not downloading
           if (!_isDownloading) {
             _isDownloading = true;
-            void autoUpdater.downloadUpdate();
+            autoUpdater.downloadUpdate().catch((err) => {
+              console.error('[AutoUpdater] Download initiation error:', err);
+              _isDownloading = false;
+              broadcastToAll('app:update-error', err?.message || 'Failed to start download');
+            });
           }
           return 'available';
         }
@@ -72,28 +73,27 @@ export function initAutoUpdater(): void {
     }
   });
 
-  // Update Available Event (silent background check se)
+  // Update Available Event - Just broadcast UI status, do not trigger downloadUpdate again
   autoUpdater.on('update-available', (info) => {
     console.log('[AutoUpdater] Update available:', info?.version);
-    if (!_isDownloading) {
-      _isDownloading = true;
-      void autoUpdater.downloadUpdate();
-    }
     broadcastToAll('app:update-available', info?.version || true);
   });
 
   autoUpdater.on('update-not-available', () => {
     console.log('[AutoUpdater] Already on latest version.');
+    _isChecking = false;
     _isDownloading = false;
   });
 
-  // Download Progress
+  // Download Progress Fix - Send raw rounded percent + speed check
   autoUpdater.on('download-progress', (progressObj) => {
-    const percent = Math.floor(progressObj.percent);
+    _isDownloading = true;
+    const percent = Math.round(progressObj.percent);
     broadcastToAll('app:update-progress', percent);
   });
 
   autoUpdater.on('update-downloaded', () => {
+    _isChecking = false;
     _isDownloading = false;
     broadcastToAll('app:update-ready');
   });
@@ -106,15 +106,15 @@ export function initAutoUpdater(): void {
   });
 
   if (!is.dev) {
-    // App ready hone ke 2 minute baad silent background check — window load hone ka waqt de
+    // 30 seconds initial delay instead of 2 minutes to feel fast
     setTimeout(() => {
       if (!_isChecking && !_isDownloading) {
         console.log('[AutoUpdater] Running startup background check...');
         void autoUpdater.checkForUpdates();
       }
-    }, 2 * 60 * 1000); // 2 minutes delay
+    }, 30 * 1000);
 
-    // Periodic check (har 4 ghante) — sirf tab jab kuch chal nahi raha
+    // Periodic check (every 4 hours)
     setInterval(() => {
       if (!_isChecking && !_isDownloading) {
         void autoUpdater.checkForUpdates();
