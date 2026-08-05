@@ -148,8 +148,8 @@ export function LoginPage(): React.JSX.Element {
     setConnectError('');
     try {
       await window.clinic?.settings.save({ serverMode: 'lan-client', clientApiUrl: selectedUrl });
-      // Reload so preload re-initializes apiUrl with the new server
-      window.location.reload();
+      // Full relaunch so main process skips local DB and points at LAN server
+      await window.clinic?.settings.relaunch?.();
     } catch {
       setConnectError('Could not save settings.');
       setConnecting(false);

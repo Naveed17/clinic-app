@@ -43,13 +43,15 @@ const roleLabels: Record<string, string> = {
   DOCTOR: 'Doctor',
   RECEPTIONIST: 'Receptionist',
   LAB_TECHNICIAN: 'Lab Technician',
+  PHARMACIST: 'Pharmacist',
 };
 
-const roleColors: Record<string, 'primary' | 'secondary' | 'default' | 'warning'> = {
+const roleColors: Record<string, 'primary' | 'secondary' | 'default' | 'warning' | 'success'> = {
   ADMIN: 'primary',
   DOCTOR: 'secondary',
   RECEPTIONIST: 'default',
   LAB_TECHNICIAN: 'warning',
+  PHARMACIST: 'success',
 };
 
 const doctorProfileSchema = z.object({
@@ -64,7 +66,7 @@ const baseSchema = {
   firstName: z.string().trim().min(1, 'First name is required.'),
   lastName: z.string().trim().min(1, 'Last name is required.'),
   email: z.string().trim().email('Enter a valid email address.'),
-  role: z.enum(['ADMIN', 'DOCTOR', 'RECEPTIONIST', 'LAB_TECHNICIAN']),
+  role: z.enum(['ADMIN', 'DOCTOR', 'RECEPTIONIST', 'LAB_TECHNICIAN', 'PHARMACIST']),
   isActive: z.boolean(),
   doctorProfile: doctorProfileSchema.optional(),
 };
@@ -188,6 +190,7 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
                       <MenuItem value="DOCTOR">Doctor</MenuItem>
                       <MenuItem value="RECEPTIONIST">Receptionist</MenuItem>
                       {modules.labDashboard && <MenuItem value="LAB_TECHNICIAN">Lab Technician</MenuItem>}
+                      {modules.pharmacy && <MenuItem value="PHARMACIST">Pharmacist</MenuItem>}
                     </Select>
                     {errors.role && <FormHelperText>{errors.role.message}</FormHelperText>}
                   </FormControl>

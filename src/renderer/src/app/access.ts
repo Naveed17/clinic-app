@@ -18,7 +18,7 @@ export type AppRoute =
 
 /** Which roles can access each route */
 export const ROUTE_ACCESS: Record<AppRoute, UserRole[]> = {
-  '/dashboard':    ['admin', 'doctor', 'receptionist', 'lab_technician'],
+  '/dashboard':    ['admin', 'doctor', 'receptionist', 'lab_technician', 'pharmacist'],
   '/patients':     ['admin', 'doctor', 'receptionist', 'lab_technician'],
   '/appointments': ['admin', 'doctor', 'receptionist'],
   '/tokens':       ['admin', 'receptionist'],
@@ -28,8 +28,8 @@ export const ROUTE_ACCESS: Record<AppRoute, UserRole[]> = {
   '/users':        ['admin'],
   '/doctors':      ['admin'],
   '/schedule':     ['admin'],
-  '/settings':     ['admin', 'doctor', 'receptionist', 'lab_technician'],
-  '/pharmacy':     ['admin', 'receptionist'],
+  '/settings':     ['admin', 'doctor', 'receptionist', 'lab_technician', 'pharmacist'],
+  '/pharmacy':     ['receptionist', 'pharmacist'],
 };
 
 /**
@@ -54,6 +54,7 @@ export const ROLE_HOME: Record<UserRole, AppRoute> = {
   doctor:         '/dashboard',
   receptionist:   '/dashboard',
   lab_technician: '/lab',
+  pharmacist:     '/dashboard',
 };
 
 export function canAccess(role: UserRole, route: AppRoute): boolean {
@@ -64,5 +65,6 @@ export function isModuleEnabled(modules: LicenseModules | undefined, route: AppR
   if (!modules) return true;
   const key = ROUTE_MODULE[route];
   if (!key) return true;
-  return modules[key] ?? true;
+  // Explicit true required — missing/false hides the route (e.g. pharmacy off)
+  return modules[key] === true;
 }

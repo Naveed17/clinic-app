@@ -55,7 +55,12 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
     });
 
     onDone();
-    window.location.reload();
+    // Relaunch so main process applies serverMode (backend bind / client skip)
+    if (window.clinic?.settings.relaunch) {
+      await window.clinic.settings.relaunch();
+    } else {
+      window.location.reload();
+    }
   }
 
   const roles: { value: Mode; icon: React.ReactNode; label: string; desc: string }[] = [

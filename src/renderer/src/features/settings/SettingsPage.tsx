@@ -26,6 +26,23 @@ import SystemUpdateAltOutlinedIcon from '@mui/icons-material/SystemUpdateAltOutl
 import WifiTetheringOutlinedIcon from '@mui/icons-material/WifiTetheringOutlined';
 import { useUpdate } from '@/context/updateProvider';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
+import type { LicenseModules } from '@/features/auth/LicenseModulesContext';
+import ExtensionOutlinedIcon from '@mui/icons-material/ExtensionOutlined';
+
+const MODULE_LABELS: { key: keyof LicenseModules; label: string }[] = [
+  { key: 'doctorDashboard', label: 'Doctor Dashboard' },
+  { key: 'labDashboard', label: 'Lab Dashboard' },
+  { key: 'pharmacy', label: 'Pharmacy / Inventory' },
+  { key: 'billing', label: 'Billing' },
+  { key: 'reports', label: 'Reports' },
+  { key: 'statistics', label: 'Statistics' },
+  { key: 'tokens', label: 'Tokens' },
+  { key: 'manageDoctors', label: 'Manage Doctors' },
+  { key: 'managePatients', label: 'Manage Patients' },
+  { key: 'manageMedicines', label: 'Manage Medicines' },
+  { key: 'manageUsers', label: 'Manage Users' },
+];
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
 
@@ -42,10 +59,12 @@ export function SettingsPage(): React.JSX.Element {
   const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const licenseModules = useLicenseModules();
 
   // Context Hook Integration for Global Auto-Updater State
   const {
     progress: downloadProgress,
+    progressInfo,
     isChecking,
     isDownloading,
     isReady: isUpdateReady,
@@ -54,8 +73,18 @@ export function SettingsPage(): React.JSX.Element {
     installUpdate
   } = useUpdate();
 
+  const downloadIndeterminate =
+    isDownloading && (progressInfo.phase === 'starting' || downloadProgress <= 0);
+  const downloadStatusText =
+    downloadIndeterminate
+      ? 'Preparing download…'
+      : progressInfo.label
+        ? `Downloading ${progressInfo.label}`
+        : 'Downloading update...';
+
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saved, setSaved] = useState(false);
+  const [restarting, setRestarting] = useState(false);
   const [lanIp, setLanIp] = useState<string>('...');
   const [backupStatus, setBackupStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [backupLoading, setBackupLoading] = useState(false);
@@ -180,12 +209,21 @@ export function SettingsPage(): React.JSX.Element {
 
   async function handleSave() {
     if (!settings) return;
-    const modeChanged = prevMode !== null && prevMode !== settings.serverMode;
+    const prev = await window.clinic?.settings.get();
+    const needsRelaunch =
+      (prevMode !== null && prevMode !== settings.serverMode) ||
+      (prev?.lanPort !== settings.lanPort) ||
+      (settings.serverMode === 'lan-client' && prev?.clientApiUrl !== settings.clientApiUrl);
+
     await window.clinic?.settings.save(settings);
     setPrevMode(settings.serverMode);
-    if (modeChanged) {
+
+    if (needsRelaunch) {
+      setRestarting(true);
       setSaved(true);
-      setTimeout(() => void window.clinic?.settings.save(settings).then(() => window.location.reload()), 1200);
+      setTimeout(() => {
+        void window.clinic?.settings.relaunch?.();
+      }, 900);
     } else {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -258,13 +296,17 @@ export function SettingsPage(): React.JSX.Element {
               <Box sx={{ width: '100%', mt: 2.5 }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                   <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                    Downloading update...
+                    {downloadStatusText}
                   </Typography>
                   <Typography variant="caption" color="primary.main" fontWeight={700}>
-                    {downloadProgress}%
+                    {downloadIndeterminate ? '…' : `${downloadProgress}%`}
                   </Typography>
                 </Stack>
-                <LinearProgress variant="determinate" value={downloadProgress} sx={{ height: 6, borderRadius: 3 }} />
+                <LinearProgress
+                  variant={downloadIndeterminate ? 'indeterminate' : 'determinate'}
+                  value={downloadIndeterminate ? undefined : downloadProgress}
+                  sx={{ height: 6, borderRadius: 3 }}
+                />
               </Box>
             )}
           </Box>
@@ -335,6 +377,34 @@ export function SettingsPage(): React.JSX.Element {
 
             <Divider sx={{ mb: 2 }} />
 
+            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.5 }}>
+              <ExtensionOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+              <Typography variant="subtitle2" fontWeight={600}>Licensed Modules</Typography>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              Controlled from license server. Off modules are hidden in the app.
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1 }}>
+              {MODULE_LABELS.map(({ key, label }) => {
+                const on = licenseModules[key] === true;
+                return (
+                  <Chip
+                    key={key}
+                    size="small"
+                    label={label}
+                    color={on ? 'success' : 'default'}
+                    variant={on ? 'filled' : 'outlined'}
+                    sx={{ fontWeight: 600, fontSize: 11, height: 24 }}
+                  />
+                );
+              })}
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              Pharmacy: {licenseModules.pharmacy ? 'Enabled — Inventory visible' : 'Disabled — Inventory hidden'}
+            </Typography>
+
+            <Divider sx={{ mb: 2, mt: 2 }} />
+
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>Backup & Restore</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Save a copy of the database or restore from a previous backup.</Typography>
             <Stack direction="row" gap={1.5} flexWrap="wrap">
@@ -386,13 +456,17 @@ export function SettingsPage(): React.JSX.Element {
                 <Box sx={{ width: '100%', mt: 2 }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                     <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                      Downloading update...
+                      {downloadStatusText}
                     </Typography>
                     <Typography variant="caption" color="primary.main" fontWeight={700}>
-                      {downloadProgress}%
+                      {downloadIndeterminate ? '…' : `${downloadProgress}%`}
                     </Typography>
                   </Stack>
-                  <LinearProgress variant="determinate" value={downloadProgress} sx={{ height: 6, borderRadius: 3 }} />
+                  <LinearProgress
+                    variant={downloadIndeterminate ? 'indeterminate' : 'determinate'}
+                    value={downloadIndeterminate ? undefined : downloadProgress}
+                    sx={{ height: 6, borderRadius: 3 }}
+                  />
                 </Box>
               )}
             </Box>
@@ -562,7 +636,7 @@ export function SettingsPage(): React.JSX.Element {
               </Button>
               {saved && (
                 <Alert severity="success" sx={{ py: 0.5 }}>
-                  {settings.serverMode !== prevMode ? 'Saved! Restarting app...' : 'Saved!'}
+                  {restarting ? 'Saved! Restarting app...' : 'Saved!'}
                 </Alert>
               )}
             </Stack>

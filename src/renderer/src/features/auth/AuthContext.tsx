@@ -2,7 +2,7 @@
 import { createContext, useContext, useState, useMemo, useEffect, type PropsWithChildren } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
-export type UserRole = 'admin' | 'doctor' | 'receptionist' | 'lab_technician';
+export type UserRole = 'admin' | 'doctor' | 'receptionist' | 'lab_technician' | 'pharmacist';
 
 export interface AuthUser {
   id: string;

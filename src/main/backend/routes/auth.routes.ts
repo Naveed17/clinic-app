@@ -7,6 +7,7 @@ import { getLicenseModules } from '../../license/license.ipc';
 const ROLE_MODULE: Record<string, string> = {
   doctor:         'doctorDashboard',
   lab_technician: 'labDashboard',
+  pharmacist:     'pharmacy',
 };
 
 export function createAuthRouter(): Router {

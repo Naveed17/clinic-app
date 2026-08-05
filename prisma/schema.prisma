@@ -7,11 +7,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==========================================
+// ENUMS
+// ==========================================
+
 enum UserRole {
   ADMIN
   DOCTOR
   RECEPTIONIST
   LAB_TECHNICIAN
+  PHARMACIST
 }
 
 enum AppointmentStatus {
@@ -37,6 +42,33 @@ enum PaymentMethod {
   MOBILE_WALLET
   OTHER
 }
+
+enum LabOrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TokenStatus {
+  WAITING
+  IN_PROGRESS
+  DONE
+  SKIPPED
+}
+
+enum MovementType {
+  PURCHASE
+  RETURN
+  ADJUSTMENT
+  EXPIRED
+  DAMAGE
+  DISPENSE
+}
+
+// ==========================================
+// USER & DOCTOR MANAGEMENT
+// ==========================================
 
 model User {
   id           String   @id @default(uuid())
@@ -72,6 +104,42 @@ model DoctorProfile {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+model DoctorSchedule {
+  id        String   @id @default(uuid())
+  doctorId  String
+  dayOfWeek Int // 0=Sun, 1=Mon, ..., 6=Sat
+  startTime String // HH:MM
+  endTime   String // HH:MM
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctor User @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, dayOfWeek])
+  @@index([doctorId])
+}
+
+model DoctorAttendance {
+  id         String    @id @default(uuid())
+  doctorId   String
+  date       String // YYYY-MM-DD
+  checkInAt  DateTime
+  checkOutAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  doctor User @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, date])
+  @@index([doctorId])
+  @@index([date])
+}
+
+// ==========================================
+// PATIENT MANAGEMENT
+// ==========================================
 
 model Patient {
   id                    String    @id @default(uuid())
@@ -117,6 +185,10 @@ model PatientDocument {
   @@index([patientId])
 }
 
+// ==========================================
+// APPOINTMENT & TOKEN SYSTEM
+// ==========================================
+
 model Appointment {
   id             String            @id @default(uuid())
   patientId      String
@@ -139,6 +211,31 @@ model Appointment {
   @@index([providerId, startsAt])
   @@index([startsAt])
 }
+
+model Token {
+  id          String      @id @default(uuid())
+  tokenNumber Int
+  date        String // YYYY-MM-DD
+  patientId   String
+  doctorId    String
+  status      TokenStatus @default(WAITING)
+  notes       String?
+  reason      String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  patient   Patient    @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  doctor    User       @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  labOrders LabOrder[]
+
+  @@unique([date, tokenNumber, doctorId])
+  @@index([date, doctorId])
+  @@index([patientId])
+}
+
+// ==========================================
+// BILLING & INVOICING (CLINIC)
+// ==========================================
 
 model Invoice {
   id            String        @id @default(uuid())
@@ -198,72 +295,9 @@ model Payment {
   @@index([paidAt])
 }
 
-enum LabOrderStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-enum TokenStatus {
-  WAITING
-  IN_PROGRESS
-  DONE
-  SKIPPED
-}
-
-model Token {
-  id          String      @id @default(uuid())
-  tokenNumber Int
-  date        String // YYYY-MM-DD
-  patientId   String
-  doctorId    String
-  status      TokenStatus @default(WAITING)
-  notes       String?
-  reason      String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
-  patient   Patient    @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  doctor    User       @relation(fields: [doctorId], references: [id], onDelete: Restrict)
-  labOrders LabOrder[]
-
-  @@unique([date, tokenNumber, doctorId])
-  @@index([date, doctorId])
-  @@index([patientId])
-}
-
-model DoctorSchedule {
-  id        String   @id @default(uuid())
-  doctorId  String
-  dayOfWeek Int // 0=Sun, 1=Mon, ..., 6=Sat
-  startTime String // HH:MM
-  endTime   String // HH:MM
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  doctor User @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-
-  @@unique([doctorId, dayOfWeek])
-  @@index([doctorId])
-}
-
-model DoctorAttendance {
-  id         String    @id @default(uuid())
-  doctorId   String
-  date       String // YYYY-MM-DD
-  checkInAt  DateTime
-  checkOutAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  doctor User @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-
-  @@unique([doctorId, date])
-  @@index([doctorId])
-  @@index([date])
-}
+// ==========================================
+// LAB MANAGEMENT
+// ==========================================
 
 model LabOrder {
   id          String         @id @default(uuid())
@@ -289,16 +323,6 @@ model LabOrder {
   @@index([status])
 }
 
-model Medicine {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  price     Decimal  @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([name])
-}
-
 model LabReport {
   id         String   @id @default(uuid())
   labOrderId String
@@ -313,4 +337,115 @@ model LabReport {
   labOrder LabOrder @relation(fields: [labOrderId], references: [id], onDelete: Cascade)
 
   @@index([labOrderId])
+}
+
+// ==========================================
+// PHARMACY INVENTORY & STOCK MODULE
+// ==========================================
+
+model Supplier {
+  id          String   @id @default(uuid())
+  name        String
+  companyName String?
+  phone       String?
+  email       String?
+  address     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  purchases PurchaseOrder[]
+
+  @@index([name])
+}
+
+model MedicineCategory {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  description String?
+  medicines   Medicine[]
+}
+
+model Medicine {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  genericName   String?
+  categoryId    String?
+  barcode       String?  @unique
+  unit          String   @default("Tablet") // Strip, Bottle, Box, Tablet, Syrup
+  rackNumber    String?
+  minStockAlert Int      @default(10)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category MedicineCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  batches  MedicineBatch[]
+
+  @@index([name])
+  @@index([genericName])
+  @@index([barcode])
+}
+
+model MedicineBatch {
+  id            String   @id @default(uuid())
+  medicineId    String
+  batchNumber   String
+  expiryDate    DateTime
+  purchasePrice Decimal  @default(0)
+  salePrice     Decimal  @default(0)
+  quantity      Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  medicine      Medicine            @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  purchaseItems PurchaseOrderItem[]
+  movements     StockMovement[]
+
+  @@unique([medicineId, batchNumber])
+  @@index([expiryDate])
+  @@index([quantity])
+}
+
+model PurchaseOrder {
+  id            String   @id @default(uuid())
+  invoiceNumber String   @unique
+  supplierId    String
+  totalAmount   Decimal  @default(0)
+  purchaseDate  DateTime @default(now())
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  supplier Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  items    PurchaseOrderItem[]
+
+  @@index([supplierId])
+}
+
+model PurchaseOrderItem {
+  id         String  @id @default(uuid())
+  purchaseId String
+  batchId    String
+  quantity   Int
+  unitPrice  Decimal @default(0)
+  lineTotal  Decimal @default(0)
+
+  purchase PurchaseOrder @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  batch    MedicineBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseId])
+  @@index([batchId])
+}
+
+model StockMovement {
+  id        String       @id @default(uuid())
+  batchId   String
+  type      MovementType
+  quantity  Int // Positive for Addition, Negative for Deduction/Adjustment
+  reference String? // e.g., Purchase Ref, Expiry Reason, Manual Adjustment
+  createdAt DateTime     @default(now())
+
+  batch MedicineBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([type])
 }

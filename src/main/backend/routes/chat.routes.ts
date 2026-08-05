@@ -9,7 +9,7 @@ export function createChatRouter(io: SocketIOServer): Router {
 
   router.post(
     '/messages',
-    requireRole(['admin', 'doctor', 'receptionist', 'lab_technician']),
+    requireRole(['admin', 'doctor', 'receptionist', 'lab_technician', 'pharmacist']),
     asyncHandler(async (req, res) => {
       const message = createChatMessage(req.body);
       if (!message.message) {

@@ -44,6 +44,7 @@ function isRoleDisabled(role: UserRole | undefined, modules: LicenseModules): bo
   const roleModule: Partial<Record<UserRole, keyof LicenseModules>> = {
     doctor: 'doctorDashboard',
     lab_technician: 'labDashboard',
+    pharmacist: 'pharmacy',
   };
   const moduleKey = role ? roleModule[role] : undefined;
   return Boolean(moduleKey && !modules[moduleKey]);

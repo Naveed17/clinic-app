@@ -2,6 +2,7 @@ import type { TokenStatus } from '@prisma/client';
 import { getPrisma } from '../database/client';
 import { randomUUID } from 'node:crypto';
 import { markCheckIn, markCheckOut } from '../doctors/attendance.service';
+import { adjustStockByMedicineName } from '../inventory/inventory.service';
 
 export interface TokenInput {
   patientId: string;
@@ -170,10 +171,7 @@ export async function upsertPrescription(tokenId: string, input: PrescriptionInp
       const oldMeds: { name: string }[] = JSON.parse(existing[0].medicines || '[]');
       for (const med of oldMeds) {
         if (med.name?.trim()) {
-          await db.$executeRawUnsafe(
-            `UPDATE "Medicine" SET stock = stock + 1, updatedAt = ? WHERE LOWER(name) = LOWER(?)`,
-            now, med.name.trim()
-          );
+          await adjustStockByMedicineName(med.name, 1, `Prescription restore:${tokenId}`);
         }
       }
     } catch { /* ignore parse errors from old data */ }
@@ -183,13 +181,10 @@ export async function upsertPrescription(tokenId: string, input: PrescriptionInp
       input.diagnosis, medicines, tests, input.advice, now, tokenId
     );
 
-    // Deduct stock for new medicines
+    // Deduct stock for new medicines (FEFO via inventory batches)
     for (const med of input.medicines) {
       if (med.name?.trim()) {
-        await db.$executeRawUnsafe(
-          `UPDATE "Medicine" SET stock = MAX(0, stock - 1), updatedAt = ? WHERE LOWER(name) = LOWER(?)`,
-          now, med.name.trim()
-        );
+        await adjustStockByMedicineName(med.name, -1, `Prescription:${tokenId}`);
       }
     }
 
@@ -201,13 +196,10 @@ export async function upsertPrescription(tokenId: string, input: PrescriptionInp
       id, tokenId, input.diagnosis, medicines, tests, input.advice, now, now
     );
 
-    // Deduct stock for prescribed medicines
+    // Deduct stock for prescribed medicines (FEFO via inventory batches)
     for (const med of input.medicines) {
       if (med.name?.trim()) {
-        await db.$executeRawUnsafe(
-          `UPDATE "Medicine" SET stock = MAX(0, stock - 1), updatedAt = ? WHERE LOWER(name) = LOWER(?)`,
-          now, med.name.trim()
-        );
+        await adjustStockByMedicineName(med.name, -1, `Prescription:${tokenId}`);
       }
     }
 

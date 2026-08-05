@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, app } from 'electron';
 import { networkInterfaces } from 'node:os';
 import { request as httpRequest } from 'node:http';
 import { getSettings, saveSettings, type AppSettings } from '../config/settings';
@@ -24,6 +24,11 @@ export function trackDiscoveredServer(server: DiscoveredServer): void {
 export function registerSettingsIpc(): void {
   ipcMain.handle('settings:get', () => getSettings());
   ipcMain.handle('settings:save', (_e, patch: Partial<AppSettings>) => saveSettings(patch));
+  ipcMain.handle('settings:relaunch', () => {
+    // Relaunch so serverMode / lanPort / clientApiUrl take effect in main process
+    app.relaunch();
+    app.exit(0);
+  });
   ipcMain.handle('settings:lan-ip', () => getLanIp());
   ipcMain.handle('settings:discovered-servers', () => Array.from(discoveredServers.values()));
   ipcMain.handle('settings:scan', () => {

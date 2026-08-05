@@ -5,7 +5,7 @@ const { existsSync } = require('fs');
 const os = require('os');
 
 function getDbPath() {
-  const appName = 'clinic-management-system';
+  const appName = 'CareFlow';
   let base;
   if (process.platform === 'win32') {
     base = process.env.APPDATA || join(os.homedir(), 'AppData', 'Roaming');

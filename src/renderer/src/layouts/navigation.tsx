@@ -27,7 +27,7 @@ const ALL_NAV_ITEMS: NavigationItem[] = [
   { label: 'Appointments', path: '/appointments', icon: <CalendarMonthOutlinedIcon /> },
   { label: 'Tokens',       path: '/tokens',       icon: <ConfirmationNumberOutlinedIcon /> },
   { label: 'Billing',      path: '/billing',      icon: <PaymentsOutlinedIcon /> },
-  { label: 'Pharmacy',     path: '/pharmacy',     icon: <LocalPharmacyOutlinedIcon /> },
+  { label: 'Inventory', path: '/pharmacy', icon: <LocalPharmacyOutlinedIcon /> },
   { label: 'Lab',          path: '/lab',          icon: <BiotechOutlinedIcon /> },
   { label: 'Statistics',   path: '/statistics',   icon: <BarChartOutlinedIcon /> },
   { label: 'Doctors',      path: '/doctors',      icon: <LocalHospitalOutlinedIcon /> },

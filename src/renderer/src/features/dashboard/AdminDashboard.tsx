@@ -1,8 +1,3 @@
-import { useState, useEffect } from 'react';
-import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
-import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
-import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
@@ -55,15 +50,15 @@ export function AdminDashboard(): React.JSX.Element {
   const doctors = Array.from(doctorMap.values()).sort((a, b) => b.count - a.count);
 
   const todaysPatientsCount = summary.data?.todaysPatients ?? 0;
-  const paidPercentage = totalInvoices ? Math.round((paidInvoices / totalInvoices) * 100) : 100;
-  const apptPercentage = totalAppts ? Math.round((completedAppts / totalAppts) * 100) : 100;
+  const paidPercentage = totalInvoices ? Math.round((paidInvoices / totalInvoices) * 100) : 0;
+  const apptPercentage = totalAppts ? Math.round((completedAppts / totalAppts) * 100) : 0;
 
   const statCards = [
     {
       label: 'Total Patients',
       value: patients.data?.total ?? 0,
       subtext: 'Registered patients',
-      percent: 85,
+      percent: patients.data?.total ? 85 : 0,
       color: theme.palette.info.main,
     },
     {
@@ -77,7 +72,7 @@ export function AdminDashboard(): React.JSX.Element {
       label: 'Monthly Revenue',
       value: money(summary.data?.monthlyRevenue ?? 0),
       subtext: 'Current month total',
-      percent: 92,
+      percent: summary.data?.monthlyRevenue ? 92 : 0,
       color: theme.palette.success.main,
     },
     {
@@ -252,38 +247,90 @@ export function AdminDashboard(): React.JSX.Element {
             </Stack>
 
             <Stack spacing={2.5}>
-              <Box sx={{ bgcolor: alpha(theme.palette.primary.main, 0.05), p: 2.25, borderRadius: '20px', border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}` }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.25 }}>
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <CheckCircleOutlineIcon color="primary" sx={{ fontSize: 18 }} />
-                    <Typography variant="body2" fontWeight={700}>Paid Invoices</Typography>
-                  </Stack>
+              <Box
+                sx={{
+                  p: 2.5,
+                  borderRadius: '24px',
+                  bgcolor: alpha(theme.palette.primary.main, 0.08),
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.18)}`
+                }}
+              >
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                  <Box>
+                    <Typography variant="body2" fontWeight={700}>
+                      Paid Invoices
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Revenue collected from issued bills
+                    </Typography>
+                  </Box>
                   <Typography variant="body2" fontWeight={800} color="primary.main">
-                    {paidInvoices} of {totalInvoices} ({paidPercentage}%)
+                    {paidPercentage}%
                   </Typography>
                 </Stack>
-                <LinearProgress
-                  variant="determinate"
-                  value={totalInvoices ? (paidInvoices / totalInvoices) * 100 : 0}
-                  sx={{ borderRadius: 99, height: 10, bgcolor: alpha(theme.palette.primary.main, 0.15), '& .MuiLinearProgress-bar': { bgcolor: theme.palette.primary.main } }}
-                />
+
+                <Box sx={{ width: '100%', height: 14, borderRadius: 99, bgcolor: alpha(theme.palette.primary.main, 0.18), overflow: 'hidden' }}>
+                  <Box
+                    sx={{
+                      width: `${paidPercentage}%`,
+                      height: '100%',
+                      bgcolor: theme.palette.primary.main,
+                      transition: 'width 0.3s ease'
+                    }}
+                  />
+                </Box>
+
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1.25 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {paidInvoices} of {totalInvoices} invoices
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {totalInvoices ? `${Math.round((paidInvoices / totalInvoices) * 100)}% settled` : 'No invoices'}
+                  </Typography>
+                </Stack>
               </Box>
 
-              <Box sx={{ bgcolor: alpha(theme.palette.secondary.main, 0.05), p: 2.25, borderRadius: '20px', border: `1px solid ${alpha(theme.palette.secondary.main, 0.15)}` }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.25 }}>
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <HourglassEmptyIcon color="secondary" sx={{ fontSize: 18 }} />
-                    <Typography variant="body2" fontWeight={700}>Completed Appointments</Typography>
-                  </Stack>
+              <Box
+                sx={{
+                  p: 2.5,
+                  borderRadius: '24px',
+                  bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                  border: `1px solid ${alpha(theme.palette.secondary.main, 0.18)}`
+                }}
+              >
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                  <Box>
+                    <Typography variant="body2" fontWeight={700}>
+                      Completed Appointments
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Appointments successfully closed
+                    </Typography>
+                  </Box>
                   <Typography variant="body2" fontWeight={800} color="secondary.main">
-                    {completedAppts} of {totalAppts} ({apptPercentage}%)
+                    {apptPercentage}%
                   </Typography>
                 </Stack>
-                <LinearProgress
-                  variant="determinate"
-                  value={totalAppts ? (completedAppts / totalAppts) * 100 : 0}
-                  sx={{ borderRadius: 99, height: 10, bgcolor: alpha(theme.palette.secondary.main, 0.15), '& .MuiLinearProgress-bar': { bgcolor: theme.palette.secondary.main } }}
-                />
+
+                <Box sx={{ width: '100%', height: 14, borderRadius: 99, bgcolor: alpha(theme.palette.secondary.main, 0.18), overflow: 'hidden' }}>
+                  <Box
+                    sx={{
+                      width: `${apptPercentage}%`,
+                      height: '100%',
+                      bgcolor: theme.palette.secondary.main,
+                      transition: 'width 0.3s ease'
+                    }}
+                  />
+                </Box>
+
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1.25 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {completedAppts} of {totalAppts} appointments
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {totalAppts ? `${Math.round((completedAppts / totalAppts) * 100)}% complete` : 'No appointments'}
+                  </Typography>
+                </Stack>
               </Box>
 
               <Stack

@@ -21,7 +21,7 @@ export interface UserInput {
   lastName: string;
   email: string;
   password: string;
-  role: 'ADMIN' | 'DOCTOR' | 'RECEPTIONIST';
+  role: 'ADMIN' | 'DOCTOR' | 'RECEPTIONIST' | 'LAB_TECHNICIAN' | 'PHARMACIST';
   isActive: boolean;
   doctorProfile?: DoctorProfileInput;
 }
@@ -30,7 +30,7 @@ export interface UserUpdateInput {
   firstName: string;
   lastName: string;
   email: string;
-  role: 'ADMIN' | 'DOCTOR' | 'RECEPTIONIST';
+  role: 'ADMIN' | 'DOCTOR' | 'RECEPTIONIST' | 'LAB_TECHNICIAN' | 'PHARMACIST';
   isActive: boolean;
   password?: string;
   doctorProfile?: DoctorProfileInput;

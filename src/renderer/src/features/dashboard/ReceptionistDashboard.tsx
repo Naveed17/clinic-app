@@ -1,7 +1,6 @@
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
-import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
 import HowToRegOutlinedIcon from '@mui/icons-material/HowToRegOutlined';
 import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
@@ -12,7 +11,7 @@ import {
   Step, StepLabel, Stepper, Stack, TextField, Typography, Chip, Avatar,
 } from '@mui/material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, useMemo } from 'react';
@@ -25,11 +24,11 @@ import { patientsService } from '@/services/patients.service';
 import { invoicesService } from '@/services/invoices.service';
 import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
-import { AppointmentDialog } from '@/features/appointments/AppointmentsPage';
 import { InvoiceDialog } from '@/features/billing/InvoicesPage';
 import { useNavigate } from 'react-router-dom';
 import type { TokenPerson, Token, PrescriptionFeedItem } from '@/types/token';
 import type { PatientInput } from '@/types/patient';
+import type { AppointmentPerson } from '@/types/appointment';
 
 const statusColor: Record<string, 'default' | 'primary' | 'success' | 'error' | 'warning'> = {
   SCHEDULED: 'primary', CHECKED_IN: 'warning', COMPLETED: 'success', CANCELLED: 'error', NO_SHOW: 'default',
@@ -302,6 +301,230 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   );
 }
 
+/* ── Book Appointment Modal (patient → appointment, no token) ── */
+const APPT_STEPS = ['Add Patient', 'Create Appointment'];
+
+function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [step, setStep] = useState(0);
+  const [patientId, setPatientId] = useState('');
+  const [patientName, setPatientName] = useState('');
+  const [useExisting, setUseExisting] = useState(false);
+  const [providerId, setProviderId] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
+  const [duration, setDuration] = useState(30);
+  const [reason, setReason] = useState('');
+  const [notes, setNotes] = useState('');
+  const [done, setDone] = useState(false);
+
+  const form = useForm<PatientForm>({ resolver: zodResolver(patientSchema), defaultValues: patientDefaults });
+
+  const { data: patients = [] } = useQuery<TokenPerson[]>({
+    queryKey: ['token-patients'],
+    queryFn: () => window.clinic.tokens.patients(),
+    enabled: open,
+  });
+  const { data: doctors = [] } = useQuery<AppointmentPerson[]>({
+    queryKey: ['doctors'],
+    queryFn: appointmentsService.doctors,
+    enabled: open,
+  });
+
+  const selectedPatient = useMemo(() => patients.find((p) => p.id === patientId) ?? null, [patients, patientId]);
+
+  const createPatientMutation = useMutation({
+    mutationFn: (values: PatientForm) => patientsService.create({
+      firstName: values.firstName, lastName: values.lastName,
+      phone: values.phone || null, dateOfBirth: values.dateOfBirth || null,
+      email: null, address: values.address || null, emergencyContactName: null,
+      emergencyContactPhone: null, bloodGroup: null, allergies: null, chronicConditions: null,
+    } as PatientInput),
+    onSuccess: async (patient) => {
+      await qc.invalidateQueries({ queryKey: ['patients'] });
+      await qc.invalidateQueries({ queryKey: ['token-patients'] });
+      setPatientId(patient.id);
+      setPatientName(`${patient.firstName} ${patient.lastName}`);
+      setStep(1);
+    },
+  });
+
+  const appointmentMutation = useMutation({
+    mutationFn: () => {
+      const startsAt = new Date(`${date}T${time}:00`);
+      return appointmentsService.create({
+        patientId,
+        providerId,
+        tokenId: null,
+        startsAt: startsAt.toISOString(),
+        endsAt: new Date(startsAt.getTime() + duration * 60000).toISOString(),
+        reason: reason || null,
+        notes: notes || null,
+        recurrenceRule: null,
+      });
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['appointments'] });
+      setDone(true);
+    },
+  });
+
+  function handleClose() {
+    setStep(0); setPatientId(''); setPatientName(''); setUseExisting(false);
+    setProviderId(''); setDate(new Date().toISOString().slice(0, 10));
+    setTime(new Date().toTimeString().slice(0, 5)); setDuration(30);
+    setReason(''); setNotes(''); setDone(false);
+    form.reset(patientDefaults);
+    onClose();
+  }
+
+  const canSubmitAppt = !!patientId && !!providerId && !!date && !!time;
+
+  return (
+    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
+      <DialogTitle>
+        <Stack direction="row" alignItems="center" gap={1}>
+          <CalendarMonthOutlinedIcon color="primary" />
+          Book Appointment
+        </Stack>
+      </DialogTitle>
+      <DialogContent>
+        <Stepper activeStep={done ? 2 : step} sx={{ mb: 3 }}>
+          {APPT_STEPS.map((label) => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}
+        </Stepper>
+
+        {/* Step 0 — Add Patient */}
+        {step === 0 && !done && (
+          <Stack spacing={2}>
+            {createPatientMutation.isError && <Alert severity="error">Could not register patient.</Alert>}
+            <Stack direction="row" gap={1}>
+              <Button size="small" variant={!useExisting ? 'contained' : 'outlined'} onClick={() => setUseExisting(false)}>New Patient</Button>
+              <Button size="small" variant={useExisting ? 'contained' : 'outlined'} onClick={() => setUseExisting(true)}>Existing Patient</Button>
+            </Stack>
+            {useExisting ? (
+              <Autocomplete
+                options={patients}
+                getOptionLabel={(p) => `${p.firstName} ${p.lastName}`}
+                value={selectedPatient}
+                onChange={(_, v) => {
+                  setPatientId(v?.id ?? '');
+                  setPatientName(v ? `${v.firstName} ${v.lastName}` : '');
+                }}
+                isOptionEqualToValue={(o, v) => o.id === v.id}
+                renderInput={(params) => <TextField {...params} label="Search patient" fullWidth />}
+              />
+            ) : (
+              <Box component="form" id="book-patient-form" onSubmit={form.handleSubmit((v) => createPatientMutation.mutate(v))}>
+                <Stack spacing={2}>
+                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
+                    <TextField label="First name" autoFocus error={!!form.formState.errors.firstName} helperText={form.formState.errors.firstName?.message} {...form.register('firstName')} />
+                    <TextField label="Last name" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
+                  </Box>
+                  <TextField label="Phone (optional)" {...form.register('phone')} />
+                  <TextField label="Address (optional)" {...form.register('address')} />
+                  <LocalizationProvider dateAdapter={AdapterDateFns}>
+                    <Controller name="dateOfBirth" control={form.control} render={({ field }) => (
+                      <DatePicker label="Date of birth (optional)"
+                        value={field.value ? new Date(field.value) : null}
+                        onChange={(v) => field.onChange(v ? v.toISOString().slice(0, 10) : '')}
+                        slotProps={{ textField: { fullWidth: true } }}
+                      />
+                    )} />
+                  </LocalizationProvider>
+                </Stack>
+              </Box>
+            )}
+          </Stack>
+        )}
+
+        {/* Step 1 — Create Appointment */}
+        {step === 1 && !done && (
+          <Stack spacing={2}>
+            {appointmentMutation.isError && <Alert severity="error">Could not create appointment.</Alert>}
+            {patientName && (
+              <Typography variant="body2" color="text.secondary">
+                Patient: <strong>{patientName}</strong>
+              </Typography>
+            )}
+            <FormControl fullWidth>
+              <InputLabel>Doctor</InputLabel>
+              <Select label="Doctor" value={providerId} onChange={(e) => setProviderId(e.target.value)}>
+                {doctors.map((d) => <MenuItem key={d.id} value={d.id}>Dr. {d.firstName} {d.lastName}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
+                <DatePicker
+                  label="Date"
+                  value={date ? new Date(date) : null}
+                  onChange={(v) => setDate(v ? v.toLocaleDateString('en-CA') : '')}
+                  slotProps={{ textField: { fullWidth: true } }}
+                />
+                <TimePicker
+                  label="Time"
+                  value={time ? new Date(`1970-01-01T${time}:00`) : null}
+                  onChange={(v) => setTime(v ? v.toTimeString().slice(0, 5) : '')}
+                  slotProps={{ textField: { fullWidth: true } }}
+                />
+              </Box>
+            </LocalizationProvider>
+            <TextField
+              select fullWidth label="Duration"
+              value={duration}
+              onChange={(e) => setDuration(Number(e.target.value))}
+            >
+              {[15, 30, 45, 60, 90, 120].map((m) => (
+                <MenuItem key={m} value={m}>{m} min</MenuItem>
+              ))}
+            </TextField>
+            <FormControl fullWidth>
+              <InputLabel>Reason (optional)</InputLabel>
+              <Select label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)}>
+                <MenuItem value="">— None —</MenuItem>
+                {['Checkup', 'Follow-up', 'Urgent', 'Consultation', 'Lab Results', 'Vaccination'].map((r) => (
+                  <MenuItem key={r} value={r}>{r}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField label="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} fullWidth multiline minRows={2} />
+          </Stack>
+        )}
+
+        {done && (
+          <Stack alignItems="center" spacing={2} sx={{ py: 2 }}>
+            <Box sx={{ width: 72, height: 72, borderRadius: '50%', bgcolor: 'success.light', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CalendarMonthOutlinedIcon sx={{ fontSize: 36, color: 'success.contrastText' }} />
+            </Box>
+            <Typography fontWeight={800} fontSize={20}>Appointment Booked!</Typography>
+            <Typography variant="body2" color="text.secondary" textAlign="center">
+              {patientName || 'Patient'} · {date} at {time}
+            </Typography>
+          </Stack>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button onClick={handleClose}>{done ? 'Done' : 'Close'}</Button>
+        {step === 0 && !done && !useExisting && (
+          <Button variant="contained" form="book-patient-form" type="submit" disabled={createPatientMutation.isPending}>
+            Next
+          </Button>
+        )}
+        {step === 0 && !done && useExisting && (
+          <Button variant="contained" disabled={!patientId} onClick={() => setStep(1)}>
+            Next
+          </Button>
+        )}
+        {step === 1 && !done && (
+          <Button variant="contained" disabled={!canSubmitAppt || appointmentMutation.isPending} onClick={() => appointmentMutation.mutate()}>
+            Book Appointment
+          </Button>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function PrescriptionFeed(): React.JSX.Element {
   const theme = useTheme();
   const queryClient = useQueryClient();
@@ -328,7 +551,7 @@ function PrescriptionFeed(): React.JSX.Element {
   }, [date, queryClient]);
 
   return (
-    <Paper variant="outlined" sx={{ p: 2.5, minWidth: 200 }}>
+    <Paper variant="outlined" sx={{ p: 2.5 }}>
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
         <MedicalServicesOutlinedIcon sx={{ fontSize: 16, color: 'primary.main' }} />
         <Typography fontWeight={700} fontSize={14}>Prescriptions</Typography>
@@ -413,14 +636,11 @@ export function ReceptionistDashboard(): React.JSX.Element {
           ))}
         </Box>
 
-        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '1fr auto' } }}>
+        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' } }}>
           {/* Today's queue */}
-          <Paper variant="outlined" sx={{ p: 3, display: 'flex', flexDirection: 'column' }}>
+          <Paper variant="outlined" sx={{ p: 3, display: 'flex', flexDirection: 'column', gridColumn: { md: 'span 3' } }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
               <Typography fontWeight={700}>Today's Queue</Typography>
-              <Button size="small" variant="outlined" onClick={() => setApptDialogOpen(true)} sx={{ borderRadius: 2 }}>
-                + Book Appointment
-              </Button>
             </Stack>
             {isLoading ? (
               <Typography variant="body2" color="text.secondary">Loading…</Typography>
@@ -477,9 +697,9 @@ export function ReceptionistDashboard(): React.JSX.Element {
             )}
           </Paper>
 
-          {/* Quick actions */}
-          <Stack spacing={2}>
-            <Paper variant="outlined" sx={{ p: 3, minWidth: 200 }}>
+          {/* Quick actions — same width as one top stat card */}
+          <Stack spacing={2} sx={{ gridColumn: { md: 'span 1' }, minWidth: 0 }}>
+            <Paper variant="outlined" sx={{ p: 3 }}>
               <Typography fontWeight={700} sx={{ mb: 2 }}>Quick Actions</Typography>
               <Stack spacing={1.5}>
                 <Button
@@ -524,11 +744,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
         </Box>
       </Stack>
       <WalkInModal open={walkInOpen} onClose={() => setWalkInOpen(false)} />
-      <AppointmentDialog
-        open={apptDialogOpen}
-        onClose={() => setApptDialogOpen(false)}
-        onSuccess={() => navigate('/appointments')}
-      />
+      <BookAppointmentModal open={apptDialogOpen} onClose={() => setApptDialogOpen(false)} />
       <InvoiceDialog
         open={invoiceDialogOpen}
         onClose={() => setInvoiceDialogOpen(false)}

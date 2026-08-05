@@ -4,6 +4,7 @@ import { AdminDashboard } from '@/features/dashboard/AdminDashboard';
 import { DoctorDashboard } from '@/features/dashboard/DoctorDashboard';
 import { ReceptionistDashboard } from '@/features/dashboard/ReceptionistDashboard';
 import { LabDashboard } from '@/features/dashboard/LabDashboard';
+import { PharmacistDashboard } from '@/features/dashboard/PharmacistDashboard';
 import { Alert, Box, CircularProgress } from '@mui/material';
 
 export function DashboardPage(): React.JSX.Element {
@@ -20,6 +21,7 @@ export function DashboardPage(): React.JSX.Element {
     case 'doctor':         return modules.doctorDashboard ? <DoctorDashboard /> : <Alert severity="error">This role is not enabled for this clinic.</Alert>;
     case 'receptionist':   return <ReceptionistDashboard />;
     case 'lab_technician': return modules.labDashboard ? <LabDashboard /> : <Alert severity="error">This role is not enabled for this clinic.</Alert>;
+    case 'pharmacist':     return modules.pharmacy ? <PharmacistDashboard /> : <Alert severity="error">This role is not enabled for this clinic.</Alert>;
     default:               return <AdminDashboard />;
   }
 }

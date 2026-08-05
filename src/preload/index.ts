@@ -9,8 +9,16 @@ const settingsReady = ipcRenderer
   .invoke('settings:get')
   .then(async (s: { serverMode: string; clientApiUrl: string }) => {
     if (s.serverMode === 'lan-client' && s.clientApiUrl) {
-      apiUrl = s.clientApiUrl;
-      isLanClient = true;
+      // If main fell back to a local backend (server unreachable), app:get-api-url is set.
+      // Prefer IPC/local in that case so we don't keep hitting a dead remote URL.
+      const runtimeUrl = await ipcRenderer.invoke('app:get-api-url').catch(() => null);
+      if (runtimeUrl) {
+        apiUrl = runtimeUrl as string;
+        isLanClient = false;
+      } else {
+        apiUrl = s.clientApiUrl;
+        isLanClient = true;
+      }
     } else {
       const url = await ipcRenderer.invoke('app:get-api-url').catch(() => null);
       if (url) apiUrl = url as string;
@@ -344,6 +352,7 @@ const api = {
   settings: {
     get: () => ipc('settings:get'),
     save: (patch: unknown) => ipc('settings:save', patch),
+    relaunch: () => ipc('settings:relaunch'),
     lanIp: () => ipc('settings:lan-ip'),
     discoveredServers: () => ipc('settings:discovered-servers'),
     testConnection: (url: string) => ipc('settings:test-connection', url),
@@ -354,7 +363,6 @@ const api = {
     },
     onLanReconnected: (handler: (url: string) => void) => {
       const listener = (_e: unknown, url: string) => {
-        // apiUrl update karo taake nayi requests seedha server ko jayein
         apiUrl = url;
         isLanClient = true;
         handler(url);
@@ -373,18 +381,103 @@ const api = {
     info: () => ipc<{ key: string; expiresAt: string | null; activatedAt: string; updatedAt: string } | null>('license:info'),
   },
   medicines: {
-    search: (query: string) => ipc('medicines:search', query),
-    list: () => ipc('medicines:list'),
-    create: (name: string, price: number) => ipc('medicines:create', name, price),
-    updatePrice: (id: string, price: number) => ipc('medicines:update-price', id, price),
+    search: (query: string) =>
+      call(
+        () => request(`/api/medicines?q=${encodeURIComponent(query)}`),
+        'medicines:search', query,
+      ),
+    list: () =>
+      call(
+        () => request('/api/medicines'),
+        'medicines:list',
+      ),
+    create: (name: string, price: number) =>
+      call(
+        () => request('/api/medicines', { method: 'POST', body: JSON.stringify({ name, price }) }),
+        'medicines:create', name, price,
+      ),
+    updatePrice: (id: string, price: number) =>
+      call(
+        () => request(`/api/medicines/${id}/price`, { method: 'PUT', body: JSON.stringify({ price }) }),
+        'medicines:update-price', id, price,
+      ),
   },
-  pharmacy: {
+  // ==========================================
+  // COMPLETE INVENTORY MODULE API (LAN & IPC)
+  // ==========================================
+  inventory: {
+    categories: {
+      list: () => call(() => request('/api/inventory/categories'), 'inventory:categories:list'),
+      create: (input: unknown) =>
+        call(
+          () => request('/api/inventory/categories', { method: 'POST', body: JSON.stringify(input) }),
+          'inventory:categories:create', input,
+        ),
+    },
     medicines: {
-      list:         (search?: string) => ipc('pharmacy:medicines:list', search),
-      upsert:       (data: unknown)   => ipc('pharmacy:medicines:upsert', data),
-      adjustStock:  (id: string, delta: number) => ipc('pharmacy:medicines:adjust-stock', id, delta),
-      lowStock:     () => ipc('pharmacy:medicines:low-stock'),
-      delete:       (id: string) => ipc('pharmacy:medicines:delete', id),
+      list: () => call(() => request('/api/inventory/medicines'), 'inventory:medicines:list'),
+      create: (input: unknown) =>
+        call(
+          () => request('/api/inventory/medicines', { method: 'POST', body: JSON.stringify(input) }),
+          'inventory:medicines:create', input,
+        ),
+      update: (id: string, input: unknown) =>
+        call(
+          () => request(`/api/inventory/medicines/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+          'inventory:medicines:update', { id, data: input },
+        ),
+      delete: (id: string) =>
+        call(
+          () => request(`/api/inventory/medicines/${id}`, { method: 'DELETE' }),
+          'inventory:medicines:delete', id,
+        ),
+      lowStock: () =>
+        call(
+          () => request('/api/inventory/medicines/low-stock'),
+          'inventory:medicines:low-stock',
+        ),
+      upsertWithStock: (input: unknown) =>
+        call(
+          () => request('/api/inventory/medicines/upsert-with-stock', { method: 'POST', body: JSON.stringify(input) }),
+          'inventory:medicines:upsert-with-stock', input,
+        ),
+    },
+    batches: {
+      list: () => call(() => request('/api/inventory/batches'), 'inventory:batches:list'),
+      create: (input: unknown) =>
+        call(
+          () => request('/api/inventory/batches', { method: 'POST', body: JSON.stringify(input) }),
+          'inventory:batches:create', input,
+        ),
+      expiringSoon: (daysAhead = 60) =>
+        call(
+          () => request(`/api/inventory/batches/expiring-soon?days=${daysAhead}`),
+          'inventory:batches:expiring-soon', daysAhead,
+        ),
+    },
+    suppliers: {
+      list: () => call(() => request('/api/inventory/suppliers'), 'inventory:suppliers:list'),
+      create: (input: unknown) =>
+        call(
+          () => request('/api/inventory/suppliers', { method: 'POST', body: JSON.stringify(input) }),
+          'inventory:suppliers:create', input,
+        ),
+    },
+    purchases: {
+      list: () => call(() => request('/api/inventory/purchases'), 'inventory:purchases:list'),
+      create: (input: unknown) =>
+        call(
+          () => request('/api/inventory/purchases', { method: 'POST', body: JSON.stringify(input) }),
+          'inventory:purchases:create', input,
+        ),
+    },
+    movements: {
+      list: () => call(() => request('/api/inventory/movements'), 'inventory:movements:list'),
+      record: (input: unknown) =>
+        call(
+          () => request('/api/inventory/movements', { method: 'POST', body: JSON.stringify(input) }),
+          'inventory:movements:record', input,
+        ),
     },
   },
   search: {
@@ -407,8 +500,15 @@ const api = {
       };
     },
 
-    onProgress: (handler: (percent: number) => void) => {
-      const listener = (_: unknown, percent: number) => handler(percent);
+    onProgress: (handler: (progress: number | {
+      percent: number;
+      transferred?: number;
+      total?: number;
+      bytesPerSecond?: number;
+      phase?: string;
+      label?: string;
+    }) => void) => {
+      const listener = (_: unknown, progress: number | Record<string, unknown>) => handler(progress as any);
       ipcRenderer.on('app:update-progress', listener);
       return () => {
         ipcRenderer.removeListener('app:update-progress', listener);

@@ -1,4 +1,4 @@
-export type AppRole = 'admin' | 'doctor' | 'receptionist' | 'lab_technician';
+export type AppRole = 'admin' | 'doctor' | 'receptionist' | 'lab_technician' | 'pharmacist';
 
 export type NotificationKind = 'info' | 'success' | 'warning' | 'error';
 

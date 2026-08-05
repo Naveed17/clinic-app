@@ -11,6 +11,18 @@ function broadcastToAll(channel: string, ...args: unknown[]): void {
   });
 }
 
+function formatBytes(n: number): string {
+  if (!n || n < 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let i = 0;
+  let v = n;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i += 1;
+  }
+  return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
 export function initAutoUpdater(): void {
   autoUpdater.logger = console;
 
@@ -22,9 +34,14 @@ export function initAutoUpdater(): void {
     ...(githubToken && { token: githubToken })
   });
 
-  // Manual download control active
+  // Manual download control
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
+
+  // Differential (blockmap) downloads often sit at 0% for a long time while
+  // hashing / fetching .blockmap — especially on slow links. Full installer
+  // download reports progress reliably.
+  autoUpdater.disableDifferentialDownload = true;
 
   ipcMain.handle('app:get-version', () => app.getVersion());
 
@@ -52,15 +69,7 @@ export function initAutoUpdater(): void {
         const latestVersion = result.updateInfo.version;
 
         if (latestVersion !== currentVersion) {
-          // Trigger download directly from here ONLY if not downloading
-          if (!_isDownloading) {
-            _isDownloading = true;
-            autoUpdater.downloadUpdate().catch((err) => {
-              console.error('[AutoUpdater] Download initiation error:', err);
-              _isDownloading = false;
-              broadcastToAll('app:update-error', err?.message || 'Failed to start download');
-            });
-          }
+          // Download is started by the update-available event handler
           return 'available';
         }
       }
@@ -73,10 +82,27 @@ export function initAutoUpdater(): void {
     }
   });
 
-  // Update Available Event - Just broadcast UI status, do not trigger downloadUpdate again
+  // Update Available — start download for background checks too
   autoUpdater.on('update-available', (info) => {
     console.log('[AutoUpdater] Update available:', info?.version);
     broadcastToAll('app:update-available', info?.version || true);
+    if (!_isDownloading) {
+      _isDownloading = true;
+      // Tell UI download has started even before first byte (indeterminate)
+      broadcastToAll('app:update-progress', {
+        percent: 0,
+        transferred: 0,
+        total: 0,
+        bytesPerSecond: 0,
+        phase: 'starting'
+      });
+      console.log('[AutoUpdater] Starting full installer download...');
+      autoUpdater.downloadUpdate().catch((err) => {
+        console.error('[AutoUpdater] Download initiation error:', err);
+        _isDownloading = false;
+        broadcastToAll('app:update-error', err?.message || 'Failed to start download');
+      });
+    }
   });
 
   autoUpdater.on('update-not-available', () => {
@@ -85,11 +111,25 @@ export function initAutoUpdater(): void {
     _isDownloading = false;
   });
 
-  // Download Progress Fix - Send raw rounded percent + speed check
   autoUpdater.on('download-progress', (progressObj) => {
     _isDownloading = true;
-    const percent = Math.round(progressObj.percent);
-    broadcastToAll('app:update-progress', percent);
+    const percent = Math.min(100, Math.max(0, Math.round(progressObj.percent || 0)));
+    const payload = {
+      percent,
+      transferred: progressObj.transferred || 0,
+      total: progressObj.total || 0,
+      bytesPerSecond: progressObj.bytesPerSecond || 0,
+      phase: 'downloading' as const,
+      label:
+        progressObj.total > 0
+          ? `${formatBytes(progressObj.transferred)} / ${formatBytes(progressObj.total)}`
+          : undefined
+    };
+    console.log(
+      `[AutoUpdater] Progress ${percent}%` +
+        (payload.label ? ` (${payload.label}, ${formatBytes(payload.bytesPerSecond)}/s)` : '')
+    );
+    broadcastToAll('app:update-progress', payload);
   });
 
   autoUpdater.on('update-downloaded', () => {
@@ -106,7 +146,6 @@ export function initAutoUpdater(): void {
   });
 
   if (!is.dev) {
-    // 30 seconds initial delay instead of 2 minutes to feel fast
     setTimeout(() => {
       if (!_isChecking && !_isDownloading) {
         console.log('[AutoUpdater] Running startup background check...');
@@ -114,7 +153,6 @@ export function initAutoUpdater(): void {
       }
     }, 30 * 1000);
 
-    // Periodic check (every 4 hours)
     setInterval(() => {
       if (!_isChecking && !_isDownloading) {
         void autoUpdater.checkForUpdates();

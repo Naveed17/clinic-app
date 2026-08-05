@@ -11,18 +11,31 @@ const CATEGORIES = ['General', 'Antibiotic', 'Painkiller', 'Vitamin', 'Antacid',
 const UNITS = ['Tablet', 'Capsule', 'Syrup (ml)', 'Injection', 'Sachet', 'Strip', 'Bottle', 'Piece', 'Other'];
 
 const schema = z.object({
-  name:         z.string().min(1, 'Name required'),
-  price:        z.coerce.number().min(0, 'Price must be ≥ 0'),
-  category:     z.string().min(1),
-  unit:         z.string().min(1),
-  stock:        z.coerce.number().int().min(0, 'Stock must be ≥ 0'),
-  reorderLevel: z.coerce.number().int().min(0),
+  name: z.string().min(1, 'Name required'),
+  price: z.coerce.number().min(0, 'Price must be ≥ 0'),
+  category: z.string().min(1),
+  unit: z.string().min(1),
+  stock: z.coerce.number().int().min(0, 'Stock must be ≥ 0'),
+  minStockAlert: z.coerce.number().int().min(0),
 });
 
 type FormValues = z.infer<typeof schema>;
 
+export interface InventoryMedicineRow {
+  id: string;
+  name: string;
+  unit: string;
+  category: string;
+  categoryId?: string | null;
+  minStockAlert: number;
+  stock: number;
+  price: number;
+  genericName?: string | null;
+  rackNumber?: string | null;
+}
+
 interface Props {
-  medicine?: PharmacyMedicine | null;
+  medicine?: InventoryMedicineRow | null;
   onClose: () => void;
 }
 
@@ -33,21 +46,30 @@ export function StockDialog({ medicine, onClose }: Props): React.JSX.Element {
   const { control, handleSubmit, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema) as any,
     defaultValues: {
-      name:         medicine?.name         ?? '',
-      price:        medicine?.price        ?? 0,
-      category:     medicine?.category     ?? 'General',
-      unit:         medicine?.unit         ?? 'Tablet',
-      stock:        medicine?.stock        ?? 0,
-      reorderLevel: medicine?.reorderLevel ?? 10,
+      name: medicine?.name ?? '',
+      price: medicine?.price ?? 0,
+      category: medicine?.category ?? 'General',
+      unit: medicine?.unit ?? 'Tablet',
+      stock: medicine?.stock ?? 0,
+      minStockAlert: medicine?.minStockAlert ?? 10,
     },
   });
 
   const mutation = useMutation({
     mutationFn: (data: FormValues) =>
-      window.clinic.pharmacy.medicines.upsert({ id: medicine?.id, ...data }),
+      window.clinic.inventory.medicines.upsertWithStock({
+        id: medicine?.id,
+        name: data.name,
+        unit: data.unit,
+        category: data.category,
+        minStockAlert: data.minStockAlert,
+        salePrice: data.price,
+        stock: data.stock,
+      }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['pharmacy-medicines'] });
-      void qc.invalidateQueries({ queryKey: ['pharmacy-low-stock'] });
+      void qc.invalidateQueries({ queryKey: ['inventory-medicines'] });
+      void qc.invalidateQueries({ queryKey: ['inventory-low-stock'] });
+      void qc.invalidateQueries({ queryKey: ['medicines'] });
       onClose();
     },
   });
@@ -64,30 +86,30 @@ export function StockDialog({ medicine, onClose }: Props): React.JSX.Element {
           <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
             <Controller name="category" control={control} render={({ field }) => (
               <TextField {...field} select label="Category" fullWidth>
-                {CATEGORIES.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                {CATEGORIES.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
               </TextField>
             )} />
             <Controller name="unit" control={control} render={({ field }) => (
               <TextField {...field} select label="Unit" fullWidth>
-                {UNITS.map(u => <MenuItem key={u} value={u}>{u}</MenuItem>)}
+                {UNITS.map((u) => <MenuItem key={u} value={u}>{u}</MenuItem>)}
               </TextField>
             )} />
           </Box>
 
           <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr 1fr' }}>
             <Controller name="price" control={control} render={({ field }) => (
-              <TextField {...field} label="Price (Rs.)" type="number"
+              <TextField {...field} label="Sale Price (Rs.)" type="number"
                 error={!!errors.price} helperText={errors.price?.message}
                 fullWidth inputProps={{ min: 0, step: 0.5 }} />
             )} />
             <Controller name="stock" control={control} render={({ field }) => (
               <TextField {...field} label="Current Stock" type="number"
-                error={!!errors.stock} helperText={errors.stock?.message}
+                error={!!errors.stock} helperText={errors.stock?.message ?? (isEdit ? 'Adjusts batch qty' : 'Opening batch')}
                 fullWidth inputProps={{ min: 0 }} />
             )} />
-            <Controller name="reorderLevel" control={control} render={({ field }) => (
-              <TextField {...field} label="Reorder Level" type="number"
-                error={!!errors.reorderLevel} helperText={errors.reorderLevel?.message}
+            <Controller name="minStockAlert" control={control} render={({ field }) => (
+              <TextField {...field} label="Min Alert" type="number"
+                error={!!errors.minStockAlert} helperText={errors.minStockAlert?.message}
                 fullWidth inputProps={{ min: 0 }} />
             )} />
           </Box>
@@ -102,7 +124,7 @@ export function StockDialog({ medicine, onClose }: Props): React.JSX.Element {
         <Button
           variant="contained"
           disabled={mutation.isPending}
-          onClick={handleSubmit(d => mutation.mutate(d))}
+          onClick={handleSubmit((d) => mutation.mutate(d))}
         >
           {isEdit ? 'Save Changes' : 'Add Medicine'}
         </Button>

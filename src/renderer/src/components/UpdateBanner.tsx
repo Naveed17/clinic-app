@@ -58,7 +58,7 @@ export function UpdateBanner(): React.JSX.Element | null {
       >
         {isReady
           ? 'A new software update is ready to install!'
-          : 'A new update is available.'}
+          : 'Downloading update…'}
       </Alert>
     </Snackbar>
   );
