@@ -4,14 +4,14 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
 import {
-  Alert, Avatar, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
-  IconButton, Stack, Tooltip, Typography,
+  Alert, Avatar, Box, Button, Chip, IconButton, Stack, Tooltip, Typography,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDeferredValue, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tableSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import { ConfirmDialog } from '@/components/DialogUI';
 import { patientsService } from '@/services/patients.service';
 import { useAuth } from '@/features/auth/AuthContext';
 import type { Patient } from '@/types/patient';
@@ -231,21 +231,15 @@ export function PatientsPage(): React.JSX.Element {
       <PatientDialog open={isDialogOpen} patient={dialogPatient} onClose={() => setDialogOpen(false)} />
       {historyPatient && <PatientHistoryDialog patient={historyPatient} onClose={() => setHistoryPatient(undefined)} />}
 
-      <Dialog open={Boolean(deletePatient)} onClose={() => setDeletePatient(undefined)}>
-        <DialogTitle>Delete patient?</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Delete {deletePatient?.firstName} {deletePatient?.lastName}? This action cannot be undone.
-          </Typography>
-          {deleteMutation.isError && (
-            <Alert severity="error" sx={{ mt: 2 }}>Unable to delete this patient. Linked records may need to be removed first.</Alert>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setDeletePatient(undefined)}>Cancel</Button>
-          <Button color="error" disabled={deleteMutation.isPending} onClick={() => deletePatient && deleteMutation.mutate(deletePatient.id)} variant="contained">Delete</Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={Boolean(deletePatient)}
+        title="Delete patient?"
+        message={deletePatient ? `Delete ${deletePatient.firstName} ${deletePatient.lastName}? Linked records may prevent removal.` : ''}
+        loading={deleteMutation.isPending}
+        error={deleteMutation.isError ? <Alert severity="error" sx={{ mt: 2 }}>Unable to delete this patient. Linked records may need to be removed first.</Alert> : undefined}
+        onClose={() => setDeletePatient(undefined)}
+        onConfirm={() => deletePatient && deleteMutation.mutate(deletePatient.id)}
+      />
     </>
   );
 }

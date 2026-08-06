@@ -14,7 +14,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
   Divider,
   IconButton,
   MenuItem,
@@ -24,6 +23,10 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import {
+  ConfirmDialog, FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -55,9 +58,9 @@ function PaymentHistoryDialog({ invoice, onClose }: { invoice: Invoice; onClose:
     queryFn: () => window.clinic.invoices.payments(invoice.id),
   });
   return (
-    <Dialog open fullWidth maxWidth="xs" onClose={onClose}>
-      <DialogTitle>Payment History — {invoice.invoiceNumber}</DialogTitle>
-      <DialogContent sx={{ p: 0 }}>
+    <Dialog open fullWidth maxWidth="xs" onClose={onClose} PaperProps={dialogPaperProps}>
+      <FormDialogTitle title={`Payment History — ${invoice.invoiceNumber}`} subtitle="All payments recorded for this invoice." />
+      <DialogContent sx={{ ...dialogContentSx, p: 0, px: 0, py: 0 }}>
         <Box sx={{ px: 3, py: 1.5, bgcolor: 'background.default', display: 'flex', gap: 3 }}>
           <Typography variant="body2" color="text.secondary">Total: <strong>{money(invoice.total)}</strong></Typography>
           <Typography variant="body2" color="text.secondary">Paid: <strong>{money(Number(invoice.amountPaid))}</strong></Typography>
@@ -85,8 +88,8 @@ function PaymentHistoryDialog({ invoice, onClose }: { invoice: Invoice; onClose:
           </Stack>
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2.5 }}>
-        <Button onClick={onClose}>Close</Button>
+      <DialogActions sx={dialogActionsSx}>
+        <Button onClick={onClose} sx={dialogCancelBtnSx}>Close</Button>
       </DialogActions>
     </Dialog>
   );
@@ -100,17 +103,16 @@ function VoidDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => voi
     onSuccess: async () => { await qc.invalidateQueries({ queryKey: ['invoices'] }); onClose(); },
   });
   return (
-    <Dialog open fullWidth maxWidth="xs" onClose={onClose}>
-      <DialogTitle>Void Invoice?</DialogTitle>
-      <DialogContent>
-        <Typography>Void <strong>{invoice.invoiceNumber}</strong>? This cannot be undone.</Typography>
-        {mutation.isError && <Alert severity="error" sx={{ mt: 2 }}>Failed to void invoice.</Alert>}
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2.5 }}>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button color="error" variant="contained" disabled={mutation.isPending} onClick={() => mutation.mutate()}>Void Invoice</Button>
-      </DialogActions>
-    </Dialog>
+    <ConfirmDialog
+      open
+      title="Void invoice?"
+      message={<>Void <strong>{invoice.invoiceNumber}</strong>?</>}
+      confirmLabel="Void Invoice"
+      loading={mutation.isPending}
+      error={mutation.isError ? <Alert severity="error" sx={{ mt: 2 }}>Failed to void invoice.</Alert> : undefined}
+      onConfirm={() => mutation.mutate()}
+      onClose={onClose}
+    />
   );
 }
 
@@ -128,10 +130,10 @@ function PaymentDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => 
     },
   });
   return (
-    <Dialog open fullWidth maxWidth="xs" onClose={onClose}>
-      <DialogTitle>Record Payment — {invoice.invoiceNumber}</DialogTitle>
+    <Dialog open fullWidth maxWidth="xs" onClose={onClose} PaperProps={dialogPaperProps}>
+      <FormDialogTitle title={`Record Payment — ${invoice.invoiceNumber}`} subtitle="Add a payment against this invoice." />
       <Box component="form" onSubmit={form.handleSubmit((v) => mutation.mutate(v))}>
-        <DialogContent>
+        <DialogContent sx={dialogContentSx}>
           <Stack spacing={2}>
             {mutation.isError && <Alert severity="error">Failed to record payment.</Alert>}
             <Typography variant="body2" color="text.secondary">
@@ -150,9 +152,9 @@ function PaymentDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => 
             <TextField label="Reference (optional)" fullWidth {...form.register('reference')} />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={mutation.isPending}>
+        <DialogActions sx={dialogActionsSx}>
+          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
+          <Button type="submit" variant="contained" disabled={mutation.isPending} sx={dialogSubmitBtnSx}>
             Record Payment
           </Button>
         </DialogActions>
@@ -196,10 +198,10 @@ export function InvoiceDialog({ open, onClose, onSuccess }: { open: boolean; onC
 
   return (
     <>
-    <Dialog fullWidth maxWidth="md" open={open} onClose={onClose}>
-      <DialogTitle>Create invoice</DialogTitle>
+    <Dialog fullWidth maxWidth="md" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
+      <FormDialogTitle title="Create Invoice" subtitle="Bill a patient for medicines and services." />
       <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
-        <DialogContent>
+        <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.5}>
             {mutation.isError && <Alert severity="error">{mutation.error instanceof Error ? mutation.error.message : 'Unable to create the invoice.'}</Alert>}
             <TextField select fullWidth label="Patient" error={Boolean(errors.patientId)} helperText={errors.patientId?.message} {...form.register('patientId')}>
@@ -241,9 +243,9 @@ export function InvoiceDialog({ open, onClose, onSuccess }: { open: boolean; onC
             </Paper>
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button disabled={mutation.isPending} type="submit" variant="contained">Create invoice</Button>
+        <DialogActions sx={dialogActionsSx}>
+          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
+          <Button disabled={mutation.isPending} type="submit" variant="contained" sx={dialogSubmitBtnSx}>Create invoice</Button>
         </DialogActions>
       </Box>
     </Dialog>

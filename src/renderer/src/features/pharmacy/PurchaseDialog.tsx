@@ -1,9 +1,13 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import {
-  Autocomplete, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
+  Autocomplete, Box, Button, Dialog, DialogActions, DialogContent,
   IconButton, Stack, TextField, Typography,
 } from '@mui/material';
+import {
+  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -90,9 +94,9 @@ export function PurchaseDialog({ onClose }: Props): React.JSX.Element {
     items.every((i) => i.medicineId && i.batchNumber.trim() && i.expiryDate && i.quantity > 0);
 
   return (
-    <Dialog open fullWidth maxWidth="md" onClose={onClose}>
-      <DialogTitle>New Purchase Order</DialogTitle>
-      <DialogContent>
+    <Dialog open fullWidth maxWidth="md" onClose={onClose} PaperProps={dialogPaperProps}>
+      <FormDialogTitle title="New Purchase Order" subtitle="Record stock received from a supplier." />
+      <DialogContent sx={dialogContentSx}>
         <Stack spacing={2} sx={{ mt: 0.5 }}>
           {error && <Typography color="error" variant="caption">{error}</Typography>}
           <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
@@ -187,9 +191,9 @@ export function PurchaseDialog({ onClose }: Props): React.JSX.Element {
           <Typography fontWeight={800} textAlign="right">Total: {money(total)}</Typography>
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} color="inherit">Cancel</Button>
-        <Button variant="contained" disabled={!canSave || mutation.isPending} onClick={() => mutation.mutate()}>
+      <DialogActions sx={dialogActionsSx}>
+        <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
+        <Button variant="contained" disabled={!canSave || mutation.isPending} onClick={() => mutation.mutate()} sx={dialogSubmitBtnSx}>
           Save Purchase
         </Button>
       </DialogActions>

@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   InputAdornment,
   Paper,
   Table,
@@ -14,49 +15,73 @@ import {
   type Theme,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import { alpha } from '@mui/material/styles';
 import type { ReactNode } from 'react';
+
+export const softCardSx: SxProps<Theme> = {
+  borderRadius: '20px',
+  border: '1px solid',
+  borderColor: 'divider',
+  boxShadow: (theme) => `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,
+};
 
 export const tableSx = {
   head: {
     '& .MuiTableCell-head': {
-      fontSize: 11.5,
-      fontWeight: 700,
+      fontSize: 10.5,
+      fontWeight: 800,
       color: 'text.secondary',
-      py: 1.5,
-      px: 2,
-      borderBottom: 'none',
-      bgcolor: 'background.paper',
+      textTransform: 'uppercase',
+      letterSpacing: '0.06em',
+      py: 1.75,
+      px: 2.25,
+      borderBottom: '1px solid',
+      borderColor: 'divider',
+      bgcolor: (theme: Theme) => alpha(theme.palette.primary.main, 0.05),
       whiteSpace: 'nowrap',
     },
   },
   row: {
     cursor: 'default',
     '& .MuiTableCell-body': {
-      fontSize: 12.5,
-      py: 0.75,
-      px: 2,
+      fontSize: 13,
+      py: 1.35,
+      px: 2.25,
       border: 'none',
       color: 'text.primary',
+      bgcolor: (theme: Theme) => alpha(theme.palette.primary.main, 0.02),
+      transition: 'background 0.15s, border-color 0.15s',
+    },
+    '& .MuiTableCell-body:first-of-type': {
+      borderTopLeftRadius: 4,
+      borderBottomLeftRadius: 4,
+      borderLeft: '3px solid',
+      borderLeftColor: 'transparent',
+    },
+    '& .MuiTableCell-body:last-of-type': {
+      borderTopRightRadius: 4,
+      borderBottomRightRadius: 4,
     },
     '&:hover .MuiTableCell-body': {
-      bgcolor: 'action.hover',
-      '&:first-of-type': { borderRadius: '8px 0 0 8px' },
-      '&:last-of-type': { borderRadius: '0 8px 8px 0' },
+      bgcolor: (theme: Theme) => alpha(theme.palette.primary.main, 0.06),
     },
-    transition: 'background 0.12s',
+    '&:hover .MuiTableCell-body:first-of-type': {
+      borderLeftColor: 'primary.main',
+    },
   },
 } satisfies Record<string, SxProps<Theme>>;
 
 export const chipSx = {
-  borderRadius: '6px',
-  fontWeight: 600,
-  fontSize: 11.5,
+  borderRadius: 1,
+  fontWeight: 700,
+  fontSize: 11,
   height: 22,
   border: 'none',
   '& .MuiChip-label': { px: 1 },
 };
 
-// Green/grey dot before status text — matches "• Active" in image
 export function StatusDot({ active = true }: { active?: boolean }): React.JSX.Element {
   return (
     <Box
@@ -77,11 +102,17 @@ export function StatusDot({ active = true }: { active?: boolean }): React.JSX.El
 }
 
 export const actionBtnSx = {
-  width: 30,
-  height: 30,
-  borderRadius: '8px',
+  width: 32,
+  height: 32,
+  borderRadius: 1,
   color: 'text.secondary',
-  '&:hover': { bgcolor: 'action.selected', color: 'text.primary' },
+  border: '1px solid',
+  borderColor: 'divider',
+  '&:hover': {
+    bgcolor: (theme: Theme) => alpha(theme.palette.primary.main, 0.08),
+    color: 'primary.main',
+    borderColor: (theme: Theme) => alpha(theme.palette.primary.main, 0.25),
+  },
 };
 
 interface TablePageShellProps {
@@ -98,41 +129,43 @@ interface TablePageShellProps {
 export function TablePageShell({ title, subtitle, action, toolbar, children, error, pager, sx }: TablePageShellProps): React.JSX.Element {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, ...sx }}>
-      <Box sx={{ display: 'flex', alignItems: { sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between' }}>
+      <Box sx={{ display: 'flex', alignItems: { sm: 'flex-end' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between' }}>
         <Box>
-          <Typography variant="h5" fontWeight={700}>{title}</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>{subtitle}</Typography>
+          <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em' }}>
+            {title}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {subtitle}
+          </Typography>
         </Box>
         {action}
       </Box>
 
-      <Paper
-        elevation={0}
-        sx={{
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 1,
-          overflow: 'hidden',
-        }}
-      >
+      <Paper elevation={0} sx={{ ...softCardSx, overflow: 'hidden', bgcolor: 'background.paper' }}>
         {toolbar && (
           <Box sx={{
-            px: 2.5, pt: 2, pb: 1.75,
-            display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center',
+            px: 2.5,
+            pt: 2,
+            pb: 1.75,
+            display: 'flex',
+            gap: 1.5,
+            flexWrap: 'wrap',
+            alignItems: 'center',
             borderBottom: '1px solid',
             borderBottomColor: 'divider',
+            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.02),
           }}>
             {toolbar}
           </Box>
         )}
         {error}
-        <TableContainer sx={{ px: 1.5, pb: 1.5, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
-          <Table stickyHeader sx={{ borderCollapse: 'separate', borderSpacing: '0 2px', '& tbody tr:last-child td': { borderBottom: 0 } }}>
+        <TableContainer sx={{ px: 2, py: 1.5, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
+          <Table stickyHeader sx={{ borderCollapse: 'separate', borderSpacing: '0 6px', '& tbody tr:last-child td': { borderBottom: 0 } }}>
             {children}
           </Table>
         </TableContainer>
         {pager && (
-          <Box sx={{ borderTop: '1px solid', borderTopColor: 'divider' }}>
+          <Box sx={{ borderTop: '1px solid', borderTopColor: 'divider', bgcolor: (theme) => alpha(theme.palette.primary.main, 0.02) }}>
             {pager}
           </Box>
         )}
@@ -163,7 +196,12 @@ export function SearchField({ value, onChange, placeholder = 'Search...', sx }: 
               <SearchIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
             </InputAdornment>
           ),
-          sx: { borderRadius: 2, fontSize: 13.5 },
+          sx: {
+            borderRadius: 2,
+            fontSize: 13.5,
+            bgcolor: 'background.paper',
+            fontWeight: 500,
+          },
         },
       }}
     />
@@ -183,6 +221,7 @@ export function TablePager({ page, rowsPerPage, total, onPageChange }: TablePage
   const totalPages = Math.max(1, Math.ceil(total / rowsPerPage));
   const currentPage = page + 1;
   if (total === 0) return <></>;
+
   return (
     <Box
       className="TablePager-root"
@@ -190,52 +229,37 @@ export function TablePager({ page, rowsPerPage, total, onPageChange }: TablePage
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        px: 2,
-        py: 1.25,
+        px: 2.5,
+        py: 1.5,
       }}
     >
-      <Typography fontSize={13} color="text.secondary">
+      <Typography fontSize={13} fontWeight={600} color="text.secondary">
         Page {currentPage} of {totalPages}
+        <Box component="span" sx={{ ml: 1, color: 'text.disabled', fontWeight: 500 }}>
+          · {total} total
+        </Box>
       </Typography>
       <Box sx={{ display: 'flex', gap: 1 }}>
-        <Box
-          component="button"
+        <Button
+          size="small"
+          variant="outlined"
           disabled={page === 0}
           onClick={() => onPageChange(page - 1)}
-          sx={{
-            px: 1.75, py: 0.5,
-            fontSize: 13, fontWeight: 500,
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: '6px',
-            bgcolor: 'background.paper',
-            color: page === 0 ? 'text.disabled' : 'text.primary',
-            cursor: page === 0 ? 'not-allowed' : 'pointer',
-            '&:hover:not(:disabled)': { bgcolor: 'action.hover' },
-            transition: 'background 0.12s',
-          }}
+          startIcon={<ChevronLeftIcon sx={{ fontSize: 18 }} />}
+          sx={{ borderRadius: 2, fontWeight: 700, px: 1.5 }}
         >
           Previous
-        </Box>
-        <Box
-          component="button"
+        </Button>
+        <Button
+          size="small"
+          variant="outlined"
           disabled={currentPage >= totalPages}
           onClick={() => onPageChange(page + 1)}
-          sx={{
-            px: 1.75, py: 0.5,
-            fontSize: 13, fontWeight: 500,
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: '6px',
-            bgcolor: 'background.paper',
-            color: currentPage >= totalPages ? 'text.disabled' : 'text.primary',
-            cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
-            '&:hover:not(:disabled)': { bgcolor: 'action.hover' },
-            transition: 'background 0.12s',
-          }}
+          endIcon={<ChevronRightIcon sx={{ fontSize: 18 }} />}
+          sx={{ borderRadius: 2, fontWeight: 700, px: 1.5 }}
         >
           Next
-        </Box>
+        </Button>
       </Box>
     </Box>
   );

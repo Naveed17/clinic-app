@@ -14,7 +14,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
   Divider,
   FormControl,
   IconButton,
@@ -34,6 +33,10 @@ import { useState } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
 import type { LabOrder, LabOrderStatus } from '@/types/lab';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import {
+  ConfirmDialog, FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 import { LabReportPrint } from './LabReportPrint';
 
 const LAB_TESTS = [
@@ -66,6 +69,7 @@ export function LabPage(): React.JSX.Element {
   const [resultDialog, setResultDialog] = useState<LabOrder | null>(null);
   const [printOrder, setPrintOrder] = useState<LabOrder | null>(null);
   const [resultText, setResultText] = useState('');
+  const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
   const [form, setForm] = useState({ patientId: '', test: '', notes: '' });
 
   const { data: orders = [], isLoading, isError } = useQuery<LabOrder[]>({
@@ -124,7 +128,10 @@ export function LabPage(): React.JSX.Element {
   });
   const deleteReportMutation = useMutation({
     mutationFn: (id: string) => window.clinic.docs.lab.delete(id),
-    onSuccess: () => refetchReports(),
+    onSuccess: () => {
+      refetchReports();
+      setDeleteReportId(null);
+    },
   });
 
   const filtered = orders.filter((order) => {
@@ -271,9 +278,9 @@ export function LabPage(): React.JSX.Element {
       </TablePageShell>
 
       {/* New Order Dialog */}
-      <Dialog fullWidth maxWidth="xs" onClose={() => setDialogOpen(false)} open={dialogOpen}>
-        <DialogTitle>New Lab Order</DialogTitle>
-        <DialogContent>
+      <Dialog fullWidth maxWidth="xs" onClose={() => setDialogOpen(false)} open={dialogOpen} PaperProps={dialogPaperProps}>
+        <FormDialogTitle title="New Lab Order" subtitle="Create a lab test order for a patient." />
+        <DialogContent sx={dialogContentSx}>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <FormControl fullWidth>
               <InputLabel>Patient</InputLabel>
@@ -311,21 +318,22 @@ export function LabPage(): React.JSX.Element {
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+        <DialogActions sx={dialogActionsSx}>
+          <Button onClick={() => setDialogOpen(false)} sx={dialogCancelBtnSx}>Cancel</Button>
           <Button
             disabled={!form.patientId || !form.test || createMutation.isPending}
             onClick={() => createMutation.mutate()}
             variant="contained"
+            sx={dialogSubmitBtnSx}
           >
             Create order
           </Button>
         </DialogActions>
       </Dialog>
 
-      {Boolean(resultDialog) && <Dialog fullWidth maxWidth="sm" onClose={() => setResultDialog(null)} open={Boolean(resultDialog)}>
-        <DialogTitle>Add Result — {resultDialog?.test}</DialogTitle>
-        <DialogContent>
+      {Boolean(resultDialog) && <Dialog fullWidth maxWidth="sm" onClose={() => setResultDialog(null)} open={Boolean(resultDialog)} PaperProps={dialogPaperProps}>
+        <FormDialogTitle title={`Add Result — ${resultDialog?.test}`} subtitle={`Patient: ${resultDialog?.patientName}`} />
+        <DialogContent sx={dialogContentSx}>
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Typography variant="body2" color="text.secondary">
               Patient: <strong>{resultDialog?.patientName}</strong>
@@ -367,7 +375,7 @@ export function LabPage(): React.JSX.Element {
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Delete">
-                          <IconButton size="small" color="error" onClick={() => deleteReportMutation.mutate(r.id)}>
+                          <IconButton size="small" color="error" onClick={() => setDeleteReportId(r.id)}>
                             <DeleteOutlineIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -381,18 +389,28 @@ export function LabPage(): React.JSX.Element {
             )}
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setResultDialog(null)}>Cancel</Button>
+        <DialogActions sx={dialogActionsSx}>
+          <Button onClick={() => setResultDialog(null)} sx={dialogCancelBtnSx}>Cancel</Button>
           <Button
             color="success"
             disabled={!resultText || resultMutation.isPending}
             onClick={() => resultMutation.mutate({ id: resultDialog!.id, result: resultText })}
             variant="contained"
+            sx={dialogSubmitBtnSx}
           >
             Save and complete
           </Button>
         </DialogActions>
       </Dialog>}
+
+      <ConfirmDialog
+        open={Boolean(deleteReportId)}
+        title="Delete attachment?"
+        message="Remove this lab report file?"
+        loading={deleteReportMutation.isPending}
+        onClose={() => setDeleteReportId(null)}
+        onConfirm={() => deleteReportId && deleteReportMutation.mutate(deleteReportId)}
+      />
 
       {printOrder && <LabReportPrint order={printOrder} onClose={() => setPrintOrder(null)} />}
     </>

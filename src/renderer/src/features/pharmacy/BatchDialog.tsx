@@ -1,7 +1,11 @@
 import {
-  Autocomplete, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
+  Autocomplete, Box, Button, Dialog, DialogActions, DialogContent,
   Stack, TextField, Typography,
 } from '@mui/material';
+import {
+  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -50,9 +54,9 @@ export function BatchDialog({ onClose, defaultMedicineId }: Props): React.JSX.El
   const canSave = !!medicineId && batchNumber.trim() && !!expiryDate;
 
   return (
-    <Dialog open fullWidth maxWidth="sm" onClose={onClose}>
-      <DialogTitle>Add Batch</DialogTitle>
-      <DialogContent>
+    <Dialog open fullWidth maxWidth="sm" onClose={onClose} PaperProps={dialogPaperProps}>
+      <FormDialogTitle title="Add Batch" subtitle="Record a new stock batch with expiry and pricing." />
+      <DialogContent sx={dialogContentSx}>
         <Stack spacing={2} sx={{ mt: 0.5 }}>
           {error && <Typography color="error" variant="caption">{error}</Typography>}
           <Autocomplete
@@ -79,9 +83,9 @@ export function BatchDialog({ onClose, defaultMedicineId }: Props): React.JSX.El
           </Box>
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} color="inherit">Cancel</Button>
-        <Button variant="contained" disabled={!canSave || mutation.isPending} onClick={() => mutation.mutate()}>
+      <DialogActions sx={dialogActionsSx}>
+        <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
+        <Button variant="contained" disabled={!canSave || mutation.isPending} onClick={() => mutation.mutate()} sx={dialogSubmitBtnSx}>
           Add Batch
         </Button>
       </DialogActions>

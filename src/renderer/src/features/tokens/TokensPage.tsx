@@ -17,7 +17,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
   FormControl,
   IconButton,
   InputLabel,
@@ -39,6 +38,10 @@ import type { Token, TokenInput, TokenPerson, TokenStatus, PrescriptionInput, Pr
 import { useAuth } from '@/features/auth/AuthContext';
 import { appointmentsService } from '@/services/appointments.service';
 import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
+import {
+  ConfirmDialog, FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
   WAITING: { label: 'Waiting', color: 'warning' },
@@ -112,9 +115,9 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   });
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Issue Token</DialogTitle>
-      <DialogContent>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
+      <FormDialogTitle title="Issue Token" subtitle="Create a queue token for a patient visit." />
+      <DialogContent sx={dialogContentSx}>
         <Stack spacing={2} sx={{ mt: 1 }}>
           {mutation.isError && <Alert severity="error">Failed to issue token.</Alert>}
           <Autocomplete
@@ -153,10 +156,11 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
           />
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2.5 }}>
-        <Button onClick={onClose}>Cancel</Button>
+      <DialogActions sx={dialogActionsSx}>
+        <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
         <Button
           variant="contained"
+          sx={dialogSubmitBtnSx}
           disabled={!patientId || !doctorId || mutation.isPending}
           onClick={() => mutation.mutate()}
         >
@@ -258,14 +262,12 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
 
   return (
     <>
-      <Dialog open onClose={onClose} maxWidth="md" fullWidth>
-        <DialogTitle>
-          Prescription — Token #{String(token.tokenNumber).padStart(3, '0')}
-          <Typography variant="body2" color="text.secondary">
-            {token.patient.firstName} {token.patient.lastName} · Dr. {token.doctor.firstName} {token.doctor.lastName}
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
+      <Dialog open onClose={onClose} maxWidth="md" fullWidth PaperProps={dialogPaperProps}>
+        <FormDialogTitle
+          title={`Prescription — Token #${String(token.tokenNumber).padStart(3, '0')}`}
+          subtitle={`${token.patient.firstName} ${token.patient.lastName} · Dr. ${token.doctor.firstName} ${token.doctor.lastName}`}
+        />
+        <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
             <TextField label="Diagnosis" fullWidth value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} />
 
@@ -351,9 +353,9 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
             <TextField label="Advice / Notes" fullWidth multiline rows={2} value={advice} onChange={(e) => setAdvice(e.target.value)} />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button variant="contained" disabled={mutation.isPending} onClick={() => mutation.mutate()}>Save Prescription</Button>
+        <DialogActions sx={dialogActionsSx}>
+          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
+          <Button variant="contained" sx={dialogSubmitBtnSx} disabled={mutation.isPending} onClick={() => mutation.mutate()}>Save Prescription</Button>
         </DialogActions>
       </Dialog>
     </>
@@ -416,6 +418,7 @@ export function TokensPage(): React.JSX.Element {
   const [filterDoctor, setFilterDoctor] = useState('ALL');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [printToken, setPrintToken] = useState<Token | null>(null);
+  const [deleteToken, setDeleteToken] = useState<Token | null>(null);
 
   const { data: tokens = [], isLoading, isError } = useQuery<Token[]>({
     queryKey: ['tokens', date],
@@ -436,7 +439,10 @@ export function TokensPage(): React.JSX.Element {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => window.clinic.tokens.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tokens'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tokens'] });
+      setDeleteToken(null);
+    },
   });
 
   const roleFiltered = isDoctor ? tokens.filter((t) => t.doctorId === user?.id) : tokens;
@@ -772,7 +778,7 @@ export function TokensPage(): React.JSX.Element {
                               <IconButton
                                 size="small"
                                 color="error"
-                                onClick={() => deleteMutation.mutate(token.id)}
+                                onClick={() => setDeleteToken(token)}
                                 sx={{ borderRadius: 1 }}
                               >
                                 <DeleteOutlineIcon fontSize="small" />
@@ -905,6 +911,14 @@ export function TokensPage(): React.JSX.Element {
 
       <IssueTokenDialog open={dialogOpen} onClose={() => setDialogOpen(false)} date={date} />
       {printToken && <TokenPrintPreview token={printToken} onClose={() => setPrintToken(null)} />}
+      <ConfirmDialog
+        open={Boolean(deleteToken)}
+        title="Delete token?"
+        message={deleteToken ? `Delete token #${String(deleteToken.tokenNumber).padStart(3, '0')} for ${deleteToken.patient.firstName} ${deleteToken.patient.lastName}?` : ''}
+        loading={deleteMutation.isPending}
+        onClose={() => setDeleteToken(null)}
+        onConfirm={() => deleteToken && deleteMutation.mutate(deleteToken.id)}
+      />
     </>
   );
 }

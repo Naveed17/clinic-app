@@ -1,7 +1,11 @@
 import {
-  Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
+  Box, Button, Dialog, DialogActions, DialogContent,
   MenuItem, Stack, TextField, Typography,
 } from '@mui/material';
+import {
+  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -75,9 +79,12 @@ export function StockDialog({ medicine, onClose }: Props): React.JSX.Element {
   });
 
   return (
-    <Dialog open fullWidth maxWidth="sm" onClose={onClose}>
-      <DialogTitle>{isEdit ? 'Edit Medicine' : 'Add Medicine'}</DialogTitle>
-      <DialogContent sx={{ pt: 2 }}>
+    <Dialog open fullWidth maxWidth="sm" onClose={onClose} PaperProps={dialogPaperProps}>
+      <FormDialogTitle
+        title={isEdit ? 'Edit Medicine' : 'Add Medicine'}
+        subtitle={isEdit ? 'Update stock, pricing, and alert settings.' : 'Add a new medicine to inventory.'}
+      />
+      <DialogContent sx={dialogContentSx}>
         <Stack spacing={2} sx={{ mt: 0.5 }}>
           <Controller name="name" control={control} render={({ field }) => (
             <TextField {...field} label="Medicine Name" error={!!errors.name} helperText={errors.name?.message} fullWidth autoFocus />
@@ -119,12 +126,13 @@ export function StockDialog({ medicine, onClose }: Props): React.JSX.Element {
           )}
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} color="inherit">Cancel</Button>
+      <DialogActions sx={dialogActionsSx}>
+        <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
         <Button
           variant="contained"
           disabled={mutation.isPending}
           onClick={handleSubmit((d) => mutation.mutate(d))}
+          sx={dialogSubmitBtnSx}
         >
           {isEdit ? 'Save Changes' : 'Add Medicine'}
         </Button>

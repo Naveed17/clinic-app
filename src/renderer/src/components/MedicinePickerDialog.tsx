@@ -6,11 +6,14 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
   InputAdornment,
   Stack,
   TextField,
 } from '@mui/material';
+import {
+  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { Medicine } from '@/types/medicine';
@@ -44,9 +47,9 @@ export function MedicinePickerDialog({ open, onClose, onAdded }: Props) {
   }
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs">
-      <DialogTitle>Add New Medicine</DialogTitle>
-      <DialogContent>
+    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
+      <FormDialogTitle title="Add New Medicine" subtitle="Quick-add a medicine to the catalog." />
+      <DialogContent sx={dialogContentSx}>
         <Stack spacing={2} sx={{ mt: 0.5 }}>
           {error && <Alert severity="error">{error}</Alert>}
           <TextField
@@ -68,13 +71,14 @@ export function MedicinePickerDialog({ open, onClose, onAdded }: Props) {
           />
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2.5 }}>
-        <Button onClick={handleClose}>Cancel</Button>
+      <DialogActions sx={dialogActionsSx}>
+        <Button onClick={handleClose} sx={dialogCancelBtnSx}>Cancel</Button>
         <Button
           variant="contained"
           startIcon={<AddOutlinedIcon />}
           disabled={!name.trim() || mutation.isPending}
           onClick={() => mutation.mutate()}
+          sx={dialogSubmitBtnSx}
         >
           Add Medicine
         </Button>
@@ -96,9 +100,9 @@ export function MedicineUpdatePriceDialog({ medicine, onClose }: { medicine: Med
   });
 
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Update Price — {medicine.name}</DialogTitle>
-      <DialogContent>
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
+      <FormDialogTitle title={`Update Price — ${medicine.name}`} subtitle="Set the new sale price for this medicine." />
+      <DialogContent sx={dialogContentSx}>
         <Box sx={{ mt: 0.5 }}>
           <TextField
             label="New Price"
@@ -112,9 +116,9 @@ export function MedicineUpdatePriceDialog({ medicine, onClose }: { medicine: Med
           />
         </Box>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2.5 }}>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
+      <DialogActions sx={dialogActionsSx}>
+        <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
+        <Button variant="contained" disabled={mutation.isPending} onClick={() => mutation.mutate()} sx={dialogSubmitBtnSx}>
           Save
         </Button>
       </DialogActions>

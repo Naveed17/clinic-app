@@ -13,7 +13,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
   Divider,
   FormControl,
   FormControlLabel,
@@ -36,6 +35,10 @@ import { z } from 'zod';
 import { usersService } from '@/services/users.service';
 import type { User, UserInput, UserUpdateInput } from '@/types/user';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import {
+  ConfirmDialog, FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
 
 const roleLabels: Record<string, string> = {
@@ -163,10 +166,13 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
   const { errors } = form.formState;
 
   return (
-    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose}>
-      <DialogTitle>{isEditing ? 'Edit user' : 'Add user'}</DialogTitle>
+    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
+      <FormDialogTitle
+        title={isEditing ? 'Edit user' : 'Add user'}
+        subtitle={isEditing ? 'Update account role and access.' : 'Create a new staff account.'}
+      />
       <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
-        <DialogContent>
+        <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.25} sx={{ pt: 0.5 }}>
             {mutation.isError && <Alert severity="error">Unable to save the user. Please try again.</Alert>}
 
@@ -226,9 +232,9 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
             )}
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button disabled={mutation.isPending} type="submit" variant="contained">
+        <DialogActions sx={dialogActionsSx}>
+          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
+          <Button disabled={mutation.isPending} type="submit" variant="contained" sx={dialogSubmitBtnSx}>
             {isEditing ? 'Save changes' : 'Add user'}
           </Button>
         </DialogActions>
@@ -334,17 +340,15 @@ export function UsersPage(): React.JSX.Element {
         </TableBody>
       </TablePageShell>
       <UserDialog open={isDialogOpen} user={dialogUser} onClose={() => setDialogOpen(false)} />
-      <Dialog open={Boolean(deleteUser)} onClose={() => setDeleteUser(undefined)}>
-        <DialogTitle>Delete user?</DialogTitle>
-        <DialogContent>
-          <Typography>Delete {deleteUser?.firstName} {deleteUser?.lastName}? This action cannot be undone.</Typography>
-          {deleteMutation.isError && <Alert severity="error" sx={{ mt: 2 }}>Unable to delete this user. They may have linked records.</Alert>}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setDeleteUser(undefined)}>Cancel</Button>
-          <Button color="error" disabled={deleteMutation.isPending} onClick={() => deleteUser && deleteMutation.mutate(deleteUser.id)} variant="contained">Delete</Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={Boolean(deleteUser)}
+        title="Delete user?"
+        message={deleteUser ? `Delete ${deleteUser.firstName} ${deleteUser.lastName}?` : ''}
+        loading={deleteMutation.isPending}
+        error={deleteMutation.isError ? <Alert severity="error" sx={{ mt: 2 }}>Unable to delete this user. They may have linked records.</Alert> : undefined}
+        onClose={() => setDeleteUser(undefined)}
+        onConfirm={() => deleteUser && deleteMutation.mutate(deleteUser.id)}
+      />
     </>
   );
 }

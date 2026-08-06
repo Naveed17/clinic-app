@@ -1,7 +1,11 @@
 import {
-  Autocomplete, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
+  Autocomplete, Box, Button, Dialog, DialogActions, DialogContent,
   MenuItem, Stack, TextField, Typography,
 } from '@mui/material';
+import {
+  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { INVENTORY_QUERY_KEYS, MOVEMENT_TYPES } from './inventoryUtils';
@@ -48,9 +52,9 @@ export function MovementDialog({ onClose }: Props): React.JSX.Element {
   });
 
   return (
-    <Dialog open fullWidth maxWidth="sm" onClose={onClose}>
-      <DialogTitle>Record Stock Movement</DialogTitle>
-      <DialogContent>
+    <Dialog open fullWidth maxWidth="sm" onClose={onClose} PaperProps={dialogPaperProps}>
+      <FormDialogTitle title="Record Stock Movement" subtitle="Adjust, purchase, or deduct stock for a batch." />
+      <DialogContent sx={dialogContentSx}>
         <Stack spacing={2} sx={{ mt: 0.5 }}>
           {error && <Typography color="error" variant="caption">{error}</Typography>}
           <Autocomplete
@@ -79,9 +83,9 @@ export function MovementDialog({ onClose }: Props): React.JSX.Element {
           <TextField label="Reference (optional)" value={reference} onChange={(e) => setReference(e.target.value)} fullWidth />
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} color="inherit">Cancel</Button>
-        <Button variant="contained" disabled={!batchId || mutation.isPending} onClick={() => mutation.mutate()}>
+      <DialogActions sx={dialogActionsSx}>
+        <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
+        <Button variant="contained" disabled={!batchId || mutation.isPending} onClick={() => mutation.mutate()} sx={dialogSubmitBtnSx}>
           Record
         </Button>
       </DialogActions>

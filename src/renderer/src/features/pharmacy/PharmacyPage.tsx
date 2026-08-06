@@ -21,6 +21,7 @@ import {
 } from '@/components/TableUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { StockDialog, type InventoryMedicineRow } from './StockDialog';
+import { ConfirmDialog } from '@/components/DialogUI';
 import { BatchDialog } from './BatchDialog';
 import { SupplierDialog } from './SupplierDialog';
 import { PurchaseDialog } from './PurchaseDialog';
@@ -55,6 +56,7 @@ export function PharmacyPage(): React.JSX.Element {
   const rowsPerPage = 10;
 
   const [editMed, setEditMed] = useState<InventoryMedicineRow | null | undefined>(undefined);
+  const [deleteMed, setDeleteMed] = useState<InventoryMedicineRow | null>(null);
   const [batchOpen, setBatchOpen] = useState(false);
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
@@ -102,6 +104,7 @@ export function PharmacyPage(): React.JSX.Element {
       void qc.invalidateQueries({ queryKey: ['inventory-medicines'] });
       void qc.invalidateQueries({ queryKey: ['inventory-low-stock'] });
       void qc.invalidateQueries({ queryKey: ['medicines'] });
+      setDeleteMed(null);
     },
   });
 
@@ -274,7 +277,7 @@ export function PharmacyPage(): React.JSX.Element {
                               <IconButton
                                 size="small"
                                 sx={{ ...actionBtnSx, '&:hover': { color: 'error.main' } }}
-                                onClick={() => { if (window.confirm(`Delete "${med.name}"?`)) deleteMutation.mutate(med.id); }}
+                                onClick={() => setDeleteMed(med)}
                               >
                                 <DeleteOutlineIcon sx={{ fontSize: 17 }} />
                               </IconButton>
@@ -482,6 +485,14 @@ export function PharmacyPage(): React.JSX.Element {
       {canManage && purchaseOpen && <PurchaseDialog onClose={() => setPurchaseOpen(false)} />}
       {canManage && movementOpen && <MovementDialog onClose={() => setMovementOpen(false)} />}
       {canManage && categoryOpen && <CategoryDialog onClose={() => setCategoryOpen(false)} />}
+      <ConfirmDialog
+        open={Boolean(deleteMed)}
+        title="Delete medicine?"
+        message={deleteMed ? `Delete "${deleteMed.name}" from inventory?` : ''}
+        loading={deleteMutation.isPending}
+        onClose={() => setDeleteMed(null)}
+        onConfirm={() => deleteMed && deleteMutation.mutate(deleteMed.id)}
+      />
     </>
   );
 }

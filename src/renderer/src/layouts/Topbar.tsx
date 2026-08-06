@@ -17,7 +17,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
   Divider,
   IconButton,
   List,
@@ -43,6 +42,10 @@ import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
 import { getNavItems } from './navigation';
 import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
 import { GlobalSearchModal } from '@/components/GlobalSearchModal';
+import {
+  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 
 interface TopbarProps {
   onMenuClick: () => void;
@@ -314,9 +317,9 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
             </MenuItem>
           </Menu>
 
-          <Dialog open={pwDialogOpen} onClose={() => setPwDialogOpen(false)} maxWidth="xs" fullWidth>
-            <DialogTitle>Change Password</DialogTitle>
-            <DialogContent>
+          <Dialog open={pwDialogOpen} onClose={() => setPwDialogOpen(false)} maxWidth="xs" fullWidth PaperProps={dialogPaperProps}>
+            <FormDialogTitle title="Change Password" subtitle="Enter your current and new password." />
+            <DialogContent sx={dialogContentSx}>
               <Stack spacing={2} sx={{ mt: 1 }}>
                 {pwSuccess && <Alert severity="success">Password changed successfully!</Alert>}
                 {pwError && <Alert severity="error">{pwError}</Alert>}
@@ -325,9 +328,9 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
                 <TextField label="Confirm New Password" type="password" fullWidth value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} />
               </Stack>
             </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 2.5 }}>
-              <Button onClick={() => setPwDialogOpen(false)}>Cancel</Button>
-              <Button variant="contained" disabled={pwLoading} onClick={() => void handleChangePassword()}>Save</Button>
+            <DialogActions sx={dialogActionsSx}>
+              <Button onClick={() => setPwDialogOpen(false)} sx={dialogCancelBtnSx}>Cancel</Button>
+              <Button variant="contained" disabled={pwLoading} onClick={() => void handleChangePassword()} sx={dialogSubmitBtnSx}>Save</Button>
             </DialogActions>
           </Dialog>
           <Tooltip title="Logout">

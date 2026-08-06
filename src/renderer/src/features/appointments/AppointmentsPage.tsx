@@ -18,7 +18,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
   FormControlLabel,
   IconButton,
   MenuItem,
@@ -42,6 +41,10 @@ import { patientsService } from '@/services/patients.service';
 import type { Appointment, AppointmentInput, AppointmentPerson } from '@/types/appointment';
 import type { Token } from '@/types/token';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import {
+  ConfirmDialog, FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
@@ -241,10 +244,13 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   const { errors } = form.formState;
 
   return (
-    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose}>
-      <DialogTitle>{appointment ? 'Update appointment' : 'Create appointment'}</DialogTitle>
+    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
+      <FormDialogTitle
+        title={appointment ? 'Update appointment' : 'Create appointment'}
+        subtitle={appointment ? 'Edit schedule, doctor, and visit details.' : 'Book a new patient visit.'}
+      />
       <Box component="form" onSubmit={form.handleSubmit((v) => mutation.mutate(v))}>
-        <DialogContent>
+        <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.25}>
             {mutation.isError && <Alert severity="error">Unable to save the appointment.</Alert>}
 
@@ -405,9 +411,9 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
           </Stack>
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button disabled={mutation.isPending} type="submit" variant="contained">
+        <DialogActions sx={dialogActionsSx}>
+          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
+          <Button disabled={mutation.isPending} type="submit" variant="contained" sx={dialogSubmitBtnSx}>
             {appointment ? 'Save changes' : 'Create appointment'}
           </Button>
         </DialogActions>
@@ -428,6 +434,7 @@ export function AppointmentsPage(): React.JSX.Element {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
+  const [deleteTarget, setDeleteTarget] = useState<Appointment | undefined>();
   const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const cancelMutation = useMutation({
     mutationFn: appointmentsService.cancel,
@@ -435,7 +442,10 @@ export function AppointmentsPage(): React.JSX.Element {
   });
   const deleteMutation = useMutation({
     mutationFn: appointmentsService.delete,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['appointments'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setDeleteTarget(undefined);
+    },
   });
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
@@ -610,7 +620,7 @@ export function AppointmentsPage(): React.JSX.Element {
                         {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
                           <Tooltip title="Cancel"><IconButton sx={actionBtnSx} onClick={() => cancelMutation.mutate(a.id)}><CancelOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                         )}
-                        <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => deleteMutation.mutate(a.id)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                        <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => setDeleteTarget(a)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                       </Stack>
                     </TableCell>
                   )}
@@ -621,6 +631,14 @@ export function AppointmentsPage(): React.JSX.Element {
         </TablePageShell>
       )}
       <AppointmentDialog appointment={active} open={open} defaultDate={defaultDate} defaultProviderId={user?.role === 'doctor' ? user.id : undefined} onClose={() => setOpen(false)} />
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete appointment?"
+        message={deleteTarget ? `Delete appointment for ${deleteTarget.patient.firstName} ${deleteTarget.patient.lastName} on ${new Date(deleteTarget.startsAt).toLocaleString()}?` : ''}
+        loading={deleteMutation.isPending}
+        onClose={() => setDeleteTarget(undefined)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      />
     </Box>
   );
 }

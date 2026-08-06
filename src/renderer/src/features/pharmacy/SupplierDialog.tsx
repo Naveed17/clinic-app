@@ -1,6 +1,10 @@
 import {
-  Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Typography,
+  Button, Dialog, DialogActions, DialogContent, Stack, TextField, Typography,
 } from '@mui/material';
+import {
+  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { INVENTORY_QUERY_KEYS } from './inventoryUtils';
@@ -35,9 +39,9 @@ export function SupplierDialog({ onClose }: Props): React.JSX.Element {
   });
 
   return (
-    <Dialog open fullWidth maxWidth="sm" onClose={onClose}>
-      <DialogTitle>Add Supplier</DialogTitle>
-      <DialogContent>
+    <Dialog open fullWidth maxWidth="sm" onClose={onClose} PaperProps={dialogPaperProps}>
+      <FormDialogTitle title="Add Supplier" subtitle="Add a supplier for purchase orders." />
+      <DialogContent sx={dialogContentSx}>
         <Stack spacing={2} sx={{ mt: 0.5 }}>
           {error && <Typography color="error" variant="caption">{error}</Typography>}
           <TextField label="Supplier name" value={name} onChange={(e) => setName(e.target.value)} fullWidth autoFocus />
@@ -47,9 +51,9 @@ export function SupplierDialog({ onClose }: Props): React.JSX.Element {
           <TextField label="Address (optional)" value={address} onChange={(e) => setAddress(e.target.value)} fullWidth multiline minRows={2} />
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} color="inherit">Cancel</Button>
-        <Button variant="contained" disabled={!name.trim() || mutation.isPending} onClick={() => mutation.mutate()}>
+      <DialogActions sx={dialogActionsSx}>
+        <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
+        <Button variant="contained" disabled={!name.trim() || mutation.isPending} onClick={() => mutation.mutate()} sx={dialogSubmitBtnSx}>
           Add Supplier
         </Button>
       </DialogActions>

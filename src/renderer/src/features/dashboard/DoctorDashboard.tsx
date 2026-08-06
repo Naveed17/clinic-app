@@ -10,9 +10,13 @@ import FormatListBulletedOutlinedIcon from '@mui/icons-material/FormatListBullet
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import {
   alpha, Avatar, Box, Button, Chip, Dialog, DialogActions, DialogContent,
-  DialogTitle, Divider, IconButton, ListItemIcon, ListItemText,
+  Divider, IconButton, ListItemIcon, ListItemText,
   Menu, MenuItem, Paper, Stack, Tab, Tabs, Tooltip, Typography, useTheme,
 } from '@mui/material';
+import {
+  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -371,19 +375,16 @@ export function DoctorDashboard(): React.JSX.Element {
       {printToken && <TokenPrintPreview token={printToken} onClose={() => setPrintToken(null)} />}
 
       {/* No token warning */}
-      <Dialog open={Boolean(noTokenPatient)} onClose={() => setNoTokenPatient(null)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <WarningAmberOutlinedIcon color="warning" />
-          Token Not Found
-        </DialogTitle>
-        <DialogContent>
+      <Dialog open={Boolean(noTokenPatient)} onClose={() => setNoTokenPatient(null)} maxWidth="xs" fullWidth PaperProps={dialogPaperProps}>
+        <FormDialogTitle title="Token Not Found" subtitle="No token has been generated for this patient today." />
+        <DialogContent sx={dialogContentSx}>
           <Typography variant="body2">
             No token has been generated for <strong>{noTokenPatient?.patientName}</strong> today. You can issue one now or ask the receptionist.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setNoTokenPatient(null)}>Cancel</Button>
-          <Button variant="contained" onClick={() => { setIssueTokenPatientId(noTokenPatient?.patientId); setIssueTokenOpen(true); setNoTokenPatient(null); }}>
+        <DialogActions sx={dialogActionsSx}>
+          <Button onClick={() => setNoTokenPatient(null)} sx={dialogCancelBtnSx}>Cancel</Button>
+          <Button variant="contained" onClick={() => { setIssueTokenPatientId(noTokenPatient?.patientId); setIssueTokenOpen(true); setNoTokenPatient(null); }} sx={dialogSubmitBtnSx}>
             Issue Token
           </Button>
         </DialogActions>

@@ -1,8 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
+  Alert, Box, Button, Dialog, DialogActions, DialogContent,
   MenuItem, Stack, TextField, Typography,
 } from '@mui/material';
+import {
+  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -100,10 +104,13 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
   const { errors } = form.formState;
 
   return (
-    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={{ sx: { borderRadius: 1 } }}>
-      <DialogTitle>{isEditing ? 'Edit patient' : 'Add patient'}</DialogTitle>
+    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
+      <FormDialogTitle
+        title={isEditing ? 'Edit patient' : 'Add patient'}
+        subtitle={isEditing ? 'Update patient details and medical info.' : 'Register a new patient in the clinic.'}
+      />
       <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
-        <DialogContent>
+        <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.25} sx={{ pt: 0.5 }}>
             {mutation.isError && <Alert severity="error">Unable to save the patient. Please try again.</Alert>}
             <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
@@ -148,9 +155,9 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
             </Box>
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button disabled={mutation.isPending} type="submit" variant="contained">
+        <DialogActions sx={dialogActionsSx}>
+          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
+          <Button disabled={mutation.isPending} type="submit" variant="contained" sx={dialogSubmitBtnSx}>
             {isEditing ? 'Save changes' : 'Add patient'}
           </Button>
         </DialogActions>

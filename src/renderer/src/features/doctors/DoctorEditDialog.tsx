@@ -3,9 +3,13 @@ import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent,
-  DialogTitle, Divider, FormControlLabel, IconButton, InputAdornment,
+  Divider, FormControlLabel, IconButton, InputAdornment,
   Stack, Switch, TextField, Typography,
 } from '@mui/material';
+import {
+  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -87,17 +91,17 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
 
   if (!doctor && open) {
     return (
-      <Dialog open={open} onClose={onClose}>
+      <Dialog open={open} onClose={onClose} PaperProps={dialogPaperProps}>
         <DialogContent><Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box></DialogContent>
       </Dialog>
     );
   }
 
   return (
-    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose}>
-      <DialogTitle>Edit doctor</DialogTitle>
+    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
+      <FormDialogTitle title="Edit Doctor" subtitle="Update account details and doctor profile." />
       <Box component="form" onSubmit={form.handleSubmit((v) => mutation.mutate(v))}>
-        <DialogContent>
+        <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.25} sx={{ pt: 0.5 }}>
             {mutation.isError && <Alert severity="error">Unable to save. Please try again.</Alert>}
             <Typography variant="subtitle2" color="text.secondary">Account</Typography>
@@ -126,9 +130,9 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
             <TextField fullWidth label="Bio" multiline minRows={2} {...form.register('bio')} />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button disabled={mutation.isPending} type="submit" variant="contained">Save changes</Button>
+        <DialogActions sx={dialogActionsSx}>
+          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
+          <Button disabled={mutation.isPending} type="submit" variant="contained" sx={dialogSubmitBtnSx}>Save changes</Button>
         </DialogActions>
       </Box>
     </Dialog>

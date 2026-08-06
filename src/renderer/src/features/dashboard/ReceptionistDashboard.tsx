@@ -7,9 +7,13 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
   Alert, Autocomplete, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent,
-  DialogTitle, Divider, FormControl, IconButton, InputLabel, MenuItem, Paper, Select,
+  Divider, FormControl, IconButton, InputLabel, MenuItem, Paper, Select,
   Step, StepLabel, Stepper, Stack, TextField, Typography, Chip, Avatar,
 } from '@mui/material';
+import {
+  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
 import { alpha, darken, useTheme } from '@mui/material/styles';
@@ -193,14 +197,9 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   }
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
-      <DialogTitle>
-        <Stack direction="row" alignItems="center" gap={1}>
-          <ConfirmationNumberOutlinedIcon color="primary" />
-          Walk-in Registration
-        </Stack>
-      </DialogTitle>
-      <DialogContent>
+    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
+      <FormDialogTitle title="Walk-in Registration" subtitle="Register a patient and issue a token." />
+      <DialogContent sx={dialogContentSx}>
         <Stepper activeStep={step} sx={{ mb: 3 }}>
           {STEPS.map((label) => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}
         </Stepper>
@@ -288,25 +287,25 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
         )}
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 2.5 }}>
-        <Button onClick={handleClose}>Close</Button>
+      <DialogActions sx={dialogActionsSx}>
+        <Button onClick={handleClose} sx={dialogCancelBtnSx}>Close</Button>
         {step === 0 && !useExisting && (
-          <Button variant="contained" form="patient-form" type="submit" disabled={createPatientMutation.isPending}>
+          <Button variant="contained" form="patient-form" type="submit" disabled={createPatientMutation.isPending} sx={dialogSubmitBtnSx}>
             Next
           </Button>
         )}
         {step === 0 && useExisting && (
-          <Button variant="contained" disabled={!patientId} onClick={() => setStep(1)}>
+          <Button variant="contained" disabled={!patientId} onClick={() => setStep(1)} sx={dialogSubmitBtnSx}>
             Next
           </Button>
         )}
         {step === 1 && (
-          <Button variant="contained" disabled={!doctorId || tokenMutation.isPending} onClick={() => tokenMutation.mutate()}>
+          <Button variant="contained" disabled={!doctorId || tokenMutation.isPending} onClick={() => tokenMutation.mutate()} sx={dialogSubmitBtnSx}>
             Issue Token & Print
           </Button>
         )}
         {step === 2 && (
-          <Button variant="outlined" startIcon={<PrintOutlinedIcon />} onClick={() => createdToken && printTokenSlip(createdToken)}>
+          <Button variant="outlined" startIcon={<PrintOutlinedIcon />} onClick={() => createdToken && printTokenSlip(createdToken)} sx={dialogCancelBtnSx}>
             Reprint
           </Button>
         )}
@@ -394,14 +393,9 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
   const canSubmitAppt = !!patientId && !!providerId && !!date && !!time;
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
-      <DialogTitle>
-        <Stack direction="row" alignItems="center" gap={1}>
-          <CalendarMonthOutlinedIcon color="primary" />
-          Book Appointment
-        </Stack>
-      </DialogTitle>
-      <DialogContent>
+    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
+      <FormDialogTitle title="Book Appointment" subtitle="Add a patient and schedule an appointment." />
+      <DialogContent sx={dialogContentSx}>
         <Stepper activeStep={done ? 2 : step} sx={{ mb: 3 }}>
           {APPT_STEPS.map((label) => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}
         </Stepper>
@@ -516,20 +510,20 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
         )}
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 2.5 }}>
-        <Button onClick={handleClose}>{done ? 'Done' : 'Close'}</Button>
+      <DialogActions sx={dialogActionsSx}>
+        <Button onClick={handleClose} sx={dialogCancelBtnSx}>{done ? 'Done' : 'Close'}</Button>
         {step === 0 && !done && !useExisting && (
-          <Button variant="contained" form="book-patient-form" type="submit" disabled={createPatientMutation.isPending}>
+          <Button variant="contained" form="book-patient-form" type="submit" disabled={createPatientMutation.isPending} sx={dialogSubmitBtnSx}>
             Next
           </Button>
         )}
         {step === 0 && !done && useExisting && (
-          <Button variant="contained" disabled={!patientId} onClick={() => setStep(1)}>
+          <Button variant="contained" disabled={!patientId} onClick={() => setStep(1)} sx={dialogSubmitBtnSx}>
             Next
           </Button>
         )}
         {step === 1 && !done && (
-          <Button variant="contained" disabled={!canSubmitAppt || appointmentMutation.isPending} onClick={() => appointmentMutation.mutate()}>
+          <Button variant="contained" disabled={!canSubmitAppt || appointmentMutation.isPending} onClick={() => appointmentMutation.mutate()} sx={dialogSubmitBtnSx}>
             Book Appointment
           </Button>
         )}
@@ -969,7 +963,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
                 color: theme.palette.common.white,
               }}
             >
-              <Typography fontWeight={700} fontSize={13} sx={{ color: alpha(theme.palette.common.white, 0.7), mb: 2 }}>
+              <Typography fontWeight={700} fontSize={theme.typography.h5.fontSize} sx={{ color: alpha(theme.palette.common.white, 0.7), mb: 2 }}>
                 Today&apos;s status
               </Typography>
               <Stack direction="row" spacing={1}>

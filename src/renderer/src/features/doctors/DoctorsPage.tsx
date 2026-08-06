@@ -13,7 +13,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
   Divider,
   FormControlLabel,
   IconButton,
@@ -33,6 +32,10 @@ import { doctorsService } from '@/services/doctors.service';
 import { useAuth } from '@/features/auth/AuthContext';
 import type { Doctor, DoctorInput, DoctorUpdateInput } from '@/types/doctor';
 import { tableSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import {
+  ConfirmDialog, FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps, dialogSubmitBtnSx,
+} from '@/components/DialogUI';
 
 const baseSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.'),
@@ -133,10 +136,13 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
   const { errors } = form.formState;
 
   return (
-    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose}>
-      <DialogTitle>{isEditing ? 'Edit doctor' : 'Add doctor'}</DialogTitle>
+    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
+      <FormDialogTitle
+        title={isEditing ? 'Edit doctor' : 'Add doctor'}
+        subtitle={isEditing ? 'Update doctor profile and account.' : 'Register a new doctor account.'}
+      />
       <Box component="form" onSubmit={form.handleSubmit(handleSubmit)}>
-        <DialogContent>
+        <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.25} sx={{ pt: 0.5 }}>
             {mutation.isError && <Alert severity="error">Unable to save. Please try again.</Alert>}
 
@@ -179,9 +185,9 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
             <TextField fullWidth label="Bio" multiline minRows={2} {...form.register('bio')} />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button disabled={mutation.isPending} type="submit" variant="contained">
+        <DialogActions sx={dialogActionsSx}>
+          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
+          <Button disabled={mutation.isPending} type="submit" variant="contained" sx={dialogSubmitBtnSx}>
             {isEditing ? 'Save changes' : 'Add doctor'}
           </Button>
         </DialogActions>
@@ -291,17 +297,15 @@ export function DoctorsPage(): React.JSX.Element {
         </TableBody>
       </TablePageShell>
       <DoctorDialog open={isDialogOpen} doctor={dialogDoctor} onClose={() => setDialogOpen(false)} />
-      <Dialog open={Boolean(deleteDoctor)} onClose={() => setDeleteDoctor(undefined)}>
-        <DialogTitle>Delete doctor?</DialogTitle>
-        <DialogContent>
-          <Typography>Delete Dr. {deleteDoctor?.firstName} {deleteDoctor?.lastName}? This action cannot be undone.</Typography>
-          {deleteMutation.isError && <Alert severity="error" sx={{ mt: 2 }}>Unable to delete. This doctor may have linked appointments.</Alert>}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setDeleteDoctor(undefined)}>Cancel</Button>
-          <Button color="error" disabled={deleteMutation.isPending} onClick={() => deleteDoctor && deleteMutation.mutate(deleteDoctor.id)} variant="contained">Delete</Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={Boolean(deleteDoctor)}
+        title="Delete doctor?"
+        message={deleteDoctor ? `Delete Dr. ${deleteDoctor.firstName} ${deleteDoctor.lastName}?` : ''}
+        loading={deleteMutation.isPending}
+        error={deleteMutation.isError ? <Alert severity="error" sx={{ mt: 2 }}>Unable to delete. This doctor may have linked appointments.</Alert> : undefined}
+        onClose={() => setDeleteDoctor(undefined)}
+        onConfirm={() => deleteDoctor && deleteMutation.mutate(deleteDoctor.id)}
+      />
     </>
   );
 }

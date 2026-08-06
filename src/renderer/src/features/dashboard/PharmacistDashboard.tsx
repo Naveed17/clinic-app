@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/AuthContext';
 import { StockDialog, type InventoryMedicineRow } from '@/features/pharmacy/StockDialog';
 import { tableSx, chipSx, actionBtnSx } from '@/components/TableUI';
+import { ConfirmDialog } from '@/components/DialogUI';
 
 const money = (n: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(n)}`;
 
@@ -42,6 +43,7 @@ export function PharmacistDashboard(): React.JSX.Element {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [editMed, setEditMed] = useState<InventoryMedicineRow | null | undefined>(undefined);
+  const [deleteMed, setDeleteMed] = useState<InventoryMedicineRow | null>(null);
 
   const { data: rawMedicines = [], isLoading } = useQuery<InventoryMedicine[]>({
     queryKey: ['inventory-medicines'],
@@ -68,6 +70,7 @@ export function PharmacistDashboard(): React.JSX.Element {
       void qc.invalidateQueries({ queryKey: ['inventory-medicines'] });
       void qc.invalidateQueries({ queryKey: ['inventory-low-stock'] });
       void qc.invalidateQueries({ queryKey: ['medicines'] });
+      setDeleteMed(null);
     },
   });
 
@@ -166,7 +169,7 @@ export function PharmacistDashboard(): React.JSX.Element {
                                 <IconButton
                                   size="small"
                                   sx={{ ...actionBtnSx, '&:hover': { color: 'error.main' } }}
-                                  onClick={() => { if (window.confirm(`Delete "${med.name}"?`)) deleteMutation.mutate(med.id); }}
+                                  onClick={() => setDeleteMed(med)}
                                 >
                                   <DeleteOutlineIcon sx={{ fontSize: 17 }} />
                                 </IconButton>
@@ -228,6 +231,14 @@ export function PharmacistDashboard(): React.JSX.Element {
       {editMed !== undefined && (
         <StockDialog medicine={editMed} onClose={() => setEditMed(undefined)} />
       )}
+      <ConfirmDialog
+        open={Boolean(deleteMed)}
+        title="Delete medicine?"
+        message={deleteMed ? `Delete "${deleteMed.name}" from inventory?` : ''}
+        loading={deleteMutation.isPending}
+        onClose={() => setDeleteMed(null)}
+        onConfirm={() => deleteMed && deleteMutation.mutate(deleteMed.id)}
+      />
     </>
   );
 }
