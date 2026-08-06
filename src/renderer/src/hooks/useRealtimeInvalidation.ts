@@ -8,7 +8,14 @@ const ENTITY_QUERY_MAP: Record<string, string[]> = {
   doctor: ['doctors'],
   invoice: ['invoices'],
   token: ['tokens'],
-  lab: ['lab'],
+  prescription: ['prescription-feed', 'tokens'],
+  lab: ['lab-orders', 'lab-patients', 'lab-orders-token'],
+  medicine: ['inventory-medicines', 'inventory-low-stock'],
+  'inventory-batch': ['inventory-batches', 'inventory-low-stock', 'inventory-medicines'],
+  'inventory-category': ['inventory-categories'],
+  supplier: ['inventory-suppliers'],
+  'purchase-order': ['inventory-purchases', 'inventory-batches', 'inventory-medicines'],
+  'stock-movement': ['inventory-movements', 'inventory-batches', 'inventory-medicines'],
 };
 
 export function useRealtimeInvalidation(): void {

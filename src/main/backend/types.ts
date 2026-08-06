@@ -10,12 +10,3 @@ export interface RealtimeNotification {
   createdAt: string;
   payload?: Record<string, unknown>;
 }
-
-export interface ChatMessage {
-  id: string;
-  roomId: string;
-  sender: string;
-  role: string;
-  message: string;
-  createdAt: string;
-}

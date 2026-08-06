@@ -46,7 +46,8 @@ export function initAutoUpdater(): void {
   ipcMain.handle('app:get-version', () => app.getVersion());
 
   ipcMain.handle('app:install-update', () => {
-    autoUpdater.quitAndInstall();
+    // Show installer UI (not silent) so failures are visible; run app after install.
+    autoUpdater.quitAndInstall(false, true);
   });
 
   ipcMain.handle('app:check-for-updates', async () => {

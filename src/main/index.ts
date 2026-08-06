@@ -93,23 +93,6 @@ function stopLanRetry(): void {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-ipcMain.handle('print:html', async (_e, html: string) => {
-  const { writeFileSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
-  const pdfFile = join(tmpdir(), `clinic-print-${Date.now()}.pdf`);
-  const win = new BrowserWindow({
-    show: false,
-    webPreferences: { nodeIntegration: false, contextIsolation: true },
-  });
-  const tmpHtml = join(tmpdir(), `clinic-print-${Date.now()}.html`);
-  writeFileSync(tmpHtml, html, 'utf-8');
-  await win.loadFile(tmpHtml);
-  const pdfData = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });
-  win.close();
-  writeFileSync(pdfFile, pdfData);
-  await shell.openPath(pdfFile);
-});
-
 function createWindow(): void {
   const iconPath = is.dev
     ? join(__dirname, '../../src/main/assets/icons/icon.png')
@@ -147,6 +130,11 @@ function createWindow(): void {
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.careflow.app');
   app.setPath('userData', join(app.getPath('appData'), 'CareFlow'));
+
+  if (app.isPackaged && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'clinic-secret-key')) {
+    console.warn('[CareFlow] JWT_SECRET is not set — using insecure default. Set JWT_SECRET before production deploy.');
+  }
+
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window));
   try {
     const settings = getSettings();

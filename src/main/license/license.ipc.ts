@@ -154,10 +154,4 @@ export function registerLicenseIpc(): void {
       return { ok: false, error: 'Cannot connect to server. Check your internet connection.' };
     }
   });
-
-  ipcMain.handle('license:info', () => {
-    const key = getSavedKey();
-    if (!key) return null;
-    return getLicenseCache(key);
-  });
 }

@@ -123,9 +123,8 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
     },
   });
   const handleSubmit = (values: FormValues) => {
-    console.log(values);
-    mutation.mutate(values)
-  }
+    mutation.mutate(values);
+  };
 
   useEffect(() => {
     if (open) { form.reset(toFormValues(doctor)); setShowPw(false); }
@@ -136,7 +135,7 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
   return (
     <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose}>
       <DialogTitle>{isEditing ? 'Edit doctor' : 'Add doctor'}</DialogTitle>
-      <Box component="form" onSubmit={form.handleSubmit((v) => { console.log(v); mutation.mutate(v) })}>
+      <Box component="form" onSubmit={form.handleSubmit(handleSubmit)}>
         <DialogContent>
           <Stack spacing={2.25} sx={{ pt: 0.5 }}>
             {mutation.isError && <Alert severity="error">Unable to save. Please try again.</Alert>}

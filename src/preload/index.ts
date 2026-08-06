@@ -187,23 +187,9 @@ const api = {
         () => request(`/api/invoices/${invoiceId}/payments`),
         'invoices:payments', invoiceId,
       ),
-    print: () => {
-      if (isLanClient) { window.print(); return Promise.resolve(true); }
-      return ipc('invoices:print');
-    },
   },
   reports: {
     summary: () => call(() => request('/api/reports/summary'), 'reports:summary'),
-    detailed: (from: string, to: string) =>
-      call(
-        () => request(`/api/reports/detailed?from=${from}&to=${to}`),
-        'reports:detailed', from, to,
-      ),
-    doctorRevenue: (from: string, to: string) =>
-      call(
-        () => request(`/api/reports/doctor-revenue?from=${from}&to=${to}`),
-        'reports:doctor-revenue', from, to,
-      ),
   },
   users: {
     list: (input: unknown) => ipc('users:list', input),
@@ -362,25 +348,6 @@ const api = {
         active?.off('notification:new', handler);
       };
     },
-    onChatMessage: (handler: (message: unknown) => void) => {
-      let active: Socket | undefined;
-      let cancelled = false;
-      void ensureSocket().then((s) => {
-        if (cancelled) return;
-        active = s;
-        s.on('chat:message', handler);
-      });
-      return () => {
-        cancelled = true;
-        active?.off('chat:message', handler);
-      };
-    },
-    sendChatMessage: async (message: unknown) => {
-      const activeSocket = await ensureSocket();
-      if (!activeSocket.connected) activeSocket.connect();
-      activeSocket.emit('chat:message', message);
-      return true;
-    },
   },
   schedule: {
     get: (doctorId: string) =>
@@ -399,7 +366,6 @@ const api = {
     save: (patch: unknown) => ipc('settings:save', patch),
     relaunch: () => ipc('settings:relaunch'),
     lanIp: () => ipc('settings:lan-ip'),
-    discoveredServers: () => ipc('settings:discovered-servers'),
     testConnection: (url: string) => ipc('settings:test-connection', url),
     scan: () => ipc('settings:scan'),
     onServerFound: (handler: (server: unknown) => void) => {
@@ -416,14 +382,10 @@ const api = {
       return () => ipcRenderer.removeListener('lan:server-reconnected', listener);
     },
   },
-  print: {
-    html: (html: string) => ipc('print:html', html),
-  },
   license: {
     status: () => ipc('license:status'),
     activate: (key: string) => ipc('license:activate', key),
     modules: () => ipc<Record<string, boolean>>('license:modules'),
-    info: () => ipc<{ key: string; expiresAt: string | null; activatedAt: string; updatedAt: string } | null>('license:info'),
   },
   medicines: {
     search: (query: string) =>

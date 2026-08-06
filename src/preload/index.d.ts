@@ -110,12 +110,9 @@ declare global {
         addPayment: (invoiceId: string, amount: number, method: string, reference?: string) => Promise<unknown>;
         void: (id: string) => Promise<unknown>;
         payments: (invoiceId: string) => Promise<unknown>;
-        print: () => Promise<unknown>;
       };
       reports: {
         summary: () => Promise<unknown>;
-        detailed: (from: string, to: string) => Promise<unknown>;
-        doctorRevenue: (from: string, to: string) => Promise<unknown>;
       };
       users: {
         list: (input: unknown) => Promise<unknown>;
@@ -179,8 +176,6 @@ declare global {
         disconnect: () => void;
         onDataChanged: (handler: (e: { entity: string; action: string }) => void) => () => void;
         onNotification: (handler: (notification: unknown) => void) => () => void;
-        onChatMessage: (handler: (message: unknown) => void) => () => void;
-        sendChatMessage: (message: unknown) => Promise<boolean>;
       };
       settings: {
         get: () => Promise<{
@@ -199,7 +194,6 @@ declare global {
         }>;
         relaunch: () => Promise<void>;
         lanIp: () => Promise<string>;
-        discoveredServers: () => Promise<{ ip: string; port: number; name: string }[]>;
         testConnection: (url: string) => Promise<boolean>;
         scan: () => Promise<{ ip: string; port: number; name: string }[]>;
         onServerFound: (handler: (server: { ip: string; port: number; name: string }) => void) => () => void;
@@ -212,14 +206,10 @@ declare global {
         ) => Promise<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | { blocked: true; error?: string } | null>;
         changePassword: (userId: string, current: string, next: string) => Promise<{ ok: boolean; error?: string }>;
       };
-      print: {
-        html: (html: string) => Promise<void>;
-      };
       license: {
         status: () => Promise<boolean>;
         activate: (key: string) => Promise<{ ok: boolean; error?: string }>;
         modules: () => Promise<Record<string, boolean> | null>;
-        info: () => Promise<{ key: string; expiresAt: string | null; activatedAt: string; updatedAt: string } | null>;
       };
       medicines: {
         search: (query: string) => Promise<unknown>;

@@ -54,6 +54,16 @@
       "icon": "src/main/assets/icons/icon.ico",
       "artifactName": "CareFlow-Setup.${ext}"
     },
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "shortcutName": "CareFlow"
+    },
     "mac": {
       "icon": "src/main/assets/icons/icon.icns"
     },

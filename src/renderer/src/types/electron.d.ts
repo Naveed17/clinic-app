@@ -97,7 +97,6 @@ declare global {
         status: () => Promise<boolean>;
         activate: (key: string) => Promise<{ ok: boolean; error?: string }>;
         modules: () => Promise<Record<string, boolean> | null>;
-        info: () => Promise<{ key: string; expiresAt: string | null; activatedAt: string; updatedAt: string } | null>;
       };
       patients: {
         list: (input: PatientListInput) => Promise<{ data: Patient[]; total: number }>;
@@ -132,19 +131,14 @@ declare global {
         addPayment: (invoiceId: string, amount: number, method: string, reference?: string) => Promise<Invoice>;
         void: (id: string) => Promise<Invoice>;
         payments: (invoiceId: string) => Promise<import('./invoice').Payment[]>;
-        print: () => Promise<boolean>;
       };
       reports: {
         summary: () => Promise<ReportSummary>;
-        detailed: (from: string, to: string) => Promise<{ date: string; patients: number; appointments: number; revenue: number; invoices: number }[]>;
-        doctorRevenue: (from: string, to: string) => Promise<{ doctorId: string; doctorName: string; appointments: number; revenue: number }[]>;
       };
       realtime: {
         connect: () => Promise<void>;
         disconnect: () => void;
         onNotification: (handler: (notification: unknown) => void) => () => void;
-        onChatMessage: (handler: (message: unknown) => void) => () => void;
-        sendChatMessage: (message: unknown) => Promise<boolean>;
       };
       users: {
         list: (input: unknown) => Promise<unknown>;
@@ -169,7 +163,6 @@ declare global {
         save: (patch: unknown) => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean }>;
         relaunch: () => Promise<void>;
         lanIp: () => Promise<string>;
-        discoveredServers: () => Promise<{ ip: string; port: number; name: string }[]>;
         testConnection: (url: string) => Promise<boolean>;
         scan: () => Promise<{ ip: string; port: number; name: string }[]>;
         onServerFound: (handler: (server: { ip: string; port: number; name: string }) => void) => () => void;
@@ -201,9 +194,6 @@ declare global {
         create: (input: { patientId: string; orderedById: string; test: string; tokenId?: string; notes?: string }) => Promise<LabOrder>;
         updateStatus: (id: string, status: string) => Promise<LabOrder>;
         saveResult: (id: string, result: string) => Promise<LabOrder>;
-      };
-      print: {
-        html: (html: string) => Promise<void>;
       };
       // ── New Inventory API Bridge Definitions ──────────────────────────────
       inventory: {

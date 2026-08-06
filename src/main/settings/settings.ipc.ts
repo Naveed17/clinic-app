@@ -30,7 +30,6 @@ export function registerSettingsIpc(): void {
     app.exit(0);
   });
   ipcMain.handle('settings:lan-ip', () => getLanIp());
-  ipcMain.handle('settings:discovered-servers', () => Array.from(discoveredServers.values()));
   ipcMain.handle('settings:scan', () => {
     discoveredServers.clear();
     sendProbe();

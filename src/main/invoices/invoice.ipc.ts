@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain } from 'electron';
+import { ipcMain } from 'electron';
 import { createInvoice, invoicePatients, listInvoices, addPayment, voidInvoice, getPayments } from './invoice.service';
 
 export function registerInvoiceIpc(): void {
@@ -13,7 +13,4 @@ export function registerInvoiceIpc(): void {
   );
   ipcMain.handle('invoices:void', (_, id: string) => voidInvoice(id));
   ipcMain.handle('invoices:payments', (_, invoiceId: string) => getPayments(invoiceId));
-  ipcMain.handle('invoices:print', () =>
-    BrowserWindow.getFocusedWindow()?.webContents.print({ printBackground: true }),
-  );
 }

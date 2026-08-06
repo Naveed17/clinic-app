@@ -101,7 +101,6 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
   const activeIndex = navItems.findIndex((item) => item.path === location.pathname);
 
   useEffect(() => {
-    void realtimeService.connect();
     const unsubscribe = realtimeService.onNotification((n: RealtimeNotification) => {
       setNotificationCount((c) => c + 1);
       setNotifications((prev) => [n, ...prev].slice(0, 50));

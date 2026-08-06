@@ -17,5 +17,5 @@ export async function seedDefaultAdmin(): Promise<void> {
       updatedAt: new Date(),
     },
   });
-  console.log('[seed] Default admin created: admin@clinic.com / admin123');
+  console.warn('[seed] Default admin account created. Change the password after first login.');
 }
