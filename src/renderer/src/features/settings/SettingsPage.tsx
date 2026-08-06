@@ -130,18 +130,28 @@ export function SettingsPage(): React.JSX.Element {
 
   async function handleBackup() {
     setBackupLoading(true); setBackupStatus(null);
-    const result = await window.clinic?.backup.create();
+    const result = await window.clinic?.backup.create() as { ok?: boolean; canceled?: boolean; path?: string; mode?: string; error?: string } | undefined;
     setBackupLoading(false);
     if (result?.canceled) return;
-    setBackupStatus(result?.ok ? { type: 'success', msg: `Backup saved to: ${result.path ?? ''}` } : { type: 'error', msg: result?.error ?? 'Backup failed.' });
+    if (result?.ok) {
+      const extra = result.mode === 'full' ? ' (database + documents)' : result.mode === 'db' ? ' (database only)' : '';
+      setBackupStatus({ type: 'success', msg: `Backup saved${extra}: ${result.path ?? ''}` });
+    } else {
+      setBackupStatus({ type: 'error', msg: result?.error ?? 'Backup failed.' });
+    }
   }
 
   async function handleRestore() {
     setRestoreLoading(true); setBackupStatus(null);
-    const result = await window.clinic?.backup.restore();
+    const result = await window.clinic?.backup.restore() as { ok?: boolean; canceled?: boolean; mode?: string; error?: string } | undefined;
     setRestoreLoading(false);
     if (result?.canceled) return;
-    setBackupStatus(result?.ok ? { type: 'success', msg: 'Restore successful! Please restart the app.' } : { type: 'error', msg: result?.error ?? 'Restore failed.' });
+    if (result?.ok) {
+      const extra = result.mode === 'full' ? ' Database and documents restored.' : ' Database restored.';
+      setBackupStatus({ type: 'success', msg: `Restore successful!${extra} Please restart the app.` });
+    } else {
+      setBackupStatus({ type: 'error', msg: result?.error ?? 'Restore failed.' });
+    }
   }
 
   // Update Check & Download Handlers
@@ -406,7 +416,9 @@ export function SettingsPage(): React.JSX.Element {
             <Divider sx={{ mb: 2, mt: 2 }} />
 
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>Backup & Restore</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Save a copy of the database or restore from a previous backup.</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Full backup (.zip) includes the database plus patient/lab documents so images and PDFs work after restore on another PC. Legacy .db-only backups are still supported.
+            </Typography>
             <Stack direction="row" gap={1.5} flexWrap="wrap">
               <Button variant="outlined" size="small" startIcon={backupLoading ? <CircularProgress size={14} /> : <BackupOutlinedIcon />} disabled={backupLoading} onClick={() => void handleBackup()}>
                 Create Backup

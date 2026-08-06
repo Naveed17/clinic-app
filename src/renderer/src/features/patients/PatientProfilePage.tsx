@@ -39,31 +39,46 @@ const apptStatusColor: Record<string, 'default' | 'primary' | 'warning' | 'succe
 
 function PrescriptionsTabInline({ patientId, patient }: { patientId: string; patient: { firstName: string; lastName: string; mrNumber?: string | null; phone?: string | null; dateOfBirth?: string | Date | null } }): React.JSX.Element {
   const theme = useTheme();
-  const [printPrescription, setPrintPrescription] = useState<Prescription | null>(null);
-  const { data: prescriptions = [], isLoading } = useQuery<Prescription[]>({
+  type PrintItem = {
+    prescription: Prescription;
+    doctor: { firstName: string; lastName: string };
+  };
+  const [printItem, setPrintItem] = useState<PrintItem | null>(null);
+  const { data: items = [], isLoading } = useQuery({
     queryKey: ['tokens-all-prescriptions', patientId],
     queryFn: async () => {
       const today = new Date();
-      const results: Prescription[] = [];
+      const results: Array<{
+        prescription: Prescription;
+        doctor: { firstName: string; lastName: string };
+      }> = [];
       for (let i = 0; i < 90; i++) {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
         const dayTokens = await window.clinic.tokens.list(d.toISOString().slice(0, 10));
-        dayTokens.forEach((t: { patientId: string; prescription: Prescription | null }) => {
-          if (t.patientId === patientId && t.prescription) results.push(t.prescription);
-        });
+        for (const t of dayTokens) {
+          if (t.patientId === patientId && t.prescription) {
+            results.push({
+              prescription: t.prescription,
+              doctor: t.doctor ?? { firstName: '', lastName: '' },
+            });
+          }
+        }
       }
       return results;
     },
   });
 
   if (isLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>;
-  if (prescriptions.length === 0) return <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No prescriptions found.</Box>;
+  if (items.length === 0) return <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No prescriptions found.</Box>;
 
   return (
     <>
     <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {prescriptions.map((pr) => (
+      {items.map((item) => {
+        const pr = item.prescription;
+        const doctorLabel = `${item.doctor?.firstName ?? ''} ${item.doctor?.lastName ?? ''}`.trim();
+        return (
         <Paper
           key={pr.id}
           variant="outlined"
@@ -80,11 +95,19 @@ function PrescriptionsTabInline({ patientId, patient }: { patientId: string; pat
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.2 }}>
                 {new Date(pr.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}
+                {doctorLabel ? ` · Dr. ${doctorLabel.replace(/^dr\.?\s*/i, '')}` : ''}
               </Typography>
             </Box>
             <Stack direction="row" spacing={1} alignItems="center">
               <Tooltip title="Print Prescription">
-                <IconButton size="small" onClick={() => setPrintPrescription(pr)} sx={{ border: '1px solid', borderColor: 'divider' }}>
+                <IconButton
+                  size="small"
+                  onClick={() => setPrintItem({
+                    prescription: pr,
+                    doctor: item.doctor ?? { firstName: '', lastName: '' },
+                  })}
+                  sx={{ border: '1px solid', borderColor: 'divider' }}
+                >
                   <PrintOutlinedIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               </Tooltip>
@@ -124,13 +147,15 @@ function PrescriptionsTabInline({ patientId, patient }: { patientId: string; pat
             </Box>
           )}
         </Paper>
-      ))}
+        );
+      })}
     </Box>
-    {printPrescription && (
+    {printItem && (
       <PrescriptionPrintPreview
-        prescription={printPrescription}
+        prescription={printItem.prescription}
         patient={patient}
-        onClose={() => setPrintPrescription(null)}
+        doctor={printItem.doctor}
+        onClose={() => setPrintItem(null)}
       />
     )}
     </>

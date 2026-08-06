@@ -1,14 +1,9 @@
-import { ipcMain, dialog, app, shell } from 'electron';
-import { copyFileSync, mkdirSync, unlinkSync, existsSync, readFileSync } from 'node:fs';
+import { ipcMain, dialog, shell } from 'electron';
+import { copyFileSync, unlinkSync, existsSync, readFileSync } from 'node:fs';
 import { join, basename, extname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { getPrisma } from '../database/client';
-
-function getDocsDir(sub: string): string {
-  const dir = join(app.getPath('userData'), 'documents', sub);
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
+import { getDocsDir, resolveDocPath, toStoredDocPath } from './docs-paths';
 
 export function registerDocumentsIpc(): void {
   // ── Patient Documents ──
@@ -30,7 +25,15 @@ export function registerDocumentsIpc(): void {
       const dest = join(dir, `${id}${extname(src)}`);
       copyFileSync(src, dest);
       const doc = await getPrisma().patientDocument.create({
-        data: { id, patientId, name: basename(src), filePath: dest, mimeType: extname(src).replace('.', ''), size: 0, updatedAt: new Date() },
+        data: {
+          id,
+          patientId,
+          name: basename(src),
+          filePath: toStoredDocPath(dest),
+          mimeType: extname(src).replace('.', ''),
+          size: 0,
+          updatedAt: new Date(),
+        },
       });
       results.push(doc);
     }
@@ -39,13 +42,17 @@ export function registerDocumentsIpc(): void {
 
   ipcMain.handle('docs:patient:delete', async (_e, id: string) => {
     const doc = await getPrisma().patientDocument.findUnique({ where: { id } });
-    if (doc && existsSync(doc.filePath)) unlinkSync(doc.filePath);
+    if (doc) {
+      const abs = resolveDocPath(doc.filePath);
+      if (existsSync(abs)) unlinkSync(abs);
+    }
     await getPrisma().patientDocument.delete({ where: { id } });
   });
 
   ipcMain.handle('docs:patient:whatsapp', async (_e, id: string, phone?: string) => {
     const doc = await getPrisma().patientDocument.findUnique({ where: { id } });
-    if (!doc || !existsSync(doc.filePath)) return { success: false, error: 'File not found.' };
+    const abs = doc ? resolveDocPath(doc.filePath) : '';
+    if (!doc || !existsSync(abs)) return { success: false, error: 'File not found.' };
 
     const token = process.env.WHATSAPP_TOKEN;
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -54,7 +61,7 @@ export function registerDocumentsIpc(): void {
     const cleaned = (phone ?? '').replace(/\D/g, '');
     if (!cleaned) return { success: false, error: 'No phone number.' };
 
-    const ext = extname(doc.filePath).toLowerCase();
+    const ext = extname(abs).toLowerCase();
     const mimeMap: Record<string, string> = {
       '.pdf': 'application/pdf',
       '.jpg': 'image/jpeg',
@@ -65,8 +72,7 @@ export function registerDocumentsIpc(): void {
     };
     const mimeType = mimeMap[ext] ?? 'application/octet-stream';
 
-    // Step 1: Upload media
-    const fileBuffer = readFileSync(doc.filePath);
+    const fileBuffer = readFileSync(abs);
     const boundary = `----FormBoundary${Date.now()}`;
     const CRLF = '\r\n';
     const bodyParts = [
@@ -96,7 +102,6 @@ export function registerDocumentsIpc(): void {
       return { success: false, error: typeof err === 'object' && err !== null ? (err.message ?? 'Upload failed.') : (err ?? 'Upload failed.') };
     }
 
-    // Step 2: Send document message
     const sendRes = await fetch(
       `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
       {
@@ -128,18 +133,20 @@ export function registerDocumentsIpc(): void {
 
   ipcMain.handle('docs:patient:open', async (_e, id: string) => {
     const doc = await getPrisma().patientDocument.findUnique({ where: { id } });
-    if (!doc || !existsSync(doc.filePath)) return null;
-    const ext = extname(doc.filePath).toLowerCase();
+    if (!doc) return null;
+    const abs = resolveDocPath(doc.filePath);
+    if (!existsSync(abs)) return null;
+    const ext = extname(abs).toLowerCase();
     if (ext === '.pdf') {
-      const buffer = readFileSync(doc.filePath);
+      const buffer = readFileSync(abs);
       return { type: 'pdf', name: doc.name, data: buffer.toString('base64') };
     }
     if (['.jpg', '.jpeg', '.png'].includes(ext)) {
-      const buffer = readFileSync(doc.filePath);
+      const buffer = readFileSync(abs);
       const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
       return { type: 'image', name: doc.name, data: `data:${mime};base64,${buffer.toString('base64')}` };
     }
-    await shell.openPath(doc.filePath);
+    await shell.openPath(abs);
     return null;
   });
 
@@ -162,7 +169,15 @@ export function registerDocumentsIpc(): void {
       const dest = join(dir, `${id}${extname(src)}`);
       copyFileSync(src, dest);
       const report = await getPrisma().labReport.create({
-        data: { id, labOrderId, name: basename(src), filePath: dest, mimeType: extname(src).replace('.', ''), size: 0, updatedAt: new Date() },
+        data: {
+          id,
+          labOrderId,
+          name: basename(src),
+          filePath: toStoredDocPath(dest),
+          mimeType: extname(src).replace('.', ''),
+          size: 0,
+          updatedAt: new Date(),
+        },
       });
       results.push(report);
     }
@@ -171,12 +186,17 @@ export function registerDocumentsIpc(): void {
 
   ipcMain.handle('docs:lab:delete', async (_e, id: string) => {
     const report = await getPrisma().labReport.findUnique({ where: { id } });
-    if (report && existsSync(report.filePath)) unlinkSync(report.filePath);
+    if (report) {
+      const abs = resolveDocPath(report.filePath);
+      if (existsSync(abs)) unlinkSync(abs);
+    }
     await getPrisma().labReport.delete({ where: { id } });
   });
 
   ipcMain.handle('docs:lab:open', async (_e, id: string) => {
     const report = await getPrisma().labReport.findUnique({ where: { id } });
-    if (report && existsSync(report.filePath)) await shell.openPath(report.filePath);
+    if (!report) return;
+    const abs = resolveDocPath(report.filePath);
+    if (existsSync(abs)) await shell.openPath(abs);
   });
 }

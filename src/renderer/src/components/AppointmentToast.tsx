@@ -9,6 +9,7 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CloseIcon from '@mui/icons-material/Close';
 import { Box, Collapse, IconButton, Paper, Stack, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
+import { useAuth } from '@/features/auth/AuthContext';
 import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
 
 interface ToastItem {
@@ -56,18 +57,43 @@ function playNotificationSound(): void {
   osc.onended = () => ctx.close();
 }
 
+/** Doctors only see queue-relevant alerts (their tokens / patients / appointments). */
+function shouldShowNotification(
+  n: RealtimeNotification,
+  role?: string,
+  userId?: string,
+): boolean {
+  const entity = n.payload?.entity as string | undefined;
+  if (role !== 'doctor') return true;
+
+  if (entity === 'patient') return true;
+  if (entity === 'token') {
+    const doctorId = n.payload?.doctorId as string | undefined;
+    return !doctorId || doctorId === userId;
+  }
+  if (entity === 'appointment') {
+    const providerId = n.payload?.providerId as string | undefined;
+    return !providerId || providerId === userId;
+  }
+  // Hide pharmacy/invoice noise on doctor PC
+  if (entity === 'invoice' || entity === 'medicine' || entity === 'inventory-batch') return false;
+  return true;
+}
+
 export function AppointmentToast(): React.JSX.Element {
+  const { user } = useAuth();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   useEffect(() => {
     const unsubscribe = realtimeService.onNotification((n: RealtimeNotification) => {
+      if (!shouldShowNotification(n, user?.role, user?.id)) return;
       const entity = n.payload?.entity as string | undefined;
       setToasts((prev) => [...prev, { id: n.id, kind: n.kind, entity, title: n.title, message: n.message, createdAt: n.createdAt }]);
       playNotificationSound();
       setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== n.id)), 6000);
     });
     return unsubscribe;
-  }, []);
+  }, [user?.id, user?.role]);
 
   return (
     <Box sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 2000, display: 'flex', flexDirection: 'column', gap: 1.5 }}>

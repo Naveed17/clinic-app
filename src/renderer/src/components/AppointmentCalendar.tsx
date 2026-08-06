@@ -9,6 +9,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
+import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import {
   alpha, Avatar, Box, Button, Chip, Divider, Fade, IconButton,
   Paper, Popper, Stack, Typography, useTheme,
@@ -47,11 +48,12 @@ interface Props {
   onDayContextMenu?: (date: string, anchor: { mouseX: number; mouseY: number }) => void;
   onAppointmentContextMenu?: (appointment: Appointment, anchor: { mouseX: number; mouseY: number }) => void;
   onPrescriptionClick?: (appointment: Appointment) => void;
+  onPatientHistoryClick?: (appointment: Appointment) => void;
   readOnly?: boolean;
   hideCheckIn?: boolean;
 }
 
-export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu, onPrescriptionClick, readOnly = false, hideCheckIn = false }: Props): React.JSX.Element {
+export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu, onPrescriptionClick, onPatientHistoryClick, readOnly = false, hideCheckIn = false }: Props): React.JSX.Element {
   const theme = useTheme();
   const today = new Date();
 
@@ -361,6 +363,12 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                     {start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </Typography>
                   <Box
+                    onContextMenu={(e) => {
+                      if (!onAppointmentContextMenu) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onAppointmentContextMenu(a, { mouseX: e.clientX, mouseY: e.clientY });
+                    }}
                     sx={{
                       mt: 0.5, p: 2, borderRadius: 1,
                       bgcolor: alpha(color, 0.08),
@@ -400,6 +408,16 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                           <IconButton size="small" onClick={() => onAppointmentClick(a)}
                             sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, p: 0.4 }}>
                             <EditOutlinedIcon sx={{ fontSize: 14 }} />
+                          </IconButton>
+                        )}
+                        {onPatientHistoryClick && (
+                          <IconButton
+                            size="small"
+                            onClick={() => onPatientHistoryClick(a)}
+                            title="Patient History"
+                            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, p: 0.4 }}
+                          >
+                            <HistoryOutlinedIcon sx={{ fontSize: 14 }} />
                           </IconButton>
                         )}
                         {onPrescriptionClick && a.status === 'COMPLETED' && (

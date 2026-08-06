@@ -40,44 +40,70 @@ function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }): Re
 }
 
 function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?: Patient }): React.JSX.Element {
-  const [printPrescription, setPrintPrescription] = useState<Prescription | null>(null);
-  const { data: tokens = [], isLoading } = useQuery({
+  type PrintItem = {
+    prescription: Prescription;
+    doctor: { firstName: string; lastName: string };
+  };
+  const [printItem, setPrintItem] = useState<PrintItem | null>(null);
+  const { data: items = [], isLoading } = useQuery({
     queryKey: ['tokens-all-prescriptions', patientId],
     queryFn: async () => {
       const today = new Date();
-      const results: Prescription[] = [];
-      // Fetch last 90 days
+      const results: Array<{
+        prescription: Prescription;
+        doctor: { firstName: string; lastName: string };
+        tokenNumber?: number;
+        date?: string;
+      }> = [];
       for (let i = 0; i < 90; i++) {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
         const dateStr = d.toISOString().slice(0, 10);
         const dayTokens = await window.clinic.tokens.list(dateStr);
-        dayTokens.forEach((t: { patientId: string; prescription: Prescription | null }) => {
-          if (t.patientId === patientId && t.prescription) results.push(t.prescription as Prescription & { _token: typeof t });
-        });
+        for (const t of dayTokens) {
+          if (t.patientId === patientId && t.prescription) {
+            results.push({
+              prescription: t.prescription,
+              doctor: t.doctor ?? { firstName: '', lastName: '' },
+              tokenNumber: t.tokenNumber,
+              date: t.date,
+            });
+          }
+        }
       }
       return results;
     },
   });
 
   if (isLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>;
-  if (tokens.length === 0) return <EmptyState icon={<MedicalServicesOutlinedIcon sx={{ fontSize: 40 }} />} text="No prescriptions found." />;
+  if (items.length === 0) return <EmptyState icon={<MedicalServicesOutlinedIcon sx={{ fontSize: 40 }} />} text="No prescriptions found." />;
 
   return (
     <>
     <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {(tokens as (Prescription & { _token?: { tokenNumber?: number; date?: string; doctor?: { firstName: string; lastName: string } } })[]).map((pr) => (
+      {items.map((item) => {
+        const pr = item.prescription;
+        const doctorLabel = `${item.doctor?.firstName ?? ''} ${item.doctor?.lastName ?? ''}`.trim();
+        return (
         <Paper key={pr.id} variant="outlined" sx={{ p: 2, borderRadius: 1 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
             <Box>
               {pr.diagnosis && <Typography fontWeight={700} fontSize={14}>{pr.diagnosis}</Typography>}
               <Typography variant="caption" color="text.secondary">
                 {new Date(pr.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}
+                {doctorLabel ? ` · Dr. ${doctorLabel.replace(/^dr\.?\s*/i, '')}` : ''}
               </Typography>
             </Box>
             <Stack direction="row" spacing={1} alignItems="center">
               <Tooltip title="Print Prescription">
-                <IconButton size="small" onClick={() => setPrintPrescription(pr)} sx={{ border: '1px solid', borderColor: 'divider' }}>
+                <IconButton
+                  size="small"
+                  onClick={() => setPrintItem({
+                    prescription: pr,
+                    doctor: item.doctor ?? { firstName: '', lastName: '' },
+                  })}
+                  sx={{ border: '1px solid', borderColor: 'divider' }}
+                >
                   <PrintOutlinedIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               </Tooltip>
@@ -107,13 +133,15 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
             </Box>
           )}
         </Paper>
-      ))}
+        );
+      })}
     </Box>
-    {printPrescription && (
+    {printItem && (
       <PrescriptionPrintPreview
-        prescription={printPrescription}
+        prescription={printItem.prescription}
         patient={patient}
-        onClose={() => setPrintPrescription(null)}
+        doctor={printItem.doctor}
+        onClose={() => setPrintItem(null)}
       />
     )}
     </>

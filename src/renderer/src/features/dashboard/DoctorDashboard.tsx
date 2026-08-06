@@ -7,6 +7,7 @@ import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutl
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import FormatListBulletedOutlinedIcon from '@mui/icons-material/FormatListBulletedOutlined';
+import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import {
   alpha, Avatar, Box, Button, Chip, Dialog, DialogActions, DialogContent,
   DialogTitle, Divider, IconButton, ListItemIcon, ListItemText,
@@ -18,9 +19,12 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { appointmentsService } from '@/services/appointments.service';
 import { AppointmentDialog } from '@/features/appointments/AppointmentsPage';
 import { AppointmentCalendar } from '@/components/AppointmentCalendar';
-import { PrescriptionDialog, TokenPrintPreview, IssueTokenDialog } from '@/features/tokens/TokensPage';
+import { TokenPrintPreview, IssueTokenDialog } from '@/features/tokens/TokensPage';
+import { PrescriptionPadDialog } from '@/features/tokens/PrescriptionPadDialog';
+import { PatientHistoryDialog } from '@/features/patients/PatientHistoryDialog';
 import type { Token } from '@/types/token';
 import type { Appointment } from '@/types/appointment';
+import type { Patient } from '@/types/patient';
 
 const STATUS_COLOR: Record<string, string> = {
   SCHEDULED: '#1976d2',
@@ -52,6 +56,7 @@ export function DoctorDashboard(): React.JSX.Element {
   const [ctxMenu, setCtxMenu] = useState<{ mouseX: number; mouseY: number } | null>(null);
   const [apptCtxMenu, setApptCtxMenu] = useState<{ mouseX: number; mouseY: number; appointment: Appointment } | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [historyPatient, setHistoryPatient] = useState<Patient | undefined>();
 
   const { data: raw = [] } = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const appointments = (raw as Appointment[]).filter((a) => a.providerId === user?.id);
@@ -66,15 +71,61 @@ export function DoctorDashboard(): React.JSX.Element {
     setPrescriptionToken(token);
   }
 
+  async function openPatientHistory(appt: Appointment): Promise<void> {
+    try {
+      const search = appt.patient?.firstName || appt.patientId;
+      const res = await window.clinic.patients.list({ page: 1, pageSize: 50, search });
+      const match = res.data.find((p) => p.id === appt.patientId);
+      if (match) {
+        setHistoryPatient(match);
+        return;
+      }
+      // Fallback minimal patient so dialog can still open
+      setHistoryPatient({
+        id: appt.patientId,
+        mrNumber: '',
+        firstName: appt.patient?.firstName ?? 'Patient',
+        lastName: appt.patient?.lastName ?? '',
+        dateOfBirth: null,
+        phone: appt.patient?.phone ?? null,
+        email: null,
+        address: null,
+        emergencyContactName: null,
+        emergencyContactPhone: null,
+        bloodGroup: null,
+        allergies: null,
+        chronicConditions: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
   const now = new Date();
   const upcomingQueue = appointments
     .filter((a) => !['CANCELLED', 'NO_SHOW', 'COMPLETED'].includes(a.status))
     .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 
   const appointmentStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: Appointment['status'] }) =>
-      appointmentsService.updateStatus(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+    mutationFn: ({
+      id,
+      status,
+    }: {
+      id: string;
+      status: Appointment['status'];
+      appt?: Appointment;
+    }) => appointmentsService.updateStatus(id, status),
+    onSuccess: async (_data, variables) => {
+      await qc.invalidateQueries({ queryKey: ['appointments'] });
+      if (variables.status !== 'COMPLETED') return;
+      const appt =
+        variables.appt ??
+        (qc.getQueryData<Appointment[]>(['appointments']) ?? []).find((a) => a.id === variables.id) ??
+        appointments.find((a) => a.id === variables.id);
+      if (appt) await openPrescription(appt);
+    },
   });
 
   return (
@@ -182,13 +233,19 @@ export function DoctorDashboard(): React.JSX.Element {
         <Box sx={{ flex: 1, minHeight: 0, display: activeTab === 0 ? 'flex' : 'none', flexDirection: 'column', overflow: 'hidden' }}>
           <AppointmentCalendar
             appointments={appointments}
-            onStatusChange={(id, status) =>
-              appointmentStatusMutation.mutate({ id, status: status as Appointment['status'] })
-            }
+            onStatusChange={(id, status) => {
+              const appt = appointments.find((a) => a.id === id);
+              appointmentStatusMutation.mutate({
+                id,
+                status: status as Appointment['status'],
+                appt,
+              });
+            }}
             onDayContextMenu={(date, anchor) => { setContextDate(date); setCtxMenu(anchor); }}
             onAppointmentContextMenu={(appt, anchor) => setApptCtxMenu({ ...anchor, appointment: appt })}
             onAppointmentClick={(appt) => { setEditAppt(appt); setApptDialogOpen(true); }}
             onPrescriptionClick={(appt) => openPrescription(appt)}
+            onPatientHistoryClick={(appt) => void openPatientHistory(appt)}
           />
         </Box>
 
@@ -264,6 +321,11 @@ export function DoctorDashboard(): React.JSX.Element {
                               <EditOutlinedIcon sx={{ fontSize: 15 }} />
                             </IconButton>
                           </Tooltip>
+                          <Tooltip title="Patient History">
+                            <IconButton size="small" sx={{ p: 0.4 }} onClick={() => void openPatientHistory(appt)}>
+                              <HistoryOutlinedIcon sx={{ fontSize: 15 }} />
+                            </IconButton>
+                          </Tooltip>
                           {appt.status === 'COMPLETED' && (
                             <Tooltip title="Write Prescription">
                               <IconButton size="small" sx={{ p: 0.4 }} onClick={() => openPrescription(appt)}>
@@ -276,7 +338,13 @@ export function DoctorDashboard(): React.JSX.Element {
                               size="small"
                               variant="outlined"
                               endIcon={next === 'COMPLETED' ? <CheckCircleOutlineIcon sx={{ fontSize: '13px !important' }} /> : <ArrowForwardIcon sx={{ fontSize: '13px !important' }} />}
-                              onClick={() => appointmentStatusMutation.mutate({ id: appt.id, status: next as Appointment['status'] })}
+                              onClick={() =>
+                                appointmentStatusMutation.mutate({
+                                  id: appt.id,
+                                  status: next as Appointment['status'],
+                                  appt,
+                                })
+                              }
                               sx={{
                                 fontSize: '0.7rem', py: 0.3, px: 1, borderRadius: 1,
                                 borderColor: STATUS_COLOR[next], color: STATUS_COLOR[next],
@@ -297,7 +365,9 @@ export function DoctorDashboard(): React.JSX.Element {
         </Box>
       </Paper>
 
-      {prescriptionToken && <PrescriptionDialog token={prescriptionToken} onClose={() => setPrescriptionToken(null)} />}
+      {prescriptionToken && (
+        <PrescriptionPadDialog token={prescriptionToken} onClose={() => setPrescriptionToken(null)} />
+      )}
       {printToken && <TokenPrintPreview token={printToken} onClose={() => setPrintToken(null)} />}
 
       {/* No token warning */}
@@ -343,6 +413,16 @@ export function DoctorDashboard(): React.JSX.Element {
           />
         </MenuItem>
         <Divider />
+        <MenuItem
+          onClick={() => {
+            const a = apptCtxMenu!.appointment;
+            setApptCtxMenu(null);
+            void openPatientHistory(a);
+          }}
+        >
+          <ListItemIcon><HistoryOutlinedIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Patient History</ListItemText>
+        </MenuItem>
         <MenuItem onClick={() => { setEditAppt(apptCtxMenu!.appointment); setApptCtxMenu(null); setApptDialogOpen(true); }}>
           <ListItemIcon><EditOutlinedIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Edit Appointment</ListItemText>
@@ -354,6 +434,10 @@ export function DoctorDashboard(): React.JSX.Element {
           </MenuItem>
         )}
       </Menu>
+
+      {historyPatient && (
+        <PatientHistoryDialog patient={historyPatient} onClose={() => setHistoryPatient(undefined)} />
+      )}
 
       {/* Day right-click menu */}
       <Menu

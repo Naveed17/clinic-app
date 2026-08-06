@@ -18,7 +18,14 @@ export function registerAppointmentIpc(io?: SocketIOServer): void {
   ipcMain.handle('appointments:doctors', () => listDoctors());
   ipcMain.handle('appointments:create', async (_, input) => {
     const appointment = await createAppointment(input);
-    if (io && appointment) emitNotification(io, { kind: 'success', title: 'Appointment created', message: 'A new appointment was scheduled.', payload: { entity: 'appointment', id: appointment.id } });
+    if (io && appointment) {
+      emitNotification(io, {
+        kind: 'success',
+        title: 'Appointment created',
+        message: 'A new appointment was scheduled.',
+        payload: { entity: 'appointment', id: appointment.id, providerId: appointment.providerId },
+      });
+    }
     return appointment;
   });
   ipcMain.handle('appointments:update', async (_, id, input) => {

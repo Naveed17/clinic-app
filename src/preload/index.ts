@@ -27,6 +27,7 @@ const settingsReady = ipcRenderer
   .catch(() => {});
 
 let socket: Socket | undefined;
+let socketUrl = '';
 
 function getAuthContext(): { token?: string } {
   try {
@@ -35,6 +36,15 @@ function getAuthContext(): { token?: string } {
   } catch {
     return {};
   }
+}
+
+/** Wait for settings so LAN clients connect to the server, not localhost. */
+async function resolveSocketUrl(): Promise<string> {
+  await settingsReady;
+  if (apiUrl) return apiUrl;
+  const runtimeUrl = await ipcRenderer.invoke('app:get-api-url').catch(() => null);
+  if (typeof runtimeUrl === 'string' && runtimeUrl) return runtimeUrl;
+  return 'http://127.0.0.1:3333';
 }
 
 function toQueryString(input: unknown): string {
@@ -81,11 +91,21 @@ function call<T>(httpFn: () => Promise<T>, ipcChannel: string, ...ipcArgs: unkno
   return ipc<T>(ipcChannel, ...ipcArgs);
 }
 
-function ensureSocket(): Socket {
+async function ensureSocket(): Promise<Socket> {
+  const url = await resolveSocketUrl();
+  if (socket && socketUrl !== url) {
+    socket.removeAllListeners();
+    socket.disconnect();
+    socket = undefined;
+  }
   if (!socket) {
-    socket = io(apiUrl || 'http://127.0.0.1:3333', {
+    socketUrl = url;
+    socket = io(url, {
       autoConnect: false,
       transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
     });
   }
   return socket;
@@ -307,34 +327,59 @@ const api = {
       ),
   },
   realtime: {
-    connect: () => {
-      const activeSocket = ensureSocket();
+    connect: async () => {
+      const activeSocket = await ensureSocket();
       const { token } = getAuthContext();
       activeSocket.auth = token ? { token } : {};
       if (!activeSocket.connected) activeSocket.connect();
-      return Promise.resolve();
     },
-    disconnect: () => { socket?.disconnect(); },
+    disconnect: () => {
+      socket?.disconnect();
+    },
     onDataChanged: (handler: (e: { entity: string; action: string }) => void) => {
-      const activeSocket = ensureSocket();
-      activeSocket.on('data:changed', handler);
-      return () => activeSocket.off('data:changed', handler);
+      let active: Socket | undefined;
+      let cancelled = false;
+      void ensureSocket().then((s) => {
+        if (cancelled) return;
+        active = s;
+        s.on('data:changed', handler);
+      });
+      return () => {
+        cancelled = true;
+        active?.off('data:changed', handler);
+      };
     },
     onNotification: (handler: (notification: unknown) => void) => {
-      const activeSocket = ensureSocket();
-      activeSocket.on('notification:new', handler);
-      return () => activeSocket.off('notification:new', handler);
+      let active: Socket | undefined;
+      let cancelled = false;
+      void ensureSocket().then((s) => {
+        if (cancelled) return;
+        active = s;
+        s.on('notification:new', handler);
+      });
+      return () => {
+        cancelled = true;
+        active?.off('notification:new', handler);
+      };
     },
     onChatMessage: (handler: (message: unknown) => void) => {
-      const activeSocket = ensureSocket();
-      activeSocket.on('chat:message', handler);
-      return () => activeSocket.off('chat:message', handler);
+      let active: Socket | undefined;
+      let cancelled = false;
+      void ensureSocket().then((s) => {
+        if (cancelled) return;
+        active = s;
+        s.on('chat:message', handler);
+      });
+      return () => {
+        cancelled = true;
+        active?.off('chat:message', handler);
+      };
     },
-    sendChatMessage: (message: unknown) => {
-      const activeSocket = ensureSocket();
+    sendChatMessage: async (message: unknown) => {
+      const activeSocket = await ensureSocket();
       if (!activeSocket.connected) activeSocket.connect();
       activeSocket.emit('chat:message', message);
-      return Promise.resolve(true);
+      return true;
     },
   },
   schedule: {

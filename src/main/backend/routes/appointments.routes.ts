@@ -48,7 +48,12 @@ export function createAppointmentsRouter(io: SocketIOServer): Router {
     asyncHandler(async (req, res) => {
       const appointment = await createAppointment(req.body as AppointmentInput);
       if (appointment) {
-        emitNotification(io, { kind: 'success', title: 'Appointment created', message: 'A new appointment was scheduled.', payload: { entity: 'appointment', id: appointment.id } });
+        emitNotification(io, {
+          kind: 'success',
+          title: 'Appointment created',
+          message: 'A new appointment was scheduled.',
+          payload: { entity: 'appointment', id: appointment.id, providerId: appointment.providerId },
+        });
         emitDataChange(io, 'appointment', 'created');
       }
       res.status(201).json(appointment);

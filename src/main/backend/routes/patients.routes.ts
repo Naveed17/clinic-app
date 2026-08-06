@@ -29,7 +29,7 @@ export function createPatientsRouter(io: SocketIOServer): Router {
       const patient = await createPatient(req.body as PatientInput);
       emitNotification(io, {
         kind: 'success',
-        title: 'Patient created',
+        title: 'Patient added',
         message: `${patient.firstName} ${patient.lastName} was added to the clinic records.`,
         payload: { entity: 'patient', id: patient.id },
       });

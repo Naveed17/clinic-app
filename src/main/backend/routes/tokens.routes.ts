@@ -40,6 +40,23 @@ export function createTokensRouter(io: SocketIOServer): Router {
   }));
   router.post('/', asyncHandler(async (req, res) => {
     const token = await createToken(req.body);
+    const patientName = `${token.patient.firstName} ${token.patient.lastName}`.trim();
+    const doctorName = token.doctor
+      ? `${token.doctor.firstName} ${token.doctor.lastName}`.trim()
+      : '';
+    emitNotification(io, {
+      kind: 'success',
+      title: 'New patient in queue',
+      message: doctorName
+        ? `Token #${String(token.tokenNumber).padStart(3, '0')} — ${patientName} for Dr. ${doctorName}.`
+        : `Token #${String(token.tokenNumber).padStart(3, '0')} issued for ${patientName}.`,
+      payload: {
+        entity: 'token',
+        id: token.id,
+        doctorId: token.doctorId,
+        patientId: token.patientId,
+      },
+    });
     emitDataChange(io, 'token', 'created');
     res.status(201).json(token);
   }));

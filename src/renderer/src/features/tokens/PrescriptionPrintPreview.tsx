@@ -1,9 +1,9 @@
 import { Document, Page, Text, View, StyleSheet, PDFViewer } from '@react-pdf/renderer';
 import { Box, Button, Dialog, DialogContent, Typography } from '@mui/material';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import type { Prescription, Token } from '@/types/token';
 import { useEffect, useState } from 'react';
+import { PrescriptionPadDocument, parsePadMeta, stripAdviceHtml } from './PrescriptionPadPdf';
 
 const styles = StyleSheet.create({
   page: {
@@ -362,18 +362,22 @@ export function PrescriptionPrintPreview({
   }, []);
 
   const activePrescription = prescriptionProp || token?.prescription;
+
+  const doctorNameRaw = doctorProp
+    ? `${doctorProp.firstName ?? ''} ${doctorProp.lastName ?? ''}`.trim()
+    : token?.doctor
+    ? `${token.doctor.firstName ?? ''} ${token.doctor.lastName ?? ''}`.trim()
+    : '';
+  const doctorName = doctorNameRaw || 'Attending Physician';
+  const doctorDisplay = /^dr\.?\s/i.test(doctorName) ? doctorName : `Dr. ${doctorName}`;
+
   const patientName = patientProp
-    ? `${patientProp.firstName} ${patientProp.lastName}`
-    : token
-    ? `${token.patient.firstName} ${token.patient.lastName}`
+    ? `${patientProp.firstName ?? ''} ${patientProp.lastName ?? ''}`.trim() || 'Patient'
+    : token?.patient
+    ? `${token.patient.firstName ?? ''} ${token.patient.lastName ?? ''}`.trim() || 'Patient'
     : 'Patient';
-  const mrNumber = patientProp?.mrNumber || token?.patient.mrNumber;
+  const mrNumber = patientProp?.mrNumber || token?.patient?.mrNumber;
   const patientPhone = patientProp?.phone;
-  const doctorName = doctorProp
-    ? `${doctorProp.firstName} ${doctorProp.lastName}`
-    : token
-    ? `${token.doctor.firstName} ${token.doctor.lastName}`
-    : 'Doctor';
 
   const dateStr = activePrescription?.createdAt
     ? new Date(activePrescription.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
@@ -392,6 +396,19 @@ export function PrescriptionPrintPreview({
     );
   }
 
+  const isFreeTextPad =
+    activePrescription.diagnosis === 'Rx' ||
+    !activePrescription.medicines?.length;
+
+  const pad = parsePadMeta(activePrescription.advice || '');
+  const padAge = pad.age || '—';
+  const padSex = pad.sex || '—';
+  const padBody = pad.body;
+  const padAddress = pad.address || patientProp?.phone || '';
+  const padDiagnosis =
+    pad.diagnosis ||
+    (activePrescription.diagnosis !== 'Rx' ? activePrescription.diagnosis : '');
+
   return (
     <Dialog open onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 1, overflow: 'hidden' } }}>
       <Box sx={{ px: 2.5, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid', borderColor: 'divider' }}>
@@ -401,15 +418,33 @@ export function PrescriptionPrintPreview({
 
       <DialogContent sx={{ p: 0, height: 750 }}>
         <PDFViewer width="100%" height="100%" showToolbar>
-          <PrescriptionPDFDocument
-            prescription={activePrescription}
-            patientName={patientName}
-            mrNumber={mrNumber}
-            patientPhone={patientPhone}
-            doctorName={doctorName}
-            dateStr={dateStr}
-            clinic={clinic}
-          />
+          {isFreeTextPad ? (
+            <PrescriptionPadDocument
+              clinic={clinic}
+              doctorName={doctorDisplay}
+              qualification="CONSULTING PHYSICIAN"
+              patientName={patientName}
+              patientAddress={padAddress}
+              patientAge={padAge}
+              patientSex={padSex}
+              dateStr={dateStr}
+              diagnosis={padDiagnosis}
+              bodyText={padBody}
+            />
+          ) : (
+            <PrescriptionPDFDocument
+              prescription={{
+                ...activePrescription,
+                advice: stripAdviceHtml(padBody || activePrescription.advice || ''),
+              }}
+              patientName={patientName}
+              mrNumber={mrNumber}
+              patientPhone={patientPhone}
+              doctorName={doctorName}
+              dateStr={dateStr}
+              clinic={clinic}
+            />
+          )}
         </PDFViewer>
       </DialogContent>
 

@@ -27,13 +27,25 @@ export function registerTokenIpc(io?: SocketIOServer): void {
   ipcMain.handle('tokens:patients', () => listTokenPatients());
   ipcMain.handle('tokens:create', async (_, input) => {
     const token = await createToken(input);
-    if (io)
+    if (io) {
+      const patientName = `${token.patient.firstName} ${token.patient.lastName}`.trim();
+      const doctorName = token.doctor
+        ? `${token.doctor.firstName} ${token.doctor.lastName}`.trim()
+        : '';
       emitNotification(io, {
         kind: 'success',
-        title: 'Token issued',
-        message: `Token #${String(token.tokenNumber).padStart(3, '0')} issued for ${token.patient.firstName} ${token.patient.lastName}.`,
-        payload: { entity: 'token', id: token.id },
+        title: 'New patient in queue',
+        message: doctorName
+          ? `Token #${String(token.tokenNumber).padStart(3, '0')} — ${patientName} for Dr. ${doctorName}.`
+          : `Token #${String(token.tokenNumber).padStart(3, '0')} issued for ${patientName}.`,
+        payload: {
+          entity: 'token',
+          id: token.id,
+          doctorId: token.doctorId,
+          patientId: token.patientId,
+        },
       });
+    }
     return token;
   });
   ipcMain.handle('tokens:update-status', (_, id: string, status: TokenStatus) =>
