@@ -4,6 +4,8 @@ import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined';
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import HourglassEmptyOutlinedIcon from '@mui/icons-material/HourglassEmptyOutlined';
+import DoneAllOutlinedIcon from '@mui/icons-material/DoneAllOutlined';
 import {
   Alert,
   Autocomplete,
@@ -11,6 +13,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -28,7 +31,7 @@ import {
 } from '@mui/material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
-import { alpha, useTheme } from '@mui/material/styles';
+import { alpha, darken, useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useEffect, useState } from 'react';
 import { Document, Page, Text, View, StyleSheet, pdf, Font } from '@react-pdf/renderer';
@@ -441,205 +444,467 @@ export function TokensPage(): React.JSX.Element {
 
   const waiting = tokens.filter((t) => t.status === 'WAITING').length;
   const done = tokens.filter((t) => t.status === 'DONE').length;
+  const skipped = tokens.filter((t) => t.status === 'SKIPPED').length;
 
   const currentToken = filtered.find((t) => t.status === 'WAITING');
 
+  const softCard = {
+    borderRadius: '20px',
+    border: '1px solid',
+    borderColor: 'divider',
+    boxShadow: `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,
+  } as const;
+
+  const summaryCards = [
+    {
+      label: 'Total Tokens',
+      value: tokens.length,
+      icon: <ConfirmationNumberOutlinedIcon />,
+      bg: alpha(theme.palette.primary.main, 0.1),
+      color: theme.palette.primary.main,
+    },
+    {
+      label: 'Waiting',
+      value: waiting,
+      icon: <HourglassEmptyOutlinedIcon />,
+      bg: alpha(theme.palette.warning.main, 0.12),
+      color: theme.palette.warning.dark,
+    },
+    {
+      label: 'Completed',
+      value: done,
+      icon: <DoneAllOutlinedIcon />,
+      bg: alpha(theme.palette.success.main, 0.12),
+      color: theme.palette.success.dark,
+    },
+    {
+      label: 'Skipped',
+      value: skipped,
+      icon: <SkipNextOutlinedIcon />,
+      bg: alpha(theme.palette.grey[500], 0.12),
+      color: theme.palette.text.secondary,
+    },
+  ];
+
   return (
     <>
-      <Stack spacing={3}>
+      <Stack spacing={2.5} sx={{ pb: 2 }}>
         {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: { sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', alignItems: { sm: 'flex-end' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between' }}>
           <Box>
-            <Typography variant="h5" fontWeight={800}>Token Queue</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-              Daily patient queue management.
+            <Typography variant="body2" color="text.secondary" fontWeight={600}>
+              Live OPD queue
+            </Typography>
+            <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
+              Token Queue
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              Issue, track, and complete patient tokens for the day.
             </Typography>
           </Box>
-          <Stack direction="row" gap={1.5} alignItems="center">
+          <Stack direction="row" gap={1.5} alignItems="center" flexWrap="wrap">
             <LocalizationProvider dateAdapter={AdapterDateFns}>
               <DatePicker
                 value={date ? new Date(date) : null}
                 onChange={(v) => setDate(v ? v.toISOString().slice(0, 10) : todayStr())}
-                slotProps={{ textField: { size: 'small', sx: { width: 160 } } }}
+                slotProps={{
+                  textField: {
+                    size: 'small',
+                    sx: {
+                      width: 168,
+                      bgcolor: 'background.paper',
+                      borderRadius: 2,
+                      '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                    },
+                  },
+                }}
               />
             </LocalizationProvider>
             {!isAdmin && (
-              <Button variant="contained" startIcon={<AddOutlinedIcon />} sx={{ borderRadius: 2, fontWeight: 600 }} onClick={() => setDialogOpen(true)}>
+              <Button
+                variant="contained"
+                startIcon={<AddOutlinedIcon />}
+                sx={{ borderRadius: 2, fontWeight: 700, px: 2.25, py: 1 }}
+                onClick={() => setDialogOpen(true)}
+              >
                 Issue Token
               </Button>
             )}
           </Stack>
         </Box>
 
-        {/* Summary cards */}
-        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 1fr)' } }}>
-          {[
-            { label: 'Total', value: tokens.length, color: theme.palette.text.primary },
-            { label: 'Waiting', value: waiting, color: theme.palette.warning.main },
-            { label: 'Done', value: done, color: theme.palette.success.main },
-          ].map((c) => (
-            <Paper key={c.label} variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-              <Typography sx={{ fontSize: 32, fontWeight: 800, color: c.color, lineHeight: 1 }}>{c.value}</Typography>
-              <Typography variant="caption" color="text.secondary">{c.label}</Typography>
+        {/* Summary metrics */}
+        <Box sx={{ display: 'grid', gap: 1.75, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
+          {summaryCards.map((c) => (
+            <Paper
+              key={c.label}
+              elevation={0}
+              sx={{
+                p: 2.25,
+                ...softCard,
+                bgcolor: c.bg,
+                border: 'none',
+              }}
+            >
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                <Box>
+                  <Typography sx={{ fontSize: 28, fontWeight: 800, color: c.color, lineHeight: 1 }}>{c.value}</Typography>
+                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mt: 0.75, display: 'block' }}>
+                    {c.label}
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 2,
+                    display: 'grid',
+                    placeItems: 'center',
+                    bgcolor: alpha(c.color, 0.15),
+                    color: c.color,
+                  }}
+                >
+                  {c.icon}
+                </Box>
+              </Stack>
             </Paper>
           ))}
         </Box>
 
-        {/* Current token highlight */}
-        {currentToken && (
-          <Paper
-            sx={{
-              p: 3,
-              bgcolor: alpha(theme.palette.primary.main, 0.06),
-              border: `2px solid ${alpha(theme.palette.primary.main, 0.3)}`,
-              borderRadius: 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-          >
-            <Box sx={{ textAlign: 'center', minWidth: 80 }}>
-              <Typography variant="caption" color="text.secondary" fontWeight={600}>NOW SERVING</Typography>
-              <Typography sx={{ fontSize: 52, fontWeight: 900, color: 'primary.main', lineHeight: 1 }}>
-                {String(currentToken.tokenNumber).padStart(3, '0')}
-              </Typography>
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <Typography fontWeight={700} fontSize={18}>
-                {currentToken.patient.firstName} {currentToken.patient.lastName}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Dr. {currentToken.doctor.firstName} {currentToken.doctor.lastName}
-              </Typography>
-              {(currentToken.reason || currentToken.notes) && (
-                <Typography variant="caption" color="text.secondary">
-                  {[currentToken.reason, currentToken.notes].filter(Boolean).join(' · ')}
-                </Typography>
-              )}
-            </Box>
-            <Chip
-              label={statusConfig[currentToken.status].label}
-              color={statusConfig[currentToken.status].color}
-              sx={{ fontWeight: 700 }}
-            />
-          </Paper>
-        )}
+        {/* Now serving + queue */}
+        <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', lg: currentToken ? 'minmax(0, 1fr) 300px' : '1fr' }, alignItems: 'start' }}>
+          <Stack spacing={2} sx={{ minWidth: 0 }}>
+            {!isDoctor && (
+              <Paper elevation={0} sx={{ p: 1.5, ...softCard }}>
+                <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+                  <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ mr: 0.5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Doctor
+                  </Typography>
+                  {[{ id: 'ALL', firstName: 'All', lastName: 'Doctors' }, ...doctors].map((d) => {
+                    const active = filterDoctor === d.id;
+                    return (
+                      <Chip
+                        key={d.id}
+                        label={d.id === 'ALL' ? 'All Doctors' : `Dr. ${d.firstName} ${d.lastName}`}
+                        onClick={() => setFilterDoctor(d.id)}
+                        color={active ? 'primary' : 'default'}
+                        variant={active ? 'filled' : 'outlined'}
+                        sx={{
+                          borderRadius: 2,
+                          fontWeight: 700,
+                          ...(active
+                            ? { boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.28)}` }
+                            : { borderColor: alpha(theme.palette.divider, 1) }),
+                        }}
+                      />
+                    );
+                  })}
+                </Stack>
+              </Paper>
+            )}
 
-        {!isDoctor && (
-          <Stack direction="row" gap={1} alignItems="center">
-            <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>Filter:</Typography>
-            {[{ id: 'ALL', firstName: 'All', lastName: 'Doctors' }, ...doctors].map((d) => (
-              <Chip
-                key={d.id}
-                label={d.id === 'ALL' ? 'All Doctors' : `Dr. ${d.firstName} ${d.lastName}`}
-                onClick={() => setFilterDoctor(d.id)}
-                color={filterDoctor === d.id ? 'primary' : 'default'}
-                variant={filterDoctor === d.id ? 'filled' : 'outlined'}
-                sx={{ borderRadius: 2 }}
-              />
-            ))}
-          </Stack>
-        )}
+            {isError && <Alert severity="error">Failed to load tokens.</Alert>}
 
-        {/* Queue list */}
-        {isError && <Alert severity="error">Failed to load tokens.</Alert>}
-        {isLoading ? (
-          <Typography color="text.secondary">Loading queue...</Typography>
-        ) : filtered.length === 0 ? (
-          <Paper variant="outlined" sx={{ p: 6, textAlign: 'center' }}>
-            <ConfirmationNumberOutlinedIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
-            <Typography color="text.secondary">No tokens for this date.</Typography>
-          </Paper>
-        ) : (
-          <Stack spacing={1}>
-            {filtered.map((token) => {
-              const cfg = statusConfig[token.status];
-              const isDone = token.status === 'DONE' || token.status === 'SKIPPED';
-              return (
-                <Paper
-                  key={token.id}
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 2,
-                    opacity: isDone ? 0.55 : 1,
-                    borderLeft: `4px solid`,
-                    borderLeftColor: token.status === 'WAITING'
-                      ? 'warning.main'
-                      : token.status === 'DONE'
-                        ? 'success.main'
-                        : 'divider',
-                  }}
-                >
-                  {/* Token number */}
-                  <Avatar
+            <Paper elevation={0} sx={{ p: 2.25, ...softCard }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.75 }}>
+                <Box>
+                  <Typography fontWeight={800} fontSize={16}>Queue</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {new Date(date).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+                    {' · '}
+                    {filtered.length} token{filtered.length === 1 ? '' : 's'}
+                  </Typography>
+                </Box>
+                {isLoading && <CircularProgress size={18} />}
+              </Stack>
+
+              {isLoading && filtered.length === 0 ? (
+                <Typography color="text.secondary" variant="body2">Loading queue…</Typography>
+              ) : filtered.length === 0 ? (
+                <Box sx={{ py: 5, textAlign: 'center' }}>
+                  <Box
                     sx={{
-                      width: 44,
-                      height: 44,
-                      bgcolor: alpha(cfg.color === 'default' ? theme.palette.action.active : theme.palette[cfg.color].main, 0.12),
-                      color: cfg.color === 'default' ? 'text.secondary' : `${cfg.color}.main`,
-                      fontWeight: 900,
-                      fontSize: 16,
+                      width: 64,
+                      height: 64,
+                      borderRadius: '18px',
+                      mx: 'auto',
+                      mb: 1.5,
+                      display: 'grid',
+                      placeItems: 'center',
+                      bgcolor: alpha(theme.palette.primary.main, 0.08),
+                      color: 'primary.main',
                     }}
                   >
-                    {String(token.tokenNumber).padStart(3, '0')}
-                  </Avatar>
-
-                  {/* Info */}
-                  <Box sx={{ flex: 1 }}>
-                    <Typography fontWeight={700} fontSize={14}>
-                      {token.patient.firstName} {token.patient.lastName}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Dr. {token.doctor.firstName} {token.doctor.lastName}
-                      {token.reason ? ` · ${token.reason}` : ''}
-                      {token.notes ? ` · ${token.notes}` : ''}
-                    </Typography>
+                    <ConfirmationNumberOutlinedIcon sx={{ fontSize: 30 }} />
                   </Box>
+                  <Typography fontWeight={700} sx={{ mb: 0.5 }}>No tokens yet</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    No tokens for this date{!isAdmin ? ' — issue one to start the queue.' : '.'}
+                  </Typography>
+                  {!isAdmin && (
+                    <Button
+                      variant="contained"
+                      startIcon={<AddOutlinedIcon />}
+                      sx={{ mt: 2, borderRadius: 2, fontWeight: 700 }}
+                      onClick={() => setDialogOpen(true)}
+                    >
+                      Issue Token
+                    </Button>
+                  )}
+                </Box>
+              ) : (
+                <Stack
+                  spacing={1}
+                  sx={{
+                    maxHeight: { lg: 520 },
+                    overflowY: 'auto',
+                    pr: 0.5,
+                    '&::-webkit-scrollbar': { width: 4 },
+                    '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
+                  }}
+                >
+                  {filtered.map((token) => {
+                    const cfg = statusConfig[token.status];
+                    const isDone = token.status === 'DONE' || token.status === 'SKIPPED';
+                    const isCurrent = currentToken?.id === token.id;
+                    return (
+                      <Box
+                        key={token.id}
+                        sx={{
+                          p: 1.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1.75,
+                          borderRadius: 1,
+                          opacity: isDone ? 0.62 : 1,
+                          bgcolor: isCurrent
+                            ? alpha(theme.palette.primary.main, 0.07)
+                            : alpha(theme.palette.primary.main, 0.03),
+                          border: '1px solid',
+                          borderColor: isCurrent
+                            ? alpha(theme.palette.primary.main, 0.28)
+                            : theme.palette.divider,
+                          borderLeft: '4px solid',
+                          borderLeftColor:
+                            token.status === 'WAITING'
+                              ? 'warning.main'
+                              : token.status === 'DONE'
+                                ? 'success.main'
+                                : 'divider',
+                        }}
+                      >
+                        <Avatar
+                          sx={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 1,
+                            bgcolor: alpha(
+                              cfg.color === 'default' ? theme.palette.action.active : theme.palette[cfg.color].main,
+                              0.12,
+                            ),
+                            color: cfg.color === 'default' ? 'text.secondary' : `${cfg.color}.main`,
+                            fontWeight: 900,
+                            fontSize: 14,
+                          }}
+                        >
+                          {String(token.tokenNumber).padStart(3, '0')}
+                        </Avatar>
 
-                  <Chip label={cfg.label} color={cfg.color} size="small" sx={{ fontWeight: 600, minWidth: 90 }} />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Stack direction="row" alignItems="center" gap={1}>
+                            <Typography fontWeight={700} fontSize={14} noWrap>
+                              {token.patient.firstName} {token.patient.lastName}
+                            </Typography>
+                            {isCurrent && (
+                              <Chip
+                                label="Now"
+                                size="small"
+                                color="primary"
+                                sx={{ height: 18, fontSize: 10, fontWeight: 800, borderRadius: 1 }}
+                              />
+                            )}
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                            Dr. {token.doctor.firstName} {token.doctor.lastName}
+                            {token.reason ? ` · ${token.reason}` : ''}
+                            {token.notes ? ` · ${token.notes}` : ''}
+                          </Typography>
+                        </Box>
 
-                  {/* Actions */}
-                  <Stack direction="row" gap={0.5}>
-                    <Tooltip title="Print Token">
-                      <IconButton size="small" onClick={() => setPrintToken(token)}>
-                        <PrintOutlinedIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    {!isAdmin && token.status === 'WAITING' && (
-                      <Tooltip title="Mark Done">
-                        <IconButton size="small" color="success" onClick={() => statusMutation.mutate({ id: token.id, status: 'DONE' })}>
-                          <CheckCircleOutlinedIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                    {!isAdmin && token.status === 'WAITING' && (
-                      <Tooltip title="Skip">
-                        <IconButton size="small" onClick={() => statusMutation.mutate({ id: token.id, status: 'SKIPPED' })}>
-                          <SkipNextOutlinedIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                    {!isAdmin && token.status === 'WAITING' && (
-                      <Tooltip title="Delete">
-                        <IconButton size="small" color="error" onClick={() => deleteMutation.mutate(token.id)}>
-                          <DeleteOutlineIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </Stack>
-                </Paper>
-              );
-            })}
+                        <Chip
+                          label={cfg.label}
+                          color={cfg.color}
+                          size="small"
+                          sx={{ fontWeight: 700, minWidth: 78, borderRadius: 1, display: { xs: 'none', sm: 'inline-flex' } }}
+                        />
+
+                        <Stack direction="row" gap={0.25}>
+                          <Tooltip title="Print Token">
+                            <IconButton size="small" onClick={() => setPrintToken(token)} sx={{ borderRadius: 1 }}>
+                              <PrintOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          {!isAdmin && token.status === 'WAITING' && (
+                            <Tooltip title="Mark Done">
+                              <IconButton
+                                size="small"
+                                color="success"
+                                onClick={() => statusMutation.mutate({ id: token.id, status: 'DONE' })}
+                                sx={{ borderRadius: 1 }}
+                              >
+                                <CheckCircleOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {!isAdmin && token.status === 'WAITING' && (
+                            <Tooltip title="Skip">
+                              <IconButton
+                                size="small"
+                                onClick={() => statusMutation.mutate({ id: token.id, status: 'SKIPPED' })}
+                                sx={{ borderRadius: 1 }}
+                              >
+                                <SkipNextOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {!isAdmin && token.status === 'WAITING' && (
+                            <Tooltip title="Delete">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => deleteMutation.mutate(token.id)}
+                                sx={{ borderRadius: 1 }}
+                              >
+                                <DeleteOutlineIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Stack>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              )}
+            </Paper>
           </Stack>
-        )}
+
+          {/* Now serving sidebar */}
+          {currentToken && (
+            <Stack spacing={2} sx={{ minWidth: 0 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.75,
+                  borderRadius: '24px',
+                  border: 'none',
+                  background: theme.palette.mode === 'dark'
+                    ? `linear-gradient(160deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.primary.dark, 0.7)} 100%)`
+                    : `linear-gradient(160deg, ${theme.palette.primary.dark} 0%, ${darken(theme.palette.primary.main, 0.42)} 100%)`,
+                  color: theme.palette.common.white,
+                  boxShadow: `0 12px 28px ${alpha(theme.palette.primary.main, 0.28)}`,
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                <Box sx={{ position: 'absolute', right: -30, top: -30, width: 120, height: 120, borderRadius: '50%', border: `2px solid ${alpha('#fff', 0.12)}` }} />
+                <Box sx={{ position: 'absolute', right: 20, bottom: -40, width: 100, height: 100, borderRadius: '50%', bgcolor: alpha('#fff', 0.08) }} />
+                <Typography variant="caption" sx={{ opacity: 0.8, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                  Now Serving
+                </Typography>
+                <Typography sx={{ fontSize: 64, fontWeight: 900, lineHeight: 1, mt: 1, letterSpacing: '-0.03em' }}>
+                  {String(currentToken.tokenNumber).padStart(3, '0')}
+                </Typography>
+                <Typography fontWeight={800} fontSize={18} sx={{ mt: 1.5 }}>
+                  {currentToken.patient.firstName} {currentToken.patient.lastName}
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.88, mt: 0.35 }}>
+                  Dr. {currentToken.doctor.firstName} {currentToken.doctor.lastName}
+                </Typography>
+                {(currentToken.reason || currentToken.notes) && (
+                  <Typography variant="caption" sx={{ opacity: 0.75, display: 'block', mt: 1 }}>
+                    {[currentToken.reason, currentToken.notes].filter(Boolean).join(' · ')}
+                  </Typography>
+                )}
+                <Stack direction="row" spacing={1} sx={{ mt: 2.5 }}>
+                  <Chip
+                    label={statusConfig[currentToken.status].label}
+                    size="small"
+                    sx={{
+                      fontWeight: 800,
+                      bgcolor: alpha('#fff', 0.18),
+                      color: '#fff',
+                      borderRadius: 1,
+                    }}
+                  />
+                  <Tooltip title="Print Token">
+                    <IconButton
+                      size="small"
+                      onClick={() => setPrintToken(currentToken)}
+                      sx={{ color: '#fff', bgcolor: alpha('#fff', 0.12), borderRadius: 1, '&:hover': { bgcolor: alpha('#fff', 0.22) } }}
+                    >
+                      <PrintOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+                {!isAdmin && (
+                  <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      startIcon={<CheckCircleOutlinedIcon />}
+                      onClick={() => statusMutation.mutate({ id: currentToken.id, status: 'DONE' })}
+                      sx={{
+                        borderRadius: 2,
+                        fontWeight: 800,
+                        bgcolor: '#fff',
+                        color: theme.palette.primary.dark,
+                        boxShadow: 'none',
+                        '&:hover': { bgcolor: alpha('#fff', 0.9), boxShadow: 'none' },
+                      }}
+                    >
+                      Done
+                    </Button>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      startIcon={<SkipNextOutlinedIcon />}
+                      onClick={() => statusMutation.mutate({ id: currentToken.id, status: 'SKIPPED' })}
+                      sx={{
+                        borderRadius: 2,
+                        fontWeight: 700,
+                        borderColor: alpha('#fff', 0.45),
+                        color: '#fff',
+                        '&:hover': { borderColor: '#fff', bgcolor: alpha('#fff', 0.08) },
+                      }}
+                    >
+                      Skip
+                    </Button>
+                  </Stack>
+                )}
+              </Paper>
+
+              <Paper elevation={0} sx={{ p: 2, ...softCard }}>
+                <Typography fontWeight={800} fontSize={13} sx={{ mb: 1.25 }}>Queue snapshot</Typography>
+                <Stack spacing={1}>
+                  {[
+                    { label: 'Waiting ahead', value: Math.max(0, waiting - (currentToken ? 1 : 0)) },
+                    { label: 'Done today', value: done },
+                    { label: 'Skipped', value: skipped },
+                  ].map((row) => (
+                    <Stack key={row.label} direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>{row.label}</Typography>
+                      <Typography fontWeight={800} fontSize={14} color="primary.main">{row.value}</Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              </Paper>
+            </Stack>
+          )}
+        </Box>
       </Stack>
 
       <IssueTokenDialog open={dialogOpen} onClose={() => setDialogOpen(false)} date={date} />
       {printToken && <TokenPrintPreview token={printToken} onClose={() => setPrintToken(null)} />}
-
     </>
   );
 }

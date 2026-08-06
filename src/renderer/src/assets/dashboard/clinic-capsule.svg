@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 160" fill="none">
+  <defs>
+    <linearGradient id="capTop" x1="30" y1="10" x2="90" y2="80" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#86EFAC"/>
+      <stop offset="1" stop-color="#16A34A"/>
+    </linearGradient>
+    <linearGradient id="capBot" x1="30" y1="80" x2="90" y2="150" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#ECFDF5"/>
+    </linearGradient>
+    <filter id="capShadow" x="-25%" y="-15%" width="150%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <g filter="url(#capShadow)" transform="rotate(-28 60 80)">
+    <path d="M35 78h50v52c0 14-11 25-25 25s-25-11-25-25V78z" fill="url(#capBot)"/>
+    <path d="M35 78h50V30c0-14-11-25-25-25S35 16 35 30v48z" fill="url(#capTop)"/>
+    <path d="M42 28c6-10 20-12 30-4" stroke="#fff" stroke-opacity="0.5" stroke-width="4" stroke-linecap="round"/>
+    <rect x="35" y="74" width="50" height="8" fill="#4ADE80" fill-opacity="0.4"/>
+  </g>
+</svg>

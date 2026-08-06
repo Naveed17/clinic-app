@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 130" fill="none">
+  <defs>
+    <linearGradient id="heartFill" x1="30" y1="10" x2="110" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#BBF7D0"/>
+      <stop offset="0.5" stop-color="#4ADE80"/>
+      <stop offset="1" stop-color="#16A34A"/>
+    </linearGradient>
+    <filter id="heartShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="7" stdDeviation="5" flood-color="#000" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <g filter="url(#heartShadow)">
+    <path d="M70 118C30 88 12 62 12 40 12 22 26 10 44 10c11 0 20 5 26 14 6-9 15-14 26-14 18 0 32 12 32 30 0 22-18 48-58 78z" fill="url(#heartFill)"/>
+    <path d="M42 34c8-10 22-8 28 2" stroke="#fff" stroke-opacity="0.45" stroke-width="5" stroke-linecap="round"/>
+    <path d="M52 72c8 6 18 10 28 8" stroke="#fff" stroke-opacity="0.35" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>
