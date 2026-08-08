@@ -7,8 +7,8 @@ import {
   Stack, Switch, TextField, Typography,
 } from '@mui/material';
 import {
-  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogFormSx, dialogPaperProps,
 } from '@/components/DialogUI';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -92,7 +92,11 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
   if (!doctor && open) {
     return (
       <Dialog open={open} onClose={onClose} PaperProps={dialogPaperProps}>
-        <DialogContent><Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box></DialogContent>
+        <DialogContent sx={dialogContentSx}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        </DialogContent>
       </Dialog>
     );
   }
@@ -100,7 +104,11 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
   return (
     <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
       <FormDialogTitle title="Edit Doctor" subtitle="Update account details and doctor profile." />
-      <Box component="form" onSubmit={form.handleSubmit((v) => mutation.mutate(v))}>
+      <Box
+        component="form"
+        onSubmit={form.handleSubmit((v) => mutation.mutate(v))}
+        sx={dialogFormSx}
+      >
         <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.25} sx={{ pt: 0.5 }}>
             {mutation.isError && <Alert severity="error">Unable to save. Please try again.</Alert>}
@@ -131,8 +139,8 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
           </Stack>
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
-          <Button disabled={mutation.isPending} type="submit" variant="contained" sx={dialogSubmitBtnSx}>Save changes</Button>
+          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+          <SubmitButton type="submit" loading={mutation.isPending}>Save changes</SubmitButton>
         </DialogActions>
       </Box>
     </Dialog>

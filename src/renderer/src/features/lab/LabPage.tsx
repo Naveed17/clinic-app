@@ -31,11 +31,12 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import type { LabOrder, LabOrderStatus } from '@/types/lab';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import {
-  ConfirmDialog, FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps,
 } from '@/components/DialogUI';
 import { LabReportPrint } from './LabReportPrint';
 
@@ -71,6 +72,7 @@ export function LabPage(): React.JSX.Element {
   const [resultText, setResultText] = useState('');
   const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
   const [form, setForm] = useState({ patientId: '', test: '', notes: '' });
+  const { isOnline: isOnlineDb } = useDatabaseMode();
 
   const { data: orders = [], isLoading, isError } = useQuery<LabOrder[]>({
     queryKey: ['lab-orders'],
@@ -263,7 +265,7 @@ export function LabPage(): React.JSX.Element {
                       <Tooltip title="Print report"><IconButton sx={actionBtnSx} onClick={() => setPrintOrder(order)}><PrintOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                     )}
                     {isLabTech && order.status === 'PENDING' && (
-                      <Button size="small" variant="outlined" sx={{ borderRadius: 1.5, fontSize: 12, py: 0.25, px: 1.25 }} onClick={() => statusMutation.mutate({ id: order.id, status: 'IN_PROGRESS' })}>Start</Button>
+                      <Button size="small" variant="outlined" loading={statusMutation.isPending} sx={{ borderRadius: 1.5, fontSize: 12, py: 0.25, px: 1.25 }} onClick={() => statusMutation.mutate({ id: order.id, status: 'IN_PROGRESS' })}>Start</Button>
                     )}
                     {isLabTech && order.status === 'IN_PROGRESS' && (
                       <Button size="small" color="success" variant="contained" sx={{ borderRadius: 1.5, fontSize: 12, py: 0.25, px: 1.25 }} onClick={() => { setResultDialog(order); setResultText(order.result ?? ''); }}>Add result</Button>
@@ -319,15 +321,14 @@ export function LabPage(): React.JSX.Element {
           </Stack>
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
-          <Button onClick={() => setDialogOpen(false)} sx={dialogCancelBtnSx}>Cancel</Button>
-          <Button
-            disabled={!form.patientId || !form.test || createMutation.isPending}
+          <Button onClick={() => setDialogOpen(false)} disabled={createMutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+          <SubmitButton
+            disabled={!form.patientId || !form.test}
+            loading={createMutation.isPending}
             onClick={() => createMutation.mutate()}
-            variant="contained"
-            sx={dialogSubmitBtnSx}
           >
             Create order
-          </Button>
+          </SubmitButton>
         </DialogActions>
       </Dialog>
 
@@ -350,17 +351,21 @@ export function LabPage(): React.JSX.Element {
             <Divider />
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="subtitle2">Attachments</Typography>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={uploadReportMutation.isPending ? <CircularProgress size={14} /> : <AttachFileOutlinedIcon />}
-                disabled={uploadReportMutation.isPending}
-                onClick={() => uploadReportMutation.mutate()}
-              >
-                Attach file
-              </Button>
+              {!isOnlineDb && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<AttachFileOutlinedIcon />}
+                  loading={uploadReportMutation.isPending}
+                  onClick={() => uploadReportMutation.mutate()}
+                >
+                  Attach file
+                </Button>
+              )}
             </Box>
-            {labReports.length === 0 ? (
+            {isOnlineDb ? (
+              <Alert severity="info">File attachments are not available in online mode yet.</Alert>
+            ) : labReports.length === 0 ? (
               <Typography variant="body2" color="text.secondary">No attachments.</Typography>
             ) : (
               <List dense disablePadding>
@@ -390,16 +395,15 @@ export function LabPage(): React.JSX.Element {
           </Stack>
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
-          <Button onClick={() => setResultDialog(null)} sx={dialogCancelBtnSx}>Cancel</Button>
-          <Button
+          <Button onClick={() => setResultDialog(null)} disabled={resultMutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+          <SubmitButton
             color="success"
-            disabled={!resultText || resultMutation.isPending}
+            disabled={!resultText}
+            loading={resultMutation.isPending}
             onClick={() => resultMutation.mutate({ id: resultDialog!.id, result: resultText })}
-            variant="contained"
-            sx={dialogSubmitBtnSx}
           >
             Save and complete
-          </Button>
+          </SubmitButton>
         </DialogActions>
       </Dialog>}
 

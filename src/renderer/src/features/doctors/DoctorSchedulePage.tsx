@@ -6,6 +6,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { doctorsService } from '@/services/doctors.service';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -16,13 +17,14 @@ interface SlotState {
   isActive: boolean;
 }
 
-const defaultSlots = (): SlotState[] =>
-  DAYS.map((_, i) => ({ dayOfWeek: i, startTime: '09:00', endTime: '17:00', isActive: i >= 1 && i <= 5 }));
+const emptySlots = (): SlotState[] =>
+  DAYS.map((_, i) => ({ dayOfWeek: i, startTime: '09:00', endTime: '17:00', isActive: false }));
 
 export function DoctorSchedulePage(): React.JSX.Element {
   const qc = useQueryClient();
-  const [doctorId, setDoctorId] = useState('');
-  const [slots, setSlots] = useState<SlotState[]>(defaultSlots());
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [doctorId, setDoctorId] = useState(() => searchParams.get('doctorId') ?? '');
+  const [slots, setSlots] = useState<SlotState[]>(emptySlots());
   const [saved, setSaved] = useState(false);
 
   const doctors = useQuery<{ id: string; firstName: string; lastName: string; isActive: boolean }[]>({
@@ -50,11 +52,23 @@ export function DoctorSchedulePage(): React.JSX.Element {
   });
 
   useEffect(() => {
-    if (!scheduleQuery.data) return;
-    const base = defaultSlots();
+    if (scheduleQuery.data === undefined) return;
+    if (scheduleQuery.data.length === 0) {
+      // No saved schedule yet — all days off until admin enables & saves
+      setSlots(emptySlots());
+      return;
+    }
+    const base = emptySlots();
     for (const s of scheduleQuery.data) {
       const idx = base.findIndex((b) => b.dayOfWeek === s.dayOfWeek);
-      if (idx >= 0) base[idx] = { dayOfWeek: s.dayOfWeek, startTime: s.startTime, endTime: s.endTime, isActive: s.isActive };
+      if (idx >= 0) {
+        base[idx] = {
+          dayOfWeek: s.dayOfWeek,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          isActive: s.isActive,
+        };
+      }
     }
     setSlots(base);
   }, [scheduleQuery.data]);
@@ -63,6 +77,8 @@ export function DoctorSchedulePage(): React.JSX.Element {
     mutationFn: () => window.clinic.schedule.upsert(doctorId, slots),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['schedule', doctorId] });
+      void qc.invalidateQueries({ queryKey: ['doctor', doctorId] });
+      void qc.invalidateQueries({ queryKey: ['doctors'] });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     },
@@ -78,7 +94,7 @@ export function DoctorSchedulePage(): React.JSX.Element {
       <Box>
         <Typography variant="h5" fontWeight={700}>Doctor Schedule</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-          Set weekly availability for each doctor.
+          Set weekly availability for each doctor. Appointments and tokens are blocked outside these hours.
         </Typography>
       </Box>
 
@@ -89,7 +105,12 @@ export function DoctorSchedulePage(): React.JSX.Element {
             <Select
               label="Select Doctor"
               value={doctorId}
-              onChange={(e) => { setDoctorId(e.target.value); setSlots(defaultSlots()); }}
+              onChange={(e) => {
+                const id = e.target.value;
+                setDoctorId(id);
+                setSlots(emptySlots());
+                setSearchParams(id ? { doctorId: id } : {});
+              }}
               sx={{ borderRadius: 1 }}
             >
               {doctorList.map((d) => (
@@ -181,15 +202,19 @@ export function DoctorSchedulePage(): React.JSX.Element {
               <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Button
                   variant="contained"
-                  startIcon={saveMutation.isPending ? <CircularProgress size={14} color="inherit" /> : <SaveOutlinedIcon />}
-                  disabled={saveMutation.isPending}
+                  startIcon={<SaveOutlinedIcon />}
+                  loading={saveMutation.isPending}
                   onClick={() => saveMutation.mutate()}
                   sx={{ borderRadius: 2 }}
                 >
                   Save schedule
                 </Button>
                 {saved && <Alert severity="success" sx={{ py: 0.5, px: 2, borderRadius: 2 }}>Schedule saved!</Alert>}
-                {saveMutation.isError && <Alert severity="error" sx={{ py: 0.5, px: 2, borderRadius: 2 }}>Failed to save.</Alert>}
+                {saveMutation.isError && (
+                  <Alert severity="error" sx={{ py: 0.5, px: 2, borderRadius: 2 }}>
+                    {(saveMutation.error as Error)?.message || 'Failed to save.'}
+                  </Alert>
+                )}
               </Box>
             </Paper>
           )}

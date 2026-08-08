@@ -9,7 +9,7 @@ export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
     define: {
-      'process.env.API_BASE_URL': JSON.stringify(env.API_BASE_URL || 'http://localhost:4000/api'),
+      'process.env.API_BASE_URL': JSON.stringify(env.API_BASE_URL || 'https://clinic-license-six.vercel.app/api'),
       'process.env.WHATSAPP_TOKEN': JSON.stringify(env.WHATSAPP_TOKEN || ''),
       'process.env.WHATSAPP_PHONE_NUMBER_ID': JSON.stringify(env.WHATSAPP_PHONE_NUMBER_ID || ''),
     },

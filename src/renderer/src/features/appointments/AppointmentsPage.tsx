@@ -42,8 +42,8 @@ import type { Appointment, AppointmentInput, AppointmentPerson } from '@/types/a
 import type { Token } from '@/types/token';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import {
-  ConfirmDialog, FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogFormSx, dialogPaperProps,
 } from '@/components/DialogUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -141,13 +141,18 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
         </TextField>
         <Button
           variant="contained" color="warning" size="small"
-          disabled={!providerId || mutation.isPending}
+          disabled={!providerId}
+          loading={mutation.isPending}
           onClick={() => mutation.mutate()}
         >
           Issue Token
         </Button>
       </Stack>
-      {mutation.isError && <Typography variant="caption" color="error">Failed to issue token.</Typography>}
+      {mutation.isError && (
+        <Typography variant="caption" color="error">
+          {(mutation.error as Error)?.message || 'Failed to issue token.'}
+        </Typography>
+      )}
     </Box>
   );
 }
@@ -249,10 +254,14 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
         title={appointment ? 'Update appointment' : 'Create appointment'}
         subtitle={appointment ? 'Edit schedule, doctor, and visit details.' : 'Book a new patient visit.'}
       />
-      <Box component="form" onSubmit={form.handleSubmit((v) => mutation.mutate(v))}>
+      <Box component="form" onSubmit={form.handleSubmit((v) => mutation.mutate(v))} sx={dialogFormSx}>
         <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.25}>
-            {mutation.isError && <Alert severity="error">Unable to save the appointment.</Alert>}
+            {mutation.isError && (
+              <Alert severity="error">
+                {(mutation.error as Error)?.message || 'Unable to save the appointment.'}
+              </Alert>
+            )}
 
             <Controller
               name="patientId"
@@ -412,10 +421,10 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
         </DialogContent>
 
         <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
-          <Button disabled={mutation.isPending} type="submit" variant="contained" sx={dialogSubmitBtnSx}>
+          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+          <SubmitButton type="submit" loading={mutation.isPending}>
             {appointment ? 'Save changes' : 'Create appointment'}
-          </Button>
+          </SubmitButton>
         </DialogActions>
       </Box>
     </Dialog>
@@ -609,16 +618,16 @@ export function AppointmentsPage(): React.JSX.Element {
                           </IconButton>
                         </span></Tooltip>
                         {a.status === 'SCHEDULED' && (
-                          <Tooltip title="Check In"><IconButton sx={actionBtnSx} onClick={() => statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' })}><LoginOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                          <Tooltip title="Check In"><IconButton sx={actionBtnSx} disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' })}><LoginOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                         )}
                         {a.status === 'CHECKED_IN' && (
-                          <Tooltip title="Mark Completed"><IconButton sx={actionBtnSx} onClick={() => statusMutation.mutate({ id: a.id, status: 'COMPLETED' })}><CheckCircleOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                          <Tooltip title="Mark Completed"><IconButton sx={actionBtnSx} disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: a.id, status: 'COMPLETED' })}><CheckCircleOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                         )}
                         {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
-                          <Tooltip title="No Show"><IconButton sx={actionBtnSx} onClick={() => statusMutation.mutate({ id: a.id, status: 'NO_SHOW' })}><PersonOffOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                          <Tooltip title="No Show"><IconButton sx={actionBtnSx} disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: a.id, status: 'NO_SHOW' })}><PersonOffOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                         )}
                         {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
-                          <Tooltip title="Cancel"><IconButton sx={actionBtnSx} onClick={() => cancelMutation.mutate(a.id)}><CancelOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                          <Tooltip title="Cancel"><IconButton sx={actionBtnSx} disabled={cancelMutation.isPending} onClick={() => cancelMutation.mutate(a.id)}><CancelOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                         )}
                         <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => setDeleteTarget(a)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                       </Stack>

@@ -1,5 +1,6 @@
 import type { AppointmentStatus } from '@prisma/client';
 import { getPrisma } from '../database/client';
+import { assertDoctorAvailable } from '../doctors/schedule.service';
 
 export interface AppointmentInput {
   patientId: string;
@@ -29,6 +30,15 @@ function toData(input: AppointmentInput) {
     notes: input.notes?.trim() ?? null,
     recurrenceRule: input.recurrenceRule ?? null,
   };
+}
+
+async function assertProviderActive(providerId: string): Promise<void> {
+  const doctor = await getPrisma().user.findFirst({
+    where: { id: providerId, role: 'DOCTOR' },
+    select: { id: true, isActive: true },
+  });
+  if (!doctor) throw new Error('Doctor not found.');
+  if (!doctor.isActive) throw new Error('This doctor is inactive. Activate them in Doctor Schedule first.');
 }
 
 export async function listAppointments() {
@@ -100,18 +110,40 @@ async function getAppointmentById(id: string) {
 }
 
 export async function createAppointment(input: AppointmentInput) {
+  await assertProviderActive(input.providerId);
+  const startsAt = parseDate(input.startsAt, 'startsAt');
+  const endsAt = parseDate(input.endsAt, 'endsAt');
+  await assertDoctorAvailable(input.providerId, startsAt, endsAt);
+
+  if (input.recurrenceRule) {
+    const [freq, countStr] = input.recurrenceRule.split(':');
+    const count = parseInt(countStr ?? '1', 10);
+    if (freq === 'WEEKLY' && count > 1) {
+      const durationMs = endsAt.getTime() - startsAt.getTime();
+      for (let i = 1; i < count; i++) {
+        const occStart = new Date(startsAt.getTime() + i * 7 * 24 * 60 * 60 * 1000);
+        const occEnd = new Date(occStart.getTime() + durationMs);
+        await assertDoctorAvailable(input.providerId, occStart, occEnd);
+      }
+    }
+  }
+
   const first = await getPrisma().appointment.create({ data: toData(input) });
 
   if (input.recurrenceRule) {
     const [freq, countStr] = input.recurrenceRule.split(':');
     const count = parseInt(countStr ?? '1', 10);
     if (freq === 'WEEKLY' && count > 1) {
-      const durationMs = new Date(input.endsAt).getTime() - new Date(input.startsAt).getTime();
+      const durationMs = endsAt.getTime() - startsAt.getTime();
       for (let i = 1; i < count; i++) {
-        const startsAt = new Date(new Date(input.startsAt).getTime() + i * 7 * 24 * 60 * 60 * 1000);
+        const occStartsAt = new Date(startsAt.getTime() + i * 7 * 24 * 60 * 60 * 1000);
         await getPrisma().appointment.create({
           data: {
-            ...toData({ ...input, startsAt: startsAt.toISOString(), endsAt: new Date(startsAt.getTime() + durationMs).toISOString() }),
+            ...toData({
+              ...input,
+              startsAt: occStartsAt.toISOString(),
+              endsAt: new Date(occStartsAt.getTime() + durationMs).toISOString(),
+            }),
             parentId: first.id,
             recurrenceRule: null,
           },
@@ -124,6 +156,12 @@ export async function createAppointment(input: AppointmentInput) {
 }
 
 export async function updateAppointment(id: string, input: AppointmentInput) {
+  await assertProviderActive(input.providerId);
+  await assertDoctorAvailable(
+    input.providerId,
+    parseDate(input.startsAt, 'startsAt'),
+    parseDate(input.endsAt, 'endsAt'),
+  );
   await getPrisma().appointment.update({ where: { id }, data: toData(input) });
   return getAppointmentById(id);
 }

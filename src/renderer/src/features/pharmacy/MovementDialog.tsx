@@ -3,8 +3,8 @@ import {
   MenuItem, Stack, TextField, Typography,
 } from '@mui/material';
 import {
-  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps,
 } from '@/components/DialogUI';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
@@ -84,10 +84,10 @@ export function MovementDialog({ onClose }: Props): React.JSX.Element {
         </Stack>
       </DialogContent>
       <DialogActions sx={dialogActionsSx}>
-        <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
-        <Button variant="contained" disabled={!batchId || mutation.isPending} onClick={() => mutation.mutate()} sx={dialogSubmitBtnSx}>
+        <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+        <SubmitButton disabled={!batchId} loading={mutation.isPending} onClick={() => mutation.mutate()}>
           Record
-        </Button>
+        </SubmitButton>
       </DialogActions>
     </Dialog>
   );

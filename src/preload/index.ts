@@ -4,10 +4,34 @@ import { io, type Socket } from 'socket.io-client';
 
 let apiUrl = '';
 let isLanClient = false;
+let isOnlineClient = false;
+let onlineSchemaId = '';
+let onlineLicenseKey = '';
 
 const settingsReady = ipcRenderer
   .invoke('settings:get')
-  .then(async (s: { serverMode: string; clientApiUrl: string }) => {
+  .then(async (s: {
+    serverMode: string;
+    clientApiUrl: string;
+    databaseMode?: string;
+    clinicalApiUrl?: string;
+    schemaId?: string;
+  }) => {
+    if (s.databaseMode === 'online' && s.clinicalApiUrl) {
+      apiUrl = s.clinicalApiUrl.replace(/\/+$/, '').replace(/\/api$/i, '');
+      isOnlineClient = true;
+      isLanClient = true; // reuse HTTP path in call()
+      onlineSchemaId = s.schemaId || '';
+      try {
+        const meta = await ipcRenderer.invoke('license:database-mode') as {
+          schemaId?: string;
+          key?: string;
+        };
+        if (meta?.schemaId) onlineSchemaId = meta.schemaId;
+        if (meta?.key) onlineLicenseKey = meta.key;
+      } catch { /* ignore */ }
+      return;
+    }
     if (s.serverMode === 'lan-client' && s.clientApiUrl) {
       // If main fell back to a local backend (server unreachable), app:get-api-url is set.
       // Prefer IPC/local in that case so we don't keep hitting a dead remote URL.
@@ -64,6 +88,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(isOnlineClient && onlineSchemaId ? { 'x-schema-id': onlineSchemaId } : {}),
+      ...(isOnlineClient && onlineLicenseKey ? { 'x-license-key': onlineLicenseKey } : {}),
       ...(init?.headers ?? {}),
     },
     ...init,
@@ -106,6 +132,15 @@ async function ensureSocket(): Promise<Socket> {
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
+      auth: isOnlineClient
+        ? {
+            schemaId: onlineSchemaId,
+            licenseKey: onlineLicenseKey,
+            ...(getAuthContext().token ? { token: getAuthContext().token } : {}),
+          }
+        : getAuthContext().token
+          ? { token: getAuthContext().token }
+          : undefined,
     });
   }
   return socket;
@@ -192,10 +227,26 @@ const api = {
     summary: () => call(() => request('/api/reports/summary'), 'reports:summary'),
   },
   users: {
-    list: (input: unknown) => ipc('users:list', input),
-    create: (input: unknown) => ipc('users:create', input),
-    update: (id: string, input: unknown) => ipc('users:update', id, input),
-    delete: (id: string) => ipc('users:delete', id),
+    list: (input: unknown) =>
+      call(
+        () => request(`/api/users?${toQueryString(input)}`),
+        'users:list', input,
+      ),
+    create: (input: unknown) =>
+      call(
+        () => request('/api/users', { method: 'POST', body: JSON.stringify(input) }),
+        'users:create', input,
+      ),
+    update: (id: string, input: unknown) =>
+      call(
+        () => request(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+        'users:update', id, input,
+      ),
+    delete: (id: string) =>
+      call(
+        () => request(`/api/users/${id}`, { method: 'DELETE' }),
+        'users:delete', id,
+      ),
   },
   doctors: {
     list: (input: unknown) =>
@@ -235,17 +286,44 @@ const api = {
   },
   docs: {
     patient: {
-      list: (patientId: string) => ipc('docs:patient:list', patientId),
-      upload: (patientId: string) => ipc('docs:patient:upload', patientId),
-      delete: (id: string) => ipc('docs:patient:delete', id),
-      open: (id: string) => ipc('docs:patient:open', id),
-      whatsapp: (id: string, phone?: string) => ipc('docs:patient:whatsapp', id, phone),
+      list: (patientId: string) =>
+        isOnlineClient
+          ? Promise.resolve([])
+          : ipc('docs:patient:list', patientId),
+      upload: (patientId: string) =>
+        isOnlineClient
+          ? Promise.reject(new Error('Document upload is not available in online mode yet.'))
+          : ipc('docs:patient:upload', patientId),
+      delete: (id: string) =>
+        isOnlineClient
+          ? Promise.reject(new Error('Document delete is not available in online mode yet.'))
+          : ipc('docs:patient:delete', id),
+      open: (id: string) =>
+        isOnlineClient
+          ? Promise.reject(new Error('Document open is not available in online mode yet.'))
+          : ipc('docs:patient:open', id),
+      whatsapp: (id: string, phone?: string) =>
+        isOnlineClient
+          ? Promise.reject(new Error('WhatsApp send is not available in online mode yet.'))
+          : ipc('docs:patient:whatsapp', id, phone),
     },
     lab: {
-      list: (labOrderId: string) => ipc('docs:lab:list', labOrderId),
-      upload: (labOrderId: string) => ipc('docs:lab:upload', labOrderId),
-      delete: (id: string) => ipc('docs:lab:delete', id),
-      open: (id: string) => ipc('docs:lab:open', id),
+      list: (labOrderId: string) =>
+        isOnlineClient
+          ? Promise.resolve([])
+          : ipc('docs:lab:list', labOrderId),
+      upload: (labOrderId: string) =>
+        isOnlineClient
+          ? Promise.reject(new Error('Lab report upload is not available in online mode yet.'))
+          : ipc('docs:lab:upload', labOrderId),
+      delete: (id: string) =>
+        isOnlineClient
+          ? Promise.reject(new Error('Lab report delete is not available in online mode yet.'))
+          : ipc('docs:lab:delete', id),
+      open: (id: string) =>
+        isOnlineClient
+          ? Promise.reject(new Error('Lab report open is not available in online mode yet.'))
+          : ipc('docs:lab:open', id),
     },
   },
   tokens: {
@@ -294,7 +372,11 @@ const api = {
   },
   lab: {
     list: () => call(() => request('/api/lab'), 'lab:list'),
-    listByToken: (tokenId: string) => ipc('lab:list-by-token', tokenId),
+    listByToken: (tokenId: string) =>
+      call(
+        () => request(`/api/lab/by-token/${encodeURIComponent(tokenId)}`),
+        'lab:list-by-token', tokenId,
+      ),
     patients: () => call(() => request('/api/lab/patients'), 'lab:patients'),
     create: (input: unknown) =>
       call(
@@ -314,9 +396,14 @@ const api = {
   },
   realtime: {
     connect: async () => {
+      await settingsReady;
       const activeSocket = await ensureSocket();
       const { token } = getAuthContext();
-      activeSocket.auth = token ? { token } : {};
+      activeSocket.auth = {
+        ...(token ? { token } : {}),
+        ...(isOnlineClient && onlineSchemaId ? { schemaId: onlineSchemaId } : {}),
+        ...(isOnlineClient && onlineLicenseKey ? { licenseKey: onlineLicenseKey } : {}),
+      };
       if (!activeSocket.connected) activeSocket.connect();
     },
     disconnect: () => {
@@ -386,6 +473,8 @@ const api = {
     status: () => ipc('license:status'),
     activate: (key: string) => ipc('license:activate', key),
     modules: () => ipc<Record<string, boolean>>('license:modules'),
+    databaseMode: () =>
+      ipc<{ databaseMode: 'local' | 'online'; clinicalApiUrl: string; schemaId: string }>('license:database-mode'),
   },
   medicines: {
     search: (query: string) =>

@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import type { Server as SocketIOServer } from 'socket.io';
 import { emitDataChange } from '../realtime';
-import { createLabOrder, labPatients, listLabOrders, saveLabResult, updateLabOrderStatus } from '../../lab/lab.service';
+import {
+  createLabOrder,
+  labPatients,
+  listLabOrders,
+  listLabOrdersByToken,
+  saveLabResult,
+  updateLabOrderStatus,
+} from '../../lab/lab.service';
 
 export function createLabRouter(io: SocketIOServer): Router {
   const router = Router();
@@ -12,6 +19,10 @@ export function createLabRouter(io: SocketIOServer): Router {
 
   router.get('/patients', async (_req, res) => {
     res.json(await labPatients());
+  });
+
+  router.get('/by-token/:tokenId', async (req, res) => {
+    res.json(await listLabOrdersByToken(String(req.params.tokenId)));
   });
 
   router.post('/', async (req, res) => {

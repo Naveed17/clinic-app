@@ -3,6 +3,7 @@ import { getPrisma } from '../database/client';
 import { randomUUID } from 'node:crypto';
 import { markCheckIn, markCheckOut } from '../doctors/attendance.service';
 import { adjustStockByMedicineName } from '../inventory/inventory.service';
+import { assertDoctorAvailableOnDate } from '../doctors/schedule.service';
 
 export interface TokenInput {
   patientId: string;
@@ -98,6 +99,14 @@ export async function listTokenPatients() {
 }
 
 export async function createToken(input: TokenInput) {
+  const doctor = await getPrisma().user.findFirst({
+    where: { id: input.doctorId, role: 'DOCTOR' },
+    select: { id: true, isActive: true },
+  });
+  if (!doctor) throw new Error('Doctor not found.');
+  if (!doctor.isActive) throw new Error('This doctor is inactive. Activate them in Doctor Schedule first.');
+  await assertDoctorAvailableOnDate(input.doctorId, input.date);
+
   const existing = await getPrisma().token.findFirst({
     where: { patientId: input.patientId, date: input.date },
     include: tokenInclude,

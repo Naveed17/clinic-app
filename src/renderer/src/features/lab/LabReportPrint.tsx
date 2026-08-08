@@ -191,13 +191,21 @@ export function LabReportPrint({ order, onClose }: { order: LabOrder; onClose: (
     }));
   }, []);
   return (
-    <Dialog open onClose={onClose} maxWidth="md" fullWidth>
-      <DialogContent sx={{ p: 0, height: 720 }}>
+    <Dialog
+      open
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: { display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' },
+      }}
+    >
+      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
         <PDFViewer width="100%" height="100%" showToolbar>
           <LabReportDocument order={order} {...clinic} />
         </PDFViewer>
       </DialogContent>
-      <DialogActions sx={{ px: 2, pb: 2 }}>
+      <DialogActions sx={{ px: 2, py: 1.5, flexShrink: 0 }}>
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
     </Dialog>

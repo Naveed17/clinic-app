@@ -21,6 +21,7 @@ import { appointmentsService } from '@/services/appointments.service';
 import { invoicesService } from '@/services/invoices.service';
 import type { Patient } from '@/types/patient';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { DocViewerDialog, type DocViewerData } from './DocViewerDialog';
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
 import { ConfirmDialog } from '@/components/DialogUI';
@@ -188,6 +189,7 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
   const [waSnack, setWaSnack] = useState<{ open: boolean; success: boolean; msg: string }>({ open: false, success: true, msg: '' });
   const [waSending, setWaSending] = useState<string | null>(null);
   const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
+  const { isOnline: isOnlineDb } = useDatabaseMode();
 
   const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list });
@@ -226,9 +228,18 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
       fullWidth
       maxWidth="lg"
       onClose={onClose}
-      PaperProps={{ sx: { borderRadius: '28px', overflow: 'hidden', bgcolor: 'background.default' } }}
+      PaperProps={{
+        sx: {
+          borderRadius: '28px',
+          overflow: 'hidden',
+          bgcolor: 'background.default',
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: '90vh',
+        },
+      }}
     >
-      <Box sx={{ p: { xs: 2, sm: 2.5 }, bgcolor: 'background.default' }}>
+      <Box sx={{ p: { xs: 2, sm: 2.5 }, bgcolor: 'background.default', flexShrink: 0 }}>
         <Stack spacing={2}>
           <Paper
             elevation={0}
@@ -292,7 +303,8 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
         onChange={(_, v) => setTab(v)}
         variant="scrollable"
         scrollButtons="auto"
-        sx={{ px: 2.5, borderBottom: 1, borderColor: 'divider', minHeight: 48,
+        sx={{
+          px: 2.5, borderBottom: 1, borderColor: 'divider', minHeight: 48, flexShrink: 0,
           '& .MuiTab-root': { minHeight: 48, fontSize: 13, fontWeight: 700, textTransform: 'none', gap: 0.75 },
         }}
       >
@@ -303,11 +315,11 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
         <Tab icon={<MedicalServicesOutlinedIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Prescriptions" />
       </Tabs>
 
-      <DialogContent sx={{ p: 0, minHeight: 420, bgcolor: 'background.default' }}>
+      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflowY: 'auto', bgcolor: 'background.default' }}>
         {tab === 0 && (
           patientAppointments.length === 0
             ? <EmptyState icon={<CalendarMonthOutlinedIcon sx={{ fontSize: 40 }} />} text="No appointments found." />
-            : <Stack spacing={1} sx={{ p: 2, maxHeight: 460, overflowY: 'auto' }}>
+            : <Stack spacing={1} sx={{ p: 2 }}>
                 {[...patientAppointments]
                   .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
                   .map((a) => (
@@ -365,7 +377,7 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
         {tab === 1 && (
           patientInvoices.length === 0
             ? <EmptyState icon={<ReceiptOutlinedIcon sx={{ fontSize: 40 }} />} text="No invoices found." />
-            : <Stack spacing={1} sx={{ p: 2, maxHeight: 460, overflowY: 'auto' }}>
+            : <Stack spacing={1} sx={{ p: 2 }}>
                 {[...patientInvoices]
                   .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                   .map((inv) => (
@@ -435,11 +447,15 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
 
         {tab === 3 && (
           <Box sx={{ p: 2 }}>
-            {!isAdmin && (
+            {isOnlineDb ? (
+              <Alert severity="info" sx={{ mb: 1.5 }}>
+                File documents are not available in online database mode yet (cloud file storage coming soon).
+              </Alert>
+            ) : !isAdmin ? (
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
                 <Button
-                  startIcon={uploadMutation.isPending ? <CircularProgress size={14} /> : <AttachFileOutlinedIcon />}
-                  disabled={uploadMutation.isPending}
+                  startIcon={<AttachFileOutlinedIcon />}
+                  loading={uploadMutation.isPending}
                   onClick={() => uploadMutation.mutate()}
                   variant="contained"
                   size="small"
@@ -448,8 +464,10 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
                   Upload file
                 </Button>
               </Box>
-            )}
-            {docs.isLoading ? (
+            ) : null}
+            {isOnlineDb ? (
+              <EmptyState icon={<InsertDriveFileOutlinedIcon sx={{ fontSize: 40 }} />} text="Cloud file storage coming soon." />
+            ) : docs.isLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
             ) : (docs.data ?? []).length === 0 ? (
               <EmptyState icon={<InsertDriveFileOutlinedIcon sx={{ fontSize: 40 }} />} text="No documents uploaded." />
@@ -511,7 +529,7 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
         {tab === 4 && <PrescriptionsTab patientId={patient.id} patient={patient} />}
       </DialogContent>
 
-      <DialogActions sx={{ px: 2.5, py: 1.75, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
+      <DialogActions sx={{ px: 2.5, py: 1.75, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.default', flexShrink: 0 }}>
         <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 2, fontWeight: 700 }}>Close</Button>
       </DialogActions>
       {viewerDoc && <DocViewerDialog doc={viewerDoc} onClose={() => setViewerDoc(null)} />}

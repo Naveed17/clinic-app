@@ -208,8 +208,14 @@ declare global {
       };
       license: {
         status: () => Promise<boolean>;
-        activate: (key: string) => Promise<{ ok: boolean; error?: string }>;
+        activate: (key: string) => Promise<{ ok: boolean; error?: string; databaseMode?: 'local' | 'online' }>;
         modules: () => Promise<Record<string, boolean> | null>;
+        databaseMode: () => Promise<{
+          key?: string | null;
+          databaseMode: 'local' | 'online';
+          clinicalApiUrl: string;
+          schemaId: string;
+        }>;
       };
       medicines: {
         search: (query: string) => Promise<unknown>;

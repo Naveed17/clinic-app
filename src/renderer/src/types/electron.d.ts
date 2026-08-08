@@ -95,8 +95,14 @@ declare global {
       medicines: any;
       license: {
         status: () => Promise<boolean>;
-        activate: (key: string) => Promise<{ ok: boolean; error?: string }>;
+        activate: (key: string) => Promise<{ ok: boolean; error?: string; databaseMode?: 'local' | 'online' }>;
         modules: () => Promise<Record<string, boolean> | null>;
+        databaseMode: () => Promise<{
+          key?: string | null;
+          databaseMode: 'local' | 'online';
+          clinicalApiUrl: string;
+          schemaId: string;
+        }>;
       };
       patients: {
         list: (input: PatientListInput) => Promise<{ data: Patient[]; total: number }>;
@@ -159,8 +165,8 @@ declare global {
         upsert: (doctorId: string, slots: { dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }[]) => Promise<{ id: string; doctorId: string; dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }[]>;
       };
       settings: {
-        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean }>;
-        save: (patch: unknown) => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean }>;
+        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string }>;
+        save: (patch: unknown) => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string }>;
         relaunch: () => Promise<void>;
         lanIp: () => Promise<string>;
         testConnection: (url: string) => Promise<boolean>;

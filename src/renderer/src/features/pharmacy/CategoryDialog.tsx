@@ -2,8 +2,8 @@ import {
   Button, Dialog, DialogActions, DialogContent, Stack, TextField, Typography,
 } from '@mui/material';
 import {
-  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps,
 } from '@/components/DialogUI';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -43,10 +43,10 @@ export function CategoryDialog({ onClose }: Props): React.JSX.Element {
         </Stack>
       </DialogContent>
       <DialogActions sx={dialogActionsSx}>
-        <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
-        <Button variant="contained" disabled={!name.trim() || mutation.isPending} onClick={() => mutation.mutate()} sx={dialogSubmitBtnSx}>
+        <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+        <SubmitButton disabled={!name.trim()} loading={mutation.isPending} onClick={() => mutation.mutate()}>
           Add Category
-        </Button>
+        </SubmitButton>
       </DialogActions>
     </Dialog>
   );

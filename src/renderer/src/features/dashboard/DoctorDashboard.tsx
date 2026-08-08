@@ -7,6 +7,7 @@ import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutl
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import FormatListBulletedOutlinedIcon from '@mui/icons-material/FormatListBulletedOutlined';
+import TodayOutlinedIcon from '@mui/icons-material/TodayOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import {
   alpha, Avatar, Box, Button, Chip, Dialog, DialogActions, DialogContent,
@@ -108,9 +109,20 @@ export function DoctorDashboard(): React.JSX.Element {
   }
 
   const now = new Date();
+  const todayKey = now.toLocaleDateString('en-CA');
+
+  const todaysQueue = appointments
+    .filter((a) => {
+      if (['CANCELLED', 'NO_SHOW'].includes(a.status)) return false;
+      return new Date(a.startsAt).toLocaleDateString('en-CA') === todayKey;
+    })
+    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+
   const upcomingQueue = appointments
     .filter((a) => !['CANCELLED', 'NO_SHOW', 'COMPLETED'].includes(a.status))
     .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+
+  const todayActiveCount = todaysQueue.filter((a) => a.status !== 'COMPLETED').length;
 
   const appointmentStatusMutation = useMutation({
     mutationFn: ({
@@ -131,6 +143,140 @@ export function DoctorDashboard(): React.JSX.Element {
       if (appt) await openPrescription(appt);
     },
   });
+
+  const tabSx = {
+    position: 'relative' as const,
+    zIndex: 1,
+    minHeight: 0,
+    px: 2.2,
+    py: 0.85,
+    borderRadius: 99,
+    fontSize: 13,
+    fontWeight: 500,
+    textTransform: 'none' as const,
+    color: 'text.secondary',
+    '&.Mui-selected': { fontWeight: 700, color: 'text.primary' },
+  };
+
+  function renderQueueList(list: Appointment[], emptyLabel: string): React.JSX.Element {
+    if (list.length === 0) {
+      return (
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+          <EventOutlinedIcon sx={{ fontSize: 40, color: 'text.disabled' }} />
+          <Typography variant="body2" color="text.secondary">{emptyLabel}</Typography>
+        </Box>
+      );
+    }
+
+    return (
+      <Stack
+        spacing={0}
+        sx={{
+          flex: 1,
+          overflowY: 'auto',
+          '&::-webkit-scrollbar': { width: 4 },
+          '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
+          '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
+        }}
+      >
+        {list.map((appt, idx) => {
+          const start = new Date(appt.startsAt);
+          const end = new Date(appt.endsAt);
+          const color = STATUS_COLOR[appt.status];
+          const next = NEXT_STATUS[appt.status];
+          const isPast = start < now;
+          const isToday = start.toLocaleDateString('en-CA') === todayKey;
+          const isCheckedIn = appt.status === 'CHECKED_IN';
+          const isCompleted = appt.status === 'COMPLETED';
+
+          return (
+            <Box key={appt.id}>
+              {idx > 0 && <Divider />}
+              <Box
+                sx={{
+                  px: 3, py: 2,
+                  borderLeft: '4px solid',
+                  borderLeftColor: color,
+                  bgcolor: isCheckedIn ? alpha(theme.palette.warning.main, 0.05) : 'transparent',
+                  opacity: (isPast && appt.status === 'SCHEDULED') || isCompleted ? 0.7 : 1,
+                  transition: 'background 0.15s',
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <Avatar sx={{ width: 40, height: 40, fontSize: 13, fontWeight: 700, flexShrink: 0, bgcolor: alpha(color, 0.15), color }}>
+                    {appt.patient.firstName[0]}{appt.patient.lastName[0]}
+                  </Avatar>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography fontWeight={700} fontSize={14} noWrap>
+                      {appt.patient.firstName} {appt.patient.lastName}
+                    </Typography>
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <AccessTimeOutlinedIcon sx={{ fontSize: 12, color: 'text.disabled' }} />
+                      <Typography variant="caption" color="text.secondary" fontSize={12}>
+                        {isToday ? '' : `${start.toLocaleDateString([], { month: 'short', day: 'numeric' })} · `}
+                        {start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {' – '}
+                        {end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </Typography>
+                      {appt.reason && (
+                        <Typography variant="caption" color="text.disabled" noWrap sx={{ maxWidth: 160 }}>· {appt.reason}</Typography>
+                      )}
+                    </Stack>
+                  </Box>
+                  <Stack direction="row" alignItems="center" gap={0.75} flexShrink={0}>
+                    <Chip
+                      size="small"
+                      label={appt.status.replace('_', ' ')}
+                      sx={{ bgcolor: alpha(color, 0.12), color, fontWeight: 600, fontSize: '0.68rem', borderRadius: 1, height: 22 }}
+                    />
+                    <Tooltip title="Edit">
+                      <IconButton size="small" sx={{ p: 0.4 }} onClick={() => { setEditAppt(appt); setApptDialogOpen(true); }}>
+                        <EditOutlinedIcon sx={{ fontSize: 15 }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Patient History">
+                      <IconButton size="small" sx={{ p: 0.4 }} onClick={() => void openPatientHistory(appt)}>
+                        <HistoryOutlinedIcon sx={{ fontSize: 15 }} />
+                      </IconButton>
+                    </Tooltip>
+                    {isCompleted && (
+                      <Tooltip title="Write Prescription">
+                        <IconButton size="small" sx={{ p: 0.4 }} onClick={() => void openPrescription(appt)}>
+                          <MedicalServicesOutlinedIcon sx={{ fontSize: 15 }} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {next && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        endIcon={next === 'COMPLETED' ? <CheckCircleOutlineIcon sx={{ fontSize: '13px !important' }} /> : <ArrowForwardIcon sx={{ fontSize: '13px !important' }} />}
+                        loading={appointmentStatusMutation.isPending}
+                        onClick={() =>
+                          appointmentStatusMutation.mutate({
+                            id: appt.id,
+                            status: next as Appointment['status'],
+                            appt,
+                          })
+                        }
+                        sx={{
+                          fontSize: '0.7rem', py: 0.3, px: 1, borderRadius: 1,
+                          borderColor: STATUS_COLOR[next], color: STATUS_COLOR[next],
+                          '&:hover': { bgcolor: alpha(STATUS_COLOR[next], 0.08), borderColor: STATUS_COLOR[next] },
+                        }}
+                      >
+                        {next === 'CHECKED_IN' ? 'Check In' : 'Complete'}
+                      </Button>
+                    )}
+                  </Stack>
+                </Stack>
+              </Box>
+            </Box>
+          );
+        })}
+      </Stack>
+    );
+  }
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', gap: 2 }}>
@@ -200,13 +346,23 @@ export function DoctorDashboard(): React.JSX.Element {
               icon={<CalendarMonthOutlinedIcon sx={{ fontSize: 15 }} />}
               iconPosition="start"
               label="Calendar & Agenda"
-              sx={{
-                position: 'relative', zIndex: 1, minHeight: 0,
-                px: 2.2, py: 0.85, borderRadius: 99,
-                fontSize: 13, fontWeight: 500, textTransform: 'none',
-                color: 'text.secondary',
-                '&.Mui-selected': { fontWeight: 700, color: 'text.primary' },
-              }}
+              sx={tabSx}
+            />
+            <Tab
+              disableRipple
+              icon={<TodayOutlinedIcon sx={{ fontSize: 15 }} />}
+              iconPosition="start"
+              label={
+                <Stack direction="row" alignItems="center" gap={0.75}>
+                  Today&apos;s Queue
+                  {todayActiveCount > 0 && (
+                    <Box sx={{ px: 0.75, py: 0.1, borderRadius: 99, bgcolor: 'primary.main', color: '#fff', fontSize: 10, fontWeight: 800, lineHeight: 1.6 }}>
+                      {todayActiveCount}
+                    </Box>
+                  )}
+                </Stack>
+              }
+              sx={tabSx}
             />
             <Tab
               disableRipple
@@ -222,18 +378,12 @@ export function DoctorDashboard(): React.JSX.Element {
                   )}
                 </Stack>
               }
-              sx={{
-                position: 'relative', zIndex: 1, minHeight: 0,
-                px: 2.2, py: 0.85, borderRadius: 99,
-                fontSize: 13, fontWeight: 500, textTransform: 'none',
-                color: 'text.secondary',
-                '&.Mui-selected': { fontWeight: 700, color: 'text.primary' },
-              }}
+              sx={tabSx}
             />
           </Tabs>
         </Box>
 
-        {/* Tab 1 — Calendar */}
+        {/* Tab 0 — Calendar */}
         <Box sx={{ flex: 1, minHeight: 0, display: activeTab === 0 ? 'flex' : 'none', flexDirection: 'column', overflow: 'hidden' }}>
           <AppointmentCalendar
             appointments={appointments}
@@ -253,119 +403,14 @@ export function DoctorDashboard(): React.JSX.Element {
           />
         </Box>
 
-        {/* Tab 2 — Live Queue */}
+        {/* Tab 1 — Today's Queue */}
         <Box sx={{ flex: 1, minHeight: 0, display: activeTab === 1 ? 'flex' : 'none', flexDirection: 'column', overflow: 'hidden' }}>
-          {upcomingQueue.length === 0 ? (
-            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-              <EventOutlinedIcon sx={{ fontSize: 40, color: 'text.disabled' }} />
-              <Typography variant="body2" color="text.secondary">No upcoming appointments.</Typography>
-            </Box>
-          ) : (
-            <Stack
-              spacing={0}
-              sx={{
-                flex: 1,
-                overflowY: 'auto',
-                '&::-webkit-scrollbar': { width: 4 },
-                '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
-                '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
-              }}
-            >
-              {upcomingQueue.map((appt, idx) => {
-                const start = new Date(appt.startsAt);
-                const end = new Date(appt.endsAt);
-                const color = STATUS_COLOR[appt.status];
-                const next = NEXT_STATUS[appt.status];
-                const isPast = start < now;
-                const isToday = start.toLocaleDateString('en-CA') === now.toLocaleDateString('en-CA');
-                const isCheckedIn = appt.status === 'CHECKED_IN';
+          {renderQueueList(todaysQueue, 'No patients in today\'s queue.')}
+        </Box>
 
-                return (
-                  <Box key={appt.id}>
-                    {idx > 0 && <Divider />}
-                    <Box
-                      sx={{
-                        px: 3, py: 2,
-                        borderLeft: '4px solid',
-                        borderLeftColor: color,
-                        bgcolor: isCheckedIn ? alpha(theme.palette.warning.main, 0.05) : 'transparent',
-                        opacity: isPast && appt.status === 'SCHEDULED' ? 0.55 : 1,
-                        transition: 'background 0.15s',
-                      }}
-                    >
-                      <Stack direction="row" alignItems="center" spacing={2}>
-                        <Avatar sx={{ width: 40, height: 40, fontSize: 13, fontWeight: 700, flexShrink: 0, bgcolor: alpha(color, 0.15), color }}>
-                          {appt.patient.firstName[0]}{appt.patient.lastName[0]}
-                        </Avatar>
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography fontWeight={700} fontSize={14} noWrap>
-                            {appt.patient.firstName} {appt.patient.lastName}
-                          </Typography>
-                          <Stack direction="row" alignItems="center" spacing={0.5}>
-                            <AccessTimeOutlinedIcon sx={{ fontSize: 12, color: 'text.disabled' }} />
-                            <Typography variant="caption" color="text.secondary" fontSize={12}>
-                              {isToday ? '' : `${start.toLocaleDateString([], { month: 'short', day: 'numeric' })} · `}
-                              {start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              {' – '}
-                              {end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </Typography>
-                            {appt.reason && (
-                              <Typography variant="caption" color="text.disabled" noWrap sx={{ maxWidth: 160 }}>· {appt.reason}</Typography>
-                            )}
-                          </Stack>
-                        </Box>
-                        <Stack direction="row" alignItems="center" gap={0.75} flexShrink={0}>
-                          <Chip
-                            size="small"
-                            label={appt.status.replace('_', ' ')}
-                            sx={{ bgcolor: alpha(color, 0.12), color, fontWeight: 600, fontSize: '0.68rem', borderRadius: 1, height: 22 }}
-                          />
-                          <Tooltip title="Edit">
-                            <IconButton size="small" sx={{ p: 0.4 }} onClick={() => { setEditAppt(appt); setApptDialogOpen(true); }}>
-                              <EditOutlinedIcon sx={{ fontSize: 15 }} />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Patient History">
-                            <IconButton size="small" sx={{ p: 0.4 }} onClick={() => void openPatientHistory(appt)}>
-                              <HistoryOutlinedIcon sx={{ fontSize: 15 }} />
-                            </IconButton>
-                          </Tooltip>
-                          {appt.status === 'COMPLETED' && (
-                            <Tooltip title="Write Prescription">
-                              <IconButton size="small" sx={{ p: 0.4 }} onClick={() => openPrescription(appt)}>
-                                <MedicalServicesOutlinedIcon sx={{ fontSize: 15 }} />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {next && (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              endIcon={next === 'COMPLETED' ? <CheckCircleOutlineIcon sx={{ fontSize: '13px !important' }} /> : <ArrowForwardIcon sx={{ fontSize: '13px !important' }} />}
-                              onClick={() =>
-                                appointmentStatusMutation.mutate({
-                                  id: appt.id,
-                                  status: next as Appointment['status'],
-                                  appt,
-                                })
-                              }
-                              sx={{
-                                fontSize: '0.7rem', py: 0.3, px: 1, borderRadius: 1,
-                                borderColor: STATUS_COLOR[next], color: STATUS_COLOR[next],
-                                '&:hover': { bgcolor: alpha(STATUS_COLOR[next], 0.08), borderColor: STATUS_COLOR[next] },
-                              }}
-                            >
-                              {next === 'CHECKED_IN' ? 'Check In' : 'Complete'}
-                            </Button>
-                          )}
-                        </Stack>
-                      </Stack>
-                    </Box>
-                  </Box>
-                );
-              })}
-            </Stack>
-          )}
+        {/* Tab 2 — Live Queue */}
+        <Box sx={{ flex: 1, minHeight: 0, display: activeTab === 2 ? 'flex' : 'none', flexDirection: 'column', overflow: 'hidden' }}>
+          {renderQueueList(upcomingQueue, 'No upcoming appointments.')}
         </Box>
       </Paper>
 

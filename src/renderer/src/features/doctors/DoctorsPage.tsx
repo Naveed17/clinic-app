@@ -1,4 +1,5 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
+import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
@@ -33,8 +34,8 @@ import { useAuth } from '@/features/auth/AuthContext';
 import type { Doctor, DoctorInput, DoctorUpdateInput } from '@/types/doctor';
 import { tableSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import {
-  ConfirmDialog, FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogFormSx, dialogPaperProps,
 } from '@/components/DialogUI';
 
 const baseSchema = z.object({
@@ -141,7 +142,11 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
         title={isEditing ? 'Edit doctor' : 'Add doctor'}
         subtitle={isEditing ? 'Update doctor profile and account.' : 'Register a new doctor account.'}
       />
-      <Box component="form" onSubmit={form.handleSubmit(handleSubmit)}>
+      <Box
+        component="form"
+        onSubmit={form.handleSubmit(handleSubmit)}
+        sx={dialogFormSx}
+      >
         <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.25} sx={{ pt: 0.5 }}>
             {mutation.isError && <Alert severity="error">Unable to save. Please try again.</Alert>}
@@ -186,10 +191,10 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
           </Stack>
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
-          <Button disabled={mutation.isPending} type="submit" variant="contained" sx={dialogSubmitBtnSx}>
+          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+          <SubmitButton type="submit" loading={mutation.isPending}>
             {isEditing ? 'Save changes' : 'Add doctor'}
-          </Button>
+          </SubmitButton>
         </DialogActions>
       </Box>
     </Dialog>
@@ -286,6 +291,7 @@ export function DoctorsPage(): React.JSX.Element {
                   <TableCell align="right">
                     <Stack direction="row" gap={0.5} justifyContent="flex-end">
                       <Tooltip title="View details"><IconButton sx={actionBtnSx} onClick={() => navigate(`/doctors/${doc.id}`)}><OpenInNewOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                      <Tooltip title="Edit schedule"><IconButton sx={actionBtnSx} onClick={() => navigate(`/schedule?doctorId=${doc.id}`)}><CalendarMonthOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                       <Tooltip title="Edit"><IconButton sx={actionBtnSx} onClick={() => { setDialogDoctor(doc); setDialogOpen(true); }}><EditOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                       <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => setDeleteDoctor(doc)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                     </Stack>

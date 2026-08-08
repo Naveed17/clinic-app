@@ -198,13 +198,21 @@ export function InvoicePrintPreview({
   }, []);
 
   return (
-    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogContent sx={{ p: 0, height: 780 }}>
+    <Dialog
+      open
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: { display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' },
+      }}
+    >
+      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
         <PDFViewer width="100%" height="100%" showToolbar>
           <ReceiptDocument invoice={invoice} {...clinic} />
         </PDFViewer>
       </DialogContent>
-      <Box sx={{ p: 1.5, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+      <Box sx={{ p: 1.5, display: 'flex', justifyContent: 'flex-end', gap: 1, flexShrink: 0 }}>
         <Button onClick={onClose}>Close</Button>
         <Button variant="contained" startIcon={<PrintOutlinedIcon />} onClick={onClose}>
           Print from PDF viewer

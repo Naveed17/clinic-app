@@ -36,8 +36,8 @@ import { usersService } from '@/services/users.service';
 import type { User, UserInput, UserUpdateInput } from '@/types/user';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import {
-  ConfirmDialog, FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogFormSx, dialogPaperProps,
 } from '@/components/DialogUI';
 import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
 
@@ -171,7 +171,7 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
         title={isEditing ? 'Edit user' : 'Add user'}
         subtitle={isEditing ? 'Update account role and access.' : 'Create a new staff account.'}
       />
-      <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+      <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))} sx={dialogFormSx}>
         <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.25} sx={{ pt: 0.5 }}>
             {mutation.isError && <Alert severity="error">Unable to save the user. Please try again.</Alert>}
@@ -233,10 +233,10 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
           </Stack>
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
-          <Button disabled={mutation.isPending} type="submit" variant="contained" sx={dialogSubmitBtnSx}>
+          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+          <SubmitButton type="submit" loading={mutation.isPending}>
             {isEditing ? 'Save changes' : 'Add user'}
-          </Button>
+          </SubmitButton>
         </DialogActions>
       </Box>
     </Dialog>

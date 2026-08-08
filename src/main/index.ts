@@ -24,7 +24,7 @@ import { registerReportIpc } from './reports/report.ipc';
 import { registerUserIpc } from './users/user.ipc';
 import { registerDoctorIpc } from './doctors/doctor.ipc';
 import { registerSettingsIpc } from './settings/settings.ipc';
-import { getSettings, saveSettings } from './config/settings';
+import { getSettings, saveSettings, resolveOnlineApiOrigin } from './config/settings';
 import { startDiscoveryBroadcast, stopDiscoveryBroadcast } from './discovery/discovery.server';
 import { startDiscoveryListener, stopDiscoveryListener } from './discovery/discovery.client';
 import { registerBackupIpc } from './backup/backup.ipc';
@@ -138,7 +138,18 @@ app.whenReady().then(async () => {
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window));
   try {
     const settings = getSettings();
-    if (settings.serverMode === 'lan-client' && settings.clientApiUrl) {
+    const online =
+      settings.databaseMode === 'online' && Boolean(settings.clinicalApiUrl);
+
+    if (online) {
+      // Online = Vercel Nest API → Neon Postgres only (no local SQLite / LAN).
+      const clinicalOrigin = resolveOnlineApiOrigin(settings.clinicalApiUrl);
+      if (clinicalOrigin !== settings.clinicalApiUrl) {
+        saveSettings({ clinicalApiUrl: clinicalOrigin });
+      }
+      process.env.CLINIC_API_URL = clinicalOrigin;
+      console.log('[CareFlow] Online mode → Neon via', process.env.CLINIC_API_URL, settings.schemaId);
+    } else if (settings.serverMode === 'lan-client' && settings.clientApiUrl) {
       // Verify remote server is reachable before committing to client mode
       const reachable = await new Promise<boolean>((resolve) => {
         const { request } = require('node:http') as typeof import('node:http');

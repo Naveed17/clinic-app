@@ -5,8 +5,8 @@ import {
   IconButton, Stack, TextField, Typography,
 } from '@mui/material';
 import {
-  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps,
 } from '@/components/DialogUI';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
@@ -192,10 +192,10 @@ export function PurchaseDialog({ onClose }: Props): React.JSX.Element {
         </Stack>
       </DialogContent>
       <DialogActions sx={dialogActionsSx}>
-        <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
-        <Button variant="contained" disabled={!canSave || mutation.isPending} onClick={() => mutation.mutate()} sx={dialogSubmitBtnSx}>
+        <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+        <SubmitButton disabled={!canSave} loading={mutation.isPending} onClick={() => mutation.mutate()}>
           Save Purchase
-        </Button>
+        </SubmitButton>
       </DialogActions>
     </Dialog>
   );

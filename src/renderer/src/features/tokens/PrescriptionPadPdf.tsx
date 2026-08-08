@@ -93,6 +93,30 @@ const styles = StyleSheet.create({
     lineHeight: 1.65,
     paddingLeft: 4,
   },
+  bodyBlock: {
+    fontSize: 11,
+    color: PAD_INK,
+    lineHeight: 1.65,
+    marginBottom: 6,
+  },
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 4,
+    paddingLeft: 4,
+  },
+  listMarker: {
+    fontSize: 11,
+    color: PAD_INK,
+    lineHeight: 1.65,
+    width: 18,
+  },
+  listContent: {
+    flex: 1,
+    fontSize: 11,
+    color: PAD_INK,
+    lineHeight: 1.65,
+  },
   watermarkWrap: {
     position: 'absolute',
     top: 40,
@@ -224,15 +248,163 @@ export interface PrescriptionPadPdfProps {
   bodyText: string;
 }
 
+export type PadInline = { text: string; bold?: boolean };
+export type PadBlock =
+  | { type: 'p'; inlines: PadInline[] }
+  | { type: 'li'; marker: string; inlines: PadInline[] };
+
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function walkInlines(node: Node): PadInline[] {
+  const result: PadInline[] = [];
+  node.childNodes.forEach((child) => {
+    if (child.nodeType === Node.TEXT_NODE) {
+      const t = decodeHtmlEntities(child.textContent ?? '');
+      if (t) result.push({ text: t });
+      return;
+    }
+    if (child.nodeType !== Node.ELEMENT_NODE) return;
+    const el = child as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'br') {
+      result.push({ text: '\n' });
+      return;
+    }
+    if (tag === 'strong' || tag === 'b') {
+      walkInlines(el).forEach((inline) => result.push({ ...inline, bold: true }));
+      return;
+    }
+    result.push(...walkInlines(el));
+  });
+  return result;
+}
+
+function directListItems(listEl: Element): Element[] {
+  return Array.from(listEl.children).filter((c) => c.tagName.toLowerCase() === 'li');
+}
+
+/** Parse pad HTML into PDF-friendly blocks (paragraphs + list items). */
+export function htmlToPadBlocks(html: string): PadBlock[] {
+  if (!html?.trim()) return [];
+  if (!/<[a-z][\s\S]*>/i.test(html)) {
+    return html
+      .split(/\n/)
+      .map((line) => line.replace(/\u00a0/g, ' '))
+      .filter((line) => line.trim().length > 0)
+      .map((line) => ({ type: 'p' as const, inlines: [{ text: line }] }));
+  }
+
+  const doc = new DOMParser().parseFromString(`<div id="pad-root">${html}</div>`, 'text/html');
+  const root = doc.getElementById('pad-root');
+  if (!root) return [];
+
+  const blocks: PadBlock[] = [];
+
+  function pushParagraph(el: Element): void {
+    const inlines = walkInlines(el);
+    if (inlines.some((i) => i.text.trim())) blocks.push({ type: 'p', inlines });
+  }
+
+  function processChildren(parent: Element): void {
+    parent.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const t = decodeHtmlEntities(child.textContent ?? '').trim();
+        if (t) blocks.push({ type: 'p', inlines: [{ text: t }] });
+        return;
+      }
+      if (child.nodeType !== Node.ELEMENT_NODE) return;
+      const el = child as HTMLElement;
+      const tag = el.tagName.toLowerCase();
+
+      if (tag === 'p') {
+        pushParagraph(el);
+        return;
+      }
+      if (tag === 'ul') {
+        directListItems(el).forEach((li) => {
+          blocks.push({ type: 'li', marker: '•', inlines: walkInlines(li) });
+        });
+        return;
+      }
+      if (tag === 'ol') {
+        directListItems(el).forEach((li, i) => {
+          blocks.push({ type: 'li', marker: `${i + 1}.`, inlines: walkInlines(li) });
+        });
+        return;
+      }
+      if (tag === 'li') {
+        blocks.push({ type: 'li', marker: '•', inlines: walkInlines(el) });
+        return;
+      }
+      if (tag === 'br') {
+        blocks.push({ type: 'p', inlines: [{ text: ' ' }] });
+        return;
+      }
+      if (['div', 'blockquote', 'section'].includes(tag)) {
+        processChildren(el);
+        return;
+      }
+      pushParagraph(el);
+    });
+  }
+
+  processChildren(root);
+  return blocks;
+}
+
+function renderInlines(inlines: PadInline[]): React.JSX.Element[] {
+  return inlines.map((inline, j) => (
+    <Text key={j} style={inline.bold ? { fontFamily: 'Helvetica-Bold' } : undefined}>
+      {inline.text}
+    </Text>
+  ));
+}
+
+function PadBodyContent({ html }: { html: string }): React.JSX.Element {
+  const blocks = htmlToPadBlocks(html);
+  if (!blocks.length) return <Text style={styles.bodyText}> </Text>;
+
+  return (
+    <View>
+      {blocks.map((block, i) => {
+        if (block.type === 'li') {
+          return (
+            <View key={i} style={styles.listRow} wrap={false}>
+              <Text style={styles.listMarker}>{block.marker}</Text>
+              <Text style={styles.listContent}>{renderInlines(block.inlines)}</Text>
+            </View>
+          );
+        }
+        return (
+          <Text key={i} style={styles.bodyBlock}>
+            {renderInlines(block.inlines)}
+          </Text>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Flatten HTML to plain text while keeping bullet/number markers. */
 export function stripAdviceHtml(text: string): string {
   if (!text) return '';
-  if (!/<[a-z][\s\S]*>/i.test(text)) return text.trim();
-  return text
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
+  if (!/<[a-z][\s\S]*>/i.test(text)) return text.replace(/\u00a0/g, ' ').trim();
+  return htmlToPadBlocks(text)
+    .map((block) => {
+      const line = block.inlines.map((i) => i.text).join('').replace(/\s+/g, ' ').trim();
+      if (!line) return '';
+      return block.type === 'li' ? `${block.marker} ${line}` : line;
+    })
+    .filter(Boolean)
+    .join('\n')
     .trim();
 }
 
@@ -254,7 +426,7 @@ export function parsePadMeta(advice: string): {
       dob: m[3] || '',
       address: m[4] || '',
       diagnosis: m[5] || '',
-      body: stripAdviceHtml(advice.slice(m[0].length)),
+      body: advice.slice(m[0].length).trim(),
     };
   }
   // legacy meta
@@ -266,10 +438,10 @@ export function parsePadMeta(advice: string): {
       dob: legacy[3] || '',
       address: '',
       diagnosis: '',
-      body: stripAdviceHtml(advice.slice(legacy[0].length)),
+      body: advice.slice(legacy[0].length).trim(),
     };
   }
-  return { sex: '', age: '', dob: '', address: '', diagnosis: '', body: stripAdviceHtml(advice) };
+  return { sex: '', age: '', dob: '', address: '', diagnosis: '', body: advice.trim() };
 }
 
 function FieldLine({ label, value, width }: { label: string; value: string; width?: string | number }): React.JSX.Element {
@@ -294,7 +466,6 @@ export function PrescriptionPadDocument({
   bodyText,
 }: PrescriptionPadPdfProps): React.JSX.Element {
   const brand = clinic.clinicName?.trim() || 'HOSPITAL';
-  const cleanBody = stripAdviceHtml(bodyText);
 
   return (
     <Document>
@@ -330,7 +501,7 @@ export function PrescriptionPadDocument({
               <PlusMedPdf size={180} color={PAD_BLUE_SOFT} />
             </View>
             <Text style={styles.rx}>Rx</Text>
-            <Text style={styles.bodyText}>{cleanBody || ' '}</Text>
+            <PadBodyContent html={bodyText || ''} />
           </View>
 
           <View style={styles.signatureBlock}>
@@ -371,7 +542,21 @@ export function PrescriptionPadPdfPreview({
   ...docProps
 }: PrescriptionPadPdfProps & { onClose: () => void }): React.JSX.Element {
   return (
-    <Dialog open onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 1, overflow: 'hidden' } }}>
+    <Dialog
+      open
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 1,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: '90vh',
+        },
+      }}
+    >
       <Box
         sx={{
           px: 2.5,
@@ -381,6 +566,7 @@ export function PrescriptionPadPdfPreview({
           justifyContent: 'space-between',
           borderBottom: '1px solid',
           borderColor: 'divider',
+          flexShrink: 0,
         }}
       >
         <Typography fontWeight={700} fontSize={15}>
@@ -390,7 +576,7 @@ export function PrescriptionPadPdfPreview({
           Close
         </Button>
       </Box>
-      <DialogContent sx={{ p: 0, height: 750 }}>
+      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
         <PDFViewer width="100%" height="100%" showToolbar>
           <PrescriptionPadDocument {...docProps} />
         </PDFViewer>

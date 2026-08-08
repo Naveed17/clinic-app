@@ -1,5 +1,6 @@
 import { createSocket } from 'node:dgram';
 import { networkInterfaces } from 'node:os';
+import { getSettings } from '../config/settings';
 
 export const DISCOVERY_PORT = 41234;
 export const DISCOVERY_MAGIC = 'CLINIC_DISCOVERY';
@@ -18,15 +19,18 @@ function getLanIp(): string {
   return '127.0.0.1';
 }
 
+function buildPayload(port: number): Buffer {
+  const ip = getLanIp();
+  const name = getSettings().clinicName?.trim() || 'Clinic Server';
+  return Buffer.from(JSON.stringify({ magic: DISCOVERY_MAGIC, ip, port, name }));
+}
+
 export function startDiscoveryBroadcast(port: number): void {
   udpSocket = createSocket({ type: 'udp4', reuseAddr: true });
-  const ip = getLanIp();
-  const payload = Buffer.from(
-    JSON.stringify({ magic: DISCOVERY_MAGIC, ip, port, name: 'Clinic Server' }),
-  );
 
   udpSocket.bind(DISCOVERY_PORT, () => {
     udpSocket!.setBroadcast(true);
+    const payload = buildPayload(port);
     udpSocket!.send(payload, 0, payload.length, DISCOVERY_PORT, '255.255.255.255');
   });
 
@@ -35,12 +39,14 @@ export function startDiscoveryBroadcast(port: number): void {
     try {
       const data = JSON.parse(msg.toString()) as { magic: string };
       if (data.magic === PROBE_MAGIC) {
+        const payload = buildPayload(port);
         udpSocket?.send(payload, 0, payload.length, DISCOVERY_PORT, rinfo.address);
       }
     } catch { /* ignore */ }
   });
 
   intervalId = setInterval(() => {
+    const payload = buildPayload(port);
     udpSocket?.send(payload, 0, payload.length, DISCOVERY_PORT, '255.255.255.255');
   }, 1000);
 }

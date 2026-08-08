@@ -11,8 +11,8 @@ import {
   TextField,
 } from '@mui/material';
 import {
-  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps,
 } from '@/components/DialogUI';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -72,16 +72,15 @@ export function MedicinePickerDialog({ open, onClose, onAdded }: Props) {
         </Stack>
       </DialogContent>
       <DialogActions sx={dialogActionsSx}>
-        <Button onClick={handleClose} sx={dialogCancelBtnSx}>Cancel</Button>
-        <Button
-          variant="contained"
+        <Button onClick={handleClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+        <SubmitButton
           startIcon={<AddOutlinedIcon />}
-          disabled={!name.trim() || mutation.isPending}
+          disabled={!name.trim()}
+          loading={mutation.isPending}
           onClick={() => mutation.mutate()}
-          sx={dialogSubmitBtnSx}
         >
           Add Medicine
-        </Button>
+        </SubmitButton>
       </DialogActions>
     </Dialog>
   );
@@ -117,10 +116,10 @@ export function MedicineUpdatePriceDialog({ medicine, onClose }: { medicine: Med
         </Box>
       </DialogContent>
       <DialogActions sx={dialogActionsSx}>
-        <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
-        <Button variant="contained" disabled={mutation.isPending} onClick={() => mutation.mutate()} sx={dialogSubmitBtnSx}>
+        <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+        <SubmitButton loading={mutation.isPending} onClick={() => mutation.mutate()}>
           Save
-        </Button>
+        </SubmitButton>
       </DialogActions>
     </Dialog>
   );

@@ -1,4 +1,3 @@
-import LocalHospitalOutlinedIcon from '@mui/icons-material/LocalHospitalOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import {
@@ -12,6 +11,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getNavItems } from './navigation';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
+import careflowLogo from '@/assets/careflow-logo.png';
 
 export const drawerWidth = 60;
 
@@ -60,16 +60,23 @@ function SidebarContents(): React.JSX.Element {
           width: 42,
           height: 42,
           borderRadius: '14px',
-          bgcolor: 'primary.main',
+          bgcolor: '#fff',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           mb: 2.5,
           flexShrink: 0,
-          boxShadow: '0 4px 12px rgba(22,163,74,0.35)',
+          boxShadow: '0 4px 12px rgba(22,163,74,0.25)',
+          overflow: 'hidden',
+          p: 0.5,
         }}
       >
-        <LocalHospitalOutlinedIcon sx={{ color: '#fff', fontSize: 22 }} />
+        <Box
+          component="img"
+          src={careflowLogo}
+          alt="CareFlow"
+          sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
+        />
       </Box>
 
       {/* Nav icons */}

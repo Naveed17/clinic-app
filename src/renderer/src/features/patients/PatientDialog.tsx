@@ -4,8 +4,8 @@ import {
   MenuItem, Stack, TextField, Typography,
 } from '@mui/material';
 import {
-  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogFormSx, dialogPaperProps,
 } from '@/components/DialogUI';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
@@ -109,7 +109,7 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
         title={isEditing ? 'Edit patient' : 'Add patient'}
         subtitle={isEditing ? 'Update patient details and medical info.' : 'Register a new patient in the clinic.'}
       />
-      <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+      <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))} sx={dialogFormSx}>
         <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.25} sx={{ pt: 0.5 }}>
             {mutation.isError && <Alert severity="error">Unable to save the patient. Please try again.</Alert>}
@@ -156,10 +156,10 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
           </Stack>
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
-          <Button disabled={mutation.isPending} type="submit" variant="contained" sx={dialogSubmitBtnSx}>
+          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+          <SubmitButton type="submit" loading={mutation.isPending}>
             {isEditing ? 'Save changes' : 'Add patient'}
-          </Button>
+          </SubmitButton>
         </DialogActions>
       </Box>
     </Dialog>

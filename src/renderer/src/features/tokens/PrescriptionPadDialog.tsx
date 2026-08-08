@@ -13,7 +13,6 @@ import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import {
   Box,
   Button,
-  CircularProgress,
   Dialog,
   IconButton,
   Stack,
@@ -46,15 +45,10 @@ function calcAge(dob: Date | string | null | undefined): string {
   return age >= 0 ? String(age) : '';
 }
 
-export function htmlToPlainText(html: string): string {
-  const tmp = document.createElement('div');
-  tmp.innerHTML = html;
-  return (tmp.textContent || tmp.innerText || '').replace(/\u00a0/g, ' ').trim();
-}
-
 function plainTextToHtml(text: string): string {
   if (!text?.trim()) return '<p></p>';
-  if (/<[a-z][\s\S]*>/i.test(text) && !text.startsWith('[Pad|')) return text;
+  // Already rich HTML from TipTap (lists, bold, etc.)
+  if (/<(?:p|ul|ol|li|strong|b|br)\b/i.test(text)) return text;
   return text
     .split(/\n{2,}/)
     .map((block) => `<p>${block.replace(/\n/g, '<br>')}</p>`)
@@ -192,13 +186,14 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
     setSaving(true);
     setError(null);
     try {
-      const plain = htmlToPlainText(editor.getHTML());
+      // Keep TipTap HTML so lists/bold survive save + print
+      const html = editor.getHTML();
       const meta = `[Pad|sex:${patientSex}|age:${patientAge}|dob:${patientDob}|addr:${patientAddress.replace(/\|/g, ' ')}|dx:${diagnosis.replace(/\|/g, ' ')}]`;
       await window.clinic.tokens.upsertPrescription(token.id, {
         diagnosis: diagnosis || 'Rx',
         medicines: [],
         tests: token.prescription?.tests ?? [],
-        advice: `${meta}\n${plain}`.trim(),
+        advice: `${meta}\n${html}`.trim(),
       });
       setSavedHint(true);
       setTimeout(() => setSavedHint(false), 2000);
@@ -213,7 +208,7 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
 
   async function handleSaveAndPdf(): Promise<void> {
     if (!editor) return;
-    setBodyTextForPdf(htmlToPlainText(editor.getHTML()));
+    setBodyTextForPdf(editor.getHTML());
     const ok = await handleSave();
     if (ok) setPdfOpen(true);
   }
@@ -228,7 +223,14 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
         maxWidth="md"
         fullWidth
         PaperProps={{
-          sx: { borderRadius: 1, overflow: 'hidden', maxHeight: '94vh', bgcolor: '#eef3f8' },
+          sx: {
+            borderRadius: 1,
+            overflow: 'hidden',
+            maxHeight: '94vh',
+            bgcolor: '#eef3f8',
+            display: 'flex',
+            flexDirection: 'column',
+          },
         }}
       >
         <Box
@@ -240,6 +242,7 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
             justifyContent: 'space-between',
             bgcolor: '#fff',
             borderBottom: '1px solid #e2e8f0',
+            flexShrink: 0,
           }}
         >
           <Typography fontWeight={700} fontSize={15} color={PAD_INK}>
@@ -259,8 +262,9 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
             <Button
               size="small"
               variant="outlined"
-              startIcon={saving ? <CircularProgress size={14} /> : <SaveOutlinedIcon />}
-              disabled={saving || !editor}
+              startIcon={<SaveOutlinedIcon />}
+              loading={saving}
+              disabled={!editor}
               onClick={() => void handleSave()}
             >
               Save
@@ -269,7 +273,8 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
               size="small"
               variant="contained"
               startIcon={<PrintOutlinedIcon />}
-              disabled={saving || !editor}
+              loading={saving}
+              disabled={!editor}
               onClick={() => void handleSaveAndPdf()}
               sx={{ bgcolor: PAD_BLUE, '&:hover': { bgcolor: '#1e4668' } }}
             >
@@ -281,7 +286,7 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
           </Stack>
         </Box>
 
-        <Box sx={{ overflow: 'auto', p: { xs: 1.5, sm: 2.5 }, maxHeight: 'calc(94vh - 56px)' }}>
+        <Box sx={{ overflow: 'auto', p: { xs: 1.5, sm: 2.5 }, flex: '1 1 auto', minHeight: 0 }}>
           <Box
             sx={{
               mx: 'auto',

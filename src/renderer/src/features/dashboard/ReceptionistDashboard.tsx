@@ -11,8 +11,8 @@ import {
   Step, StepLabel, Stepper, Stack, TextField, Typography, Chip, Avatar,
 } from '@mui/material';
 import {
-  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps,
 } from '@/components/DialogUI';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
@@ -248,7 +248,11 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
         {/* Step 1 — Issue Token */}
         {step === 1 && (
           <Stack spacing={2}>
-            {tokenMutation.isError && <Alert severity="error">Could not issue token.</Alert>}
+            {tokenMutation.isError && (
+              <Alert severity="error">
+                {(tokenMutation.error as Error)?.message || 'Could not issue token.'}
+              </Alert>
+            )}
             <FormControl fullWidth>
               <InputLabel>Doctor</InputLabel>
               <Select label="Doctor" value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
@@ -290,19 +294,19 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       <DialogActions sx={dialogActionsSx}>
         <Button onClick={handleClose} sx={dialogCancelBtnSx}>Close</Button>
         {step === 0 && !useExisting && (
-          <Button variant="contained" form="patient-form" type="submit" disabled={createPatientMutation.isPending} sx={dialogSubmitBtnSx}>
+          <SubmitButton form="patient-form" type="submit" loading={createPatientMutation.isPending}>
             Next
-          </Button>
+          </SubmitButton>
         )}
         {step === 0 && useExisting && (
-          <Button variant="contained" disabled={!patientId} onClick={() => setStep(1)} sx={dialogSubmitBtnSx}>
+          <SubmitButton disabled={!patientId} onClick={() => setStep(1)}>
             Next
-          </Button>
+          </SubmitButton>
         )}
         {step === 1 && (
-          <Button variant="contained" disabled={!doctorId || tokenMutation.isPending} onClick={() => tokenMutation.mutate()} sx={dialogSubmitBtnSx}>
+          <SubmitButton disabled={!doctorId} loading={tokenMutation.isPending} onClick={() => tokenMutation.mutate()}>
             Issue Token & Print
-          </Button>
+          </SubmitButton>
         )}
         {step === 2 && (
           <Button variant="outlined" startIcon={<PrintOutlinedIcon />} onClick={() => createdToken && printTokenSlip(createdToken)} sx={dialogCancelBtnSx}>
@@ -513,19 +517,19 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
       <DialogActions sx={dialogActionsSx}>
         <Button onClick={handleClose} sx={dialogCancelBtnSx}>{done ? 'Done' : 'Close'}</Button>
         {step === 0 && !done && !useExisting && (
-          <Button variant="contained" form="book-patient-form" type="submit" disabled={createPatientMutation.isPending} sx={dialogSubmitBtnSx}>
+          <SubmitButton form="book-patient-form" type="submit" loading={createPatientMutation.isPending}>
             Next
-          </Button>
+          </SubmitButton>
         )}
         {step === 0 && !done && useExisting && (
-          <Button variant="contained" disabled={!patientId} onClick={() => setStep(1)} sx={dialogSubmitBtnSx}>
+          <SubmitButton disabled={!patientId} onClick={() => setStep(1)}>
             Next
-          </Button>
+          </SubmitButton>
         )}
         {step === 1 && !done && (
-          <Button variant="contained" disabled={!canSubmitAppt || appointmentMutation.isPending} onClick={() => appointmentMutation.mutate()} sx={dialogSubmitBtnSx}>
+          <SubmitButton disabled={!canSubmitAppt} loading={appointmentMutation.isPending} onClick={() => appointmentMutation.mutate()}>
             Book Appointment
-          </Button>
+          </SubmitButton>
         )}
       </DialogActions>
     </Dialog>
@@ -963,7 +967,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
                 color: theme.palette.common.white,
               }}
             >
-              <Typography fontWeight={700} fontSize={theme.typography.h5.fontSize} sx={{ color: alpha(theme.palette.common.white, 0.7), mb: 2 }}>
+              <Typography fontWeight={800} fontSize={16} sx={{ color: alpha(theme.palette.common.white, 0.7), mb: 2 }}>
                 Today&apos;s status
               </Typography>
               <Stack direction="row" spacing={1}>

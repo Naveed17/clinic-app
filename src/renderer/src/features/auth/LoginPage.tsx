@@ -1,7 +1,6 @@
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
-import LocalHospitalOutlinedIcon from '@mui/icons-material/LocalHospitalOutlined';
 import LaptopOutlinedIcon from '@mui/icons-material/LaptopOutlined';
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import WifiTetheringIcon from '@mui/icons-material/WifiTethering';
@@ -10,7 +9,6 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   Collapse,
   Divider,
   IconButton,
@@ -25,6 +23,8 @@ import {
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { useDatabaseMode } from '@/context/DatabaseModeProvider';
+import careflowLogo from '@/assets/careflow-logo.png';
 
 /* ── Animated galaxy canvas ── */
 function GalaxyCanvas(): React.JSX.Element {
@@ -121,6 +121,7 @@ export function LoginPage(): React.JSX.Element {
   const [connectError, setConnectError] = useState('');
   const [connected, setConnected] = useState(false);
   const [serverMode, setServerMode] = useState<string>('local');
+  const { isOnline } = useDatabaseMode();
 
   useEffect(() => {
     void window.clinic?.settings.get().then((s) => {
@@ -224,28 +225,35 @@ export function LoginPage(): React.JSX.Element {
         {/* Machine Role Badge */}
         {serverMode && (
           <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1.5 }}>
-            {serverMode === 'lan-server' && (
+            {isOnline && (
+              <Stack direction="row" alignItems="center" spacing={0.6}
+                sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(14,165,233,0.2)', border: '1px solid rgba(56,189,248,0.45)' }}>
+                <WifiTetheringIcon sx={{ fontSize: 13, color: '#38bdf8' }} />
+                <Typography variant="caption" sx={{ color: '#7dd3fc', fontWeight: 700, fontSize: 11 }}>Online database</Typography>
+              </Stack>
+            )}
+            {!isOnline && serverMode === 'lan-server' && (
               <Stack direction="row" alignItems="center" spacing={0.6}
                 sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(15,118,110,0.25)', border: '1px solid rgba(15,118,110,0.5)' }}>
                 <DnsOutlinedIcon sx={{ fontSize: 13, color: '#4ade80' }} />
                 <Typography variant="caption" sx={{ color: '#4ade80', fontWeight: 700, fontSize: 11 }}>LAN Server</Typography>
               </Stack>
             )}
-            {serverMode === 'local' && (
+            {!isOnline && serverMode === 'local' && (
               <Stack direction="row" alignItems="center" spacing={0.6}
                 sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)' }}>
                 <LaptopOutlinedIcon sx={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }} />
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, fontSize: 11 }}>Standalone</Typography>
               </Stack>
             )}
-            {serverMode === 'lan-client' && connected && (
+            {!isOnline && serverMode === 'lan-client' && connected && (
               <Stack direction="row" alignItems="center" spacing={0.6}
                 sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.4)' }}>
                 <CheckCircleOutlineIcon sx={{ fontSize: 13, color: '#60a5fa' }} />
                 <Typography variant="caption" sx={{ color: '#60a5fa', fontWeight: 700, fontSize: 11 }}>LAN Client — Connected</Typography>
               </Stack>
             )}
-            {serverMode === 'lan-client' && !connected && (
+            {!isOnline && serverMode === 'lan-client' && !connected && (
               <Stack direction="row" alignItems="center" spacing={0.6}
                 sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)' }}>
                 <WifiTetheringIcon sx={{ fontSize: 13, color: '#f87171' }} />
@@ -257,8 +265,26 @@ export function LoginPage(): React.JSX.Element {
 
         {/* Logo */}
         <Stack direction="row" alignItems="center" gap={1.5} sx={{ mb: 3 }}>
-          <Box sx={{ width: 42, height: 42, borderRadius: 2.5, bgcolor: 'primary.main', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(15,118,110,0.6)' }}>
-            <LocalHospitalOutlinedIcon sx={{ color: '#fff', fontSize: 22 }} />
+          <Box
+            sx={{
+              width: 42,
+              height: 42,
+              borderRadius: 2.5,
+              bgcolor: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 0 20px rgba(22,163,74,0.45)',
+              overflow: 'hidden',
+              p: 0.5,
+            }}
+          >
+            <Box
+              component="img"
+              src={careflowLogo}
+              alt="CareFlow"
+              sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            />
           </Box>
           <Box>
             <Typography fontWeight={800} fontSize={22} color="#fff" lineHeight={1.1}>CareFlow</Typography>
@@ -322,7 +348,7 @@ export function LoginPage(): React.JSX.Element {
             fullWidth
             variant="contained"
             size="large"
-            disabled={loading}
+            loading={loading}
             onClick={() => void handleLogin()}
             sx={{
               borderRadius: 3,
@@ -335,7 +361,7 @@ export function LoginPage(): React.JSX.Element {
               '&:active': { transform: 'translateY(0)' },
             }}
           >
-            {loading ? <CircularProgress size={22} sx={{ color: 'inherit' }} /> : 'Login'}
+            Login
           </Button>
         </Stack>
 
@@ -368,7 +394,7 @@ export function LoginPage(): React.JSX.Element {
               <Stack spacing={1.5} sx={{ mt: 2 }}>
                 <Stack direction="row" alignItems="center" justifyContent="space-between">
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>Available servers on network:</Typography>
-                  <Button size="small" startIcon={scanning ? <CircularProgress size={12} sx={{ color: 'inherit' }} /> : <WifiTetheringIcon />} onClick={handleScan} disabled={scanning} sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
+                  <Button size="small" startIcon={<WifiTetheringIcon />} loading={scanning} onClick={handleScan} sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
                     {scanning ? 'Scanning...' : 'Scan'}
                   </Button>
                 </Stack>
@@ -404,8 +430,8 @@ export function LoginPage(): React.JSX.Element {
                   </Alert>
                 )}
 
-                <Button fullWidth variant="contained" size="small" disabled={!selectedUrl || connecting} onClick={() => void handleConnect()} sx={{ borderRadius: 2, background: 'linear-gradient(90deg,#0f766e,#16a34a)', fontWeight: 700 }}>
-                  {connecting ? 'Connecting...' : 'Connect & Save'}
+                <Button fullWidth variant="contained" size="small" disabled={!selectedUrl} loading={connecting} onClick={() => void handleConnect()} sx={{ borderRadius: 2, background: 'linear-gradient(90deg,#0f766e,#16a34a)', fontWeight: 700 }}>
+                  Connect & Save
                 </Button>
               </Stack>
             </Collapse>

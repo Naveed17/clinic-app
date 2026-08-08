@@ -39,8 +39,8 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { appointmentsService } from '@/services/appointments.service';
 import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
 import {
-  ConfirmDialog, FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps,
 } from '@/components/DialogUI';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
@@ -119,7 +119,11 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
       <FormDialogTitle title="Issue Token" subtitle="Create a queue token for a patient visit." />
       <DialogContent sx={dialogContentSx}>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          {mutation.isError && <Alert severity="error">Failed to issue token.</Alert>}
+          {mutation.isError && (
+            <Alert severity="error">
+              {(mutation.error as Error)?.message || 'Failed to issue token.'}
+            </Alert>
+          )}
           <Autocomplete
             options={patients}
             getOptionLabel={(p) => `${p.firstName} ${p.lastName}`}
@@ -157,15 +161,14 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
         </Stack>
       </DialogContent>
       <DialogActions sx={dialogActionsSx}>
-        <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
-        <Button
-          variant="contained"
-          sx={dialogSubmitBtnSx}
-          disabled={!patientId || !doctorId || mutation.isPending}
+        <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+        <SubmitButton
+          disabled={!patientId || !doctorId}
+          loading={mutation.isPending}
           onClick={() => mutation.mutate()}
         >
           Issue Token
-        </Button>
+        </SubmitButton>
       </DialogActions>
     </Dialog>
   );
@@ -311,7 +314,8 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
                 <Button
                   size="small"
                   variant="outlined"
-                  disabled={!labTest.trim() || createLabOrderMutation.isPending}
+                  disabled={!labTest.trim()}
+                  loading={createLabOrderMutation.isPending}
                   onClick={() => createLabOrderMutation.mutate(labTest.trim())}
                 >
                   Order
@@ -354,8 +358,8 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
           </Stack>
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
-          <Button variant="contained" sx={dialogSubmitBtnSx} disabled={mutation.isPending} onClick={() => mutation.mutate()}>Save Prescription</Button>
+          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+          <SubmitButton loading={mutation.isPending} onClick={() => mutation.mutate()}>Save Prescription</SubmitButton>
         </DialogActions>
       </Dialog>
     </>
@@ -391,8 +395,16 @@ export function TokenPrintPreview({ token, onClose }: { token: Token; onClose: (
   }, [clinic, freshToken]);
 
   return (
-    <Dialog open onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogContent sx={{ p: 0, height: 560 }}>
+    <Dialog
+      open
+      onClose={onClose}
+      maxWidth="xs"
+      fullWidth
+      PaperProps={{
+        sx: { display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' },
+      }}
+    >
+      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'hidden', height: 560 }}>
         {blobUrl ? (
           <iframe src={blobUrl} width="100%" height="100%" style={{ border: 'none' }} />
         ) : (
@@ -401,7 +413,7 @@ export function TokenPrintPreview({ token, onClose }: { token: Token; onClose: (
           </Box>
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 2, pb: 2 }}>
+      <DialogActions sx={{ px: 2, py: 1.5, flexShrink: 0 }}>
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
     </Dialog>
@@ -755,6 +767,7 @@ export function TokensPage(): React.JSX.Element {
                               <IconButton
                                 size="small"
                                 color="success"
+                                disabled={statusMutation.isPending}
                                 onClick={() => statusMutation.mutate({ id: token.id, status: 'DONE' })}
                                 sx={{ borderRadius: 1 }}
                               >
@@ -766,6 +779,7 @@ export function TokensPage(): React.JSX.Element {
                             <Tooltip title="Skip">
                               <IconButton
                                 size="small"
+                                disabled={statusMutation.isPending}
                                 onClick={() => statusMutation.mutate({ id: token.id, status: 'SKIPPED' })}
                                 sx={{ borderRadius: 1 }}
                               >
@@ -858,6 +872,7 @@ export function TokensPage(): React.JSX.Element {
                       fullWidth
                       variant="contained"
                       startIcon={<CheckCircleOutlinedIcon />}
+                      loading={statusMutation.isPending}
                       onClick={() => statusMutation.mutate({ id: currentToken.id, status: 'DONE' })}
                       sx={{
                         borderRadius: 2,
@@ -874,6 +889,7 @@ export function TokensPage(): React.JSX.Element {
                       fullWidth
                       variant="outlined"
                       startIcon={<SkipNextOutlinedIcon />}
+                      loading={statusMutation.isPending}
                       onClick={() => statusMutation.mutate({ id: currentToken.id, status: 'SKIPPED' })}
                       sx={{
                         borderRadius: 2,

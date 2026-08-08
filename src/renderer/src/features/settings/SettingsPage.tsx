@@ -25,24 +25,8 @@ import RestoreOutlinedIcon from '@mui/icons-material/RestoreOutlined';
 import SystemUpdateAltOutlinedIcon from '@mui/icons-material/SystemUpdateAltOutlined';
 import WifiTetheringOutlinedIcon from '@mui/icons-material/WifiTetheringOutlined';
 import { useUpdate } from '@/context/updateProvider';
+import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useAuth } from '@/features/auth/AuthContext';
-import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
-import type { LicenseModules } from '@/features/auth/LicenseModulesContext';
-import ExtensionOutlinedIcon from '@mui/icons-material/ExtensionOutlined';
-
-const MODULE_LABELS: { key: keyof LicenseModules; label: string }[] = [
-  { key: 'doctorDashboard', label: 'Doctor Dashboard' },
-  { key: 'labDashboard', label: 'Lab Dashboard' },
-  { key: 'pharmacy', label: 'Pharmacy / Inventory' },
-  { key: 'billing', label: 'Billing' },
-  { key: 'reports', label: 'Reports' },
-  { key: 'statistics', label: 'Statistics' },
-  { key: 'tokens', label: 'Tokens' },
-  { key: 'manageDoctors', label: 'Manage Doctors' },
-  { key: 'managePatients', label: 'Manage Patients' },
-  { key: 'manageMedicines', label: 'Manage Medicines' },
-  { key: 'manageUsers', label: 'Manage Users' },
-];
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
 
@@ -53,13 +37,16 @@ interface Settings {
   clinicName: string;
   clinicAddress: string;
   clinicPhone: string;
+  databaseMode?: 'local' | 'online';
+  clinicalApiUrl?: string;
+  schemaId?: string;
 }
 
 export function SettingsPage(): React.JSX.Element {
   const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const licenseModules = useLicenseModules();
+  const { isOnline, schemaId, ready: databaseModeReady, refresh: refreshDatabaseMode } = useDatabaseMode();
 
   // Context Hook Integration for Global Auto-Updater State
   const {
@@ -89,6 +76,7 @@ export function SettingsPage(): React.JSX.Element {
   const [backupStatus, setBackupStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Update States & Notifications
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'latest' | 'error'>('idle');
@@ -190,17 +178,18 @@ export function SettingsPage(): React.JSX.Element {
   }
 
   useEffect(() => {
+    if (!databaseModeReady) return;
     void window.clinic?.settings.get().then((s) => {
       setSettings(s);
       setPrevMode(s.serverMode);
-      if (s.serverMode === 'lan-client' && s.clientApiUrl) {
+      if (!isOnline && s.serverMode === 'lan-client' && s.clientApiUrl) {
         void window.clinic?.settings.testConnection(s.clientApiUrl).then((ok) => setConnectionOk(ok ?? false));
       }
     }).catch(() => {
-      setSettings({ serverMode: 'local', clientApiUrl: '', lanPort: 3333, clinicName: '', clinicAddress: '', clinicPhone: '' });
+      setSettings({ serverMode: 'local', clientApiUrl: '', lanPort: 3333, clinicName: '', clinicAddress: '', clinicPhone: '', databaseMode: 'local' });
     });
     void window.clinic?.settings.lanIp().then((ip) => setLanIp(ip));
-  }, []);
+  }, [databaseModeReady, isOnline]);
 
   async function handleScan() {
     setScanning(true); setDiscovered([]); setTestResult(null);
@@ -219,24 +208,30 @@ export function SettingsPage(): React.JSX.Element {
 
   async function handleSave() {
     if (!settings) return;
-    const prev = await window.clinic?.settings.get();
-    const needsRelaunch =
-      (prevMode !== null && prevMode !== settings.serverMode) ||
-      (prev?.lanPort !== settings.lanPort) ||
-      (settings.serverMode === 'lan-client' && prev?.clientApiUrl !== settings.clientApiUrl);
+    setSaving(true);
+    try {
+      const prev = await window.clinic?.settings.get();
+      const needsRelaunch =
+        (prevMode !== null && prevMode !== settings.serverMode) ||
+        (prev?.lanPort !== settings.lanPort) ||
+        (settings.serverMode === 'lan-client' && prev?.clientApiUrl !== settings.clientApiUrl);
 
-    await window.clinic?.settings.save(settings);
-    setPrevMode(settings.serverMode);
+      await window.clinic?.settings.save(settings);
+      await refreshDatabaseMode();
+      setPrevMode(settings.serverMode);
 
-    if (needsRelaunch) {
-      setRestarting(true);
-      setSaved(true);
-      setTimeout(() => {
-        void window.clinic?.settings.relaunch?.();
-      }, 900);
-    } else {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      if (needsRelaunch) {
+        setRestarting(true);
+        setSaved(true);
+        setTimeout(() => {
+          void window.clinic?.settings.relaunch?.();
+        }, 900);
+      } else {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -293,8 +288,9 @@ export function SettingsPage(): React.JSX.Element {
                 variant="outlined"
                 fullWidth
                 size="large"
-                startIcon={(updateStatus === 'checking' || isChecking) ? <CircularProgress size={16} /> : <SystemUpdateAltOutlinedIcon />}
-                disabled={updateStatus === 'checking' || isChecking || isDownloading}
+                startIcon={<SystemUpdateAltOutlinedIcon />}
+                loading={updateStatus === 'checking' || isChecking}
+                disabled={isDownloading}
                 onClick={() => void handleCheckUpdate()}
               >
                 {(updateStatus === 'checking' || isChecking) ? 'Checking...' : 'Check for Updates'}
@@ -387,47 +383,27 @@ export function SettingsPage(): React.JSX.Element {
 
             <Divider sx={{ mb: 2 }} />
 
-            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.5 }}>
-              <ExtensionOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-              <Typography variant="subtitle2" fontWeight={600}>Licensed Modules</Typography>
-            </Stack>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              Controlled from license server. Off modules are hidden in the app.
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1 }}>
-              {MODULE_LABELS.map(({ key, label }) => {
-                const on = licenseModules[key] === true;
-                return (
-                  <Chip
-                    key={key}
-                    size="small"
-                    label={label}
-                    color={on ? 'success' : 'default'}
-                    variant={on ? 'filled' : 'outlined'}
-                    sx={{ fontWeight: 600, fontSize: 11, height: 24 }}
-                  />
-                );
-              })}
-            </Box>
-            <Typography variant="caption" color="text.secondary">
-              Pharmacy: {licenseModules.pharmacy ? 'Enabled — Inventory visible' : 'Disabled — Inventory hidden'}
-            </Typography>
-
-            <Divider sx={{ mb: 2, mt: 2 }} />
-
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>Backup & Restore</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Full backup (.zip) includes the database plus patient/lab documents so images and PDFs work after restore on another PC. Legacy .db-only backups are still supported.
-            </Typography>
-            <Stack direction="row" gap={1.5} flexWrap="wrap">
-              <Button variant="outlined" size="small" startIcon={backupLoading ? <CircularProgress size={14} /> : <BackupOutlinedIcon />} disabled={backupLoading} onClick={() => void handleBackup()}>
-                Create Backup
-              </Button>
-              <Button variant="outlined" size="small" color="warning" startIcon={restoreLoading ? <CircularProgress size={14} /> : <RestoreOutlinedIcon />} disabled={restoreLoading} onClick={() => void handleRestore()}>
-                Restore Backup
-              </Button>
-            </Stack>
-            {backupStatus && <Alert severity={backupStatus.type} sx={{ mt: 2 }}>{backupStatus.msg}</Alert>}
+            {isOnline ? (
+              <Alert severity="info" sx={{ mb: 0 }}>
+                Online database mode — clinic data lives in the cloud (Neon). Local Backup & Restore is disabled because it only copies the offline SQLite file.
+              </Alert>
+            ) : (
+              <>
+                <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>Backup & Restore</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Full backup (.zip) includes the database plus patient/lab documents so images and PDFs work after restore on another PC. Legacy .db-only backups are still supported.
+                </Typography>
+                <Stack direction="row" gap={1.5} flexWrap="wrap">
+                  <Button variant="outlined" size="small" startIcon={<BackupOutlinedIcon />} loading={backupLoading} onClick={() => void handleBackup()}>
+                    Create Backup
+                  </Button>
+                  <Button variant="outlined" size="small" color="warning" startIcon={<RestoreOutlinedIcon />} loading={restoreLoading} onClick={() => void handleRestore()}>
+                    Restore Backup
+                  </Button>
+                </Stack>
+                {backupStatus && <Alert severity={backupStatus.type} sx={{ mt: 2 }}>{backupStatus.msg}</Alert>}
+              </>
+            )}
 
             <Divider sx={{ my: 2 }} />
 
@@ -455,8 +431,9 @@ export function SettingsPage(): React.JSX.Element {
                 <Button
                   variant="outlined"
                   fullWidth
-                  startIcon={(updateStatus === 'checking' || isChecking) ? <CircularProgress size={16} /> : <SystemUpdateAltOutlinedIcon />}
-                  disabled={updateStatus === 'checking' || isChecking || isDownloading}
+                  startIcon={<SystemUpdateAltOutlinedIcon />}
+                  loading={updateStatus === 'checking' || isChecking}
+                  disabled={isDownloading}
                   onClick={() => void handleCheckUpdate()}
                 >
                   {(updateStatus === 'checking' || isChecking) ? 'Checking...' : 'Check for Updates'}
@@ -486,20 +463,31 @@ export function SettingsPage(): React.JSX.Element {
 
           <Divider orientation="vertical" flexItem />
 
-          {/* Right Side: Network Settings */}
+          {/* Right Side: Network Settings (hidden when online database license) */}
           <Stack spacing={3} flex={1}>
             <Box>
               <Typography variant="h6" fontWeight={700}>Network Settings</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                Configure how this machine connects to the clinic network.
+                {isOnline
+                  ? 'This license uses online Postgres — LAN roles are disabled.'
+                  : 'Configure how this machine connects to the clinic network.'}
               </Typography>
-              {settings.serverMode === 'lan-client' && connectionOk === false && (
+              {isOnline && (
+                <Alert severity="info" sx={{ mt: 1.5 }}>
+                  Online database mode is active
+                  {schemaId ? ` (tenant ${schemaId})` : ''}.
+                  Clinic data is stored in the shared cloud schema, filtered per license.
+                </Alert>
+              )}
+              {!isOnline && settings?.serverMode === 'lan-client' && connectionOk === false && (
                 <Alert severity="error" sx={{ mt: 1.5 }}>
                   LAN server unreachable. App has fallen back to local mode. Please check the server URL and save again.
                 </Alert>
               )}
             </Box>
 
+            {isOnline ? null : (
+            <>
             <Divider />
 
             <Box>
@@ -583,8 +571,8 @@ export function SettingsPage(): React.JSX.Element {
                   <Button
                     variant="outlined"
                     size="small"
-                    startIcon={scanning ? <CircularProgress size={14} /> : <WifiTetheringOutlinedIcon />}
-                    disabled={scanning}
+                    startIcon={<WifiTetheringOutlinedIcon />}
+                    loading={scanning}
                     onClick={() => void handleScan()}
                   >
                     Scan Network
@@ -625,10 +613,11 @@ export function SettingsPage(): React.JSX.Element {
                     variant="outlined"
                     size="small"
                     sx={{ whiteSpace: 'nowrap', mt: 0.5 }}
-                    disabled={!settings.clientApiUrl || testing}
+                    disabled={!settings.clientApiUrl}
+                    loading={testing}
                     onClick={() => void handleTestConnection()}
                   >
-                    {testing ? <CircularProgress size={14} /> : 'Test'}
+                    Test
                   </Button>
                 </Stack>
 
@@ -639,11 +628,13 @@ export function SettingsPage(): React.JSX.Element {
                 )}
               </Stack>
             )}
+            </>
+            )}
 
             <Divider />
 
             <Stack direction="row" alignItems="center" spacing={2}>
-              <Button variant="contained" onClick={() => void handleSave()}>
+              <Button variant="contained" loading={saving} onClick={() => void handleSave()}>
                 Save Settings
               </Button>
               {saved && (

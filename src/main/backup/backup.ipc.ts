@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { disconnectPrisma, getPrisma } from '../database/client';
 import { getDocumentsRoot, resolveDocPath, toStoredDocPath } from './docs-paths';
+import { isOnlineDatabaseMode } from '../config/settings';
 
 function getDbPath(): string {
   return join(app.getPath('userData'), 'clinic.db');
@@ -66,6 +67,12 @@ export function registerBackupIpc(): void {
   ipcMain.removeHandler('backup:restore');
 
   ipcMain.handle('backup:create', async () => {
+    if (isOnlineDatabaseMode()) {
+      return {
+        ok: false,
+        error: 'Backup is not available in online database mode. Data is stored in the cloud.',
+      };
+    }
     const stamp = new Date().toISOString().slice(0, 10);
     const { filePath, canceled } = await dialog.showSaveDialog({
       title: 'Save Clinic Backup (ZIP)',
@@ -103,6 +110,12 @@ export function registerBackupIpc(): void {
   });
 
   ipcMain.handle('backup:restore', async () => {
+    if (isOnlineDatabaseMode()) {
+      return {
+        ok: false,
+        error: 'Restore is not available in online database mode. Data is stored in the cloud.',
+      };
+    }
     const { filePaths, canceled } = await dialog.showOpenDialog({
       title: 'Select Backup File',
       filters: [

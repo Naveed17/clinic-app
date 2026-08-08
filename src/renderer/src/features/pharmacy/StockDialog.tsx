@@ -3,8 +3,8 @@ import {
   MenuItem, Stack, TextField, Typography,
 } from '@mui/material';
 import {
-  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps,
 } from '@/components/DialogUI';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -127,15 +127,13 @@ export function StockDialog({ medicine, onClose }: Props): React.JSX.Element {
         </Stack>
       </DialogContent>
       <DialogActions sx={dialogActionsSx}>
-        <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
-        <Button
-          variant="contained"
-          disabled={mutation.isPending}
+        <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+        <SubmitButton
+          loading={mutation.isPending}
           onClick={handleSubmit((d) => mutation.mutate(d))}
-          sx={dialogSubmitBtnSx}
         >
           {isEdit ? 'Save Changes' : 'Add Medicine'}
-        </Button>
+        </SubmitButton>
       </DialogActions>
     </Dialog>
   );

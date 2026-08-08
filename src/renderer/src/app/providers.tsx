@@ -11,13 +11,12 @@ import { useSocket, useRealtimeInvalidation } from '@/hooks';
 import { AppointmentToast } from '@/components/AppointmentToast';
 import { UpdateBanner } from '@/components/UpdateBanner';
 import { UpdateProvider } from '@/context/updateProvider';
+import { DatabaseModeProvider } from '@/context/DatabaseModeProvider';
 
 function RealtimeBootstrap({ children }: PropsWithChildren): React.JSX.Element {
   useSocket();
   useRealtimeInvalidation();
 
-  // Jab background retry server dhundh le toh page reload karo
-  // taake app LAN mode mein aa jaye bina manual restart ke
   useEffect(() => {
     const off = window.clinic.settings.onLanReconnected(() => {
       window.location.reload();
@@ -63,11 +62,13 @@ export function AppProviders({ children }: PropsWithChildren): React.JSX.Element
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <AuthProvider>
-            <LicenseModulesProvider>
-              <UpdateProvider>
-                <RealtimeBootstrap>{children}</RealtimeBootstrap>
-              </UpdateProvider>
-            </LicenseModulesProvider>
+            <DatabaseModeProvider>
+              <LicenseModulesProvider>
+                <UpdateProvider>
+                  <RealtimeBootstrap>{children}</RealtimeBootstrap>
+                </UpdateProvider>
+              </LicenseModulesProvider>
+            </DatabaseModeProvider>
           </AuthProvider>
         </ThemeProvider>
       </ColorModeContext.Provider>

@@ -43,8 +43,8 @@ import { getNavItems } from './navigation';
 import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
 import { GlobalSearchModal } from '@/components/GlobalSearchModal';
 import {
-  FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogPaperProps,
 } from '@/components/DialogUI';
 
 interface TopbarProps {
@@ -329,8 +329,8 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
               </Stack>
             </DialogContent>
             <DialogActions sx={dialogActionsSx}>
-              <Button onClick={() => setPwDialogOpen(false)} sx={dialogCancelBtnSx}>Cancel</Button>
-              <Button variant="contained" disabled={pwLoading} onClick={() => void handleChangePassword()} sx={dialogSubmitBtnSx}>Save</Button>
+              <Button onClick={() => setPwDialogOpen(false)} disabled={pwLoading} sx={dialogCancelBtnSx}>Cancel</Button>
+              <SubmitButton loading={pwLoading} onClick={() => void handleChangePassword()}>Save</SubmitButton>
             </DialogActions>
           </Dialog>
           <Tooltip title="Logout">

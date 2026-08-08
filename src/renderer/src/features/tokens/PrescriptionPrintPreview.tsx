@@ -410,13 +410,27 @@ export function PrescriptionPrintPreview({
     (activePrescription.diagnosis !== 'Rx' ? activePrescription.diagnosis : '');
 
   return (
-    <Dialog open onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 1, overflow: 'hidden' } }}>
-      <Box sx={{ px: 2.5, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid', borderColor: 'divider' }}>
+    <Dialog
+      open
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 1,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: '90vh',
+        },
+      }}
+    >
+      <Box sx={{ px: 2.5, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
         <Typography fontWeight={700} fontSize={15}>Prescription PDF Preview</Typography>
         <Button onClick={onClose} size="small" startIcon={<CloseOutlinedIcon />}>Close</Button>
       </Box>
 
-      <DialogContent sx={{ p: 0, height: 750 }}>
+      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
         <PDFViewer width="100%" height="100%" showToolbar>
           {isFreeTextPad ? (
             <PrescriptionPadDocument

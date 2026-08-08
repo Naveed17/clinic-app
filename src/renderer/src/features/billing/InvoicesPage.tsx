@@ -24,8 +24,8 @@ import {
   Typography,
 } from '@mui/material';
 import {
-  ConfirmDialog, FormDialogTitle, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps, dialogSubmitBtnSx,
+  ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  dialogFormSx, dialogPaperProps,
 } from '@/components/DialogUI';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -132,7 +132,7 @@ function PaymentDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => 
   return (
     <Dialog open fullWidth maxWidth="xs" onClose={onClose} PaperProps={dialogPaperProps}>
       <FormDialogTitle title={`Record Payment — ${invoice.invoiceNumber}`} subtitle="Add a payment against this invoice." />
-      <Box component="form" onSubmit={form.handleSubmit((v) => mutation.mutate(v))}>
+      <Box component="form" onSubmit={form.handleSubmit((v) => mutation.mutate(v))} sx={dialogFormSx}>
         <DialogContent sx={dialogContentSx}>
           <Stack spacing={2}>
             {mutation.isError && <Alert severity="error">Failed to record payment.</Alert>}
@@ -153,10 +153,10 @@ function PaymentDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => 
           </Stack>
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={mutation.isPending} sx={dialogSubmitBtnSx}>
+          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+          <SubmitButton type="submit" loading={mutation.isPending}>
             Record Payment
-          </Button>
+          </SubmitButton>
         </DialogActions>
       </Box>
     </Dialog>
@@ -200,7 +200,7 @@ export function InvoiceDialog({ open, onClose, onSuccess }: { open: boolean; onC
     <>
     <Dialog fullWidth maxWidth="md" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
       <FormDialogTitle title="Create Invoice" subtitle="Bill a patient for medicines and services." />
-      <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+      <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))} sx={dialogFormSx}>
         <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.5}>
             {mutation.isError && <Alert severity="error">{mutation.error instanceof Error ? mutation.error.message : 'Unable to create the invoice.'}</Alert>}
@@ -244,8 +244,8 @@ export function InvoiceDialog({ open, onClose, onSuccess }: { open: boolean; onC
           </Stack>
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} sx={dialogCancelBtnSx}>Cancel</Button>
-          <Button disabled={mutation.isPending} type="submit" variant="contained" sx={dialogSubmitBtnSx}>Create invoice</Button>
+          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+          <SubmitButton type="submit" loading={mutation.isPending}>Create invoice</SubmitButton>
         </DialogActions>
       </Box>
     </Dialog>
