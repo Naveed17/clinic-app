@@ -43,6 +43,7 @@ import {
   dialogPaperProps,
 } from '@/components/DialogUI';
 import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
+import { printReactPdfDocument } from '@/utils/printPdf';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
   WAITING: { label: 'Waiting', color: 'warning' },
@@ -414,7 +415,6 @@ export function TokenPrintPreview({
     setPrinting(true);
     setPrintError(null);
     try {
-      const { printReactPdfDocument } = await import('@/utils/printPdf');
       // Walk-in / token slip: silent print fails when default is "Microsoft Print to PDF"
       await printReactPdfDocument(pdfDocument, { printDialog: true });
     } catch (err) {
