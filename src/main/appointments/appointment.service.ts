@@ -161,6 +161,52 @@ export async function createAppointment(input: AppointmentInput) {
   return getAppointmentById(first.id);
 }
 
+/**
+ * Token / walk-in: same patient + doctor + day → update existing appointment
+ * instead of inserting a duplicate card (same token #).
+ */
+export async function ensureSameDayAppointment(input: AppointmentInput) {
+  await assertProviderActive(input.providerId);
+  const startsAt = parseDate(input.startsAt, 'startsAt');
+  const endsAt = parseDate(input.endsAt, 'endsAt');
+  await assertDoctorAvailable(input.providerId, startsAt, endsAt);
+
+  const day = startsAt.toISOString().slice(0, 10);
+  const dayStart = new Date(`${day}T00:00:00.000`);
+  const dayEnd = new Date(`${day}T23:59:59.999`);
+
+  const existing = await getPrisma().appointment.findMany({
+    where: {
+      patientId: input.patientId,
+      providerId: input.providerId,
+      startsAt: { gte: dayStart, lte: dayEnd },
+      status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+    },
+    orderBy: { startsAt: 'desc' },
+  });
+
+  const open = existing.find((a) => a.status === 'SCHEDULED' || a.status === 'CHECKED_IN');
+  const target = open ?? existing[0];
+
+  if (target) {
+    const nextStatus: AppointmentStatus =
+      target.status === 'COMPLETED' ? 'SCHEDULED' : (target.status as AppointmentStatus);
+    await getPrisma().appointment.update({
+      where: { id: target.id },
+      data: {
+        startsAt,
+        endsAt,
+        reason: input.reason?.trim() ?? target.reason,
+        notes: input.notes?.trim() ?? target.notes,
+        status: nextStatus,
+      },
+    });
+    return getAppointmentById(target.id);
+  }
+
+  return createAppointment({ ...input, recurrenceRule: null });
+}
+
 export async function updateAppointment(id: string, input: AppointmentInput) {
   await assertProviderActive(input.providerId);
   await assertDoctorAvailable(

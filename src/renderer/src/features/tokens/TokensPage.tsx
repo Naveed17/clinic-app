@@ -4,6 +4,7 @@ import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined';
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import HourglassEmptyOutlinedIcon from '@mui/icons-material/HourglassEmptyOutlined';
 import DoneAllOutlinedIcon from '@mui/icons-material/DoneAllOutlined';
 import {
@@ -44,6 +45,7 @@ import {
 } from '@/components/DialogUI';
 import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
 import { printReactPdfDocument } from '@/utils/printPdf';
+import { POS_PAPER } from '@shared/invoicePaper';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
   WAITING: { label: 'Waiting', color: 'warning' },
@@ -99,7 +101,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
       const tokenTime = new Date(token.createdAt);
       const startsAt = tokenTime.toISOString();
       const endsAt = new Date(tokenTime.getTime() + 30 * 60000).toISOString();
-      await appointmentsService.create({
+      await appointmentsService.ensureSameDay({
         patientId,
         providerId: doctorId,
         startsAt,
@@ -208,7 +210,7 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
   const time = new Date(token.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return (
     <Document>
-      <Page size={[226, 400]} style={ts.page} wrap={false}>
+      <Page size={[POS_PAPER.pdfPageWidth, POS_PAPER.pdfPageHeightToken]} style={ts.page} wrap={false}>
         <Text style={ts.shopName}>{clinicName || 'CLINIC'}</Text>
         {clinicAddress ? <Text style={ts.shopSub}>{clinicAddress}</Text> : null}
         {clinicPhone ? <Text style={ts.shopSub}>Tel: {clinicPhone}</Text> : null}
@@ -416,7 +418,7 @@ export function TokenPrintPreview({
     setPrintError(null);
     try {
       // Walk-in / token slip: silent print fails when default is "Microsoft Print to PDF"
-      await printReactPdfDocument(pdfDocument, { printDialog: true });
+      await printReactPdfDocument(pdfDocument, { printDialog: false, paper: 'pos80' });
     } catch (err) {
       setPrintError(err instanceof Error ? err.message : 'Print failed');
     } finally {
@@ -462,9 +464,11 @@ export function TokenPrintPreview({
         <Typography fontWeight={700} fontSize={15}>
           Token Slip PDF
         </Typography>
-        <Button onClick={onClose} size="small">
-          Close
-        </Button>
+        <Tooltip title="Close">
+          <IconButton size="small" onClick={onClose} aria-label="Close">
+            <CloseOutlinedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
       </Box>
       <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'auto', bgcolor: '#f1f5f9' }}>
         {pdfDocument ? (
@@ -475,20 +479,27 @@ export function TokenPrintPreview({
           </Box>
         )}
       </DialogContent>
-      <Box sx={{ px: 2.5, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+      <Box sx={{ px: 2, py: 1, display: 'flex', flexDirection: 'column', gap: 1, borderTop: '1px solid', borderColor: 'divider' }}>
         {printError && <Alert severity="error">{printError}</Alert>}
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-          <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 1 }}>Close</Button>
-          <Button
-            variant="contained"
-            startIcon={<PrintOutlinedIcon />}
-            loading={printing}
-            disabled={printing || !pdfDocument}
-            onClick={() => void handlePrint()}
-            sx={{ borderRadius: 1 }}
-          >
-            Print
-          </Button>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
+          <Tooltip title="Close">
+            <IconButton onClick={onClose} aria-label="Close" size="small">
+              <CloseOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={printing ? 'Printing...' : 'Print'}>
+            <span>
+              <IconButton
+                color="primary"
+                disabled={printing || !pdfDocument}
+                onClick={() => void handlePrint()}
+                aria-label="Print"
+                size="small"
+              >
+                {printing ? <CircularProgress size={18} /> : <PrintOutlinedIcon fontSize="small" />}
+              </IconButton>
+            </span>
+          </Tooltip>
         </Box>
       </Box>
     </Dialog>

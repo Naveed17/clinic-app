@@ -178,6 +178,16 @@ const api = {
         () => request('/api/appointments', { method: 'POST', body: JSON.stringify(input) }),
         'appointments:create', input,
       ),
+    ensureSameDay: (input: unknown) =>
+      call(
+        () =>
+          request('/api/appointments/ensure-same-day', {
+            method: 'POST',
+            body: JSON.stringify(input),
+          }),
+        'appointments:ensureSameDay',
+        input,
+      ),
     update: (id: string, input: unknown) =>
       call(
         () => request(`/api/appointments/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
@@ -449,10 +459,15 @@ const api = {
       ),
   },
   print: {
-    /** Base64-encoded PDF — printed via pdf-to-printer (Windows). */
-    pdf: (base64: string, options?: { printDialog?: boolean }) =>
+    /** Base64 PDF — Chromium print (preview often unavailable for PDFs). */
+    pdf: (base64: string, options?: { printDialog?: boolean; paper?: 'pos80' | 'A4' }) =>
       ipc<{ ok: boolean; error?: string }>('print:pdf', base64, options),
-    html: (html: string) => ipc<{ ok: boolean; error?: string }>('print:html', html),
+    /** HTML receipt — Chromium print dialog with live preview. */
+    html: (html: string, options?: { printDialog?: boolean }) =>
+      ipc<{ ok: boolean; error?: string }>('print:html', html, options),
+    /** Offscreen HTML → PNG base64 (prescription list thumbnails). */
+    captureHtml: (html: string, options?: { width?: number; height?: number }) =>
+      ipc<{ ok: boolean; base64?: string; error?: string }>('print:captureHtml', html, options),
   },
   settings: {
     get: () => ipc('settings:get'),

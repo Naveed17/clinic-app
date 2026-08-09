@@ -44,6 +44,8 @@ export interface Prescription {
   medicines: PrescriptionMedicine[];
   tests: string[];
   advice: string;
+  thumbName?: string | null;
+  thumbnail?: string | null;
   createdAt: string;
 }
 
@@ -52,6 +54,8 @@ export interface PrescriptionInput {
   medicines: PrescriptionMedicine[];
   tests: string[];
   advice: string;
+  thumbName?: string | null;
+  thumbnail?: string | null;
 }
 
 export interface PrescriptionFeedItem {

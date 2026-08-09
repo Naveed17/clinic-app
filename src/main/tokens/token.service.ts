@@ -18,6 +18,8 @@ export interface PrescriptionInput {
   medicines: { name: string; dosage: string; duration: string; instructions: string }[];
   tests: string[];
   advice: string;
+  thumbName?: string | null;
+  thumbnail?: string | null;
 }
 
 export interface PrescriptionFeedItem {
@@ -34,6 +36,20 @@ const tokenInclude = {
   doctor:  { select: { id: true, firstName: true, lastName: true } },
 };
 
+function mapPrescription(tokenId: unknown, r: Record<string, unknown>) {
+  return {
+    id: r.prescriptionId ?? r.id,
+    tokenId,
+    diagnosis: r.diagnosis,
+    medicines: JSON.parse((r.medicines as string) || '[]'),
+    tests: JSON.parse((r.tests as string) || '[]'),
+    advice: r.advice,
+    thumbName: (r.thumbName as string | null | undefined) ?? null,
+    thumbnail: (r.thumbnail as string | null | undefined) ?? null,
+    createdAt: r.prescriptionCreatedAt ?? r.createdAt,
+  };
+}
+
 function parseRawToken(_row: Record<string, unknown>) { return _row; } 
 
 export async function listTokens(date: string) {
@@ -42,6 +58,7 @@ export async function listTokens(date: string) {
     SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
            u.id as doctorObjId, u.firstName as doctorFirstName, u.lastName as doctorLastName,
            pr.id as prescriptionId, pr.diagnosis, pr.medicines, pr.tests, pr.advice,
+           pr.thumbName, pr.thumbnail,
            pr.createdAt as prescriptionCreatedAt,
            CASE WHEN pr.id IS NOT NULL THEN 1 ELSE 0 END as prescriptionRaw
     FROM "Token" t
@@ -57,12 +74,7 @@ export async function listTokens(date: string) {
     status: r.status, notes: r.notes, reason: r.reason, createdAt: r.createdAt, updatedAt: r.updatedAt,
     patient: { id: r.patientObjId, firstName: r.patientFirstName, lastName: r.patientLastName, mrNumber: r.patientMrNumber },
     doctor:  { id: r.doctorObjId,  firstName: r.doctorFirstName,  lastName: r.doctorLastName },
-    prescription: r.prescriptionRaw
-      ? { id: r.prescriptionId, tokenId: r.id, diagnosis: r.diagnosis,
-          medicines: JSON.parse(r.medicines as string || '[]'),
-          tests: JSON.parse(r.tests as string || '[]'),
-          advice: r.advice, createdAt: r.prescriptionCreatedAt }
-      : null,
+    prescription: r.prescriptionRaw ? mapPrescription(r.id, r) : null,
   }));
 }
 
@@ -156,12 +168,7 @@ export async function updateTokenStatus(id: string, status: TokenStatus) {
   );
   return {
     ...token,
-    prescription: pr[0]
-      ? { id: pr[0].id, tokenId: id, diagnosis: pr[0].diagnosis,
-          medicines: JSON.parse(pr[0].medicines as string || '[]'),
-          tests: JSON.parse(pr[0].tests as string || '[]'),
-          advice: pr[0].advice, createdAt: pr[0].createdAt }
-      : null,
+    prescription: pr[0] ? mapPrescription(id, pr[0]) : null,
   };
 }
 
@@ -173,6 +180,10 @@ export async function upsertPrescription(tokenId: string, input: PrescriptionInp
   const now = new Date().toISOString();
   const medicines = JSON.stringify(input.medicines);
   const tests = JSON.stringify(input.tests);
+  const thumbName =
+    input.thumbName === undefined ? undefined : input.thumbName?.trim() || null;
+  const thumbnail =
+    input.thumbnail === undefined ? undefined : input.thumbnail?.trim() || null;
 
   if (existing.length > 0) {
     // Restore stock for old medicines before applying new ones
@@ -185,10 +196,25 @@ export async function upsertPrescription(tokenId: string, input: PrescriptionInp
       }
     } catch { /* ignore parse errors from old data */ }
 
-    await db.$executeRawUnsafe(
-      `UPDATE "Prescription" SET diagnosis=?, medicines=?, tests=?, advice=?, updatedAt=? WHERE tokenId=?`,
-      input.diagnosis, medicines, tests, input.advice, now, tokenId
-    );
+    if (thumbName !== undefined || thumbnail !== undefined) {
+      await db.$executeRawUnsafe(
+        `UPDATE "Prescription" SET diagnosis=?, medicines=?, tests=?, advice=?,
+          thumbName=COALESCE(?, thumbName), thumbnail=COALESCE(?, thumbnail), updatedAt=? WHERE tokenId=?`,
+        input.diagnosis,
+        medicines,
+        tests,
+        input.advice,
+        thumbName ?? null,
+        thumbnail ?? null,
+        now,
+        tokenId,
+      );
+    } else {
+      await db.$executeRawUnsafe(
+        `UPDATE "Prescription" SET diagnosis=?, medicines=?, tests=?, advice=?, updatedAt=? WHERE tokenId=?`,
+        input.diagnosis, medicines, tests, input.advice, now, tokenId
+      );
+    }
 
     // Deduct stock for new medicines (FEFO via inventory batches)
     for (const med of input.medicines) {
@@ -201,8 +227,17 @@ export async function upsertPrescription(tokenId: string, input: PrescriptionInp
   } else {
     const id = randomUUID();
     await db.$executeRawUnsafe(
-      `INSERT INTO "Prescription" (id, tokenId, diagnosis, medicines, tests, advice, createdAt, updatedAt) VALUES (?,?,?,?,?,?,?,?)`,
-      id, tokenId, input.diagnosis, medicines, tests, input.advice, now, now
+      `INSERT INTO "Prescription" (id, tokenId, diagnosis, medicines, tests, advice, thumbName, thumbnail, createdAt, updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      id,
+      tokenId,
+      input.diagnosis,
+      medicines,
+      tests,
+      input.advice,
+      thumbName ?? null,
+      thumbnail ?? null,
+      now,
+      now,
     );
 
     // Deduct stock for prescribed medicines (FEFO via inventory batches)
@@ -222,6 +257,7 @@ export async function getTokenForPatient(patientId: string, date: string) {
     SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
            u.id as doctorObjId, u.firstName as doctorFirstName, u.lastName as doctorLastName,
            pr.id as prescriptionId, pr.diagnosis, pr.medicines, pr.tests, pr.advice,
+           pr.thumbName, pr.thumbnail,
            pr.createdAt as prescriptionCreatedAt,
            CASE WHEN pr.id IS NOT NULL THEN 1 ELSE 0 END as prescriptionRaw
     FROM "Token" t
@@ -239,12 +275,7 @@ export async function getTokenForPatient(patientId: string, date: string) {
     status: r.status, notes: r.notes, reason: r.reason, createdAt: r.createdAt, updatedAt: r.updatedAt,
     patient: { id: r.patientObjId, firstName: r.patientFirstName, lastName: r.patientLastName, mrNumber: r.patientMrNumber },
     doctor:  { id: r.doctorObjId,  firstName: r.doctorFirstName,  lastName: r.doctorLastName },
-    prescription: r.prescriptionRaw
-      ? { id: r.prescriptionId, tokenId: r.id, diagnosis: r.diagnosis,
-          medicines: JSON.parse(r.medicines as string || '[]'),
-          tests: JSON.parse(r.tests as string || '[]'),
-          advice: r.advice, createdAt: r.prescriptionCreatedAt }
-      : null,
+    prescription: r.prescriptionRaw ? mapPrescription(r.id, r) : null,
   };
 }
 
@@ -254,6 +285,7 @@ export async function getTokenById(tokenId: string) {
     SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
            u.id as doctorObjId, u.firstName as doctorFirstName, u.lastName as doctorLastName,
            pr.id as prescriptionId, pr.diagnosis, pr.medicines, pr.tests, pr.advice,
+           pr.thumbName, pr.thumbnail,
            pr.createdAt as prescriptionCreatedAt,
            CASE WHEN pr.id IS NOT NULL THEN 1 ELSE 0 END as prescriptionRaw
     FROM "Token" t
@@ -271,12 +303,7 @@ export async function getTokenById(tokenId: string) {
     status: r.status, notes: r.notes, reason: r.reason, createdAt: r.createdAt, updatedAt: r.updatedAt,
     patient: { id: r.patientObjId, firstName: r.patientFirstName, lastName: r.patientLastName, mrNumber: r.patientMrNumber },
     doctor:  { id: r.doctorObjId,  firstName: r.doctorFirstName,  lastName: r.doctorLastName },
-    prescription: r.prescriptionRaw
-      ? { id: r.prescriptionId, tokenId: r.id, diagnosis: r.diagnosis,
-          medicines: JSON.parse(r.medicines as string || '[]'),
-          tests: JSON.parse(r.tests as string || '[]'),
-          advice: r.advice, createdAt: r.prescriptionCreatedAt }
-      : null,
+    prescription: r.prescriptionRaw ? mapPrescription(r.id, r) : null,
   };
 }
 

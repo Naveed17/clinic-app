@@ -98,6 +98,7 @@ declare global {
         patients: () => Promise<unknown>;
         doctors: () => Promise<unknown>;
         create: (input: unknown) => Promise<unknown>;
+        ensureSameDay: (input: unknown) => Promise<unknown>;
         update: (id: string, input: unknown) => Promise<unknown>;
         updateStatus: (id: string, status: string) => Promise<unknown>;
         cancel: (id: string) => Promise<unknown>;
@@ -178,8 +179,15 @@ declare global {
         onNotification: (handler: (notification: unknown) => void) => () => void;
       };
       print: {
-        pdf: (base64: string, options?: { printDialog?: boolean }) => Promise<{ ok: boolean; error?: string }>;
+        pdf: (
+          base64: string,
+          options?: { printDialog?: boolean; paper?: 'pos80' | 'A4' },
+        ) => Promise<{ ok: boolean; error?: string }>;
         html: (html: string) => Promise<{ ok: boolean; error?: string }>;
+        captureHtml: (
+          html: string,
+          options?: { width?: number; height?: number },
+        ) => Promise<{ ok: boolean; base64?: string; error?: string }>;
       };
       settings: {
         get: () => Promise<{

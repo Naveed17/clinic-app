@@ -127,6 +127,7 @@ declare global {
         patients: () => Promise<AppointmentPerson[]>;
         doctors: () => Promise<AppointmentPerson[]>;
         create: (input: AppointmentInput) => Promise<Appointment>;
+        ensureSameDay: (input: AppointmentInput) => Promise<Appointment>;
         update: (id: string, input: AppointmentInput) => Promise<Appointment>;
         cancel: (id: string) => Promise<Appointment>;
       };
@@ -165,8 +166,15 @@ declare global {
         upsert: (doctorId: string, slots: { dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }[]) => Promise<{ id: string; doctorId: string; dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }[]>;
       };
       print: {
-        pdf: (base64: string, options?: { printDialog?: boolean }) => Promise<{ ok: boolean; error?: string }>;
-        html: (html: string) => Promise<{ ok: boolean; error?: string }>;
+        pdf: (
+          base64: string,
+          options?: { printDialog?: boolean; paper?: 'pos80' | 'A4' },
+        ) => Promise<{ ok: boolean; error?: string }>;
+        html: (html: string, options?: { printDialog?: boolean }) => Promise<{ ok: boolean; error?: string }>;
+        captureHtml: (
+          html: string,
+          options?: { width?: number; height?: number },
+        ) => Promise<{ ok: boolean; base64?: string; error?: string }>;
       };
       settings: {
         get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string }>;

@@ -48,19 +48,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 28,
+    marginBottom: 24,
   },
   doctorName: {
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: 'Helvetica-Bold',
     color: PAD_BLUE,
     marginBottom: 4,
   },
   qualification: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: 'Helvetica-Bold',
     color: PAD_BLUE,
-    letterSpacing: 1.2,
+    letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: 3,
   },
@@ -71,10 +71,10 @@ const styles = StyleSheet.create({
   fieldRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   fieldLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: 'Helvetica-Bold',
     color: PAD_BLUE,
     marginRight: 6,
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
     fontSize: 10,
     color: PAD_INK,
-    minHeight: 14,
+    minHeight: 13,
   },
   halfField: {
     flex: 1,
@@ -95,70 +95,70 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    marginTop: 18,
+    marginTop: 14,
     position: 'relative',
-    minHeight: 340,
+    minHeight: 280,
   },
   rx: {
-    fontSize: 36,
+    fontSize: 28,
     fontFamily: 'Helvetica-Bold',
     color: PAD_BLUE,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   bodyText: {
-    fontSize: 11,
+    fontSize: 10,
     color: PAD_INK,
-    lineHeight: 1.65,
+    lineHeight: 1.5,
     paddingLeft: 4,
   },
   bodyBlock: {
-    fontSize: 11,
+    fontSize: 10,
     color: PAD_INK,
-    lineHeight: 1.65,
-    marginBottom: 6,
+    lineHeight: 1.5,
+    marginBottom: 5,
   },
   listRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 4,
+    marginBottom: 3,
     paddingLeft: 4,
   },
   listMarker: {
-    fontSize: 11,
+    fontSize: 10,
     color: PAD_INK,
-    lineHeight: 1.65,
-    width: 18,
+    lineHeight: 1.5,
+    width: 16,
   },
   listContent: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 10,
     color: PAD_INK,
-    lineHeight: 1.65,
+    lineHeight: 1.5,
   },
   watermarkWrap: {
     position: 'absolute',
-    top: 40,
+    top: 36,
     left: 0,
     right: 0,
     alignItems: 'center',
-    opacity: 0.1,
+    opacity: 0.09,
   },
   headerLogo: {
-    width: 56,
-    height: 56,
+    width: 52,
+    height: 52,
     objectFit: 'contain',
   },
   watermarkLogo: {
-    width: 180,
-    height: 180,
+    width: 160,
+    height: 160,
     objectFit: 'contain',
   },
   signatureBlock: {
     alignItems: 'center',
     alignSelf: 'flex-end',
-    width: 160,
-    marginTop: 24,
-    marginBottom: 16,
+    width: 150,
+    marginTop: 18,
+    marginBottom: 10,
   },
   signatureLine: {
     width: '100%',
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontFamily: 'Helvetica-Bold',
     color: PAD_BLUE,
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
   },
   footer: {
     position: 'absolute',
@@ -178,18 +178,18 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingHorizontal: 40,
-    paddingTop: 14,
-    paddingBottom: 18,
+    paddingTop: 12,
+    paddingBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#ffffff',
   },
   footerBrand: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: 'Helvetica',
     color: PAD_FOOTER_TEXT,
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   footerItem: {
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     maxWidth: '34%',
   },
   footerText: {
-    fontSize: 8.5,
+    fontSize: 8,
     color: PAD_FOOTER_TEXT,
     marginLeft: 5,
   },
@@ -228,7 +228,7 @@ function PhoneIconPdf({ size = 11, color = PAD_FOOTER_TEXT }: { size?: number; c
 
 function FooterGradientLine(): React.JSX.Element {
   return (
-    <Svg width={515} height={2} viewBox="0 0 515 2" style={{ marginBottom: 12 }}>
+    <Svg width={515} height={2} viewBox="0 0 515 2" style={{ marginBottom: 10 }}>
       <Defs>
         <LinearGradient id="footerGrad" x1="0" y1="0" x2="1" y2="0">
           <Stop offset="0" stopColor="#5EC8D8" />
@@ -421,6 +421,13 @@ export function stripAdviceHtml(text: string): string {
     .trim();
 }
 
+/** List/preview: strip pad meta + HTML so advice shows as readable text. */
+export function formatAdvicePreview(advice: string): string {
+  if (!advice?.trim()) return '';
+  const { body } = parsePadMeta(advice);
+  return stripAdviceHtml(body);
+}
+
 export function parsePadMeta(advice: string): {
   sex: string;
   age: string;
@@ -482,7 +489,7 @@ export function PrescriptionPadDocument({
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size="A4" orientation="portrait" style={styles.page}>
         <View style={styles.content}>
           <View style={styles.header}>
             <View>
@@ -578,7 +585,7 @@ export function PrescriptionPadPdfPreview({
     setPrinting(true);
     setPrintError(null);
     try {
-      await printReactPdfDocument(pdfDocument);
+      await printReactPdfDocument(pdfDocument, { paper: 'A4' });
     } catch (err) {
       setPrintError(err instanceof Error ? err.message : 'Print failed');
     } finally {

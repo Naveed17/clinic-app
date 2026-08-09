@@ -1,5 +1,6 @@
 import { pdf, type DocumentProps } from '@react-pdf/renderer';
 import type { ReactElement } from 'react';
+import type { PrintPaperId } from '@shared/invoicePaper';
 
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -15,11 +16,13 @@ function blobToBase64(blob: Blob): Promise<string> {
 }
 
 export type PrintReactPdfOptions = {
-  /** Token slips / Print-to-PDF need the system dialog */
+  /** Open Chromium print dialog with preview (default true on main process). */
   printDialog?: boolean;
+  /** pos80 = token/receipt; A4 = prescription */
+  paper?: PrintPaperId;
 };
 
-/** Generate a react-pdf Document and print via main-process pdf-to-printer. */
+/** Generate a react-pdf Document and print via Electron native print dialog. */
 export async function printReactPdfDocument(
   pdfDocument: ReactElement<DocumentProps>,
   options?: PrintReactPdfOptions,

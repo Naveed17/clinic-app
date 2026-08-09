@@ -4,6 +4,7 @@ import {
   cancelAppointment,
   createAppointment,
   deleteAppointment,
+  ensureSameDayAppointment,
   listAppointmentPatients,
   listAppointments,
   listDoctors,
@@ -39,6 +40,24 @@ export function createAppointmentsRouter(io: SocketIOServer): Router {
     requireRole(['admin', 'doctor', 'receptionist']),
     asyncHandler(async (_req, res) => {
       res.json(await listDoctors());
+    }),
+  );
+
+  router.post(
+    '/ensure-same-day',
+    requireRole(['admin', 'doctor', 'receptionist']),
+    asyncHandler(async (req, res) => {
+      const appointment = await ensureSameDayAppointment(req.body as AppointmentInput);
+      if (appointment) {
+        emitNotification(io, {
+          kind: 'success',
+          title: 'Appointment ready',
+          message: 'Visit appointment was created or updated for this token.',
+          payload: { entity: 'appointment', id: appointment.id, providerId: appointment.providerId },
+        });
+        emitDataChange(io, 'appointment', 'updated');
+      }
+      res.status(200).json(appointment);
     }),
   );
 

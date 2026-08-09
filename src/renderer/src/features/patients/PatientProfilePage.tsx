@@ -113,69 +113,74 @@ function PrescriptionsTabInline({ patientId, patient }: {
         {items.map((item) => {
           const pr = item.prescription;
           const doctorLabel = `${item.doctor?.firstName ?? ''} ${item.doctor?.lastName ?? ''}`.trim();
+          const title = pr.thumbName?.trim() || pr.diagnosis || 'Prescription Entry';
+          const thumbSrc = pr.thumbnail ? `data:image/png;base64,${pr.thumbnail}` : null;
           return (
             <Box
               key={pr.id}
+              onClick={() => setPrintItem({ prescription: pr, doctor: item.doctor ?? { firstName: '', lastName: '' } })}
               sx={{
-                p: 1.75,
+                p: 1.25,
                 borderRadius: 1,
                 bgcolor: alpha(theme.palette.primary.main, 0.03),
                 border: '1px solid',
                 borderColor: 'divider',
                 borderLeft: '4px solid',
                 borderLeftColor: 'primary.main',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.25,
+                cursor: 'pointer',
+                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
               }}
             >
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1.5}>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography fontWeight={700} fontSize={14}>
-                    {pr.diagnosis || 'Prescription Entry'}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
-                    {new Date(pr.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}
-                    {doctorLabel ? ` · Dr. ${doctorLabel.replace(/^dr\.?\s*/i, '')}` : ''}
-                  </Typography>
-                </Box>
-                <Stack direction="row" spacing={0.5} alignItems="center">
-                  <Tooltip title="Print Prescription">
-                    <IconButton
-                      size="small"
-                      onClick={() => setPrintItem({ prescription: pr, doctor: item.doctor ?? { firstName: '', lastName: '' } })}
-                      sx={{ borderRadius: 1 }}
-                    >
-                      <PrintOutlinedIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <Chip label="Rx" size="small" color="primary" sx={{ fontWeight: 700, borderRadius: 1, height: 22 }} />
-                </Stack>
-              </Stack>
-
-              {pr.medicines.length > 0 && (
-                <Box sx={{ mt: 1.25, p: 1.25, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1 }}>
-                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', mb: 0.5 }}>
-                    Medicines
-                  </Typography>
-                  {pr.medicines.map((m, i) => (
-                    <Typography key={i} variant="body2" sx={{ mt: 0.35, fontSize: 13 }}>
-                      <strong>{i + 1}. {m.name}</strong> — {m.dosage} · {m.duration}
-                      {m.instructions ? ` · (${m.instructions})` : ''}
-                    </Typography>
-                  ))}
-                </Box>
-              )}
-              {pr.tests.length > 0 && (
-                <Typography variant="body2" color="primary.main" fontWeight={600} sx={{ mt: 1, fontSize: 13 }}>
-                  Tests: {pr.tests.join(', ')}
+              <Box
+                sx={{
+                  width: 56,
+                  height: 72,
+                  flexShrink: 0,
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: alpha(theme.palette.primary.main, 0.08),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {thumbSrc ? (
+                  <Box
+                    component="img"
+                    src={thumbSrc}
+                    alt=""
+                    sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                ) : (
+                  <MedicalServicesOutlinedIcon sx={{ fontSize: 22, color: 'primary.main' }} />
+                )}
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography fontWeight={700} fontSize={14} noWrap>
+                  {title}
                 </Typography>
-              )}
-              {pr.advice && (
-                <Box sx={{ mt: 1, p: 1.1, bgcolor: alpha(theme.palette.info.main, 0.06), borderRadius: 1, borderLeft: `3px solid ${theme.palette.info.main}` }}>
-                  <Typography variant="caption" fontWeight={700} color="info.main" sx={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Advice
-                  </Typography>
-                  <Typography variant="body2" sx={{ mt: 0.2, fontSize: 13 }}>{pr.advice}</Typography>
-                </Box>
-              )}
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }} noWrap>
+                  {new Date(pr.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {doctorLabel ? ` · Dr. ${doctorLabel.replace(/^dr\.?\s*/i, '')}` : ''}
+                </Typography>
+              </Box>
+              <Stack direction="row" spacing={0.5} alignItems="center" onClick={(e) => e.stopPropagation()}>
+                <Tooltip title="Print Prescription">
+                  <IconButton
+                    size="small"
+                    onClick={() => setPrintItem({ prescription: pr, doctor: item.doctor ?? { firstName: '', lastName: '' } })}
+                    sx={{ borderRadius: 1 }}
+                  >
+                    <PrintOutlinedIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Chip label="Rx" size="small" color="primary" sx={{ fontWeight: 700, borderRadius: 1, height: 22 }} />
+              </Stack>
             </Box>
           );
         })}

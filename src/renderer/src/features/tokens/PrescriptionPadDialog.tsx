@@ -30,9 +30,68 @@ import {
   PAD_LINE,
   PrescriptionPadPdfPreview,
   parsePadMeta,
+  stripAdviceHtml,
   type PrescriptionPadClinic,
 } from './PrescriptionPadPdf';
 import careflowLogo from '@/assets/careflow-logo.png';
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function buildPrescriptionThumbHtml(opts: {
+  clinicName: string;
+  patientName: string;
+  diagnosis: string;
+  adviceHtml: string;
+  dateStr: string;
+}): string {
+  const adviceText = stripAdviceHtml(opts.adviceHtml)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 8)
+    .map((line) => `<div class="line">${escapeHtml(line)}</div>`)
+    .join('');
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 280px; height: 360px; overflow: hidden; background: #fff; }
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    color: #0f172a;
+    padding: 14px 12px;
+    border: 1px solid #cbd5e1;
+  }
+  .brand { font-size: 12px; font-weight: 800; color: #0f766e; letter-spacing: 0.02em; }
+  .meta { margin-top: 6px; font-size: 10px; color: #64748b; }
+  .name { margin-top: 10px; font-size: 13px; font-weight: 700; }
+  .dx { margin-top: 4px; font-size: 11px; color: #334155; }
+  .rx {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed #94a3b8;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .rx .label { font-size: 10px; font-weight: 700; color: #0f766e; margin-bottom: 4px; }
+  .line { margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style></head><body>
+  <div class="brand">${escapeHtml(opts.clinicName || 'CareFlow')}</div>
+  <div class="meta">${escapeHtml(opts.dateStr)} · Prescription</div>
+  <div class="name">${escapeHtml(opts.patientName || 'Patient')}</div>
+  ${opts.diagnosis ? `<div class="dx">Dx: ${escapeHtml(opts.diagnosis)}</div>` : ''}
+  <div class="rx">
+    <div class="label">Rx / Advice</div>
+    ${adviceText || '<div class="line">—</div>'}
+  </div>
+</body></html>`;
+}
 
 function calcAge(dob: Date | string | null | undefined): string {
   if (!dob) return '';
@@ -175,11 +234,31 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
       // Keep TipTap HTML so lists/bold survive save + print
       const html = editor.getHTML();
       const meta = `[Pad|sex:${patientSex}|age:${patientAge}|dob:${patientDob}|addr:${patientAddress.replace(/\|/g, ' ')}|dx:${diagnosis.replace(/\|/g, ' ')}]`;
+      const thumbName = `Rx · ${patientName || 'Patient'} · ${dateStr}`;
+      let thumbnail: string | null = null;
+      try {
+        const thumbHtml = buildPrescriptionThumbHtml({
+          clinicName: brand,
+          patientName,
+          diagnosis,
+          adviceHtml: html,
+          dateStr,
+        });
+        const captured = await window.clinic.print.captureHtml(thumbHtml, {
+          width: 280,
+          height: 360,
+        });
+        if (captured?.ok && captured.base64) thumbnail = captured.base64;
+      } catch {
+        /* list still works without thumbnail */
+      }
       await window.clinic.tokens.upsertPrescription(token.id, {
         diagnosis: diagnosis || 'Rx',
         medicines: [],
         tests: token.prescription?.tests ?? [],
         advice: `${meta}\n${html}`.trim(),
+        thumbName,
+        thumbnail,
       });
       setSavedHint(true);
       setTimeout(() => setSavedHint(false), 2000);

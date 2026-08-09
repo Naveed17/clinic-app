@@ -8,16 +8,14 @@ const env = loadEnv('', process.cwd(), '');
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
+    resolve: { alias: { '@shared': resolve('src/shared') } },
     define: {
       'process.env.API_BASE_URL': JSON.stringify(env.API_BASE_URL || 'https://clinic-license-six.vercel.app/api'),
       'process.env.WHATSAPP_TOKEN': JSON.stringify(env.WHATSAPP_TOKEN || ''),
       'process.env.WHATSAPP_PHONE_NUMBER_ID': JSON.stringify(env.WHATSAPP_PHONE_NUMBER_ID || ''),
     },
     build: {
-      rollupOptions: {
-        // Keep Node printer libs external (CJS + SumatraPDF .exe must load from node_modules)
-        external: ['pdf-to-printer'],
-      },
+      rollupOptions: {},
       copyPublicDir: true,
     },
     publicDir: resolve('src/main/assets'),
@@ -26,7 +24,12 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
   },
   renderer: {
-    resolve: { alias: { '@': resolve('src/renderer/src') } },
+    resolve: {
+      alias: {
+        '@': resolve('src/renderer/src'),
+        '@shared': resolve('src/shared'),
+      },
+    },
     plugins: [react()],
     optimizeDeps: {
       include: [

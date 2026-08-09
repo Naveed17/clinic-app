@@ -328,6 +328,8 @@ export async function initializeDatabase(): Promise<void> {
       "medicines" TEXT NOT NULL DEFAULT '[]',
       "tests" TEXT NOT NULL DEFAULT '[]',
       "advice" TEXT NOT NULL DEFAULT '',
+      "thumbName" TEXT,
+      "thumbnail" TEXT,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" DATETIME NOT NULL,
       FOREIGN KEY ("tokenId") REFERENCES "Token"("id") ON DELETE CASCADE
@@ -336,6 +338,15 @@ export async function initializeDatabase(): Promise<void> {
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Prescription_tokenId_idx" ON "Prescription"("tokenId")',
   );
+  const prescriptionCols = (
+    await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Prescription)')
+  ).map((r) => r.name);
+  if (!prescriptionCols.includes('thumbName')) {
+    await database.$executeRawUnsafe('ALTER TABLE "Prescription" ADD COLUMN "thumbName" TEXT');
+  }
+  if (!prescriptionCols.includes('thumbnail')) {
+    await database.$executeRawUnsafe('ALTER TABLE "Prescription" ADD COLUMN "thumbnail" TEXT');
+  }
 
   // ==========================================
   // PHARMACY & INVENTORY TABLES

@@ -22,6 +22,7 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Snackbar,
 } from '@mui/material';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
@@ -34,7 +35,7 @@ import { useEffect, useState } from 'react';
 import { invoicesService } from '@/services/invoices.service';
 import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
 import type { Invoice, InvoiceInput, InvoicePerson, Payment } from '@/types/invoice';
-import { InvoicePrintPreview } from './InvoicePrintPreview';
+import { printInvoiceReceipt } from '@/utils/printInvoiceReceipt';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { useAuth } from '@/features/auth/AuthContext';
 
@@ -179,14 +180,26 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 const defaults: FormValues = { patientId: '', drFee: 0, discount: 0, notes: '', items: [{ description: '', quantity: 1, unitPrice: 0 }] };
 
-export function InvoiceDialog({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess?: () => void }): React.JSX.Element {
+export function InvoiceDialog({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated?: (invoice: Invoice) => void;
+}): React.JSX.Element {
   const client = useQueryClient();
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: defaults });
   const fields = useFieldArray({ control: form.control, name: 'items' });
   const patients = useQuery({ queryKey: ['invoice-patients'], queryFn: invoicesService.patients });
   const mutation = useMutation({
     mutationFn: (values: FormValues) => invoicesService.create(values as InvoiceInput),
-    onSuccess: async () => { await client.invalidateQueries({ queryKey: ['invoices'] }); onClose(); onSuccess?.(); },
+    onSuccess: async (invoice) => {
+      await client.invalidateQueries({ queryKey: ['invoices'] });
+      onClose();
+      onCreated?.(invoice as Invoice);
+    },
   });
   useEffect(() => { if (open) form.reset(defaults); }, [form, open]);
   const items = form.watch('items');
@@ -259,15 +272,28 @@ export function InvoicesPage(): React.JSX.Element {
   const qc = useQueryClient();
   const isAdmin = user?.role === 'admin';
   const [open, setOpen] = useState(false);
-  const [previewInvoice, setPreviewInvoice] = useState<Invoice | undefined>();
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | undefined>();
   const [historyInvoice, setHistoryInvoice] = useState<Invoice | undefined>();
   const [voidInvoice, setVoidInvoice] = useState<Invoice | undefined>();
   const [loadingHistoryId, setLoadingHistoryId] = useState<string | null>(null);
+  const [printingId, setPrintingId] = useState<string | null>(null);
+  const [printError, setPrintError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
   const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list });
+
+  async function handlePrintInvoice(invoice: Invoice): Promise<void> {
+    setPrintingId(invoice.id);
+    setPrintError(null);
+    try {
+      await printInvoiceReceipt(invoice);
+    } catch (err) {
+      setPrintError(err instanceof Error ? err.message : 'Print failed');
+    } finally {
+      setPrintingId(null);
+    }
+  }
 
   async function openPaymentHistory(invoice: Invoice): Promise<void> {
     setLoadingHistoryId(invoice.id);
@@ -368,7 +394,16 @@ export function InvoicesPage(): React.JSX.Element {
                         </span>
                       </Tooltip>
                       <Tooltip title="Print invoice">
-                        <IconButton sx={actionBtnSx} onClick={() => setPreviewInvoice(invoice)}><PrintOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
+                        <span>
+                          <IconButton
+                            sx={actionBtnSx}
+                            loading={printingId === invoice.id}
+                            disabled={printingId === invoice.id}
+                            onClick={() => void handlePrintInvoice(invoice)}
+                          >
+                            <PrintOutlinedIcon sx={{ fontSize: 17 }} />
+                          </IconButton>
+                        </span>
                       </Tooltip>
                       {!isAdmin && invoice.status !== 'VOID' && invoice.status !== 'PAID' && (
                         <Tooltip title="Void Invoice">
@@ -383,11 +418,26 @@ export function InvoicesPage(): React.JSX.Element {
           )}
         </TableBody>
       </TablePageShell>
-      <InvoiceDialog open={open} onClose={() => setOpen(false)} />
-      {previewInvoice && <InvoicePrintPreview invoice={previewInvoice} onClose={() => setPreviewInvoice(undefined)} />}
+      <InvoiceDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        onCreated={(invoice) => {
+          void handlePrintInvoice(invoice);
+        }}
+      />
       {paymentInvoice && <PaymentDialog invoice={paymentInvoice} onClose={() => setPaymentInvoice(undefined)} />}
       {historyInvoice && <PaymentHistoryDialog invoice={historyInvoice} onClose={() => setHistoryInvoice(undefined)} />}
       {voidInvoice && <VoidDialog invoice={voidInvoice} onClose={() => setVoidInvoice(undefined)} />}
+      <Snackbar
+        open={Boolean(printError)}
+        autoHideDuration={5000}
+        onClose={() => setPrintError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="error" onClose={() => setPrintError(null)} variant="filled">
+          {printError}
+        </Alert>
+      </Snackbar>
     </>
   );
 }

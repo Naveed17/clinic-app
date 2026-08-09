@@ -473,7 +473,7 @@ export function PrescriptionPrintPreview({
     setPrinting(true);
     setPrintError(null);
     try {
-      await printReactPdfDocument(pdfDocument);
+      await printReactPdfDocument(pdfDocument, { paper: 'A4' });
     } catch (err) {
       setPrintError(err instanceof Error ? err.message : 'Print failed');
     } finally {

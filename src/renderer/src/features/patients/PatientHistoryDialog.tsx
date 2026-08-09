@@ -103,65 +103,78 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
       {items.map((item) => {
         const pr = item.prescription;
         const doctorLabel = `${item.doctor?.firstName ?? ''} ${item.doctor?.lastName ?? ''}`.trim();
+        const title = pr.thumbName?.trim() || pr.diagnosis || 'Prescription Entry';
+        const thumbSrc = pr.thumbnail ? `data:image/png;base64,${pr.thumbnail}` : null;
         return (
         <Box
           key={pr.id}
+          onClick={() => setPrintItem({
+            prescription: pr,
+            doctor: item.doctor ?? { firstName: '', lastName: '' },
+          })}
           sx={{
-            p: 1.75,
+            p: 1.25,
             borderRadius: 1,
             bgcolor: alpha(theme.palette.primary.main, 0.03),
             border: '1px solid',
             borderColor: 'divider',
             borderLeft: '4px solid',
             borderLeftColor: 'primary.main',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.25,
+            cursor: 'pointer',
+            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
           }}
         >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-            <Box>
-              <Typography fontWeight={700} fontSize={14}>{pr.diagnosis || 'Prescription Entry'}</Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
-                {new Date(pr.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}
-                {doctorLabel ? ` · Dr. ${doctorLabel.replace(/^dr\.?\s*/i, '')}` : ''}
-              </Typography>
-            </Box>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Tooltip title="Print Prescription">
-                <IconButton
-                  size="small"
-                  onClick={() => setPrintItem({
-                    prescription: pr,
-                    doctor: item.doctor ?? { firstName: '', lastName: '' },
-                  })}
-                  sx={{ borderRadius: 1 }}
-                >
-                  <PrintOutlinedIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-              </Tooltip>
-              <Chip label="Rx" size="small" color="primary" sx={{ fontSize: 10, height: 20, borderRadius: 1, fontWeight: 700 }} />
-            </Stack>
+          <Box
+            sx={{
+              width: 56,
+              height: 72,
+              flexShrink: 0,
+              borderRadius: 1,
+              overflow: 'hidden',
+              border: '1px solid',
+              borderColor: 'divider',
+              bgcolor: alpha(theme.palette.primary.main, 0.08),
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {thumbSrc ? (
+              <Box
+                component="img"
+                src={thumbSrc}
+                alt=""
+                sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+            ) : (
+              <MedicalServicesOutlinedIcon sx={{ fontSize: 22, color: 'primary.main' }} />
+            )}
           </Box>
-          {pr.medicines.length > 0 && (
-            <Box sx={{ mb: 1, p: 1.25, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1 }}>
-              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>Medicines</Typography>
-              {pr.medicines.map((m, i) => (
-                <Typography key={i} variant="body2" sx={{ mt: 0.25 }}>
-                  {i + 1}. <strong>{m.name}</strong> — {m.dosage} · {m.duration}{m.instructions ? ` · ${m.instructions}` : ''}
-                </Typography>
-              ))}
-            </Box>
-          )}
-          {pr.tests.length > 0 && (
-            <Box sx={{ mb: 1 }}>
-              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lab Tests</Typography>
-              <Typography variant="body2">{pr.tests.join(', ')}</Typography>
-            </Box>
-          )}
-          {pr.advice && (
-            <Box sx={{ p: 1.1, bgcolor: alpha(theme.palette.info.main, 0.06), borderRadius: 1, borderLeft: `3px solid ${theme.palette.info.main}` }}>
-              <Typography variant="caption" fontWeight={700} color="info.main" sx={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>Advice</Typography>
-              <Typography variant="body2">{pr.advice}</Typography>
-            </Box>
-          )}
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography fontWeight={700} fontSize={14} noWrap>{title}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }} noWrap>
+              {new Date(pr.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}
+              {doctorLabel ? ` · Dr. ${doctorLabel.replace(/^dr\.?\s*/i, '')}` : ''}
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={0.5} alignItems="center" onClick={(e) => e.stopPropagation()}>
+            <Tooltip title="Print Prescription">
+              <IconButton
+                size="small"
+                onClick={() => setPrintItem({
+                  prescription: pr,
+                  doctor: item.doctor ?? { firstName: '', lastName: '' },
+                })}
+                sx={{ borderRadius: 1 }}
+              >
+                <PrintOutlinedIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+            <Chip label="Rx" size="small" color="primary" sx={{ fontSize: 10, height: 20, borderRadius: 1, fontWeight: 700 }} />
+          </Stack>
         </Box>
         );
       })}
@@ -235,6 +248,7 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
           bgcolor: 'background.default',
           display: 'flex',
           flexDirection: 'column',
+          minHeight: 650,
           maxHeight: '90vh',
         },
       }}
@@ -315,7 +329,7 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
         <Tab icon={<MedicalServicesOutlinedIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Prescriptions" />
       </Tabs>
 
-      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflowY: 'auto', bgcolor: 'background.default' }}>
+      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflowY: 'auto', bgcolor: 'background.default', display: 'flex', flexDirection: 'column' }}>
         {tab === 0 && (
           patientAppointments.length === 0
             ? <EmptyState icon={<CalendarMonthOutlinedIcon sx={{ fontSize: 40 }} />} text="No appointments found." />

@@ -4,6 +4,7 @@ import {
   cancelAppointment,
   createAppointment,
   deleteAppointment,
+  ensureSameDayAppointment,
   listAppointmentPatients,
   listAppointments,
   listDoctors,
@@ -23,6 +24,18 @@ export function registerAppointmentIpc(io?: SocketIOServer): void {
         kind: 'success',
         title: 'Appointment created',
         message: 'A new appointment was scheduled.',
+        payload: { entity: 'appointment', id: appointment.id, providerId: appointment.providerId },
+      });
+    }
+    return appointment;
+  });
+  ipcMain.handle('appointments:ensureSameDay', async (_, input) => {
+    const appointment = await ensureSameDayAppointment(input);
+    if (io && appointment) {
+      emitNotification(io, {
+        kind: 'success',
+        title: 'Appointment ready',
+        message: 'Visit appointment was created or updated for this token.',
         payload: { entity: 'appointment', id: appointment.id, providerId: appointment.providerId },
       });
     }

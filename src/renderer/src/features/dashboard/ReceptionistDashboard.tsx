@@ -117,7 +117,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       await window.clinic.tokens.updateStatus(token.id, 'WAITING');
       const startsAt = new Date(token.createdAt).toISOString();
       const endsAt = new Date(new Date(token.createdAt).getTime() + 30 * 60000).toISOString();
-      await appointmentsService.create({ patientId, providerId: doctorId, startsAt, endsAt, reason: reason || null, notes: null, recurrenceRule: null });
+      await appointmentsService.ensureSameDay({ patientId, providerId: doctorId, startsAt, endsAt, reason: reason || null, notes: null, recurrenceRule: null });
       await qc.invalidateQueries({ queryKey: ['tokens'] });
       await qc.invalidateQueries({ queryKey: ['appointments'] });
       setCreatedToken(token);
@@ -1223,7 +1223,9 @@ export function ReceptionistDashboard(): React.JSX.Element {
       <InvoiceDialog
         open={invoiceDialogOpen}
         onClose={() => setInvoiceDialogOpen(false)}
-        onSuccess={() => navigate('/billing')}
+        onCreated={() => {
+          void navigate('/billing');
+        }}
       />
     </>
   );

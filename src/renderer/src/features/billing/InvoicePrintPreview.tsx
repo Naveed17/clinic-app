@@ -5,26 +5,42 @@ import {
   View,
   Image,
   StyleSheet,
-  PDFViewer,
   Font,
 } from '@react-pdf/renderer';
-import { Dialog, DialogContent, Box, Button } from '@mui/material';
+import {
+  Dialog,
+  DialogContent,
+  Box,
+  IconButton,
+  Tooltip,
+  Typography,
+  Alert,
+  CircularProgress,
+} from '@mui/material';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import type { Invoice } from '@/types/invoice';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 // cspell:ignore bwipjs
 import bwipjs from 'bwip-js';
+import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
+import { printReactPdfDocument } from '@/utils/printPdf';
+import { POS_PAPER } from '@shared/invoicePaper';
 
-function generateBarcode(text: string): string {
-  const canvas = document.createElement('canvas');
-  bwipjs.toCanvas(canvas, {
-    bcid: 'code128',
-    text,
-    scale: 2,
-    height: 12,
-    includetext: false,
-  });
-  return canvas.toDataURL('image/png');
+function generateBarcode(text: string): string | null {
+  try {
+    const canvas = document.createElement('canvas');
+    bwipjs.toCanvas(canvas, {
+      bcid: 'code128',
+      text,
+      scale: 2,
+      height: 12,
+      includetext: false,
+    });
+    return canvas.toDataURL('image/png');
+  } catch {
+    return null;
+  }
 }
 
 Font.register({
@@ -47,14 +63,12 @@ const styles = StyleSheet.create({
     paddingVertical: 32,
     fontFamily: 'Courier',
   },
-  center: { textAlign: 'center' },
   shopName: { fontSize: 16, fontWeight: 'bold', textAlign: 'center', marginBottom: 3 },
   shopSub: { fontSize: 9, textAlign: 'center', color: '#444', marginBottom: 2 },
   stars: { fontSize: 8, textAlign: 'center', color: '#888', marginVertical: 6 },
   receiptTitle: { fontSize: 11, fontWeight: 'bold', textAlign: 'center', marginVertical: 2 },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
   headerLabel: { fontSize: 10, fontWeight: 'bold' },
-  headerValue: { fontSize: 10, fontWeight: 'bold' },
   itemLabel: { fontSize: 9.5, flex: 1 },
   itemQty: { fontSize: 9.5, width: 30, textAlign: 'center' },
   itemPrice: { fontSize: 9.5, width: 55, textAlign: 'right' },
@@ -65,25 +79,31 @@ const styles = StyleSheet.create({
   metaLabel: { fontSize: 9, color: '#555' },
   metaValue: { fontSize: 9, color: '#555' },
   thankYou: { fontSize: 12, fontWeight: 'bold', textAlign: 'center', marginTop: 4 },
-  divider: { borderBottomWidth: 0.5, borderBottomColor: '#ccc', marginVertical: 6 },
 });
 
 const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(Number(v))}`;
 
-function ReceiptDocument({ invoice, clinicName, clinicAddress, clinicPhone }: {
+function ReceiptDocument({
+  invoice,
+  clinicName,
+  clinicAddress,
+  clinicPhone,
+  barcodeSrc,
+}: {
   invoice: Invoice;
   clinicName: string;
   clinicAddress: string;
   clinicPhone: string;
+  barcodeSrc: string | null;
 }) {
   // Doctor fee is included in the invoice total but is not stored as a separate
   // database column. Derive it from the medicines subtotal, discount, and total.
   const doctorFee = Math.max(0, invoice.total + invoice.discount - invoice.subtotal);
+  const items = invoice.items ?? [];
 
   return (
     <Document>
-      <Page size={[226, 720]} style={styles.page} wrap={false}>
-        {/* Shop Header */}
+      <Page size={[POS_PAPER.pdfPageWidth, POS_PAPER.pdfPageHeightInvoice]} style={styles.page} wrap={false}>
         <Text style={styles.shopName}>{clinicName || 'CLINIC MANAGEMENT'}</Text>
         {clinicAddress ? <Text style={styles.shopSub}>{clinicAddress}</Text> : null}
         {clinicPhone ? <Text style={styles.shopSub}>Tel: {clinicPhone}</Text> : null}
@@ -92,7 +112,6 @@ function ReceiptDocument({ invoice, clinicName, clinicAddress, clinicPhone }: {
         <Text style={styles.receiptTitle}>CASH RECEIPT</Text>
         <Text style={styles.stars}>{STAR_LINE}</Text>
 
-        {/* Invoice Meta */}
         <View style={styles.row}>
           <Text style={styles.metaLabel}>Invoice #</Text>
           <Text style={styles.metaValue}>{invoice.invoiceNumber}</Text>
@@ -114,7 +133,6 @@ function ReceiptDocument({ invoice, clinicName, clinicAddress, clinicPhone }: {
 
         <Text style={styles.stars}>{STAR_LINE}</Text>
 
-        {/* Items Header */}
         <View style={styles.row}>
           <Text style={[styles.headerLabel, { flex: 1 }]}>Description</Text>
           <Text style={[styles.headerLabel, { width: 30, textAlign: 'center' }]}>Qty</Text>
@@ -123,8 +141,7 @@ function ReceiptDocument({ invoice, clinicName, clinicAddress, clinicPhone }: {
 
         <Text style={styles.stars}>{STAR_LINE}</Text>
 
-        {/* Items */}
-        {invoice.items.map((item) => (
+        {items.map((item) => (
           <View key={item.id} style={styles.row}>
             <Text style={styles.itemLabel}>{item.description}</Text>
             <Text style={styles.itemQty}>{item.quantity}</Text>
@@ -141,7 +158,6 @@ function ReceiptDocument({ invoice, clinicName, clinicAddress, clinicPhone }: {
 
         <Text style={styles.stars}>{STAR_LINE}</Text>
 
-        {/* Totals */}
         <View style={styles.row}>
           <Text style={styles.totalLabel}>Total</Text>
           <Text style={styles.totalValue}>{money(invoice.total)}</Text>
@@ -167,11 +183,12 @@ function ReceiptDocument({ invoice, clinicName, clinicAddress, clinicPhone }: {
         <Text style={styles.thankYou}>THANK YOU!</Text>
         <Text style={styles.stars}>{STAR_LINE}</Text>
 
-        {/* Barcode */}
-        <Image
-          src={generateBarcode(invoice.invoiceNumber)}
-          style={{ width: 160, height: 50, alignSelf: 'center', marginTop: 6 }}
-        />
+        {barcodeSrc ? (
+          <Image
+            src={barcodeSrc}
+            style={{ width: 160, height: 50, alignSelf: 'center', marginTop: 6 }}
+          />
+        ) : null}
         <Text style={{ fontSize: 8, textAlign: 'center', color: '#555', marginTop: 3 }}>
           {invoice.invoiceNumber}
         </Text>
@@ -183,40 +200,154 @@ function ReceiptDocument({ invoice, clinicName, clinicAddress, clinicPhone }: {
 export function InvoicePrintPreview({
   invoice,
   onClose,
+  autoPrint = false,
 }: {
   invoice: Invoice;
   onClose: () => void;
+  /** After create: open preview and start the system print dialog */
+  autoPrint?: boolean;
 }): React.JSX.Element {
-  const [clinic, setClinic] = useState({ clinicName: '', clinicAddress: '', clinicPhone: '' });
+  const [clinic, setClinic] = useState<{
+    clinicName: string;
+    clinicAddress: string;
+    clinicPhone: string;
+  } | null>(null);
+  const [printing, setPrinting] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const autoPrintDone = useRef(false);
+
+  const barcodeSrc = useMemo(
+    () => generateBarcode(invoice.invoiceNumber),
+    [invoice.invoiceNumber],
+  );
 
   useEffect(() => {
-    void window.clinic?.settings.get().then((s) => setClinic({
-      clinicName: s.clinicName ?? '',
-      clinicAddress: s.clinicAddress ?? '',
-      clinicPhone: s.clinicPhone ?? '',
-    }));
+    void window.clinic?.settings.get().then((s) =>
+      setClinic({
+        clinicName: s.clinicName ?? '',
+        clinicAddress: s.clinicAddress ?? '',
+        clinicPhone: s.clinicPhone ?? '',
+      }),
+    );
   }, []);
+
+  const documentKey = [
+    invoice.id,
+    invoice.invoiceNumber,
+    invoice.total,
+    clinic?.clinicName ?? '',
+    barcodeSrc ? '1' : '0',
+  ].join('|');
+
+  const pdfDocument = useMemo(() => {
+    if (!clinic) return null;
+    return (
+      <ReceiptDocument
+        invoice={invoice}
+        barcodeSrc={barcodeSrc}
+        {...clinic}
+      />
+    );
+  }, [clinic, invoice, barcodeSrc]);
+
+  async function handlePrint(): Promise<void> {
+    if (!pdfDocument) return;
+    setPrinting(true);
+    setPrintError(null);
+    try {
+      await printReactPdfDocument(pdfDocument, { printDialog: true, paper: 'pos80' });
+    } catch (err) {
+      setPrintError(err instanceof Error ? err.message : 'Print failed');
+    } finally {
+      setPrinting(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!autoPrint || !pdfDocument || autoPrintDone.current) return;
+    autoPrintDone.current = true;
+    void handlePrint();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPrint, pdfDocument]);
 
   return (
     <Dialog
       open
       onClose={onClose}
-      maxWidth="sm"
+      maxWidth="xs"
       fullWidth
       PaperProps={{
-        sx: { display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' },
+        sx: {
+          borderRadius: 1,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: '90vh',
+        },
       }}
     >
-      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
-        <PDFViewer width="100%" height="100%" showToolbar>
-          <ReceiptDocument invoice={invoice} {...clinic} />
-        </PDFViewer>
+      <Box
+        sx={{
+          px: 2.5,
+          py: 1.5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          flexShrink: 0,
+        }}
+      >
+        <Typography fontWeight={700} fontSize={15}>
+          Invoice Receipt
+        </Typography>
+        <Tooltip title="Close">
+          <IconButton size="small" onClick={onClose} aria-label="Close">
+            <CloseOutlinedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Box>
+      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'auto', bgcolor: '#f1f5f9' }}>
+        {pdfDocument ? (
+          <PdfBlobPreview documentKey={documentKey} pdfDocument={pdfDocument} height={560} />
+        ) : (
+          <Box sx={{ height: 560, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Typography color="text.secondary">Loading...</Typography>
+          </Box>
+        )}
       </DialogContent>
-      <Box sx={{ p: 1.5, display: 'flex', justifyContent: 'flex-end', gap: 1, flexShrink: 0 }}>
-        <Button onClick={onClose}>Close</Button>
-        <Button variant="contained" startIcon={<PrintOutlinedIcon />} onClick={onClose}>
-          Print from PDF viewer
-        </Button>
+      <Box
+        sx={{
+          px: 2,
+          py: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+        }}
+      >
+        {printError && <Alert severity="error">{printError}</Alert>}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
+          <Tooltip title="Close">
+            <IconButton onClick={onClose} aria-label="Close" size="small">
+              <CloseOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={printing ? 'Printing...' : 'Print'}>
+            <span>
+              <IconButton
+                color="primary"
+                disabled={printing || !pdfDocument}
+                onClick={() => void handlePrint()}
+                aria-label="Print"
+                size="small"
+              >
+                {printing ? <CircularProgress size={18} /> : <PrintOutlinedIcon fontSize="small" />}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
       </Box>
     </Dialog>
   );

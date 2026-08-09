@@ -23,11 +23,15 @@
     "paths": {
       "@/*": [
         "src/renderer/src/*"
+      ],
+      "@shared/*": [
+        "src/shared/*"
       ]
     }
   },
   "include": [
     "src/renderer/**/*",
-    "src/preload/index.d.ts"
+    "src/preload/index.d.ts",
+    "src/shared/**/*.ts"
   ]
 }
