@@ -1,9 +1,12 @@
-import { Document, Page, Text, View, StyleSheet, PDFViewer } from '@react-pdf/renderer';
-import { Box, Button, Dialog, DialogContent, Typography } from '@mui/material';
+import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Alert, Box, Button, Dialog, DialogContent, Typography } from '@mui/material';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
+import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import type { Prescription, Token } from '@/types/token';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PrescriptionPadDocument, parsePadMeta, stripAdviceHtml } from './PrescriptionPadPdf';
+import { printReactPdfDocument } from '@/utils/printPdf';
+import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
 
 const styles = StyleSheet.create({
   page: {
@@ -348,6 +351,8 @@ export function PrescriptionPrintPreview({
   onClose,
 }: PrescriptionPrintPreviewProps): React.JSX.Element {
   const [clinic, setClinic] = useState({ clinicName: '', clinicAddress: '', clinicPhone: '' });
+  const [printing, setPrinting] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
 
   useEffect(() => {
     void window.clinic?.settings?.get().then((settings) => {
@@ -385,7 +390,98 @@ export function PrescriptionPrintPreview({
     ? new Date(token.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
     : new Date().toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
 
-  if (!activePrescription) {
+  const isFreeTextPad = Boolean(
+    activePrescription &&
+      (activePrescription.diagnosis === 'Rx' || !activePrescription.medicines?.length),
+  );
+
+  const pad = useMemo(
+    () => parsePadMeta(activePrescription?.advice || ''),
+    [activePrescription?.advice],
+  );
+  const padAge = pad.age || '—';
+  const padSex = pad.sex || '—';
+  const padBody = pad.body;
+  const padAddress = pad.address || '';
+  const padDiagnosis =
+    pad.diagnosis ||
+    (activePrescription && activePrescription.diagnosis !== 'Rx' ? activePrescription.diagnosis : '');
+
+  const documentKey = [
+    activePrescription?.id ?? 'none',
+    isFreeTextPad ? 'pad' : 'rx',
+    clinic.clinicName,
+    dateStr,
+    padBody,
+    padAge,
+    padSex,
+    padAddress,
+    padDiagnosis,
+  ].join('|');
+
+  const pdfDocument = useMemo(() => {
+    if (!activePrescription) return null;
+    if (isFreeTextPad) {
+      return (
+        <PrescriptionPadDocument
+          clinic={clinic}
+          doctorName={doctorDisplay}
+          qualification="CONSULTING PHYSICIAN"
+          patientName={patientName}
+          patientAddress={padAddress}
+          patientAge={padAge}
+          patientSex={padSex}
+          dateStr={dateStr}
+          diagnosis={padDiagnosis}
+          bodyText={padBody}
+        />
+      );
+    }
+    return (
+      <PrescriptionPDFDocument
+        prescription={{
+          ...activePrescription,
+          advice: stripAdviceHtml(padBody || activePrescription.advice || ''),
+        }}
+        patientName={patientName}
+        mrNumber={mrNumber}
+        patientPhone={patientPhone}
+        doctorName={doctorName}
+        dateStr={dateStr}
+        clinic={clinic}
+      />
+    );
+  }, [
+    activePrescription,
+    clinic,
+    dateStr,
+    doctorDisplay,
+    doctorName,
+    isFreeTextPad,
+    mrNumber,
+    padAddress,
+    padAge,
+    padBody,
+    padDiagnosis,
+    padSex,
+    patientName,
+    patientPhone,
+  ]);
+
+  async function handlePrint(): Promise<void> {
+    if (!pdfDocument) return;
+    setPrinting(true);
+    setPrintError(null);
+    try {
+      await printReactPdfDocument(pdfDocument);
+    } catch (err) {
+      setPrintError(err instanceof Error ? err.message : 'Print failed');
+    } finally {
+      setPrinting(false);
+    }
+  }
+
+  if (!activePrescription || !pdfDocument) {
     return (
       <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
         <DialogContent sx={{ p: 4, textAlign: 'center' }}>
@@ -395,19 +491,6 @@ export function PrescriptionPrintPreview({
       </Dialog>
     );
   }
-
-  const isFreeTextPad =
-    activePrescription.diagnosis === 'Rx' ||
-    !activePrescription.medicines?.length;
-
-  const pad = parsePadMeta(activePrescription.advice || '');
-  const padAge = pad.age || '—';
-  const padSex = pad.sex || '—';
-  const padBody = pad.body;
-  const padAddress = pad.address || patientProp?.phone || '';
-  const padDiagnosis =
-    pad.diagnosis ||
-    (activePrescription.diagnosis !== 'Rx' ? activePrescription.diagnosis : '');
 
   return (
     <Dialog
@@ -430,40 +513,25 @@ export function PrescriptionPrintPreview({
         <Button onClick={onClose} size="small" startIcon={<CloseOutlinedIcon />}>Close</Button>
       </Box>
 
-      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
-        <PDFViewer width="100%" height="100%" showToolbar>
-          {isFreeTextPad ? (
-            <PrescriptionPadDocument
-              clinic={clinic}
-              doctorName={doctorDisplay}
-              qualification="CONSULTING PHYSICIAN"
-              patientName={patientName}
-              patientAddress={padAddress}
-              patientAge={padAge}
-              patientSex={padSex}
-              dateStr={dateStr}
-              diagnosis={padDiagnosis}
-              bodyText={padBody}
-            />
-          ) : (
-            <PrescriptionPDFDocument
-              prescription={{
-                ...activePrescription,
-                advice: stripAdviceHtml(padBody || activePrescription.advice || ''),
-              }}
-              patientName={patientName}
-              mrNumber={mrNumber}
-              patientPhone={patientPhone}
-              doctorName={doctorName}
-              dateStr={dateStr}
-              clinic={clinic}
-            />
-          )}
-        </PDFViewer>
+      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'auto', bgcolor: '#f1f5f9' }}>
+        <PdfBlobPreview documentKey={documentKey} pdfDocument={pdfDocument} height={560} />
       </DialogContent>
 
-      <Box sx={{ px: 2.5, py: 1.5, display: 'flex', justifyContent: 'flex-end', gap: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-        <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 1 }}>Close</Button>
+      <Box sx={{ px: 2.5, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+        {printError && <Alert severity="error">{printError}</Alert>}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+          <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 1 }}>Close</Button>
+          <Button
+            variant="contained"
+            startIcon={<PrintOutlinedIcon />}
+            loading={printing}
+            disabled={printing}
+            onClick={() => void handlePrint()}
+            sx={{ borderRadius: 1 }}
+          >
+            Print
+          </Button>
+        </Box>
       </Box>
     </Dialog>
   );

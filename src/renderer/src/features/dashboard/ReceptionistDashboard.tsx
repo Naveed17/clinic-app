@@ -22,12 +22,12 @@ import { useEffect, useState, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Document, Page, Text, View, StyleSheet, pdf, Font } from '@react-pdf/renderer';
 import { appointmentsService } from '@/services/appointments.service';
 import { patientsService } from '@/services/patients.service';
 import { invoicesService } from '@/services/invoices.service';
 import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
+import { TokenPrintPreview } from '@/features/tokens/TokensPage';
 import { InvoiceDialog } from '@/features/billing/InvoicesPage';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -63,71 +63,6 @@ const patientSchema = z.object({
 type PatientForm = z.infer<typeof patientSchema>;
 const patientDefaults: PatientForm = { firstName: '', lastName: '', phone: '', dateOfBirth: '', address: '' };
 
-/* ── Token slip PDF (same style as TokensPage) ── */
-Font.register({
-  family: 'Courier',
-  fonts: [
-    { src: 'https://fonts.gstatic.com/s/cousine/v27/d6lIkaiiRdih4SpPzSMlzA.ttf' },
-    { src: 'https://fonts.gstatic.com/s/cousine/v27/d6lNkaiiRdih4SpP_SEvyRTo39l8hw.ttf', fontWeight: 'bold' },
-  ],
-});
-const STAR = '- - - - - - - - - - - - - - - - - - - -';
-const ts = StyleSheet.create({
-  page: { backgroundColor: '#fff', paddingHorizontal: 24, paddingVertical: 28, fontFamily: 'Courier' },
-  shopName: { fontSize: 15, fontWeight: 'bold', textAlign: 'center', marginBottom: 2 },
-  shopSub: { fontSize: 9, textAlign: 'center', color: '#555', marginBottom: 1 },
-  stars: { fontSize: 8, textAlign: 'center', color: '#999', marginVertical: 5 },
-  title: { fontSize: 10, fontWeight: 'bold', textAlign: 'center', marginVertical: 2, letterSpacing: 1 },
-  tokenBox: { borderWidth: 2, borderColor: '#000', marginVertical: 8, paddingVertical: 8, alignItems: 'center' },
-  tokenLabel: { fontSize: 9, letterSpacing: 2, color: '#555' },
-  tokenNum: { fontSize: 48, fontWeight: 'bold', lineHeight: 1, letterSpacing: 3 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
-  lbl: { fontSize: 9, color: '#666' },
-  val: { fontSize: 9 },
-  footer: { fontSize: 8, color: '#999', textAlign: 'center', marginTop: 10 },
-});
-function TokenSlip({ token, clinicName, clinicAddress, clinicPhone }: { token: Token; clinicName: string; clinicAddress: string; clinicPhone: string }) {
-  const date = new Date(token.createdAt).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
-  const time = new Date(token.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  return (
-    <Document>
-      <Page size={[226, 380]} style={ts.page} wrap={false}>
-        <Text style={ts.shopName}>{clinicName || 'CLINIC'}</Text>
-        {clinicAddress ? <Text style={ts.shopSub}>{clinicAddress}</Text> : null}
-        {clinicPhone ? <Text style={ts.shopSub}>Tel: {clinicPhone}</Text> : null}
-        <Text style={ts.stars}>{STAR}</Text>
-        <Text style={ts.title}>PATIENT TOKEN SLIP</Text>
-        <Text style={ts.stars}>{STAR}</Text>
-        <View style={ts.tokenBox}>
-          <Text style={ts.tokenLabel}>TOKEN NO.</Text>
-          <Text style={ts.tokenNum}>{String(token.tokenNumber).padStart(3, '0')}</Text>
-        </View>
-        <Text style={ts.stars}>{STAR}</Text>
-        <View style={ts.row}><Text style={ts.lbl}>Patient</Text><Text style={ts.val}>{token.patient.firstName} {token.patient.lastName}</Text></View>
-        <View style={ts.row}><Text style={ts.lbl}>Doctor</Text><Text style={ts.val}>Dr. {token.doctor.firstName} {token.doctor.lastName}</Text></View>
-        <View style={ts.row}><Text style={ts.lbl}>Date</Text><Text style={ts.val}>{date}</Text></View>
-        <View style={ts.row}><Text style={ts.lbl}>Time</Text><Text style={ts.val}>{time}</Text></View>
-        {token.reason ? <View style={ts.row}><Text style={ts.lbl}>Reason</Text><Text style={ts.val}>{token.reason}</Text></View> : null}
-        <Text style={ts.stars}>{STAR}</Text>
-        <Text style={ts.footer}>Please wait for your token to be called.{`\n`}Thank you for your visit.</Text>
-      </Page>
-    </Document>
-  );
-}
-
-async function printTokenSlip(token: Token) {
-  const s = await window.clinic.settings.get();
-  const blob = await pdf(
-    <TokenSlip token={token} clinicName={s.clinicName ?? ''} clinicAddress={s.clinicAddress ?? ''} clinicPhone={s.clinicPhone ?? ''} />
-  ).toBlob();
-  const url = URL.createObjectURL(blob);
-  const iframe = document.createElement('iframe');
-  iframe.style.display = 'none';
-  iframe.src = url;
-  document.body.appendChild(iframe);
-  iframe.onload = () => { iframe.contentWindow?.print(); };
-}
-
 /* ── Merged Walk-in Modal ── */
 const STEPS = ['Register Patient', 'Issue Token', 'Print Token'];
 
@@ -139,6 +74,8 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   const [doctorId, setDoctorId] = useState('');
   const [reason, setReason] = useState('');
   const [useExisting, setUseExisting] = useState(false);
+  const [previewToken, setPreviewToken] = useState<Token | null>(null);
+  const [previewAutoPrint, setPreviewAutoPrint] = useState(false);
 
   const form = useForm<PatientForm>({ resolver: zodResolver(patientSchema), defaultValues: patientDefaults });
 
@@ -185,13 +122,17 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       await qc.invalidateQueries({ queryKey: ['appointments'] });
       setCreatedToken(token);
       setStep(2);
-      void printTokenSlip(token);
+      // Auto-open slip preview + print dialog
+      setPreviewAutoPrint(true);
+      setPreviewToken(token);
     },
   });
 
   function handleClose() {
     setStep(0); setPatientId(''); setDoctorId(''); setReason('');
     setCreatedToken(null); setUseExisting(false);
+    setPreviewToken(null);
+    setPreviewAutoPrint(false);
     form.reset(patientDefaults);
     onClose();
   }
@@ -286,7 +227,9 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
               <Typography fontWeight={600}>{createdToken.patient.firstName} {createdToken.patient.lastName}</Typography>
               <Typography variant="body2" color="text.secondary">Dr. {createdToken.doctor.firstName} {createdToken.doctor.lastName}</Typography>
             </Paper>
-            <Typography variant="caption" color="text.secondary">Slip sent to printer automatically.</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Print dialog opens automatically — reprint anytime below.
+            </Typography>
           </Stack>
         )}
       </DialogContent>
@@ -309,11 +252,31 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
           </SubmitButton>
         )}
         {step === 2 && (
-          <Button variant="outlined" startIcon={<PrintOutlinedIcon />} onClick={() => createdToken && printTokenSlip(createdToken)} sx={dialogCancelBtnSx}>
+          <Button
+            variant="outlined"
+            startIcon={<PrintOutlinedIcon />}
+            disabled={!createdToken}
+            onClick={() => {
+              if (!createdToken) return;
+              setPreviewAutoPrint(true);
+              setPreviewToken(createdToken);
+            }}
+            sx={dialogCancelBtnSx}
+          >
             Reprint
           </Button>
         )}
       </DialogActions>
+      {previewToken && (
+        <TokenPrintPreview
+          token={previewToken}
+          autoPrint={previewAutoPrint}
+          onClose={() => {
+            setPreviewToken(null);
+            setPreviewAutoPrint(false);
+          }}
+        />
+      )}
     </Dialog>
   );
 }

@@ -26,13 +26,13 @@ import type { Token } from '@/types/token';
 import type { Patient } from '@/types/patient';
 import {
   PAD_BLUE,
-  PAD_BLUE_SOFT,
   PAD_INK,
   PAD_LINE,
   PrescriptionPadPdfPreview,
   parsePadMeta,
   type PrescriptionPadClinic,
 } from './PrescriptionPadPdf';
+import careflowLogo from '@/assets/careflow-logo.png';
 
 function calcAge(dob: Date | string | null | undefined): string {
   if (!dob) return '';
@@ -53,20 +53,6 @@ function plainTextToHtml(text: string): string {
     .split(/\n{2,}/)
     .map((block) => `<p>${block.replace(/\n/g, '<br>')}</p>`)
     .join('');
-}
-
-function PlusMedIcon({ size = 56, color = PAD_BLUE }: { size?: number; color?: string }): React.JSX.Element {
-  const bar = size * 0.22;
-  const len = size * 0.72;
-  const r = bar / 2;
-  const mid = (size - bar) / 2;
-  const midL = (size - len) / 2;
-  return (
-    <Box component="svg" width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden sx={{ display: 'block' }}>
-      <rect x={mid} y={midL} width={bar} height={len} rx={r} ry={r} fill={color} />
-      <rect x={midL} y={mid} width={len} height={bar} rx={r} ry={r} fill={color} />
-    </Box>
-  );
 }
 
 const underlineFieldSx = {
@@ -330,9 +316,12 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
                   }}
                 />
               </Box>
-              <Box sx={{ pt: 0.5 }}>
-                <PlusMedIcon size={56} />
-              </Box>
+              <Box
+                component="img"
+                src={careflowLogo}
+                alt="CareFlow"
+                sx={{ width: 56, height: 56, objectFit: 'contain', display: 'block', pt: 0.5 }}
+              />
             </Box>
 
             {/* Patient fields */}
@@ -419,18 +408,22 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
             {/* Rx body */}
             <Box sx={{ position: 'relative', flex: 1, px: 5, pt: 1, pb: 2, minHeight: 380 }}>
               <Box
+                component="img"
+                src={careflowLogo}
+                alt=""
                 sx={{
                   position: 'absolute',
                   top: '12%',
                   left: '50%',
                   transform: 'translateX(-50%)',
                   pointerEvents: 'none',
-                  opacity: 0.12,
+                  opacity: 0.1,
                   zIndex: 0,
+                  width: 200,
+                  height: 200,
+                  objectFit: 'contain',
                 }}
-              >
-                <PlusMedIcon size={200} color={PAD_BLUE_SOFT} />
-              </Box>
+              />
               <Typography sx={{ position: 'relative', zIndex: 1, fontWeight: 800, color: `${PAD_BLUE} !important`, fontSize: 34, mb: 1, lineHeight: 1 }}>
                 Rx
               </Typography>

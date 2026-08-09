@@ -3,9 +3,6 @@ import { PrismaClient } from '@prisma/client';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-// Fix userData path so it never changes regardless of productName
-app.setName('clinic-management-system');
-
 let prisma: PrismaClient | undefined;
 
 export function getPrisma(): PrismaClient {

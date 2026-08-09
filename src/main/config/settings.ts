@@ -87,7 +87,24 @@ function normalizeOnlineSettings(settings: AppSettings): AppSettings {
 
 export function saveSettings(settings: Partial<AppSettings>): AppSettings {
   const current = getSettings();
-  const next = normalizeOnlineSettings({ ...current, ...settings });
+  // databaseMode / clinicalApiUrl / schemaId come from license API only —
+  // ignore accidental UI patches so Network Settings save cannot force local mode.
+  const safePatch: Partial<AppSettings> = { ...settings };
+  delete safePatch.databaseMode;
+  delete safePatch.clinicalApiUrl;
+  delete safePatch.schemaId;
+  const next = normalizeOnlineSettings({ ...current, ...safePatch });
+  writeFileSync(getPath(), JSON.stringify(next, null, 2), 'utf-8');
+  return next;
+}
+
+/** License/main-process only — updates cloud vs local database mode. */
+export function saveDatabaseModeSettings(
+  patch: Pick<AppSettings, 'databaseMode' | 'clinicalApiUrl' | 'schemaId'> &
+    Partial<Pick<AppSettings, 'serverMode' | 'clientApiUrl'>>,
+): AppSettings {
+  const current = getSettings();
+  const next = normalizeOnlineSettings({ ...current, ...patch });
   writeFileSync(getPath(), JSON.stringify(next, null, 2), 'utf-8');
   return next;
 }

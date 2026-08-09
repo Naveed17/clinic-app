@@ -1,6 +1,24 @@
-import { Document, Page, Text, View, StyleSheet, PDFViewer, Svg, Rect, Path, Defs, LinearGradient, Stop } from '@react-pdf/renderer';
-import { Box, Button, Dialog, DialogContent, Typography } from '@mui/material';
+import {
+  Document,
+  Page,
+  Text,
+  View,
+  StyleSheet,
+  Svg,
+  Path,
+  Rect,
+  Defs,
+  LinearGradient,
+  Stop,
+  Image,
+} from '@react-pdf/renderer';
+import { Alert, Box, Button, Dialog, DialogContent, Typography } from '@mui/material';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
+import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import { useMemo, useState } from 'react';
+import careflowLogo from '@/assets/careflow-logo.png';
+import { printReactPdfDocument } from '@/utils/printPdf';
+import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
 
 /** Sample palette — soft medical blue */
 export const PAD_BLUE = '#2B5F8A';
@@ -125,6 +143,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     opacity: 0.1,
   },
+  headerLogo: {
+    width: 56,
+    height: 56,
+    objectFit: 'contain',
+  },
+  watermarkLogo: {
+    width: 180,
+    height: 180,
+    objectFit: 'contain',
+  },
   signatureBlock: {
     alignItems: 'center',
     alignSelf: 'flex-end',
@@ -175,21 +203,6 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
 });
-
-/** Filled rounded medical plus */
-export function PlusMedPdf({ size = 56, color = PAD_BLUE, opacity = 1 }: { size?: number; color?: string; opacity?: number }): React.JSX.Element {
-  const bar = size * 0.22;
-  const len = size * 0.72;
-  const r = bar / 2;
-  const mid = (size - bar) / 2;
-  const midL = (size - len) / 2;
-  return (
-    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ opacity }}>
-      <Rect x={mid} y={midL} width={bar} height={len} rx={r} ry={r} fill={color} />
-      <Rect x={midL} y={mid} width={len} height={bar} rx={r} ry={r} fill={color} />
-    </Svg>
-  );
-}
 
 function LocationIconPdf({ size = 11, color = PAD_FOOTER_TEXT }: { size?: number; color?: string }): React.JSX.Element {
   return (
@@ -477,7 +490,7 @@ export function PrescriptionPadDocument({
               <Text style={styles.qualification}>{qualification}</Text>
               {certification ? <Text style={styles.certification}>{certification}</Text> : null}
             </View>
-            <PlusMedPdf size={52} />
+            <Image src={careflowLogo} style={styles.headerLogo} />
           </View>
 
           <FieldLine label="Patient Name:" value={patientName} />
@@ -498,7 +511,7 @@ export function PrescriptionPadDocument({
 
           <View style={styles.body}>
             <View style={styles.watermarkWrap}>
-              <PlusMedPdf size={180} color={PAD_BLUE_SOFT} />
+              <Image src={careflowLogo} style={styles.watermarkLogo} />
             </View>
             <Text style={styles.rx}>Rx</Text>
             <PadBodyContent html={bodyText || ''} />
@@ -541,6 +554,38 @@ export function PrescriptionPadPdfPreview({
   onClose,
   ...docProps
 }: PrescriptionPadPdfProps & { onClose: () => void }): React.JSX.Element {
+  const [printing, setPrinting] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
+
+  const documentKey = [
+    docProps.patientName,
+    docProps.dateStr,
+    docProps.bodyText,
+    docProps.patientAge,
+    docProps.patientSex,
+    docProps.patientAddress,
+    docProps.diagnosis,
+    docProps.clinic.clinicName,
+  ].join('|');
+
+  const pdfDocument = useMemo(
+    () => <PrescriptionPadDocument {...docProps} />,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [documentKey],
+  );
+
+  async function handlePrint(): Promise<void> {
+    setPrinting(true);
+    setPrintError(null);
+    try {
+      await printReactPdfDocument(pdfDocument);
+    } catch (err) {
+      setPrintError(err instanceof Error ? err.message : 'Print failed');
+    } finally {
+      setPrinting(false);
+    }
+  }
+
   return (
     <Dialog
       open
@@ -576,11 +621,25 @@ export function PrescriptionPadPdfPreview({
           Close
         </Button>
       </Box>
-      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
-        <PDFViewer width="100%" height="100%" showToolbar>
-          <PrescriptionPadDocument {...docProps} />
-        </PDFViewer>
+      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'auto', bgcolor: '#f1f5f9' }}>
+        <PdfBlobPreview documentKey={documentKey} pdfDocument={pdfDocument} height={560} />
       </DialogContent>
+      <Box sx={{ px: 2.5, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+        {printError && <Alert severity="error">{printError}</Alert>}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+          <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 1 }}>Close</Button>
+          <Button
+            variant="contained"
+            startIcon={<PrintOutlinedIcon />}
+            loading={printing}
+            disabled={printing}
+            onClick={() => void handlePrint()}
+            sx={{ borderRadius: 1 }}
+          >
+            Print
+          </Button>
+        </Box>
+      </Box>
     </Dialog>
   );
 }

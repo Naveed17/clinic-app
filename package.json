@@ -1,6 +1,6 @@
 {
   "name": "care-flow",
-  "version": "1.0.32",
+  "version": "1.0.33",
   "repository": {
     "type": "git",
     "url": "https://github.com/Naveed17/clinic-app.git"
@@ -29,9 +29,13 @@
     "appId": "com.careflow.app",
     "productName": "CareFlow",
     "asar": true,
+    "asarUnpack": [
+      "**/node_modules/pdf-to-printer/**"
+    ],
     "files": [
       "out/**/*",
-      "package.json"
+      "package.json",
+      "node_modules/pdf-to-printer/**"
     ],
     "extraResources": [
       {
@@ -111,6 +115,7 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "node-machine-id": "^1.1.12",
+    "pdf-to-printer": "^5.8.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-hook-form": "^7.62.0",

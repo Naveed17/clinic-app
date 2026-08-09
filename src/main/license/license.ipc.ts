@@ -3,7 +3,7 @@ import { machineIdSync } from 'node-machine-id';
 import { join } from 'node:path';
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import os from 'node:os';
-import { saveSettings, type DatabaseMode, resolveOnlineApiOrigin } from '../config/settings';
+import { saveSettings, saveDatabaseModeSettings, type DatabaseMode, resolveOnlineApiOrigin } from '../config/settings';
 
 const API_BASE_URL = process.env.API_BASE_URL || 'https://clinic-license-six.vercel.app/api';
 
@@ -126,10 +126,11 @@ function applyDatabaseModeFromApi(key: string, data: LicenseApiExtras & { expire
     schemaId: schemaId || null,
   });
 
-  saveSettings({
+  saveDatabaseModeSettings({
     databaseMode,
     clinicalApiUrl: databaseMode === 'online' ? clinicalApiUrl : '',
     schemaId: databaseMode === 'online' ? schemaId : '',
+    ...(databaseMode === 'online' ? { serverMode: 'local' as const, clientApiUrl: '' } : {}),
   });
 }
 

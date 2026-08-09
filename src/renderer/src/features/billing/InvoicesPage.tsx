@@ -256,16 +256,31 @@ export function InvoiceDialog({ open, onClose, onSuccess }: { open: boolean; onC
 /* ── Invoices Page ── */
 export function InvoicesPage(): React.JSX.Element {
   const { user } = useAuth();
+  const qc = useQueryClient();
   const isAdmin = user?.role === 'admin';
   const [open, setOpen] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | undefined>();
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | undefined>();
   const [historyInvoice, setHistoryInvoice] = useState<Invoice | undefined>();
   const [voidInvoice, setVoidInvoice] = useState<Invoice | undefined>();
+  const [loadingHistoryId, setLoadingHistoryId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
   const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list });
+
+  async function openPaymentHistory(invoice: Invoice): Promise<void> {
+    setLoadingHistoryId(invoice.id);
+    try {
+      await qc.fetchQuery({
+        queryKey: ['invoice-payments', invoice.id],
+        queryFn: () => window.clinic.invoices.payments(invoice.id),
+      });
+      setHistoryInvoice(invoice);
+    } finally {
+      setLoadingHistoryId(null);
+    }
+  }
 
   const filtered = (invoices.data ?? []).filter((inv) => {
     if (!search) return true;
@@ -341,7 +356,16 @@ export function InvoicesPage(): React.JSX.Element {
                         </Tooltip>
                       )}
                       <Tooltip title="Payment History">
-                        <IconButton sx={actionBtnSx} onClick={() => setHistoryInvoice(invoice)}><HistoryOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
+                        <span>
+                          <IconButton
+                            sx={actionBtnSx}
+                            loading={loadingHistoryId === invoice.id}
+                            disabled={loadingHistoryId === invoice.id}
+                            onClick={() => void openPaymentHistory(invoice)}
+                          >
+                            <HistoryOutlinedIcon sx={{ fontSize: 17 }} />
+                          </IconButton>
+                        </span>
                       </Tooltip>
                       <Tooltip title="Print invoice">
                         <IconButton sx={actionBtnSx} onClick={() => setPreviewInvoice(invoice)}><PrintOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>

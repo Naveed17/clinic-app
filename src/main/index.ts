@@ -1,5 +1,10 @@
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
+import { app, BrowserWindow, shell, ipcMain } from 'electron';
+
+// Must run before app ready — locks AppData to CareFlow (not Electron / old productName).
+app.setName('CareFlow');
+app.setPath('userData', join(app.getPath('appData'), 'CareFlow'));
 
 // Redirect @prisma/client and .prisma/client to extraResources path (outside ASAR)
 if (process.resourcesPath) {
@@ -12,7 +17,6 @@ if (process.resourcesPath) {
   }
 }
 
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { environment } from './config/environment';
 import { disconnectPrisma, initializeDatabase } from './database/client';
@@ -24,14 +28,15 @@ import { registerReportIpc } from './reports/report.ipc';
 import { registerUserIpc } from './users/user.ipc';
 import { registerDoctorIpc } from './doctors/doctor.ipc';
 import { registerSettingsIpc } from './settings/settings.ipc';
-import { getSettings, saveSettings, resolveOnlineApiOrigin } from './config/settings';
+import { registerPrintIpc } from './print/print.ipc';
+import { getSettings, saveDatabaseModeSettings, resolveOnlineApiOrigin, isOnlineDatabaseMode } from './config/settings';
 import { startDiscoveryBroadcast, stopDiscoveryBroadcast } from './discovery/discovery.server';
 import { startDiscoveryListener, stopDiscoveryListener } from './discovery/discovery.client';
 import { registerBackupIpc } from './backup/backup.ipc';
 import { registerDocumentsIpc } from './backup/documents.ipc';
 import { registerTokenIpc } from './tokens/token.ipc';
 import { registerLabIpc } from './lab/lab.ipc';
-import { registerLicenseIpc } from './license/license.ipc';
+import { registerLicenseIpc, isLicenseActivated, getLicenseRuntimeMeta } from './license/license.ipc';
 import { registerAuthIpc } from './auth/auth.ipc';
 import { registerSearchIpc } from './search/search.ipc';
 import { registerMedicineIpc } from './medicines/medicine.ipc';
@@ -116,7 +121,11 @@ function createWindow(): void {
 
   window.on('ready-to-show', () => window.show());
   window.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    // Only real http(s) links — about:blank / empty open must not hit Windows shell
+    // (that shows "Get an app to open this 'about' link").
+    if (/^https?:\/\//i.test(url)) {
+      void shell.openExternal(url);
+    }
     return { action: 'deny' };
   });
 
@@ -129,7 +138,6 @@ function createWindow(): void {
 
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.careflow.app');
-  app.setPath('userData', join(app.getPath('appData'), 'CareFlow'));
 
   if (app.isPackaged && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'clinic-secret-key')) {
     console.warn('[CareFlow] JWT_SECRET is not set — using insecure default. Set JWT_SECRET before production deploy.');
@@ -137,18 +145,31 @@ app.whenReady().then(async () => {
 
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window));
   try {
+    // Pull online/local flag from license API (or cache) BEFORE starting SQLite/LAN.
+    try {
+      await isLicenseActivated();
+    } catch (err) {
+      console.warn('[CareFlow] License sync at startup failed — using cached mode', err);
+    }
+
     const settings = getSettings();
+    const meta = getLicenseRuntimeMeta();
     const online =
-      settings.databaseMode === 'online' && Boolean(settings.clinicalApiUrl);
+      isOnlineDatabaseMode(settings) ||
+      (meta.databaseMode === 'online' && Boolean(meta.clinicalApiUrl || settings.clinicalApiUrl));
 
     if (online) {
       // Online = Vercel Nest API → Neon Postgres only (no local SQLite / LAN).
-      const clinicalOrigin = resolveOnlineApiOrigin(settings.clinicalApiUrl);
-      if (clinicalOrigin !== settings.clinicalApiUrl) {
-        saveSettings({ clinicalApiUrl: clinicalOrigin });
-      }
+      const clinicalOrigin = resolveOnlineApiOrigin(settings.clinicalApiUrl || meta.clinicalApiUrl);
+      saveDatabaseModeSettings({
+        databaseMode: 'online',
+        clinicalApiUrl: clinicalOrigin,
+        schemaId: settings.schemaId || meta.schemaId || '',
+        serverMode: 'local',
+        clientApiUrl: '',
+      });
       process.env.CLINIC_API_URL = clinicalOrigin;
-      console.log('[CareFlow] Online mode → Neon via', process.env.CLINIC_API_URL, settings.schemaId);
+      console.log('[CareFlow] Online mode → Neon via', process.env.CLINIC_API_URL, settings.schemaId || meta.schemaId);
     } else if (settings.serverMode === 'lan-client' && settings.clientApiUrl) {
       // Verify remote server is reachable before committing to client mode
       const reachable = await new Promise<boolean>((resolve) => {
@@ -208,10 +229,14 @@ app.whenReady().then(async () => {
   registerUserIpc();
   registerDoctorIpc();
   registerSettingsIpc();
+  registerPrintIpc();
   registerSearchIpc();
   registerMedicineIpc();
   registerInventoryIPCHandlers();
-  startDiscoveryListener(); // always listen so admin can also scan
+  // LAN discovery only when not on cloud Postgres
+  if (!isOnlineDatabaseMode()) {
+    startDiscoveryListener();
+  }
   initAutoUpdater();
   createWindow();
 

@@ -30,11 +30,17 @@ export function DatabaseModeProvider({ children }: PropsWithChildren): React.JSX
 
   const refresh = useCallback(async () => {
     try {
-      const s = await window.clinic?.settings.get();
-      const mode: DatabaseMode = s?.databaseMode === 'online' ? 'online' : 'local';
+      // Sync license → settings/cache first (also refreshes onlineDatabase flag)
+      await window.clinic?.license?.modules?.().catch(() => null);
+      const [meta, s] = await Promise.all([
+        window.clinic?.license?.databaseMode?.().catch(() => null),
+        window.clinic?.settings.get().catch(() => null),
+      ]);
+      const mode: DatabaseMode =
+        meta?.databaseMode === 'online' || s?.databaseMode === 'online' ? 'online' : 'local';
       setDatabaseMode(mode);
-      setClinicalApiUrl(s?.clinicalApiUrl || '');
-      setSchemaId(s?.schemaId || '');
+      setClinicalApiUrl(meta?.clinicalApiUrl || s?.clinicalApiUrl || '');
+      setSchemaId(meta?.schemaId || s?.schemaId || '');
     } catch {
       setDatabaseMode('local');
       setClinicalApiUrl('');

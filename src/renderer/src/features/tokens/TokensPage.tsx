@@ -32,8 +32,8 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { alpha, darken, useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useEffect, useState } from 'react';
-import { Document, Page, Text, View, StyleSheet, pdf, Font } from '@react-pdf/renderer';
+import { useMemo, useEffect, useState, useRef } from 'react';
+import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
 import type { Token, TokenInput, TokenPerson, TokenStatus, PrescriptionInput, PrescriptionMedicine } from '@/types/token';
 import { useAuth } from '@/features/auth/AuthContext';
 import { appointmentsService } from '@/services/appointments.service';
@@ -42,6 +42,7 @@ import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogPaperProps,
 } from '@/components/DialogUI';
+import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
   WAITING: { label: 'Waiting', color: 'warning' },
@@ -199,7 +200,7 @@ const ts = StyleSheet.create({
   footer: { fontSize: 8, color: '#999', textAlign: 'center', marginTop: 10 },
 });
 
-function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone }: {
+export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone }: {
   token: Token; clinicName: string; clinicAddress: string; clinicPhone: string;
 }) {
   const date = new Date(token.createdAt).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
@@ -367,10 +368,21 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
 }
 
 
-export function TokenPrintPreview({ token, onClose }: { token: Token; onClose: () => void }) {
+export function TokenPrintPreview({
+  token,
+  onClose,
+  autoPrint = false,
+}: {
+  token: Token;
+  onClose: () => void;
+  /** Walk-in: open preview and start print dialog automatically */
+  autoPrint?: boolean;
+}) {
   const [clinic, setClinic] = useState<{ clinicName: string; clinicAddress: string; clinicPhone: string } | null>(null);
   const [freshToken, setFreshToken] = useState<Token>(token);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const autoPrintDone = useRef(false);
 
   useEffect(() => {
     void window.clinic?.settings.get().then((s) => setClinic({
@@ -384,15 +396,40 @@ export function TokenPrintPreview({ token, onClose }: { token: Token; onClose: (
     });
   }, [token.id]);
 
-  useEffect(() => {
-    if (!clinic) return;
-    let url: string;
-    void pdf(<TokenSlipDocument token={freshToken} {...clinic} />).toBlob().then((blob) => {
-      url = URL.createObjectURL(blob);
-      setBlobUrl(url);
-    });
-    return () => { if (url) URL.revokeObjectURL(url); };
+  const documentKey = [
+    freshToken.id,
+    freshToken.tokenNumber,
+    clinic?.clinicName ?? '',
+    clinic?.clinicAddress ?? '',
+    clinic?.clinicPhone ?? '',
+  ].join('|');
+
+  const pdfDocument = useMemo(() => {
+    if (!clinic) return null;
+    return <TokenSlipDocument token={freshToken} {...clinic} />;
   }, [clinic, freshToken]);
+
+  async function handlePrint(): Promise<void> {
+    if (!pdfDocument) return;
+    setPrinting(true);
+    setPrintError(null);
+    try {
+      const { printReactPdfDocument } = await import('@/utils/printPdf');
+      // Walk-in / token slip: silent print fails when default is "Microsoft Print to PDF"
+      await printReactPdfDocument(pdfDocument, { printDialog: true });
+    } catch (err) {
+      setPrintError(err instanceof Error ? err.message : 'Print failed');
+    } finally {
+      setPrinting(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!autoPrint || !pdfDocument || autoPrintDone.current) return;
+    autoPrintDone.current = true;
+    void handlePrint();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPrint, pdfDocument]);
 
   return (
     <Dialog
@@ -401,21 +438,59 @@ export function TokenPrintPreview({ token, onClose }: { token: Token; onClose: (
       maxWidth="xs"
       fullWidth
       PaperProps={{
-        sx: { display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden' },
+        sx: {
+          borderRadius: 1,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: '90vh',
+        },
       }}
     >
-      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'hidden', height: 560 }}>
-        {blobUrl ? (
-          <iframe src={blobUrl} width="100%" height="100%" style={{ border: 'none' }} />
+      <Box
+        sx={{
+          px: 2.5,
+          py: 1.5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          flexShrink: 0,
+        }}
+      >
+        <Typography fontWeight={700} fontSize={15}>
+          Token Slip PDF
+        </Typography>
+        <Button onClick={onClose} size="small">
+          Close
+        </Button>
+      </Box>
+      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'auto', bgcolor: '#f1f5f9' }}>
+        {pdfDocument ? (
+          <PdfBlobPreview documentKey={documentKey} pdfDocument={pdfDocument} height={560} />
         ) : (
-          <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Box sx={{ height: 560, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Typography color="text.secondary">Loading...</Typography>
           </Box>
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 2, py: 1.5, flexShrink: 0 }}>
-        <Button onClick={onClose}>Close</Button>
-      </DialogActions>
+      <Box sx={{ px: 2.5, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+        {printError && <Alert severity="error">{printError}</Alert>}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+          <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 1 }}>Close</Button>
+          <Button
+            variant="contained"
+            startIcon={<PrintOutlinedIcon />}
+            loading={printing}
+            disabled={printing || !pdfDocument}
+            onClick={() => void handlePrint()}
+            sx={{ borderRadius: 1 }}
+          >
+            Print
+          </Button>
+        </Box>
+      </Box>
     </Dialog>
   );
 }

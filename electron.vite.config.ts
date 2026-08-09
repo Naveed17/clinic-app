@@ -15,7 +15,8 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        external: [],
+        // Keep Node printer libs external (CJS + SumatraPDF .exe must load from node_modules)
+        external: ['pdf-to-printer'],
       },
       copyPublicDir: true,
     },

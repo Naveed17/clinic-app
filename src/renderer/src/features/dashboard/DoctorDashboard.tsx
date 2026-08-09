@@ -62,6 +62,7 @@ export function DoctorDashboard(): React.JSX.Element {
   const [apptCtxMenu, setApptCtxMenu] = useState<{ mouseX: number; mouseY: number; appointment: Appointment } | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [historyPatient, setHistoryPatient] = useState<Patient | undefined>();
+  const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
 
   const { data: raw = [] } = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const appointments = (raw as Appointment[]).filter((a) => a.providerId === user?.id);
@@ -77,6 +78,7 @@ export function DoctorDashboard(): React.JSX.Element {
   }
 
   async function openPatientHistory(appt: Appointment): Promise<void> {
+    setHistoryLoadingId(appt.id);
     try {
       const search = appt.patient?.firstName || appt.patientId;
       const res = await window.clinic.patients.list({ page: 1, pageSize: 50, search });
@@ -105,22 +107,31 @@ export function DoctorDashboard(): React.JSX.Element {
       });
     } catch {
       /* ignore */
+    } finally {
+      setHistoryLoadingId(null);
     }
   }
 
   const now = new Date();
   const todayKey = now.toLocaleDateString('en-CA');
 
+  const byTokenDesc = (a: Appointment, b: Appointment) => {
+    const ta = a.tokenNumber ?? -1;
+    const tb = b.tokenNumber ?? -1;
+    if (tb !== ta) return tb - ta;
+    return new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime();
+  };
+
   const todaysQueue = appointments
     .filter((a) => {
       if (['CANCELLED', 'NO_SHOW'].includes(a.status)) return false;
       return new Date(a.startsAt).toLocaleDateString('en-CA') === todayKey;
     })
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+    .sort(byTokenDesc);
 
   const upcomingQueue = appointments
     .filter((a) => !['CANCELLED', 'NO_SHOW', 'COMPLETED'].includes(a.status))
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+    .sort(byTokenDesc);
 
   const todayActiveCount = todaysQueue.filter((a) => a.status !== 'COMPLETED').length;
 
@@ -209,6 +220,11 @@ export function DoctorDashboard(): React.JSX.Element {
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography fontWeight={700} fontSize={14} noWrap>
                       {appt.patient.firstName} {appt.patient.lastName}
+                      {appt.tokenNumber != null && Number(appt.tokenNumber) > 0 && (
+                        <Box component="span" sx={{ color: 'primary.main', fontFamily: 'monospace', fontWeight: 800, ml: 0.75 }}>
+                          #{String(appt.tokenNumber).padStart(3, '0')}
+                        </Box>
+                      )}
                     </Typography>
                     <Stack direction="row" alignItems="center" spacing={0.5}>
                       <AccessTimeOutlinedIcon sx={{ fontSize: 12, color: 'text.disabled' }} />
@@ -235,9 +251,17 @@ export function DoctorDashboard(): React.JSX.Element {
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Patient History">
-                      <IconButton size="small" sx={{ p: 0.4 }} onClick={() => void openPatientHistory(appt)}>
-                        <HistoryOutlinedIcon sx={{ fontSize: 15 }} />
-                      </IconButton>
+                      <span>
+                        <IconButton
+                          size="small"
+                          sx={{ p: 0.4 }}
+                          loading={historyLoadingId === appt.id}
+                          disabled={historyLoadingId === appt.id}
+                          onClick={() => void openPatientHistory(appt)}
+                        >
+                          <HistoryOutlinedIcon sx={{ fontSize: 15 }} />
+                        </IconButton>
+                      </span>
                     </Tooltip>
                     {isCompleted && (
                       <Tooltip title="Write Prescription">
@@ -399,7 +423,7 @@ export function DoctorDashboard(): React.JSX.Element {
             onAppointmentContextMenu={(appt, anchor) => setApptCtxMenu({ ...anchor, appointment: appt })}
             onAppointmentClick={(appt) => { setEditAppt(appt); setApptDialogOpen(true); }}
             onPrescriptionClick={(appt) => openPrescription(appt)}
-            onPatientHistoryClick={(appt) => void openPatientHistory(appt)}
+            onPatientHistoryClick={(appt) => openPatientHistory(appt)}
           />
         </Box>
 

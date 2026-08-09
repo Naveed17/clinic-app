@@ -51,7 +51,8 @@ export async function listAppointments() {
       (
         SELECT t.tokenNumber FROM "Token" t
         WHERE t.patientId = a.patientId AND t.doctorId = a.providerId
-        ORDER BY t.createdAt DESC LIMIT 1
+          AND t.date = strftime('%Y-%m-%d', a.startsAt)
+        ORDER BY t.tokenNumber DESC LIMIT 1
       ) as tokenNumber
     FROM "Appointment" a
     JOIN "Patient" pat ON pat.id = a.patientId
@@ -62,7 +63,7 @@ export async function listAppointments() {
     id: r.id, patientId: r.patientId, providerId: r.providerId,
     startsAt: r.startsAt, endsAt: r.endsAt, status: r.status,
     reason: r.reason, notes: r.notes, recurrenceRule: r.recurrenceRule, parentId: r.parentId,
-    tokenNumber: r.tokenNumber ?? null,
+    tokenNumber: r.tokenNumber != null ? Number(r.tokenNumber) : null,
     patient: { id: r.patId, firstName: r.patFirst, lastName: r.patLast, role: '', phone: r.patPhone ?? null },
     provider: { id: r.provId, firstName: r.provFirst, lastName: r.provLast, role: r.provRole },
   }));
@@ -90,7 +91,12 @@ async function getAppointmentById(id: string) {
       a.reason, a.notes, a.recurrenceRule, a.parentId,
       pat.id as patId, pat.firstName as patFirst, pat.lastName as patLast, pat.phone as patPhone,
       prov.id as provId, prov.firstName as provFirst, prov.lastName as provLast, prov.role as provRole,
-      (SELECT t.tokenNumber FROM "Token" t WHERE t.patientId = a.patientId AND t.doctorId = a.providerId ORDER BY t.createdAt DESC LIMIT 1) as tokenNumber
+      (
+        SELECT t.tokenNumber FROM "Token" t
+        WHERE t.patientId = a.patientId AND t.doctorId = a.providerId
+          AND t.date = strftime('%Y-%m-%d', a.startsAt)
+        ORDER BY t.tokenNumber DESC LIMIT 1
+      ) as tokenNumber
     FROM "Appointment" a
     JOIN "Patient" pat ON pat.id = a.patientId
     JOIN "User" prov ON prov.id = a.providerId
@@ -103,7 +109,7 @@ async function getAppointmentById(id: string) {
     id: r.id, patientId: r.patientId, providerId: r.providerId,
     startsAt: r.startsAt, endsAt: r.endsAt, status: r.status,
     reason: r.reason, notes: r.notes, recurrenceRule: r.recurrenceRule, parentId: r.parentId,
-    tokenNumber: r.tokenNumber ?? null,
+    tokenNumber: r.tokenNumber != null ? Number(r.tokenNumber) : null,
     patient: { id: r.patId, firstName: r.patFirst, lastName: r.patLast, role: '', phone: r.patPhone ?? null },
     provider: { id: r.provId, firstName: r.provFirst, lastName: r.provLast, role: r.provRole },
   };

@@ -177,6 +177,10 @@ declare global {
         onDataChanged: (handler: (e: { entity: string; action: string }) => void) => () => void;
         onNotification: (handler: (notification: unknown) => void) => () => void;
       };
+      print: {
+        pdf: (base64: string, options?: { printDialog?: boolean }) => Promise<{ ok: boolean; error?: string }>;
+        html: (html: string) => Promise<{ ok: boolean; error?: string }>;
+      };
       settings: {
         get: () => Promise<{
           serverMode: 'local' | 'lan-server' | 'lan-client';

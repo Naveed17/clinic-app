@@ -14,8 +14,10 @@ import {
   alpha, Avatar, Box, Button, Chip, Divider, Fade, IconButton,
   Paper, Popper, Stack, Typography, useTheme,
 } from '@mui/material';
-import { useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo, useRef, useState } from 'react';
 import type { Appointment } from '@/types/appointment';
+import type { Token } from '@/types/token';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -40,6 +42,27 @@ function getCalendarDays(year: number, month: number): Date[] {
   return days;
 }
 
+function tokenNum(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : -1;
+}
+
+/** Latest token number first; appointments without a token sink to the bottom. */
+function sortByTokenDesc(a: Appointment, b: Appointment): number {
+  const ta = tokenNum(a.tokenNumber);
+  const tb = tokenNum(b.tokenNumber);
+  if (tb !== ta) return tb - ta;
+  return new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime();
+}
+
+function withDayToken(appt: Appointment, dayTokens: Token[]): Appointment {
+  const match = dayTokens.find(
+    (t) => t.patientId === appt.patientId && t.doctorId === appt.providerId,
+  );
+  if (!match) return appt;
+  return { ...appt, tokenNumber: match.tokenNumber };
+}
+
 interface Props {
   appointments: Appointment[];
   onStatusChange: (id: string, status: string) => void;
@@ -47,8 +70,8 @@ interface Props {
   onAppointmentClick?: (appointment: Appointment) => void;
   onDayContextMenu?: (date: string, anchor: { mouseX: number; mouseY: number }) => void;
   onAppointmentContextMenu?: (appointment: Appointment, anchor: { mouseX: number; mouseY: number }) => void;
-  onPrescriptionClick?: (appointment: Appointment) => void;
-  onPatientHistoryClick?: (appointment: Appointment) => void;
+  onPrescriptionClick?: (appointment: Appointment) => void | Promise<void>;
+  onPatientHistoryClick?: (appointment: Appointment) => void | Promise<void>;
   readOnly?: boolean;
   hideCheckIn?: boolean;
 }
@@ -56,6 +79,7 @@ interface Props {
 export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu, onPrescriptionClick, onPatientHistoryClick, readOnly = false, hideCheckIn = false }: Props): React.JSX.Element {
   const theme = useTheme();
   const today = new Date();
+  const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
 
   const STATUS_COLOR: Record<string, string> = {
     SCHEDULED: theme.palette.primary.main,
@@ -77,13 +101,29 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const calDays = getCalendarDays(cursor.getFullYear(), cursor.getMonth());
+  const selectedDateKey = selected.toLocaleDateString('en-CA');
 
-  const selectedAppts = appointments
-    .filter((a) => isSameDay(new Date(a.startsAt), selected))
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  const { data: dayTokens = [] } = useQuery({
+    queryKey: ['tokens', selectedDateKey],
+    queryFn: () => window.clinic.tokens.list(selectedDateKey) as Promise<Token[]>,
+  });
+
+  const selectedAppts = useMemo(
+    () =>
+      appointments
+        .filter((a) => isSameDay(new Date(a.startsAt), selected))
+        .map((a) => withDayToken(a, dayTokens))
+        .sort(sortByTokenDesc),
+    [appointments, selected, dayTokens],
+  );
 
   function apptsByDay(d: Date) {
-    return appointments.filter((a) => isSameDay(new Date(a.startsAt), d));
+    return appointments
+      .filter((a) => isSameDay(new Date(a.startsAt), d))
+      .map((a) =>
+        isSameDay(d, selected) ? withDayToken(a, dayTokens) : a,
+      )
+      .sort(sortByTokenDesc);
   }
 
   return (
@@ -356,6 +396,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
               const next = NEXT_STATUS[a.status];
               const initials = `${a.patient.firstName[0]}${a.patient.lastName[0]}`.toUpperCase();
               const color = STATUS_COLOR[a.status];
+              const tok = tokenNum(a.tokenNumber);
 
               return (
                 <Box key={a.id} sx={{ mb: 2 }}>
@@ -377,16 +418,29 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                     }}
                   >
                     <Box sx={{ height: 4, borderRadius: 2, bgcolor: color, mb: 1.5 }} />
-                    <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
-                      <Box>
-                        <Typography variant="subtitle2" fontWeight={700}>
+                    <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography variant="subtitle2" fontWeight={700} noWrap sx={{ mb: 0.25 }}>
                           {a.patient.firstName} {a.patient.lastName}
+                          {tok > 0 && (
+                            <Box
+                              component="span"
+                              sx={{
+                                color: 'primary.main',
+                                fontFamily: 'monospace',
+                                fontWeight: 800,
+                                ml: 0.75,
+                              }}
+                            >
+                              #{String(tok).padStart(3, '0')}
+                            </Box>
+                          )}
                         </Typography>
                         {a.reason && (
                           <Typography variant="caption" color="text.secondary">{a.reason}</Typography>
                         )}
                       </Box>
-                      <Avatar sx={{ width: 26, height: 26, fontSize: 11, fontWeight: 700, bgcolor: alpha(color, 0.3), color }}>
+                      <Avatar sx={{ width: 26, height: 26, fontSize: 11, fontWeight: 700, bgcolor: alpha(color, 0.3), color, flexShrink: 0 }}>
                         {initials}
                       </Avatar>
                     </Stack>
@@ -413,8 +467,19 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                         {onPatientHistoryClick && (
                           <IconButton
                             size="small"
-                            onClick={() => onPatientHistoryClick(a)}
                             title="Patient History"
+                            loading={historyLoadingId === a.id}
+                            disabled={historyLoadingId === a.id}
+                            onClick={() => {
+                              void (async () => {
+                                setHistoryLoadingId(a.id);
+                                try {
+                                  await onPatientHistoryClick(a);
+                                } finally {
+                                  setHistoryLoadingId(null);
+                                }
+                              })();
+                            }}
                             sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, p: 0.4 }}
                           >
                             <HistoryOutlinedIcon sx={{ fontSize: 14 }} />

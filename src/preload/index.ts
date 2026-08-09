@@ -448,6 +448,12 @@ const api = {
         'schedule:upsert', doctorId, slots,
       ),
   },
+  print: {
+    /** Base64-encoded PDF — printed via pdf-to-printer (Windows). */
+    pdf: (base64: string, options?: { printDialog?: boolean }) =>
+      ipc<{ ok: boolean; error?: string }>('print:pdf', base64, options),
+    html: (html: string) => ipc<{ ok: boolean; error?: string }>('print:html', html),
+  },
   settings: {
     get: () => ipc('settings:get'),
     save: (patch: unknown) => ipc('settings:save', patch),
