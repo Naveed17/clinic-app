@@ -81,12 +81,13 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  appointments  Appointment[]
-  doctorProfile DoctorProfile?
-  labOrders     LabOrder[]
-  tokens        Token[]
-  schedules     DoctorSchedule[]
-  attendance    DoctorAttendance[]
+  appointments    Appointment[]
+  doctorProfile   DoctorProfile?
+  labOrders       LabOrder[]
+  tokens          Token[]
+  schedules       DoctorSchedule[]
+  attendance      DoctorAttendance[]
+  primaryPatients Patient[]        @relation("PatientPrimaryDoctor")
 
   @@index([lastName, firstName])
 }
@@ -155,18 +156,21 @@ model Patient {
   bloodGroup            String?
   allergies             String?
   chronicConditions     String?
+  primaryDoctorId       String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  appointments Appointment[]
-  invoices     Invoice[]
-  labOrders    LabOrder[]
-  documents    PatientDocument[]
-  tokens       Token[]
+  primaryDoctor User?             @relation("PatientPrimaryDoctor", fields: [primaryDoctorId], references: [id], onDelete: SetNull)
+  appointments  Appointment[]
+  invoices      Invoice[]
+  labOrders     LabOrder[]
+  documents     PatientDocument[]
+  tokens        Token[]
 
   @@index([lastName, firstName])
   @@index([phone])
   @@index([mrNumber])
+  @@index([primaryDoctorId])
 }
 
 model PatientDocument {

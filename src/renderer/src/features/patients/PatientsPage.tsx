@@ -36,7 +36,13 @@ export function PatientsPage(): React.JSX.Element {
 
   const patientsQuery = useQuery({
     queryKey: ['patients', { page, rowsPerPage, search: deferredSearch, providerId: isDoctor ? user?.id : undefined }],
-    queryFn: () => patientsService.list({ page: page + 1, pageSize: rowsPerPage, search: deferredSearch, providerId: isDoctor ? user?.id : undefined }),
+    queryFn: () =>
+      patientsService.list({
+        page: page + 1,
+        pageSize: rowsPerPage,
+        search: deferredSearch,
+        providerId: isDoctor ? user?.id : undefined,
+      }),
     placeholderData: keepPreviousData,
   });
   const deleteMutation = useMutation({
@@ -234,9 +240,14 @@ export function PatientsPage(): React.JSX.Element {
       <ConfirmDialog
         open={Boolean(deletePatient)}
         title="Delete patient?"
-        message={deletePatient ? `Delete ${deletePatient.firstName} ${deletePatient.lastName}? Linked records may prevent removal.` : ''}
+        message={
+          deletePatient
+            ? `Delete ${deletePatient.firstName} ${deletePatient.lastName}? This also removes their appointments, tokens, prescriptions, invoices/payments, lab orders, and documents.`
+            : ''
+        }
+        confirmLabel="Delete"
         loading={deleteMutation.isPending}
-        error={deleteMutation.isError ? <Alert severity="error" sx={{ mt: 2 }}>Unable to delete this patient. Linked records may need to be removed first.</Alert> : undefined}
+        error={deleteMutation.isError ? <Alert severity="error" sx={{ mt: 2 }}>Unable to delete this patient. Please try again.</Alert> : undefined}
         onClose={() => setDeletePatient(undefined)}
         onConfirm={() => deletePatient && deleteMutation.mutate(deletePatient.id)}
       />

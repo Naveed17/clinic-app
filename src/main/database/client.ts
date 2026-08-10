@@ -74,6 +74,12 @@ export async function initializeDatabase(): Promise<void> {
     await database.$executeRawUnsafe('CREATE UNIQUE INDEX IF NOT EXISTS "Patient_mrNumber_key" ON "Patient"("mrNumber")');
     await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "Patient_mrNumber_idx" ON "Patient"("mrNumber")');
   }
+  if (!patientCols.includes('primaryDoctorId')) {
+    await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "primaryDoctorId" TEXT');
+    await database.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "Patient_primaryDoctorId_idx" ON "Patient"("primaryDoctorId")',
+    );
+  }
 
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Appointment" (

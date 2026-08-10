@@ -20,6 +20,10 @@ export interface AppSettings {
   /** Cloud API origin when databaseMode=online (no trailing /api — paths already include /api/...) */
   clinicalApiUrl: string;
   schemaId: string;
+  /** Groq free API — Prescription AI Suggest / history summary */
+  aiEnabled: boolean;
+  groqApiKey: string;
+  groqModel: string;
 }
 
 const DEFAULTS: AppSettings = {
@@ -33,6 +37,9 @@ const DEFAULTS: AppSettings = {
   databaseMode: 'local',
   clinicalApiUrl: '',
   schemaId: '',
+  aiEnabled: false,
+  groqApiKey: '',
+  groqModel: 'llama-3.1-8b-instant',
 };
 
 function getPath(): string {

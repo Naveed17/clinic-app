@@ -110,6 +110,7 @@ declare global {
         create: (input: unknown) => Promise<unknown>;
         addPayment: (invoiceId: string, amount: number, method: string, reference?: string) => Promise<unknown>;
         void: (id: string) => Promise<unknown>;
+        delete: (id: string) => Promise<unknown>;
         payments: (invoiceId: string) => Promise<unknown>;
       };
       reports: {
@@ -188,6 +189,25 @@ declare global {
           html: string,
           options?: { width?: number; height?: number },
         ) => Promise<{ ok: boolean; base64?: string; error?: string }>;
+      };
+      ai: {
+        suggestPrescription: (
+          input: {
+            diagnosis?: string;
+            age?: string;
+            sex?: string;
+            currentText?: string;
+            patientName?: string;
+          },
+          onDelta?: (delta: string) => void,
+        ) => Promise<{ ok: boolean; html?: string; error?: string }>;
+        summarizePatient: (
+          input: {
+            patientName?: string;
+            visits: Array<{ date?: string; diagnosis?: string; advice?: string }>;
+          },
+          onDelta?: (delta: string) => void,
+        ) => Promise<{ ok: boolean; summary?: string; error?: string }>;
       };
       settings: {
         get: () => Promise<{

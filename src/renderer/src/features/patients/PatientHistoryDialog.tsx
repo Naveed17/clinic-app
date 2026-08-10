@@ -7,6 +7,7 @@ import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutl
 import ReceiptOutlinedIcon from '@mui/icons-material/ReceiptOutlined';
 import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import {
   Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions,
@@ -24,6 +25,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { DocViewerDialog, type DocViewerData } from './DocViewerDialog';
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
+import { formatAdvicePreview } from '@/features/tokens/PrescriptionPadPdf';
 import { ConfirmDialog } from '@/components/DialogUI';
 
 type DocItem = { id: string; name: string; filePath: string; uploadedAt: string };
@@ -64,6 +66,9 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
     doctor: { firstName: string; lastName: string };
   };
   const [printItem, setPrintItem] = useState<PrintItem | null>(null);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['tokens-all-prescriptions', patientId],
     queryFn: async () => {
@@ -94,12 +99,80 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
     },
   });
 
+  async function handleSummarize(): Promise<void> {
+    setSummaryLoading(true);
+    setSummaryError(null);
+    setSummary('');
+    try {
+      const visits = items.slice(0, 12).map((item) => ({
+        date: new Date(item.prescription.createdAt).toLocaleDateString(),
+        diagnosis: item.prescription.diagnosis || item.prescription.thumbName || '',
+        advice: formatAdvicePreview(item.prescription.advice || ''),
+      }));
+      let streamed = '';
+      const result = await window.clinic.ai.summarizePatient(
+        {
+          patientName: patient
+            ? `${patient.firstName} ${patient.lastName}`.trim()
+            : undefined,
+          visits,
+        },
+        (delta) => {
+          streamed += delta;
+          setSummary(streamed);
+        },
+      );
+      if (!result?.ok || !result.summary) {
+        setSummaryError(result?.error || 'Summary failed');
+        setSummary(null);
+        return;
+      }
+      setSummary(result.summary);
+    } catch (err: unknown) {
+      setSummaryError(err instanceof Error ? err.message : 'Summary failed');
+      setSummary(null);
+    } finally {
+      setSummaryLoading(false);
+    }
+  }
+
   if (isLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>;
   if (items.length === 0) return <EmptyState icon={<MedicalServicesOutlinedIcon sx={{ fontSize: 40 }} />} text="No prescriptions found." />;
 
   return (
     <>
     <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
+        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+          {items.length} prescription{items.length === 1 ? '' : 's'}
+        </Typography>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<AutoAwesomeOutlinedIcon />}
+          loading={summaryLoading}
+          onClick={() => void handleSummarize()}
+          sx={{ borderRadius: 1 }}
+        >
+          AI Summarize
+        </Button>
+      </Stack>
+      {summaryError && <Alert severity="error" onClose={() => setSummaryError(null)}>{summaryError}</Alert>}
+      {summary !== null && (
+        <Alert
+          severity="info"
+          icon={<AutoAwesomeOutlinedIcon fontSize="inherit" />}
+          onClose={() => setSummary(null)}
+          sx={{ whiteSpace: 'pre-wrap', alignItems: 'flex-start' }}
+        >
+          <Typography variant="caption" fontWeight={700} display="block" sx={{ mb: 0.5 }}>
+            AI visit summary — verify clinically
+          </Typography>
+          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+            {summary || (summaryLoading ? '…' : '')}
+          </Typography>
+        </Alert>
+      )}
       {items.map((item) => {
         const pr = item.prescription;
         const doctorLabel = `${item.doctor?.firstName ?? ''} ${item.doctor?.lastName ?? ''}`.trim();

@@ -117,6 +117,32 @@ function VoidDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => voi
   );
 }
 
+/* ── Delete Confirm Dialog ── */
+function DeleteInvoiceDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
+  const qc = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: () => window.clinic.invoices.delete(invoice.id),
+    onSuccess: async () => { await qc.invalidateQueries({ queryKey: ['invoices'] }); onClose(); },
+  });
+  return (
+    <ConfirmDialog
+      open
+      title="Delete invoice?"
+      message={
+        <>
+          Permanently delete <strong>{invoice.invoiceNumber}</strong> for{' '}
+          <strong>{personLabel(invoice.patient)}</strong>? Payments recorded on this invoice will also be removed. This cannot be undone.
+        </>
+      }
+      confirmLabel="Delete"
+      loading={mutation.isPending}
+      error={mutation.isError ? <Alert severity="error" sx={{ mt: 2 }}>Failed to delete invoice.</Alert> : undefined}
+      onConfirm={() => mutation.mutate()}
+      onClose={onClose}
+    />
+  );
+}
+
 /* ── Payment Dialog ── */
 function PaymentDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
   const queryClient = useQueryClient();
@@ -275,6 +301,7 @@ export function InvoicesPage(): React.JSX.Element {
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | undefined>();
   const [historyInvoice, setHistoryInvoice] = useState<Invoice | undefined>();
   const [voidInvoice, setVoidInvoice] = useState<Invoice | undefined>();
+  const [deleteInvoice, setDeleteInvoice] = useState<Invoice | undefined>();
   const [loadingHistoryId, setLoadingHistoryId] = useState<string | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
@@ -410,6 +437,13 @@ export function InvoicesPage(): React.JSX.Element {
                           <IconButton sx={actionBtnSx} onClick={() => setVoidInvoice(invoice)}><BlockOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
                         </Tooltip>
                       )}
+                      {!isAdmin && (
+                        <Tooltip title="Delete invoice">
+                          <IconButton sx={actionBtnSx} color="error" onClick={() => setDeleteInvoice(invoice)}>
+                            <DeleteOutlineIcon sx={{ fontSize: 17 }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </Stack>
                   </TableCell>
                 </TableRow>
@@ -428,6 +462,7 @@ export function InvoicesPage(): React.JSX.Element {
       {paymentInvoice && <PaymentDialog invoice={paymentInvoice} onClose={() => setPaymentInvoice(undefined)} />}
       {historyInvoice && <PaymentHistoryDialog invoice={historyInvoice} onClose={() => setHistoryInvoice(undefined)} />}
       {voidInvoice && <VoidDialog invoice={voidInvoice} onClose={() => setVoidInvoice(undefined)} />}
+      {deleteInvoice && <DeleteInvoiceDialog invoice={deleteInvoice} onClose={() => setDeleteInvoice(undefined)} />}
       <Snackbar
         open={Boolean(printError)}
         autoHideDuration={5000}

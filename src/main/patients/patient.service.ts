@@ -20,6 +20,8 @@ export interface PatientInput {
   bloodGroup?: string | null;
   allergies?: string | null;
   chronicConditions?: string | null;
+  /** Doctor who registered / owns this patient (not an appointment). */
+  primaryDoctorId?: string | null;
 }
 
 async function generateMrNumber(): Promise<string> {
@@ -33,7 +35,7 @@ async function generateMrNumber(): Promise<string> {
 }
 
 function mapPatientInput(input: PatientInput): Omit<Prisma.PatientCreateInput, 'mrNumber'> {
-  return {
+  const data: Omit<Prisma.PatientCreateInput, 'mrNumber'> = {
     firstName: input.firstName.trim(),
     lastName: input.lastName.trim(),
     dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
@@ -46,6 +48,10 @@ function mapPatientInput(input: PatientInput): Omit<Prisma.PatientCreateInput, '
     allergies: input.allergies?.trim() || null,
     chronicConditions: input.chronicConditions?.trim() || null,
   };
+  if (input.primaryDoctorId) {
+    data.primaryDoctor = { connect: { id: input.primaryDoctorId } };
+  }
+  return data;
 }
 
 export async function listPatients({ page, pageSize, search, providerId }: PatientListInput): Promise<{
@@ -54,25 +60,62 @@ export async function listPatients({ page, pageSize, search, providerId }: Patie
 }> {
   const prisma = getPrisma();
   const where: Prisma.PatientWhereInput = {
-    ...(providerId ? { appointments: { some: { providerId } } } : {}),
-    ...(search ? {
-      OR: [
-        { firstName: { contains: search } },
-        { lastName: { contains: search } },
-        { phone: { contains: search } },
-        { email: { contains: search } },
-        { mrNumber: { contains: search } },
-      ],
-    } : {}),
+    ...(providerId
+      ? {
+          OR: [
+            { primaryDoctorId: providerId },
+            { appointments: { some: { providerId } } },
+            { tokens: { some: { doctorId: providerId } } },
+          ],
+        }
+      : {}),
+    ...(search
+      ? {
+          OR: [
+            { firstName: { contains: search } },
+            { lastName: { contains: search } },
+            { phone: { contains: search } },
+            { email: { contains: search } },
+            { mrNumber: { contains: search } },
+          ],
+        }
+      : {}),
   };
+
+  // When both provider + search, Prisma ANDs top-level keys — but two OR keys collide.
+  // Build AND explicitly when both are present.
+  const whereFinal: Prisma.PatientWhereInput =
+    providerId && search
+      ? {
+          AND: [
+            {
+              OR: [
+                { primaryDoctorId: providerId },
+                { appointments: { some: { providerId } } },
+                { tokens: { some: { doctorId: providerId } } },
+              ],
+            },
+            {
+              OR: [
+                { firstName: { contains: search } },
+                { lastName: { contains: search } },
+                { phone: { contains: search } },
+                { email: { contains: search } },
+                { mrNumber: { contains: search } },
+              ],
+            },
+          ],
+        }
+      : where;
+
   const [data, total] = await prisma.$transaction([
     prisma.patient.findMany({
-      where,
+      where: whereFinal,
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
-    prisma.patient.count({ where }),
+    prisma.patient.count({ where: whereFinal }),
   ]);
 
   return { data, total };
@@ -84,9 +127,46 @@ export async function createPatient(input: PatientInput): Promise<Patient> {
 }
 
 export async function updatePatient(id: string, input: PatientInput): Promise<Patient> {
-  return getPrisma().patient.update({ where: { id }, data: mapPatientInput(input) });
+  const data = mapPatientInput(input);
+  // Do not re-assign primary doctor on normal demographic edits unless explicitly sent
+  if (input.primaryDoctorId === undefined) {
+    delete (data as { primaryDoctor?: unknown }).primaryDoctor;
+  } else if (!input.primaryDoctorId) {
+    delete (data as { primaryDoctor?: unknown }).primaryDoctor;
+    (data as Prisma.PatientUpdateInput).primaryDoctor = { disconnect: true };
+  }
+  return getPrisma().patient.update({ where: { id }, data });
 }
 
 export async function deletePatient(id: string): Promise<void> {
-  await getPrisma().patient.delete({ where: { id } });
+  const prisma = getPrisma();
+  await prisma.$transaction(async (tx) => {
+    const invoices = await tx.invoice.findMany({ where: { patientId: id }, select: { id: true } });
+    const invoiceIds = invoices.map((i) => i.id);
+    if (invoiceIds.length > 0) {
+      await tx.payment.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+      await tx.invoiceItem.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+      await tx.invoice.deleteMany({ where: { patientId: id } });
+    }
+
+    const labOrders = await tx.labOrder.findMany({ where: { patientId: id }, select: { id: true } });
+    const labOrderIds = labOrders.map((o) => o.id);
+    if (labOrderIds.length > 0) {
+      await tx.labReport.deleteMany({ where: { labOrderId: { in: labOrderIds } } });
+      await tx.labOrder.deleteMany({ where: { patientId: id } });
+    }
+
+    const tokens = await tx.token.findMany({ where: { patientId: id }, select: { id: true } });
+    if (tokens.length > 0) {
+      // Prescription is SQLite-only (not in Prisma schema); remove before tokens.
+      for (const token of tokens) {
+        await tx.$executeRawUnsafe('DELETE FROM "Prescription" WHERE "tokenId" = ?', token.id);
+      }
+      await tx.token.deleteMany({ where: { patientId: id } });
+    }
+
+    await tx.appointment.deleteMany({ where: { patientId: id } });
+    await tx.patientDocument.deleteMany({ where: { patientId: id } });
+    await tx.patient.delete({ where: { id } });
+  });
 }

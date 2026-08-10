@@ -6,8 +6,12 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  FormControlLabel,
   Paper,
   Stack,
+  Switch,
+  Tab,
+  Tabs,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -24,6 +28,8 @@ import BackupOutlinedIcon from '@mui/icons-material/BackupOutlined';
 import RestoreOutlinedIcon from '@mui/icons-material/RestoreOutlined';
 import SystemUpdateAltOutlinedIcon from '@mui/icons-material/SystemUpdateAltOutlined';
 import WifiTetheringOutlinedIcon from '@mui/icons-material/WifiTetheringOutlined';
+import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
+import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import { useUpdate } from '@/context/updateProvider';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -40,6 +46,9 @@ interface Settings {
   databaseMode?: 'local' | 'online';
   clinicalApiUrl?: string;
   schemaId?: string;
+  aiEnabled?: boolean;
+  groqApiKey?: string;
+  groqModel?: string;
 }
 
 export function SettingsPage(): React.JSX.Element {
@@ -109,6 +118,7 @@ export function SettingsPage(): React.JSX.Element {
     }
   }, [updateError]);
 
+  const [settingsTab, setSettingsTab] = useState<'general' | 'ai' | 'backup'>('general');
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   const [prevMode, setPrevMode] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -186,7 +196,18 @@ export function SettingsPage(): React.JSX.Element {
         void window.clinic?.settings.testConnection(s.clientApiUrl).then((ok) => setConnectionOk(ok ?? false));
       }
     }).catch(() => {
-      setSettings({ serverMode: 'local', clientApiUrl: '', lanPort: 3333, clinicName: '', clinicAddress: '', clinicPhone: '', databaseMode: 'local' });
+      setSettings({
+        serverMode: 'local',
+        clientApiUrl: '',
+        lanPort: 3333,
+        clinicName: '',
+        clinicAddress: '',
+        clinicPhone: '',
+        databaseMode: 'local',
+        aiEnabled: false,
+        groqApiKey: '',
+        groqModel: 'llama-3.1-8b-instant',
+      });
     });
     void window.clinic?.settings.lanIp().then((ip) => setLanIp(ip));
   }, [databaseModeReady, isOnline]);
@@ -347,302 +368,421 @@ export function SettingsPage(): React.JSX.Element {
         maxWidth: 1120,
         width: '100%',
         mx: 'auto',
+        height: 'calc(100vh - 20px)',
+        maxHeight: 'calc(100vh - 20px)',
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
       }}
     >
       {!settings ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
       ) : (
-        <Stack direction="row" spacing={4} alignItems="flex-start">
-          {/* Left Side: Clinic Info, Backup & App Update */}
-          <Box sx={{ width: 280, flexShrink: 0 }}>
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>Clinic Information</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Shown on printed receipts and invoices.</Typography>
-            <Stack spacing={1.5} sx={{ mb: 3 }}>
-              <TextField
-                label="Clinic Name"
-                size="small"
-                fullWidth
-                value={settings.clinicName}
-                onChange={(e) => setSettings((s) => s && ({ ...s, clinicName: e.target.value }))}
-              />
-              <TextField
-                label="Address"
-                size="small"
-                fullWidth
-                value={settings.clinicAddress}
-                onChange={(e) => setSettings((s) => s && ({ ...s, clinicAddress: e.target.value }))}
-              />
-              <TextField
-                label="Phone"
-                size="small"
-                fullWidth
-                value={settings.clinicPhone}
-                onChange={(e) => setSettings((s) => s && ({ ...s, clinicPhone: e.target.value }))}
-              />
-            </Stack>
+        <Stack spacing={0} sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <Tabs
+            value={settingsTab}
+            onChange={(_, v: 'general' | 'ai' | 'backup') => setSettingsTab(v)}
+            sx={{
+              mb: 3,
+              minHeight: 44,
+              borderBottom: 1,
+              borderColor: 'divider',
+              flexShrink: 0,
+              '& .MuiTab-root': {
+                minHeight: 44,
+                textTransform: 'none',
+                fontWeight: 700,
+                fontSize: 14,
+                gap: 0.75,
+              },
+            }}
+          >
+            <Tab
+              value="general"
+              icon={<TuneOutlinedIcon sx={{ fontSize: 18 }} />}
+              iconPosition="start"
+              label="General"
+            />
+            <Tab
+              value="ai"
+              icon={<AutoAwesomeOutlinedIcon sx={{ fontSize: 18 }} />}
+              iconPosition="start"
+              label="AI"
+            />
+            <Tab
+              value="backup"
+              icon={<BackupOutlinedIcon sx={{ fontSize: 18 }} />}
+              iconPosition="start"
+              label="Backup & Restore"
+            />
+          </Tabs>
 
-            <Divider sx={{ mb: 2 }} />
-
-            {isOnline ? (
-              <Alert severity="info" sx={{ mb: 0 }}>
-                Online database mode — clinic data lives in the cloud (Neon). Local Backup & Restore is disabled because it only copies the offline SQLite file.
-              </Alert>
-            ) : (
-              <>
-                <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>Backup & Restore</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Full backup (.zip) includes the database plus patient/lab documents so images and PDFs work after restore on another PC. Legacy .db-only backups are still supported.
-                </Typography>
-                <Stack direction="row" gap={1.5} flexWrap="wrap">
-                  <Button variant="outlined" size="small" startIcon={<BackupOutlinedIcon />} loading={backupLoading} onClick={() => void handleBackup()}>
-                    Create Backup
-                  </Button>
-                  <Button variant="outlined" size="small" color="warning" startIcon={<RestoreOutlinedIcon />} loading={restoreLoading} onClick={() => void handleRestore()}>
-                    Restore Backup
-                  </Button>
-                </Stack>
-                {backupStatus && <Alert severity={backupStatus.type} sx={{ mt: 2 }}>{backupStatus.msg}</Alert>}
-              </>
-            )}
-
-            <Divider sx={{ my: 2 }} />
-
-            {/* App Update Section */}
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>App Update</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Check if a newer version is available on GitHub.</Typography>
-
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary">Current Version:</Typography>
-              <Chip label={`v${currentVersion}`} size="small" variant="outlined" color="primary" sx={{ fontWeight: 600, height: 22 }} />
-            </Stack>
-
-            <Box sx={{ width: '100%' }}>
-              {isUpdateReady ? (
-                <Button
-                  variant="contained"
-                  color="success"
-                  fullWidth
-                  startIcon={<SystemUpdateAltOutlinedIcon />}
-                  onClick={installUpdate}
-                >
-                  Restart & Install Update
-                </Button>
-              ) : (
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  startIcon={<SystemUpdateAltOutlinedIcon />}
-                  loading={updateStatus === 'checking' || isChecking}
-                  disabled={isDownloading}
-                  onClick={() => void handleCheckUpdate()}
-                >
-                  {(updateStatus === 'checking' || isChecking) ? 'Checking...' : 'Check for Updates'}
-                </Button>
-              )}
-
-              {/* Downloading Linear Progress */}
-              {isDownloading && (
-                <Box sx={{ width: '100%', mt: 2 }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                      {downloadStatusText}
-                    </Typography>
-                    <Typography variant="caption" color="primary.main" fontWeight={700}>
-                      {downloadIndeterminate ? '…' : `${downloadProgress}%`}
-                    </Typography>
-                  </Stack>
-                  <LinearProgress
-                    variant={downloadIndeterminate ? 'indeterminate' : 'determinate'}
-                    value={downloadIndeterminate ? undefined : downloadProgress}
-                    sx={{ height: 6, borderRadius: 3 }}
-                  />
-                </Box>
-              )}
-            </Box>
-          </Box>
-
-          <Divider orientation="vertical" flexItem />
-
-          {/* Right Side: Network Settings (hidden when online database license) */}
-          <Stack spacing={3} flex={1}>
-            <Box>
-              <Typography variant="h6" fontWeight={700}>Network Settings</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                {isOnline
-                  ? 'This license uses online Postgres — LAN roles are disabled.'
-                  : 'Configure how this machine connects to the clinic network.'}
-              </Typography>
-              {isOnline && (
-                <Alert severity="info" sx={{ mt: 1.5 }}>
-                  Online database mode is active
-                  {schemaId ? ` (tenant ${schemaId})` : ''}.
-                  Clinic data is stored in the shared cloud schema, filtered per license.
-                </Alert>
-              )}
-              {!isOnline && settings?.serverMode === 'lan-client' && connectionOk === false && (
-                <Alert severity="error" sx={{ mt: 1.5 }}>
-                  LAN server unreachable. App has fallen back to local mode. Please check the server URL and save again.
-                </Alert>
-              )}
-            </Box>
-
-            {isOnline ? null : (
-            <>
-            <Divider />
-
-            <Box>
-              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>Machine Role</Typography>
-              <ToggleButtonGroup
-                value={settings.serverMode}
-                exclusive
-                onChange={(_e, val) => val && setSettings((s) => s && ({ ...s, serverMode: val as ServerMode }))}
-                sx={{ gap: 1, flexWrap: 'wrap', width: '100%' }}
-              >
-                {([
-                  { value: 'local', icon: <LaptopOutlinedIcon />, label: 'Standalone', desc: 'Only this machine, no sharing' },
-                  { value: 'lan-server', icon: <DnsOutlinedIcon />, label: 'LAN Server', desc: 'Share data with other machines' },
-                  { value: 'lan-client', icon: <DevicesOutlinedIcon />, label: 'LAN Client', desc: 'Connect to another machine' },
-                ] as const).map(({ value, icon, label, desc }) => (
-                  <ToggleButton
-                    key={value}
-                    value={value}
-                    sx={{
-                      flex: 1,
-                      flexDirection: 'column',
-                      gap: 0.5,
-                      py: 2,
-                      px: 3,
-                      borderRadius: '12px !important',
-                      border: '1px solid !important',
-                      borderColor: settings.serverMode === value
-                        ? `${theme.palette.primary.main} !important`
-                        : 'divider !important',
-                      bgcolor: settings.serverMode === value
-                        ? alpha(theme.palette.primary.main, 0.1)
-                        : 'transparent',
-                      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
-                    }}
-                  >
-                    {icon}
-                    <Typography variant="caption" fontWeight={700}>{label}</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>{desc}</Typography>
-                  </ToggleButton>
-                ))}
-              </ToggleButtonGroup>
-            </Box>
-
-            <Divider />
-
-            {settings.serverMode !== 'lan-client' && (
-              <>
-                <Alert severity="info" icon={<DnsOutlinedIcon />}>
-                  <Typography variant="body2" fontWeight={600}>
-                    {settings.serverMode === 'lan-server' ? 'LAN Server mode active.' : 'This machine hosts the database.'}
-                  </Typography>
-                  <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    Other machines on the network will auto-discover this machine. They connect via:
-                  </Typography>
-                  <Chip
-                    label={`http://${lanIp}:${settings.lanPort}`}
-                    size="small"
-                    sx={{ mt: 1, fontFamily: 'monospace', fontWeight: 600 }}
-                  />
-                </Alert>
-                <TextField
-                  label="Server Port"
-                  type="number"
-                  value={settings.lanPort}
-                  onChange={(e) => setSettings((s) => s && ({ ...s, lanPort: Number(e.target.value) }))}
-                  size="small"
-                  sx={{ maxWidth: 180 }}
-                  helperText="Default: 3333"
-                />
-              </>
-            )}
-
-            {settings.serverMode === 'lan-client' && (
-              <Stack spacing={2}>
-                <Alert severity="info" icon={<DevicesOutlinedIcon />}>
-                  <Typography variant="body2" fontWeight={600}>LAN Client mode</Typography>
-                  <Typography variant="body2" sx={{ mt: 0.5 }}>Scan for a server on your network, or enter the server URL manually.</Typography>
-                </Alert>
-
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<WifiTetheringOutlinedIcon />}
-                    loading={scanning}
-                    onClick={() => void handleScan()}
-                  >
-                    Scan Network
-                  </Button>
-                  {discovered.length > 0 && (
-                    <Typography variant="caption" color="text.secondary">{discovered.length} server(s) found</Typography>
-                  )}
-                </Stack>
-
-                {discovered.length > 0 && (
-                  <Stack spacing={0.5}>
-                    {discovered.map((s) => (
-                      <Chip
-                        key={s.ip}
-                        label={`${s.name} — http://${s.ip}:${s.port}`}
-                        size="small"
-                        clickable
-                        onClick={() => {
-                          setSettings((prev) => prev && ({ ...prev, clientApiUrl: `http://${s.ip}:${s.port}` }));
-                          setTestResult(null);
-                        }}
-                        sx={{ fontFamily: 'monospace', justifyContent: 'flex-start' }}
-                      />
-                    ))}
-                  </Stack>
-                )}
-
-                <Stack direction="row" spacing={1} alignItems="flex-start">
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              pr: 0.5,
+              '&::-webkit-scrollbar': { width: 6 },
+              '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
+              '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,0,0,0.15)', borderRadius: 99 },
+            }}
+          >
+          {settingsTab === 'general' && (
+            <Stack direction="row" spacing={4} alignItems="flex-start">
+              {/* Left Side: Clinic Info, Backup & App Update */}
+              <Box sx={{ width: 280, flexShrink: 0 }}>
+                <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>Clinic Information</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Shown on printed receipts and invoices.</Typography>
+                <Stack spacing={1.5} sx={{ mb: 3 }}>
                   <TextField
-                    label="Server URL"
+                    label="Clinic Name"
                     size="small"
                     fullWidth
-                    placeholder="http://192.168.1.x:3333"
-                    value={settings.clientApiUrl}
-                    onChange={(e) => { setSettings((s) => s && ({ ...s, clientApiUrl: e.target.value })); setTestResult(null); }}
+                    value={settings.clinicName}
+                    onChange={(e) => setSettings((s) => s && ({ ...s, clinicName: e.target.value }))}
                   />
-                  <Button
-                    variant="outlined"
+                  <TextField
+                    label="Address"
                     size="small"
-                    sx={{ whiteSpace: 'nowrap', mt: 0.5 }}
-                    disabled={!settings.clientApiUrl}
-                    loading={testing}
-                    onClick={() => void handleTestConnection()}
-                  >
-                    Test
-                  </Button>
+                    fullWidth
+                    value={settings.clinicAddress}
+                    onChange={(e) => setSettings((s) => s && ({ ...s, clinicAddress: e.target.value }))}
+                  />
+                  <TextField
+                    label="Phone"
+                    size="small"
+                    fullWidth
+                    value={settings.clinicPhone}
+                    onChange={(e) => setSettings((s) => s && ({ ...s, clinicPhone: e.target.value }))}
+                  />
                 </Stack>
 
-                {testResult !== null && (
-                  <Alert severity={testResult ? 'success' : 'error'}>
-                    {testResult ? 'Connection successful!' : 'Could not reach server. Check the URL and firewall.'}
-                  </Alert>
+                <Divider sx={{ my: 2 }} />
+
+                {/* App Update Section */}
+                <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>App Update</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Check if a newer version is available on GitHub.</Typography>
+
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">Current Version:</Typography>
+                  <Chip label={`v${currentVersion}`} size="small" variant="outlined" color="primary" sx={{ fontWeight: 600, height: 22 }} />
+                </Stack>
+
+                <Box sx={{ width: '100%' }}>
+                  {isUpdateReady ? (
+                    <Button
+                      variant="contained"
+                      color="success"
+                      fullWidth
+                      startIcon={<SystemUpdateAltOutlinedIcon />}
+                      onClick={installUpdate}
+                    >
+                      Restart & Install Update
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      startIcon={<SystemUpdateAltOutlinedIcon />}
+                      loading={updateStatus === 'checking' || isChecking}
+                      disabled={isDownloading}
+                      onClick={() => void handleCheckUpdate()}
+                    >
+                      {(updateStatus === 'checking' || isChecking) ? 'Checking...' : 'Check for Updates'}
+                    </Button>
+                  )}
+
+                  {isDownloading && (
+                    <Box sx={{ width: '100%', mt: 2 }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                          {downloadStatusText}
+                        </Typography>
+                        <Typography variant="caption" color="primary.main" fontWeight={700}>
+                          {downloadIndeterminate ? '…' : `${downloadProgress}%`}
+                        </Typography>
+                      </Stack>
+                      <LinearProgress
+                        variant={downloadIndeterminate ? 'indeterminate' : 'determinate'}
+                        value={downloadIndeterminate ? undefined : downloadProgress}
+                        sx={{ height: 6, borderRadius: 3 }}
+                      />
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+
+              <Divider orientation="vertical" flexItem />
+
+              {/* Right Side: Network Settings */}
+              <Stack spacing={3} flex={1}>
+                <Box>
+                  <Typography variant="h6" fontWeight={700}>Network Settings</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    {isOnline
+                      ? 'This license uses online Postgres — LAN roles are disabled.'
+                      : 'Configure how this machine connects to the clinic network.'}
+                  </Typography>
+                  {isOnline && (
+                    <Alert severity="info" sx={{ mt: 1.5 }}>
+                      Online database mode is active
+                      {schemaId ? ` (tenant ${schemaId})` : ''}.
+                      Clinic data is stored in the shared cloud schema, filtered per license.
+                    </Alert>
+                  )}
+                  {!isOnline && settings?.serverMode === 'lan-client' && connectionOk === false && (
+                    <Alert severity="error" sx={{ mt: 1.5 }}>
+                      LAN server unreachable. App has fallen back to local mode. Please check the server URL and save again.
+                    </Alert>
+                  )}
+                </Box>
+
+                {isOnline ? null : (
+                <>
+                <Divider />
+
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>Machine Role</Typography>
+                  <ToggleButtonGroup
+                    value={settings.serverMode}
+                    exclusive
+                    onChange={(_e, val) => val && setSettings((s) => s && ({ ...s, serverMode: val as ServerMode }))}
+                    sx={{ gap: 1, flexWrap: 'wrap', width: '100%' }}
+                  >
+                    {([
+                      { value: 'local', icon: <LaptopOutlinedIcon />, label: 'Standalone', desc: 'Only this machine, no sharing' },
+                      { value: 'lan-server', icon: <DnsOutlinedIcon />, label: 'LAN Server', desc: 'Share data with other machines' },
+                      { value: 'lan-client', icon: <DevicesOutlinedIcon />, label: 'LAN Client', desc: 'Connect to another machine' },
+                    ] as const).map(({ value, icon, label, desc }) => (
+                      <ToggleButton
+                        key={value}
+                        value={value}
+                        sx={{
+                          flex: 1,
+                          flexDirection: 'column',
+                          gap: 0.5,
+                          py: 2,
+                          px: 3,
+                          borderRadius: '12px !important',
+                          border: '1px solid !important',
+                          borderColor: settings.serverMode === value
+                            ? `${theme.palette.primary.main} !important`
+                            : 'divider !important',
+                          bgcolor: settings.serverMode === value
+                            ? alpha(theme.palette.primary.main, 0.1)
+                            : 'transparent',
+                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
+                        }}
+                      >
+                        {icon}
+                        <Typography variant="caption" fontWeight={700}>{label}</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>{desc}</Typography>
+                      </ToggleButton>
+                    ))}
+                  </ToggleButtonGroup>
+                </Box>
+
+                <Divider />
+
+                {settings.serverMode !== 'lan-client' && (
+                  <>
+                    <Alert severity="info" icon={<DnsOutlinedIcon />}>
+                      <Typography variant="body2" fontWeight={600}>
+                        {settings.serverMode === 'lan-server' ? 'LAN Server mode active.' : 'This machine hosts the database.'}
+                      </Typography>
+                      <Typography variant="body2" sx={{ mt: 0.5 }}>
+                        Other machines on the network will auto-discover this machine. They connect via:
+                      </Typography>
+                      <Chip
+                        label={`http://${lanIp}:${settings.lanPort}`}
+                        size="small"
+                        sx={{ mt: 1, fontFamily: 'monospace', fontWeight: 600 }}
+                      />
+                    </Alert>
+                    <TextField
+                      label="Server Port"
+                      type="number"
+                      value={settings.lanPort}
+                      onChange={(e) => setSettings((s) => s && ({ ...s, lanPort: Number(e.target.value) }))}
+                      size="small"
+                      sx={{ maxWidth: 180 }}
+                      helperText="Default: 3333"
+                    />
+                  </>
+                )}
+
+                {settings.serverMode === 'lan-client' && (
+                  <Stack spacing={2}>
+                    <Alert severity="info" icon={<DevicesOutlinedIcon />}>
+                      <Typography variant="body2" fontWeight={600}>LAN Client mode</Typography>
+                      <Typography variant="body2" sx={{ mt: 0.5 }}>Scan for a server on your network, or enter the server URL manually.</Typography>
+                    </Alert>
+
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<WifiTetheringOutlinedIcon />}
+                        loading={scanning}
+                        onClick={() => void handleScan()}
+                      >
+                        Scan Network
+                      </Button>
+                      {discovered.length > 0 && (
+                        <Typography variant="caption" color="text.secondary">{discovered.length} server(s) found</Typography>
+                      )}
+                    </Stack>
+
+                    {discovered.length > 0 && (
+                      <Stack spacing={0.5}>
+                        {discovered.map((s) => (
+                          <Chip
+                            key={s.ip}
+                            label={`${s.name} — http://${s.ip}:${s.port}`}
+                            size="small"
+                            clickable
+                            onClick={() => {
+                              setSettings((prev) => prev && ({ ...prev, clientApiUrl: `http://${s.ip}:${s.port}` }));
+                              setTestResult(null);
+                            }}
+                            sx={{ fontFamily: 'monospace', justifyContent: 'flex-start' }}
+                          />
+                        ))}
+                      </Stack>
+                    )}
+
+                    <Stack direction="row" spacing={1} alignItems="flex-start">
+                      <TextField
+                        label="Server URL"
+                        size="small"
+                        fullWidth
+                        placeholder="http://192.168.1.x:3333"
+                        value={settings.clientApiUrl}
+                        onChange={(e) => { setSettings((s) => s && ({ ...s, clientApiUrl: e.target.value })); setTestResult(null); }}
+                      />
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        sx={{ whiteSpace: 'nowrap', mt: 0.5 }}
+                        disabled={!settings.clientApiUrl}
+                        loading={testing}
+                        onClick={() => void handleTestConnection()}
+                      >
+                        Test
+                      </Button>
+                    </Stack>
+
+                    {testResult !== null && (
+                      <Alert severity={testResult ? 'success' : 'error'}>
+                        {testResult ? 'Connection successful!' : 'Could not reach server. Check the URL and firewall.'}
+                      </Alert>
+                    )}
+                  </Stack>
+                )}
+                </>
                 )}
               </Stack>
-            )}
-            </>
-            )}
-
-            <Divider />
-
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <Button variant="contained" loading={saving} onClick={() => void handleSave()}>
-                Save Settings
-              </Button>
-              {saved && (
-                <Alert severity="success" sx={{ py: 0.5 }}>
-                  {restarting ? 'Saved! Restarting app...' : 'Saved!'}
-                </Alert>
-              )}
             </Stack>
+          )}
+
+          {settingsTab === 'ai' && (
+            <Box sx={{ maxWidth: 480 }}>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                <AutoAwesomeOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                <Typography variant="h6" fontWeight={700}>AI Assist (Groq)</Typography>
+              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+                Free Groq API for prescription drafts and patient history summaries. Get a key at console.groq.com — no model install on each PC.
+              </Typography>
+              <Stack spacing={2}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={Boolean(settings.aiEnabled)}
+                      onChange={(e) => setSettings((s) => s && ({ ...s, aiEnabled: e.target.checked }))}
+                      size="small"
+                    />
+                  }
+                  label="Enable AI features"
+                />
+                <TextField
+                  label="Groq API key"
+                  size="small"
+                  fullWidth
+                  type="password"
+                  autoComplete="off"
+                  value={settings.groqApiKey || ''}
+                  onChange={(e) => setSettings((s) => s && ({ ...s, groqApiKey: e.target.value }))}
+                  disabled={!settings.aiEnabled}
+                  placeholder="gsk_..."
+                />
+                <TextField
+                  label="Model"
+                  size="small"
+                  fullWidth
+                  value={settings.groqModel || 'llama-3.1-8b-instant'}
+                  onChange={(e) => setSettings((s) => s && ({ ...s, groqModel: e.target.value }))}
+                  disabled={!settings.aiEnabled}
+                  helperText="Default: llama-3.1-8b-instant"
+                />
+              </Stack>
+            </Box>
+          )}
+
+          {settingsTab === 'backup' && (
+            <Box sx={{ maxWidth: 560 }}>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                <BackupOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                <Typography variant="h6" fontWeight={700}>Backup & Restore</Typography>
+              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+                Full backup (.zip) includes the database plus patient/lab documents so images and PDFs work after restore on another PC. Legacy .db-only backups are still supported.
+              </Typography>
+              {isOnline ? (
+                <Alert severity="info">
+                  Online database mode — clinic data lives in the cloud (Neon). Local Backup & Restore is disabled because it only copies the offline SQLite file.
+                </Alert>
+              ) : (
+                <Stack spacing={2}>
+                  <Stack direction="row" gap={1.5} flexWrap="wrap">
+                    <Button
+                      variant="outlined"
+                      startIcon={<BackupOutlinedIcon />}
+                      loading={backupLoading}
+                      onClick={() => void handleBackup()}
+                    >
+                      Create Backup
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="warning"
+                      startIcon={<RestoreOutlinedIcon />}
+                      loading={restoreLoading}
+                      onClick={() => void handleRestore()}
+                    >
+                      Restore Backup
+                    </Button>
+                  </Stack>
+                  {backupStatus && <Alert severity={backupStatus.type}>{backupStatus.msg}</Alert>}
+                </Stack>
+              )}
+            </Box>
+          )}
+          </Box>
+
+          <Divider sx={{ my: 3, flexShrink: 0 }} />
+
+          <Stack direction="row" alignItems="center" spacing={2} sx={{ flexShrink: 0 }}>
+            <Button variant="contained" loading={saving} onClick={() => void handleSave()}>
+              Save Settings
+            </Button>
+            {saved && (
+              <Alert severity="success" sx={{ py: 0.5 }}>
+                {restarting ? 'Saved! Restarting app...' : 'Saved!'}
+              </Alert>
+            )}
           </Stack>
         </Stack>
       )}

@@ -227,6 +227,11 @@ const api = {
         () => request(`/api/invoices/${id}/void`, { method: 'POST' }),
         'invoices:void', id,
       ),
+    delete: (id: string) =>
+      call(
+        () => request(`/api/invoices/${id}`, { method: 'DELETE' }),
+        'invoices:delete', id,
+      ),
     payments: (invoiceId: string) =>
       call(
         () => request(`/api/invoices/${invoiceId}/payments`),
@@ -468,6 +473,49 @@ const api = {
     /** Offscreen HTML → PNG base64 (prescription list thumbnails). */
     captureHtml: (html: string, options?: { width?: number; height?: number }) =>
       ipc<{ ok: boolean; base64?: string; error?: string }>('print:captureHtml', html, options),
+  },
+  ai: {
+    suggestPrescription: (
+      input: {
+        diagnosis?: string;
+        age?: string;
+        sex?: string;
+        currentText?: string;
+        patientName?: string;
+      },
+      onDelta?: (delta: string) => void,
+    ) => {
+      const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const listener = (_e: unknown, msg: { requestId?: string; delta?: string }) => {
+        if (msg?.requestId === requestId && msg.delta) onDelta?.(msg.delta);
+      };
+      if (onDelta) ipcRenderer.on('ai:suggestPrescription:delta', listener);
+      return ipc<{ ok: boolean; html?: string; error?: string }>('ai:suggestPrescription', {
+        ...input,
+        requestId,
+      }).finally(() => {
+        if (onDelta) ipcRenderer.removeListener('ai:suggestPrescription:delta', listener);
+      });
+    },
+    summarizePatient: (
+      input: {
+        patientName?: string;
+        visits: Array<{ date?: string; diagnosis?: string; advice?: string }>;
+      },
+      onDelta?: (delta: string) => void,
+    ) => {
+      const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const listener = (_e: unknown, msg: { requestId?: string; delta?: string }) => {
+        if (msg?.requestId === requestId && msg.delta) onDelta?.(msg.delta);
+      };
+      if (onDelta) ipcRenderer.on('ai:summarizePatient:delta', listener);
+      return ipc<{ ok: boolean; summary?: string; error?: string }>('ai:summarizePatient', {
+        ...input,
+        requestId,
+      }).finally(() => {
+        if (onDelta) ipcRenderer.removeListener('ai:summarizePatient:delta', listener);
+      });
+    },
   },
   settings: {
     get: () => ipc('settings:get'),

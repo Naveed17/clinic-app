@@ -13,6 +13,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
+import { useAuth } from '@/features/auth/AuthContext';
 import { patientsService } from '@/services/patients.service';
 import type { Patient, PatientInput } from '@/types/patient';
 
@@ -58,7 +59,7 @@ function toFormValues(patient?: Patient): PatientFormValues {
   };
 }
 
-function toPatientInput(values: PatientFormValues): PatientInput {
+function toPatientInput(values: PatientFormValues, primaryDoctorId?: string | null): PatientInput {
   return {
     ...values,
     dateOfBirth: values.dateOfBirth || null,
@@ -70,6 +71,7 @@ function toPatientInput(values: PatientFormValues): PatientInput {
     bloodGroup: values.bloodGroup || null,
     allergies: values.allergies || null,
     chronicConditions: values.chronicConditions || null,
+    ...(primaryDoctorId ? { primaryDoctorId } : {}),
   };
 }
 
@@ -81,16 +83,20 @@ interface PatientDialogProps {
 
 export function PatientDialog({ patient, open, onClose }: PatientDialogProps): React.JSX.Element {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const isEditing = Boolean(patient);
   const form = useForm<PatientFormValues>({
     resolver: zodResolver(patientSchema),
     defaultValues: emptyFormValues,
   });
   const mutation = useMutation({
-    mutationFn: (values: PatientFormValues) =>
-      patient
+    mutationFn: (values: PatientFormValues) => {
+      const linkDoctorId =
+        !patient && user?.role === 'doctor' ? user.id : undefined;
+      return patient
         ? patientsService.update(patient.id, toPatientInput(values))
-        : patientsService.create(toPatientInput(values)),
+        : patientsService.create(toPatientInput(values, linkDoctorId));
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['patients'] });
       onClose();

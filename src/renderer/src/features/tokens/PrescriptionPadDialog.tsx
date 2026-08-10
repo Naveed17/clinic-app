@@ -3,6 +3,7 @@ import StarterKit from '@tiptap/starter-kit';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
+import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import FormatBoldIcon from '@mui/icons-material/FormatBold';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
@@ -152,6 +153,8 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
   const [diagnosis, setDiagnosis] = useState('');
   const [qualification, setQualification] = useState('CONSULTING PHYSICIAN');
   const [saving, setSaving] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiHint, setAiHint] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedHint, setSavedHint] = useState(false);
@@ -271,6 +274,51 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
     }
   }
 
+  async function handleAiSuggest(): Promise<void> {
+    if (!editor) return;
+    setAiLoading(true);
+    setError(null);
+    setAiHint(true);
+    const currentText = stripAdviceHtml(editor.getHTML());
+    editor.commands.setContent('<p></p>');
+    let streamed = '';
+    let lastPaint = 0;
+    const paint = (html: string, force = false) => {
+      const now = Date.now();
+      if (!force && now - lastPaint < 50) return;
+      lastPaint = now;
+      // Stream may be partial HTML; TipTap still paints usable fragments.
+      editor.commands.setContent(html.trim() || '<p></p>');
+    };
+    try {
+      const result = await window.clinic.ai.suggestPrescription(
+        {
+          diagnosis,
+          // Age/sex only for dosing context in main — never shown as draft lines
+          age: patientAge,
+          sex: patientSex,
+          currentText,
+        },
+        (delta) => {
+          streamed += delta;
+          paint(streamed);
+        },
+      );
+      if (!result?.ok || !result.html) {
+        setError(result?.error || 'AI suggestion failed');
+        setAiHint(false);
+        return;
+      }
+      editor.commands.setContent(result.html);
+      setTimeout(() => setAiHint(false), 4000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'AI suggestion failed');
+      setAiHint(false);
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
   async function handleSaveAndPdf(): Promise<void> {
     if (!editor) return;
     setBodyTextForPdf(editor.getHTML());
@@ -319,11 +367,31 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
                 Saved
               </Typography>
             )}
+            {aiHint && (
+              <Typography variant="caption" color="info.main" fontWeight={600}>
+                AI draft — verify before saving
+              </Typography>
+            )}
             {error && (
-              <Typography variant="caption" color="error" sx={{ maxWidth: 200 }} noWrap>
+              <Typography variant="caption" color="error" sx={{ maxWidth: 220 }} noWrap title={error}>
                 {error}
               </Typography>
             )}
+            <Tooltip title="Draft Rx/advice with Groq AI (edit before save)">
+              <span>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="secondary"
+                  startIcon={<AutoAwesomeOutlinedIcon />}
+                  loading={aiLoading}
+                  disabled={!editor || aiLoading || saving}
+                  onClick={() => void handleAiSuggest()}
+                >
+                  AI Suggest
+                </Button>
+              </span>
+            </Tooltip>
             <Button
               size="small"
               variant="outlined"

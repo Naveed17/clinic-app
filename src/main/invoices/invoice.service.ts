@@ -94,6 +94,15 @@ export async function voidInvoice(id: string) {
   return serializeInvoice(invoice);
 }
 
+export async function deleteInvoice(id: string): Promise<void> {
+  const database = getPrisma();
+  await database.$transaction(async (tx) => {
+    await tx.payment.deleteMany({ where: { invoiceId: id } });
+    await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
+    await tx.invoice.delete({ where: { id } });
+  });
+}
+
 export async function getPayments(invoiceId: string) {
   return getPrisma().payment.findMany({
     where: { invoiceId },

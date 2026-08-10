@@ -137,6 +137,7 @@ declare global {
         create: (input: InvoiceInput) => Promise<Invoice>;
         addPayment: (invoiceId: string, amount: number, method: string, reference?: string) => Promise<Invoice>;
         void: (id: string) => Promise<Invoice>;
+        delete: (id: string) => Promise<void>;
         payments: (invoiceId: string) => Promise<import('./invoice').Payment[]>;
       };
       reports: {
@@ -176,9 +177,28 @@ declare global {
           options?: { width?: number; height?: number },
         ) => Promise<{ ok: boolean; base64?: string; error?: string }>;
       };
+      ai: {
+        suggestPrescription: (
+          input: {
+            diagnosis?: string;
+            age?: string;
+            sex?: string;
+            currentText?: string;
+            patientName?: string;
+          },
+          onDelta?: (delta: string) => void,
+        ) => Promise<{ ok: boolean; html?: string; error?: string }>;
+        summarizePatient: (
+          input: {
+            patientName?: string;
+            visits: Array<{ date?: string; diagnosis?: string; advice?: string }>;
+          },
+          onDelta?: (delta: string) => void,
+        ) => Promise<{ ok: boolean; summary?: string; error?: string }>;
+      };
       settings: {
-        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string }>;
-        save: (patch: unknown) => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string }>;
+        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string; aiEnabled?: boolean; groqApiKey?: string; groqModel?: string }>;
+        save: (patch: unknown) => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string; aiEnabled?: boolean; groqApiKey?: string; groqModel?: string }>;
         relaunch: () => Promise<void>;
         lanIp: () => Promise<string>;
         testConnection: (url: string) => Promise<boolean>;

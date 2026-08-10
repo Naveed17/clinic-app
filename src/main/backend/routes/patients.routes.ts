@@ -17,6 +17,7 @@ export function createPatientsRouter(io: SocketIOServer): Router {
         page: Number(req.query.page ?? 1),
         pageSize: Number(req.query.pageSize ?? 10),
         search: typeof req.query.search === 'string' ? req.query.search : '',
+        providerId: typeof req.query.providerId === 'string' ? req.query.providerId : undefined,
       };
       res.json(await listPatients(input));
     }),

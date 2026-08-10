@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Server as SocketIOServer } from 'socket.io';
-import { createInvoice, invoicePatients, listInvoices, addPayment, voidInvoice, getPayments } from '../../invoices/invoice.service';
+import { createInvoice, invoicePatients, listInvoices, addPayment, voidInvoice, deleteInvoice, getPayments } from '../../invoices/invoice.service';
 import type { InvoiceInput } from '../../invoices/invoice.service';
 import { asyncHandler } from '../utils/async-handler';
 import { requireRole } from '../middleware/auth';
@@ -61,6 +61,23 @@ export function createInvoicesRouter(io: SocketIOServer): Router {
       emitNotification(io, { kind: 'warning', title: 'Invoice voided', message: `Invoice ${invoice.invoiceNumber} was voided.`, payload: { entity: 'invoice', id: invoice.id } });
       emitDataChange(io, 'invoice', 'deleted');
       res.json(invoice);
+    }),
+  );
+
+  router.delete(
+    '/:id',
+    requireRole(['admin', 'receptionist']),
+    asyncHandler(async (req, res) => {
+      const id = req.params['id'] as string;
+      await deleteInvoice(id);
+      emitNotification(io, {
+        kind: 'warning',
+        title: 'Invoice deleted',
+        message: 'An invoice was permanently removed.',
+        payload: { entity: 'invoice', id },
+      });
+      emitDataChange(io, 'invoice', 'deleted');
+      res.status(204).send();
     }),
   );
 

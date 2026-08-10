@@ -12,6 +12,7 @@ export interface Patient {
   bloodGroup: string | null;
   allergies: string | null;
   chronicConditions: string | null;
+  primaryDoctorId?: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
@@ -28,6 +29,7 @@ export interface PatientInput {
   bloodGroup?: string | null;
   allergies?: string | null;
   chronicConditions?: string | null;
+  primaryDoctorId?: string | null;
 }
 
 export interface PatientListInput {
