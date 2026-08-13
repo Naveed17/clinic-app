@@ -143,6 +143,30 @@ function applyDatabaseModeFromApi(key: string, data: LicenseApiExtras & { expire
 }
 
 // ── Modules ───────────────────────────────────────────────────────────────────
+const KNOWN_MODULE_KEYS = [
+  'doctorDashboard',
+  'labDashboard',
+  'billing',
+  'reports',
+  'statistics',
+  'tokens',
+  'manageDoctors',
+  'managePatients',
+  'manageMedicines',
+  'manageUsers',
+  'pharmacy',
+  'whatsapp',
+  'ai',
+] as const;
+
+function normalizeModulesPayload(modules?: Record<string, boolean> | null): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  for (const key of KNOWN_MODULE_KEYS) {
+    out[key] = modules?.[key] === true;
+  }
+  return out;
+}
+
 export async function getLicenseModules(): Promise<Record<string, boolean> | null> {
   const savedKey = getSavedKey();
   if (!savedKey) return null;
@@ -157,13 +181,18 @@ export async function getLicenseModules(): Promise<Record<string, boolean> | nul
       modules?: Record<string, boolean>;
       expiresAt?: string | null;
     } & LicenseApiExtras;
-    if (!data.ok || !data.modules) return getCachedModules(savedKey);
+    if (!data.ok || !data.modules) {
+      const cached = getCachedModules(savedKey);
+      return cached ? normalizeModulesPayload(cached) : null;
+    }
 
     applyDatabaseModeFromApi(savedKey, data);
-    saveModulesCache(savedKey, data.modules);
-    return data.modules;
+    const normalized = normalizeModulesPayload(data.modules);
+    saveModulesCache(savedKey, normalized);
+    return normalized;
   } catch {
-    return getCachedModules(savedKey);
+    const cached = getCachedModules(savedKey);
+    return cached ? normalizeModulesPayload(cached) : null;
   }
 }
 

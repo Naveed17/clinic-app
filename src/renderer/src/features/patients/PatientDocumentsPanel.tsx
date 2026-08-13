@@ -155,7 +155,7 @@ export function PatientDocumentsPanel({ patient }: { patient: Patient }): React.
                       <FolderOpenOutlinedIcon sx={{ fontSize: 16 }} />
                     </IconButton>
                   </Tooltip>
-                  {modules.whatsapp && (
+                  {modules.whatsapp === true && (
                     <Tooltip title={phone ? 'Send on WhatsApp' : 'Patient has no WhatsApp number'}>
                       <span>
                         <IconButton

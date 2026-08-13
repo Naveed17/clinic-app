@@ -512,7 +512,7 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
       </DialogContent>
 
       <DialogActions sx={{ px: 2.5, py: 1.75, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.default', flexShrink: 0, gap: 1 }}>
-        {modules.whatsapp && (
+        {modules.whatsapp === true && (
           <Button
             startIcon={<WhatsAppIcon />}
             onClick={() => setWaOpen(true)}
@@ -524,7 +524,7 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
         )}
         <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 2, fontWeight: 700 }}>Close</Button>
       </DialogActions>
-      {modules.whatsapp && (
+      {modules.whatsapp === true && (
         <PatientWhatsAppSendDialog open={waOpen} patient={patient} onClose={() => setWaOpen(false)} />
       )}
     </Dialog>
