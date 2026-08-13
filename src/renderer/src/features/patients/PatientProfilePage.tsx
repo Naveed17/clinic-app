@@ -314,7 +314,7 @@ export function PatientProfilePage(): React.JSX.Element {
             </Box>
           </Stack>
           <Stack direction="row" spacing={1}>
-            {modules.whatsapp && (
+            {modules.whatsapp === true && (
               <Button
                 startIcon={<WhatsAppIcon />}
                 variant="contained"
@@ -688,7 +688,7 @@ export function PatientProfilePage(): React.JSX.Element {
       {editOpen && patient && (
         <PatientDialog open={editOpen} patient={patient} onClose={() => setEditOpen(false)} />
       )}
-      {modules.whatsapp && (
+      {modules.whatsapp === true && (
         <PatientWhatsAppSendDialog open={waOpen} patient={patient} onClose={() => setWaOpen(false)} />
       )}
     </>

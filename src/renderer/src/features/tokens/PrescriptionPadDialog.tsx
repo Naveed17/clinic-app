@@ -379,7 +379,7 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
                 {error}
               </Typography>
             )}
-            {modules.ai && (
+            {modules.ai === true && (
               <Tooltip title="Draft Rx/advice with Groq AI (edit before save)">
                 <span>
                   <Button

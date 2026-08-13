@@ -63,8 +63,8 @@ async function pickPrinter(
     );
     if (real.length === 0) return undefined;
     real.sort((a, b) => {
-      const sa = scorePrinter(a.displayName || a.name, paper) + (a.isDefault ? 2 : 0);
-      const sb = scorePrinter(b.displayName || b.name, paper) + (b.isDefault ? 2 : 0);
+      const sa = scorePrinter(a.displayName || a.name, paper);
+      const sb = scorePrinter(b.displayName || b.name, paper);
       return sb - sa;
     });
     return real[0]?.name;
@@ -107,7 +107,6 @@ async function printWindow(
         pageSize: resolvePageSize(paper),
         // `none` + CSS `size: auto` printed blank rolls on thermal POS.
         margins: { marginType: 'printableArea' },
-        preferCSSPageSize: false,
         scaleFactor: 100,
         ...(deviceName ? { deviceName } : {}),
       },

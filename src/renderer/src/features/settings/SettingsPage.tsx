@@ -36,7 +36,7 @@ import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
 import { useUpdate } from '@/context/updateProvider';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useAuth } from '@/features/auth/AuthContext';
-import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
+import { useLicenseModules, useRefreshLicenseModules } from '@/features/auth/LicenseModulesContext';
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { WhatsAppCampaignDialog } from '@/features/settings/WhatsAppCampaignDialog';
 import {
@@ -71,6 +71,7 @@ export function SettingsPage(): React.JSX.Element {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const modules = useLicenseModules();
+  const refreshLicenseModules = useRefreshLicenseModules();
   const { isOnline, schemaId, ready: databaseModeReady, refresh: refreshDatabaseMode } = useDatabaseMode();
 
   // Context Hook Integration for Global Auto-Updater State
@@ -299,8 +300,12 @@ export function SettingsPage(): React.JSX.Element {
   }
 
   useEffect(() => {
-    if (settingsTab === 'ai' && !modules.ai) setSettingsTab('general');
-    if (settingsTab === 'whatsapp' && !modules.whatsapp) setSettingsTab('general');
+    void refreshLicenseModules();
+  }, [refreshLicenseModules]);
+
+  useEffect(() => {
+    if (settingsTab === 'ai' && modules.ai !== true) setSettingsTab('general');
+    if (settingsTab === 'whatsapp' && modules.whatsapp !== true) setSettingsTab('general');
   }, [modules.ai, modules.whatsapp, settingsTab]);
 
   useEffect(() => {
@@ -533,7 +538,7 @@ export function SettingsPage(): React.JSX.Element {
               iconPosition="start"
               label="General"
             />
-            {modules.ai && (
+            {modules.ai === true && (
               <Tab
                 value="ai"
                 icon={<AutoAwesomeOutlinedIcon sx={{ fontSize: 18 }} />}
@@ -541,7 +546,7 @@ export function SettingsPage(): React.JSX.Element {
                 label="AI"
               />
             )}
-            {modules.whatsapp && (
+            {modules.whatsapp === true && (
               <Tab
                 value="whatsapp"
                 icon={<WhatsAppIcon sx={{ fontSize: 18 }} />}
@@ -825,7 +830,7 @@ export function SettingsPage(): React.JSX.Element {
             </Stack>
           )}
 
-          {settingsTab === 'ai' && (
+          {settingsTab === 'ai' && modules.ai === true && (
             <Box sx={{ maxWidth: 480 }}>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                 <AutoAwesomeOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
@@ -869,7 +874,7 @@ export function SettingsPage(): React.JSX.Element {
             </Box>
           )}
 
-          {settingsTab === 'whatsapp' && (
+          {settingsTab === 'whatsapp' && modules.whatsapp === true && (
             <Box>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                 <WhatsAppIcon sx={{ fontSize: 20, color: 'primary.main' }} />

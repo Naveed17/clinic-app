@@ -141,7 +141,7 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
         <Typography variant="caption" color="text.secondary" fontWeight={600}>
           {items.length} prescription{items.length === 1 ? '' : 's'}
         </Typography>
-        {modules.ai && (
+        {modules.ai === true && (
           <Button
             size="small"
             variant="outlined"
@@ -154,8 +154,8 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
           </Button>
         )}
       </Stack>
-      {modules.ai && summaryError && <Alert severity="error" onClose={() => setSummaryError(null)}>{summaryError}</Alert>}
-      {modules.ai && summary !== null && (
+      {modules.ai === true && summaryError && <Alert severity="error" onClose={() => setSummaryError(null)}>{summaryError}</Alert>}
+      {modules.ai === true && summary !== null && (
         <Alert
           severity="info"
           icon={<AutoAwesomeOutlinedIcon fontSize="inherit" />}
