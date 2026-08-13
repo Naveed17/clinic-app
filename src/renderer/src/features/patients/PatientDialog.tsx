@@ -14,6 +14,7 @@ import { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { useAuth } from '@/features/auth/AuthContext';
+import { PhoneInputField } from '@/components/PhoneInputField';
 import { patientsService } from '@/services/patients.service';
 import type { Patient, PatientInput } from '@/types/patient';
 
@@ -137,7 +138,17 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
                     />
                   )}
                 />
-                <TextField fullWidth label="Phone" {...form.register('phone')} />
+                <Controller
+                  name="phone"
+                  control={form.control}
+                  render={({ field }) => (
+                    <PhoneInputField
+                      label="Phone"
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
               </Box>
             </LocalizationProvider>
             <TextField fullWidth label="Email" type="email" error={Boolean(errors.email)} helperText={errors.email?.message} {...form.register('email')} />
@@ -145,7 +156,17 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
             <Typography color="text.secondary" variant="subtitle2">Emergency contact</Typography>
             <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
               <TextField fullWidth label="Name" {...form.register('emergencyContactName')} />
-              <TextField fullWidth label="Phone" {...form.register('emergencyContactPhone')} />
+              <Controller
+                name="emergencyContactPhone"
+                control={form.control}
+                render={({ field }) => (
+                  <PhoneInputField
+                    label="Phone"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
             </Box>
 
             <Typography color="text.secondary" variant="subtitle2">Medical Information</Typography>

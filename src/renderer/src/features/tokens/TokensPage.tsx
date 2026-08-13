@@ -34,7 +34,8 @@ import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { alpha, darken, useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useEffect, useState, useRef } from 'react';
-import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
+import careflowLogo from '@/assets/careflow-logo.png';
 import type { Token, TokenInput, TokenPerson, TokenStatus, PrescriptionInput, PrescriptionMedicine } from '@/types/token';
 import { useAuth } from '@/features/auth/AuthContext';
 import { appointmentsService } from '@/services/appointments.service';
@@ -44,8 +45,8 @@ import {
   dialogPaperProps,
 } from '@/components/DialogUI';
 import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
-import { printReactPdfDocument } from '@/utils/printPdf';
-import { POS_PAPER } from '@shared/invoicePaper';
+import { printTokenSlip } from '@/utils/printTokenSlip';
+import { POS_PAPER, POS_RECEIPT } from '@shared/invoicePaper';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
   WAITING: { label: 'Waiting', color: 'warning' },
@@ -186,21 +187,29 @@ Font.register({
   ],
 });
 
-const STAR_LINE = '- - - - - - - - - - - - - - - - - - - -';
-
 const ts = StyleSheet.create({
-  page: { backgroundColor: '#fff', paddingHorizontal: 24, paddingVertical: 28, fontFamily: 'Courier' },
-  shopName: { fontSize: 15, fontWeight: 'bold', textAlign: 'center', marginBottom: 2 },
-  shopSub: { fontSize: 9, textAlign: 'center', color: '#555', marginBottom: 1 },
-  stars: { fontSize: 8, textAlign: 'center', color: '#999', marginVertical: 5 },
-  title: { fontSize: 10, fontWeight: 'bold', textAlign: 'center', marginVertical: 2, letterSpacing: 1 },
+  page: {
+    backgroundColor: '#fff',
+    color: POS_RECEIPT.ink,
+    paddingTop: POS_PAPER.pdfPaddingTop,
+    paddingBottom: POS_PAPER.pdfPaddingBottom,
+    paddingLeft: POS_PAPER.pdfPaddingLeft,
+    paddingRight: POS_PAPER.pdfPaddingRight,
+    fontFamily: 'Courier',
+  },
+  logo: { width: 36, height: 36, alignSelf: 'center', marginBottom: 6 },
+  shopName: { fontSize: 14, fontWeight: 'bold', textAlign: 'center', marginBottom: 2, color: '#000' },
+  shopSub: { fontSize: 9, textAlign: 'center', color: '#000', marginBottom: 1 },
+  stars: { fontSize: 9, textAlign: 'center', color: '#000', marginVertical: 5 },
+  title: { fontSize: 11, fontWeight: 'bold', textAlign: 'center', marginVertical: 2, letterSpacing: 1, color: '#000' },
   tokenBox: { borderWidth: 2, borderColor: '#000', marginVertical: 8, paddingVertical: 8, alignItems: 'center' },
-  tokenLabel: { fontSize: 9, letterSpacing: 2, color: '#555' },
-  tokenNum: { fontSize: 48, fontWeight: 'bold', lineHeight: 1, letterSpacing: 3 },
+  tokenLabel: { fontSize: 9, letterSpacing: 2, color: '#000', fontWeight: 'bold' },
+  tokenNum: { fontSize: 48, fontWeight: 'bold', lineHeight: 1, letterSpacing: 3, color: '#000' },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
-  lbl: { fontSize: 9, color: '#666' },
-  val: { fontSize: 9 },
-  footer: { fontSize: 8, color: '#999', textAlign: 'center', marginTop: 10 },
+  lbl: { fontSize: 10, color: '#000', fontWeight: 'bold' },
+  val: { fontSize: 10, color: '#000' },
+  footer: { fontSize: 9, color: '#000', textAlign: 'center', marginTop: 10 },
+  brand: { fontSize: 8, color: '#000', textAlign: 'center', marginTop: 8, fontWeight: 'bold', letterSpacing: 1 },
 });
 
 export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone }: {
@@ -211,17 +220,18 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
   return (
     <Document>
       <Page size={[POS_PAPER.pdfPageWidth, POS_PAPER.pdfPageHeightToken]} style={ts.page} wrap={false}>
-        <Text style={ts.shopName}>{clinicName || 'CLINIC'}</Text>
+        <Image src={careflowLogo} style={ts.logo} />
+        <Text style={ts.shopName}>{clinicName || POS_RECEIPT.clinicFallback}</Text>
         {clinicAddress ? <Text style={ts.shopSub}>{clinicAddress}</Text> : null}
         {clinicPhone ? <Text style={ts.shopSub}>Tel: {clinicPhone}</Text> : null}
-        <Text style={ts.stars}>{STAR_LINE}</Text>
+        <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
         <Text style={ts.title}>PATIENT TOKEN SLIP</Text>
-        <Text style={ts.stars}>{STAR_LINE}</Text>
+        <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
         <View style={ts.tokenBox}>
           <Text style={ts.tokenLabel}>TOKEN NO.</Text>
           <Text style={ts.tokenNum}>{String(token.tokenNumber).padStart(3, '0')}</Text>
         </View>
-        <Text style={ts.stars}>{STAR_LINE}</Text>
+        <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
         <View style={ts.row}><Text style={ts.lbl}>Patient</Text><Text style={ts.val}>{token.patient.firstName} {token.patient.lastName}</Text></View>
         {token.patient.mrNumber ? <View style={ts.row}><Text style={ts.lbl}>MR #</Text><Text style={ts.val}>{token.patient.mrNumber}</Text></View> : null}
         <View style={ts.row}><Text style={ts.lbl}>Doctor</Text><Text style={ts.val}>Dr. {token.doctor.firstName} {token.doctor.lastName}</Text></View>
@@ -229,8 +239,9 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
         <View style={ts.row}><Text style={ts.lbl}>Time</Text><Text style={ts.val}>{time}</Text></View>
         {token.notes ? <View style={ts.row}><Text style={ts.lbl}>Note</Text><Text style={ts.val}>{token.notes}</Text></View> : null}
         {token.reason ? <View style={ts.row}><Text style={ts.lbl}>Reason</Text><Text style={ts.val}>{token.reason}</Text></View> : null}
-        <Text style={ts.stars}>{STAR_LINE}</Text>
-        <Text style={ts.footer}>Please wait for your token to be called.{`\n`}Thank you for your visit.</Text>
+        <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
+        <Text style={ts.footer}>Please wait for your token to be called.{`\n`}{POS_RECEIPT.thankYou}</Text>
+        <Text style={ts.brand}>CAREFLOW</Text>
       </Page>
     </Document>
   );
@@ -378,7 +389,7 @@ export function TokenPrintPreview({
 }: {
   token: Token;
   onClose: () => void;
-  /** Walk-in: open preview and start print dialog automatically */
+  /** Walk-in: open preview and silently print to the POS printer */
   autoPrint?: boolean;
 }) {
   const [clinic, setClinic] = useState<{ clinicName: string; clinicAddress: string; clinicPhone: string } | null>(null);
@@ -413,12 +424,10 @@ export function TokenPrintPreview({
   }, [clinic, freshToken]);
 
   async function handlePrint(): Promise<void> {
-    if (!pdfDocument) return;
     setPrinting(true);
     setPrintError(null);
     try {
-      // Walk-in / token slip: silent print fails when default is "Microsoft Print to PDF"
-      await printReactPdfDocument(pdfDocument, { printDialog: false, paper: 'pos80' });
+      await printTokenSlip(freshToken, { silent: true });
     } catch (err) {
       setPrintError(err instanceof Error ? err.message : 'Print failed');
     } finally {
@@ -427,11 +436,11 @@ export function TokenPrintPreview({
   }
 
   useEffect(() => {
-    if (!autoPrint || !pdfDocument || autoPrintDone.current) return;
+    if (!autoPrint || autoPrintDone.current) return;
     autoPrintDone.current = true;
     void handlePrint();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPrint, pdfDocument]);
+  }, [autoPrint]);
 
   return (
     <Dialog

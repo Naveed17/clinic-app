@@ -6,12 +6,17 @@
 export const POS_PAPER = {
   id: 'pos80' as const,
   label: 'POS 80mm',
-  /** CSS @page */
-  pageSize: '80mm auto',
-  pageMargin: '2mm',
-  bodyWidth: '72mm',
-  bodyMaxWidth: '72mm',
-  bodyPadding: '4px 6px',
+  /** CSS @page — fixed height (auto height prints blank on many POS drivers) */
+  pageSize: '80mm 200mm',
+  pageMargin: '0',
+  bodyWidth: '100%',
+  /**
+   * 80mm roll printable width is ~72mm. Full 80mm body clips the right
+   * border/text on thermal drivers (printableArea + left dead zone).
+   */
+  bodyMaxWidth: '68mm',
+  /** Extra right inset so the token box stroke is not cut off. */
+  bodyPadding: '6px 12px 28px 4px',
   fontName: '"Courier New", Courier, monospace',
   fontSize: '11px',
   nameSize: '15px',
@@ -21,8 +26,22 @@ export const POS_PAPER = {
   electronPageSize: { width: 80_000, height: 297_000 },
   /** @react-pdf Page size in points (~80mm wide) */
   pdfPageWidth: 226,
-  pdfPageHeightToken: 400,
+  pdfPageHeightToken: 460,
   pdfPageHeightInvoice: 720,
+  /** Optical center on 80mm roll (pts). Left smaller to cancel driver left gutter. */
+  pdfPaddingLeft: 8,
+  pdfPaddingRight: 16,
+  pdfPaddingTop: 16,
+  /** Extra bottom gap so the slip can be torn at the cutter. */
+  pdfPaddingBottom: 36,
+};
+
+/** Shared POS slip copy — token + invoice use the same header/dividers. */
+export const POS_RECEIPT = {
+  starLine: '* * * * * * * * * * * * * * *',
+  clinicFallback: 'CLINIC',
+  ink: '#000',
+  thankYou: 'THANK YOU!',
 };
 
 /** Prescription pad — A4 portrait. */

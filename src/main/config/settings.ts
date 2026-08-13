@@ -24,6 +24,12 @@ export interface AppSettings {
   aiEnabled: boolean;
   groqApiKey: string;
   groqModel: string;
+  /** Per-clinic Meta WhatsApp Cloud API (not the shared .env fallback). */
+  whatsappEnabled: boolean;
+  whatsappToken: string;
+  whatsappPhoneNumberId: string;
+  /** Clinic WhatsApp display number, e.g. 923001234567 */
+  whatsappDisplayNumber: string;
 }
 
 const DEFAULTS: AppSettings = {
@@ -40,6 +46,10 @@ const DEFAULTS: AppSettings = {
   aiEnabled: false,
   groqApiKey: '',
   groqModel: 'llama-3.1-8b-instant',
+  whatsappEnabled: false,
+  whatsappToken: '',
+  whatsappPhoneNumberId: '',
+  whatsappDisplayNumber: '',
 };
 
 function getPath(): string {

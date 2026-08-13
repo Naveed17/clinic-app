@@ -14,6 +14,7 @@ import {
   FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogPaperProps,
 } from '@/components/DialogUI';
+import { PhoneInputField } from '@/components/PhoneInputField';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
 import { alpha, darken, useTheme } from '@mui/material/styles';
@@ -169,7 +170,13 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
                     <TextField label="First name" autoFocus error={!!form.formState.errors.firstName} helperText={form.formState.errors.firstName?.message} {...form.register('firstName')} />
                     <TextField label="Last name" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
                   </Box>
-                  <TextField label="Phone (optional)" {...form.register('phone')} />
+                  <Controller
+                    name="phone"
+                    control={form.control}
+                    render={({ field }) => (
+                      <PhoneInputField label="Phone (optional)" value={field.value} onChange={field.onChange} />
+                    )}
+                  />
                   <TextField label="Address (optional)" {...form.register('address')} />
                   <LocalizationProvider dateAdapter={AdapterDateFns}>
                     <Controller name="dateOfBirth" control={form.control} render={({ field }) => (
@@ -394,7 +401,13 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
                     <TextField label="First name" autoFocus error={!!form.formState.errors.firstName} helperText={form.formState.errors.firstName?.message} {...form.register('firstName')} />
                     <TextField label="Last name" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
                   </Box>
-                  <TextField label="Phone (optional)" {...form.register('phone')} />
+                  <Controller
+                    name="phone"
+                    control={form.control}
+                    render={({ field }) => (
+                      <PhoneInputField label="Phone (optional)" value={field.value} onChange={field.onChange} />
+                    )}
+                  />
                   <TextField label="Address (optional)" {...form.register('address')} />
                   <LocalizationProvider dateAdapter={AdapterDateFns}>
                     <Controller name="dateOfBirth" control={form.control} render={({ field }) => (

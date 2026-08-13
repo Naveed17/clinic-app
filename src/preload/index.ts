@@ -468,7 +468,7 @@ const api = {
     pdf: (base64: string, options?: { printDialog?: boolean; paper?: 'pos80' | 'A4' }) =>
       ipc<{ ok: boolean; error?: string }>('print:pdf', base64, options),
     /** HTML receipt — Chromium print dialog with live preview. */
-    html: (html: string, options?: { printDialog?: boolean }) =>
+    html: (html: string, options?: { printDialog?: boolean; paper?: 'pos80' | 'A4' }) =>
       ipc<{ ok: boolean; error?: string }>('print:html', html, options),
     /** Offscreen HTML → PNG base64 (prescription list thumbnails). */
     captureHtml: (html: string, options?: { width?: number; height?: number }) =>
@@ -516,6 +516,40 @@ const api = {
         if (onDelta) ipcRenderer.removeListener('ai:summarizePatient:delta', listener);
       });
     },
+  },
+  whatsapp: {
+    status: () =>
+      ipc<{ enabled: boolean; configured: boolean; displayNumber: string }>('whatsapp:status'),
+    embeddedConfig: () =>
+      ipc<{ configured: boolean; appId: string; configId: string }>('whatsapp:embeddedConfig'),
+    embeddedExchange: (input: {
+      code: string;
+      phoneNumberId?: string | null;
+      wabaId?: string | null;
+    }) =>
+      ipc<{
+        success: boolean;
+        token?: string;
+        phoneNumberId?: string;
+        displayNumber?: string;
+        wabaId?: string;
+        error?: string;
+      }>('whatsapp:embeddedExchange', input),
+    test: () =>
+      ipc<{ ok: boolean; name?: string; phone?: string; error?: string }>('whatsapp:test'),
+    campaign: (input: {
+      text: string;
+      phones: string[];
+      imageBase64?: string;
+      imageMime?: string;
+      imageName?: string;
+    }) =>
+      ipc<{ sent: number; failed: number; skipped: number; errors: string[] }>(
+        'whatsapp:campaign',
+        input,
+      ),
+    sendMessage: (input: { phone?: string; text: string }) =>
+      ipc<{ success: boolean; error?: string }>('whatsapp:sendMessage', input),
   },
   settings: {
     get: () => ipc('settings:get'),

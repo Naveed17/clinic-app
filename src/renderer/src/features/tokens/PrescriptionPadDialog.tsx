@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
 import type { Token } from '@/types/token';
 import type { Patient } from '@/types/patient';
 import {
@@ -138,6 +139,7 @@ interface PrescriptionPadDialogProps {
 
 export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogProps): React.JSX.Element {
   const { user } = useAuth();
+  const modules = useLicenseModules();
   const [clinic, setClinic] = useState<PrescriptionPadClinic>({
     clinicName: '',
     clinicAddress: '',
@@ -377,21 +379,23 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
                 {error}
               </Typography>
             )}
-            <Tooltip title="Draft Rx/advice with Groq AI (edit before save)">
-              <span>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="secondary"
-                  startIcon={<AutoAwesomeOutlinedIcon />}
-                  loading={aiLoading}
-                  disabled={!editor || aiLoading || saving}
-                  onClick={() => void handleAiSuggest()}
-                >
-                  AI Suggest
-                </Button>
-              </span>
-            </Tooltip>
+            {modules.ai && (
+              <Tooltip title="Draft Rx/advice with Groq AI (edit before save)">
+                <span>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="secondary"
+                    startIcon={<AutoAwesomeOutlinedIcon />}
+                    loading={aiLoading}
+                    disabled={!editor || aiLoading || saving}
+                    onClick={() => void handleAiSuggest()}
+                  >
+                    AI Suggest
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
             <Button
               size="small"
               variant="outlined"

@@ -30,6 +30,49 @@ function previewSize(paper?: PrintPaperId): { width: number; height: number } {
   return { width: POS_PAPER.previewWidth, height: POS_PAPER.previewHeight };
 }
 
+/** Virtual/PDF targets — never pre-select these for clinic slips. */
+const VIRTUAL_PRINTER =
+  /print to pdf|xps document|fax|onenote|anydesk|send to|pdf writer|document writer|adobe pdf|cutepdf|bullzip|dopdf|microsoft print/i;
+
+function isVirtualPrinter(name: string): boolean {
+  return VIRTUAL_PRINTER.test(name);
+}
+
+function scorePrinter(name: string, paper?: PrintPaperId): number {
+  const n = name.toLowerCase();
+  if (isVirtualPrinter(n)) return -100;
+  let score = 10;
+  if (paper !== 'A4') {
+    if (/pos|thermal|receipt|xprinter|rongta|tsp|tm-|star micronics|citizen/i.test(n)) score += 50;
+  }
+  if (/usb/i.test(n)) score += 8;
+  if (/epson|hp |canon|brother|lexmark/i.test(n)) score += 6;
+  return score;
+}
+
+/** Prefer the attached physical printer over Microsoft Print to PDF. */
+async function pickPrinter(
+  win: BrowserWindow,
+  paper?: PrintPaperId,
+): Promise<string | undefined> {
+  try {
+    const list = await win.webContents.getPrintersAsync();
+    if (!list?.length) return undefined;
+    const real = list.filter(
+      (p) => !isVirtualPrinter(p.name) && !isVirtualPrinter(p.displayName || ''),
+    );
+    if (real.length === 0) return undefined;
+    real.sort((a, b) => {
+      const sa = scorePrinter(a.displayName || a.name, paper) + (a.isDefault ? 2 : 0);
+      const sb = scorePrinter(b.displayName || b.name, paper) + (b.isDefault ? 2 : 0);
+      return sb - sa;
+    });
+    return real[0]?.name;
+  } catch {
+    return undefined;
+  }
+}
+
 function waitForLoad(win: BrowserWindow): Promise<void> {
   return new Promise((resolve, reject) => {
     const onOk = () => {
@@ -49,11 +92,12 @@ function waitForLoad(win: BrowserWindow): Promise<void> {
   });
 }
 
-function printWindow(
+async function printWindow(
   win: BrowserWindow,
   silent: boolean,
   paper?: PrintPaperId,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const deviceName = await pickPrinter(win, paper);
   return new Promise((resolve) => {
     win.webContents.print(
       {
@@ -61,6 +105,11 @@ function printWindow(
         printBackground: true,
         landscape: false,
         pageSize: resolvePageSize(paper),
+        // `none` + CSS `size: auto` printed blank rolls on thermal POS.
+        margins: { marginType: 'printableArea' },
+        preferCSSPageSize: false,
+        scaleFactor: 100,
+        ...(deviceName ? { deviceName } : {}),
       },
       (success, failureReason) => {
         if (success || /cancel/i.test(failureReason || '')) {
@@ -295,6 +344,45 @@ async function openHtmlPreview(html: string): Promise<{ ok: true } | { ok: false
   }
 }
 
+async function silentPrintHtml(
+  html: string,
+  paper: PrintPaperId,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const file = join(app.getPath('temp'), `careflow-print-${randomUUID()}.html`);
+  let win: BrowserWindow | null = null;
+  const size = previewSize(paper);
+  try {
+    writeFileSync(file, html, 'utf8');
+    win = new BrowserWindow({
+      show: false,
+      width: size.width,
+      height: size.height,
+      autoHideMenuBar: true,
+      webPreferences: {
+        sandbox: false,
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
+    const loadDone = waitForLoad(win);
+    await win.loadURL(pathToFileURL(file).href);
+    await loadDone;
+    await new Promise((r) => setTimeout(r, 800));
+    return await printWindow(win, true, paper);
+  } finally {
+    try {
+      win?.destroy();
+    } catch {
+      /* ignore */
+    }
+    try {
+      unlinkSync(file);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 async function printPdfFile(
   file: string,
   options?: PrintOptions,
@@ -324,16 +412,17 @@ async function silentPrintPdf(
       height: size.height,
       autoHideMenuBar: true,
       webPreferences: {
-        sandbox: true,
+        sandbox: false,
         contextIsolation: true,
         nodeIntegration: false,
+        plugins: true,
       },
     });
 
     const loadDone = waitForLoad(win);
     await win.loadURL(pathToFileURL(file).href);
     await loadDone;
-    await new Promise((r) => setTimeout(r, 400));
+    await new Promise((r) => setTimeout(r, 800));
     return await printWindow(win, true, paper);
   } finally {
     try {
@@ -616,9 +705,12 @@ async function captureHtmlToPng(
 }
 
 export function registerPrintIpc(): void {
-  ipcMain.handle('print:html', async (_event, html: string, _options?: PrintOptions) => {
+  ipcMain.handle('print:html', async (_event, html: string, options?: PrintOptions) => {
     if (typeof html !== 'string' || !html.trim()) {
       return { ok: false as const, error: 'Empty HTML' };
+    }
+    if (options?.printDialog === false) {
+      return silentPrintHtml(html, options.paper ?? 'pos80');
     }
     return openHtmlPreview(html);
   });

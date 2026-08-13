@@ -30,9 +30,20 @@ import SystemUpdateAltOutlinedIcon from '@mui/icons-material/SystemUpdateAltOutl
 import WifiTetheringOutlinedIcon from '@mui/icons-material/WifiTetheringOutlined';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
+import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
 import { useUpdate } from '@/context/updateProvider';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
+import { PhoneInputField } from '@/components/PhoneInputField';
+import { WhatsAppCampaignDialog } from '@/features/settings/WhatsAppCampaignDialog';
+import {
+  WhatsAppConnectMetaDialog,
+  type ConnectMetaFormValues,
+} from '@/features/settings/WhatsAppConnectMetaDialog';
+import { launchWhatsAppEmbeddedSignup } from '@/features/settings/whatsappEmbeddedSignup';
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
 
@@ -49,12 +60,17 @@ interface Settings {
   aiEnabled?: boolean;
   groqApiKey?: string;
   groqModel?: string;
+  whatsappEnabled?: boolean;
+  whatsappToken?: string;
+  whatsappPhoneNumberId?: string;
+  whatsappDisplayNumber?: string;
 }
 
 export function SettingsPage(): React.JSX.Element {
   const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const modules = useLicenseModules();
   const { isOnline, schemaId, ready: databaseModeReady, refresh: refreshDatabaseMode } = useDatabaseMode();
 
   // Context Hook Integration for Global Auto-Updater State
@@ -118,7 +134,14 @@ export function SettingsPage(): React.JSX.Element {
     }
   }, [updateError]);
 
-  const [settingsTab, setSettingsTab] = useState<'general' | 'ai' | 'backup'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'ai' | 'whatsapp' | 'backup'>('general');
+  const [waTesting, setWaTesting] = useState(false);
+  const [waTest, setWaTest] = useState<{ ok: boolean; name?: string; phone?: string; error?: string } | null>(null);
+  const [waCampaignOpen, setWaCampaignOpen] = useState(false);
+  const [waConnecting, setWaConnecting] = useState(false);
+  const [waConnectOpen, setWaConnectOpen] = useState(false);
+  const [waConnectMsg, setWaConnectMsg] = useState<{ type: 'success' | 'error' | 'info'; msg: string } | null>(null);
+  const [embeddedMeta, setEmbeddedMeta] = useState<{ configured: boolean; appId: string; configId: string } | null>(null);
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   const [prevMode, setPrevMode] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -207,6 +230,10 @@ export function SettingsPage(): React.JSX.Element {
         aiEnabled: false,
         groqApiKey: '',
         groqModel: 'llama-3.1-8b-instant',
+        whatsappEnabled: false,
+        whatsappToken: '',
+        whatsappPhoneNumberId: '',
+        whatsappDisplayNumber: '',
       });
     });
     void window.clinic?.settings.lanIp().then((ip) => setLanIp(ip));
@@ -253,6 +280,108 @@ export function SettingsPage(): React.JSX.Element {
       }
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleTestWhatsApp(): Promise<void> {
+    if (!settings) return;
+    setWaTesting(true);
+    setWaTest(null);
+    try {
+      await window.clinic.settings.save(settings);
+      const result = await window.clinic.whatsapp.test();
+      setWaTest(result);
+    } catch (err) {
+      setWaTest({ ok: false, error: err instanceof Error ? err.message : 'Test failed.' });
+    } finally {
+      setWaTesting(false);
+    }
+  }
+
+  useEffect(() => {
+    if (settingsTab === 'ai' && !modules.ai) setSettingsTab('general');
+    if (settingsTab === 'whatsapp' && !modules.whatsapp) setSettingsTab('general');
+  }, [modules.ai, modules.whatsapp, settingsTab]);
+
+  useEffect(() => {
+    if (settingsTab !== 'whatsapp') return;
+    void window.clinic.whatsapp.embeddedConfig().then(setEmbeddedMeta).catch(() => {
+      setEmbeddedMeta({ configured: false, appId: '', configId: '' });
+    });
+  }, [settingsTab]);
+
+  async function handleConnectWithMeta(values: ConnectMetaFormValues): Promise<void> {
+    if (!settings) return;
+    setWaConnectOpen(false);
+    setWaConnecting(true);
+    setWaConnectMsg(null);
+    setWaTest(null);
+    try {
+      const cfg = embeddedMeta ?? (await window.clinic.whatsapp.embeddedConfig());
+      setEmbeddedMeta(cfg);
+      if (!cfg.configured) {
+        setWaConnectMsg({
+          type: 'error',
+          msg: 'Set META_APP_ID, META_APP_SECRET, and META_EMBEDDED_CONFIG_ID in .env, then restart the app.',
+        });
+        return;
+      }
+
+      const launched = await launchWhatsAppEmbeddedSignup({
+        appId: cfg.appId,
+        configId: cfg.configId,
+        clinic: {
+          clinicName: settings.clinicName,
+          clinicAddress: settings.clinicAddress,
+          clinicPhone: settings.clinicPhone || settings.whatsappDisplayNumber,
+          email: values.email,
+          website: values.website,
+        },
+      });
+      if (!launched.ok) {
+        setWaConnectMsg({
+          type: launched.canceled ? 'info' : 'error',
+          msg: launched.error,
+        });
+        return;
+      }
+
+      const exchanged = await window.clinic.whatsapp.embeddedExchange({
+        code: launched.code,
+        phoneNumberId: launched.session.phoneNumberId,
+        wabaId: launched.session.wabaId,
+      });
+      if (!exchanged.success || !exchanged.token || !exchanged.phoneNumberId) {
+        setWaConnectMsg({
+          type: 'error',
+          msg: exchanged.error || 'Failed to exchange Meta authorization code.',
+        });
+        return;
+      }
+
+      setSettings((s) =>
+        s
+          ? {
+              ...s,
+              whatsappEnabled: true,
+              whatsappToken: exchanged.token!,
+              whatsappPhoneNumberId: exchanged.phoneNumberId!,
+              whatsappDisplayNumber:
+                exchanged.displayNumber || s.whatsappDisplayNumber || '',
+            }
+          : s,
+      );
+      setWaConnectMsg({
+        type: 'success',
+        msg: 'Connected with Meta — token and Phone Number ID filled. Click Save Settings.',
+      });
+    } catch (err) {
+      setWaConnectMsg({
+        type: 'error',
+        msg: err instanceof Error ? err.message : 'Connect with Meta failed.',
+      });
+    } finally {
+      setWaConnecting(false);
     }
   }
 
@@ -382,7 +511,7 @@ export function SettingsPage(): React.JSX.Element {
         <Stack spacing={0} sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <Tabs
             value={settingsTab}
-            onChange={(_, v: 'general' | 'ai' | 'backup') => setSettingsTab(v)}
+            onChange={(_, v: 'general' | 'ai' | 'whatsapp' | 'backup') => setSettingsTab(v)}
             sx={{
               mb: 3,
               minHeight: 44,
@@ -404,12 +533,22 @@ export function SettingsPage(): React.JSX.Element {
               iconPosition="start"
               label="General"
             />
-            <Tab
-              value="ai"
-              icon={<AutoAwesomeOutlinedIcon sx={{ fontSize: 18 }} />}
-              iconPosition="start"
-              label="AI"
-            />
+            {modules.ai && (
+              <Tab
+                value="ai"
+                icon={<AutoAwesomeOutlinedIcon sx={{ fontSize: 18 }} />}
+                iconPosition="start"
+                label="AI"
+              />
+            )}
+            {modules.whatsapp && (
+              <Tab
+                value="whatsapp"
+                icon={<WhatsAppIcon sx={{ fontSize: 18 }} />}
+                iconPosition="start"
+                label="WhatsApp"
+              />
+            )}
             <Tab
               value="backup"
               icon={<BackupOutlinedIcon sx={{ fontSize: 18 }} />}
@@ -450,12 +589,11 @@ export function SettingsPage(): React.JSX.Element {
                     value={settings.clinicAddress}
                     onChange={(e) => setSettings((s) => s && ({ ...s, clinicAddress: e.target.value }))}
                   />
-                  <TextField
+                  <PhoneInputField
                     label="Phone"
                     size="small"
-                    fullWidth
                     value={settings.clinicPhone}
-                    onChange={(e) => setSettings((s) => s && ({ ...s, clinicPhone: e.target.value }))}
+                    onChange={(digits) => setSettings((s) => s && ({ ...s, clinicPhone: digits }))}
                   />
                 </Stack>
 
@@ -731,6 +869,121 @@ export function SettingsPage(): React.JSX.Element {
             </Box>
           )}
 
+          {settingsTab === 'whatsapp' && (
+            <Box>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                <WhatsAppIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                <Typography variant="h6" fontWeight={700}>WhatsApp (this clinic)</Typography>
+              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+                Har clinic ki apni Meta Cloud API. Patient add/delete pe number automatically WhatsApp pe lag jata hai / hat jata hai — yahan table nahi.
+              </Typography>
+              <Stack spacing={2} sx={{ maxWidth: 520, mb: 3 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={Boolean(settings.whatsappEnabled)}
+                      onChange={(e) => setSettings((s) => s && ({ ...s, whatsappEnabled: e.target.checked }))}
+                      size="small"
+                    />
+                  }
+                  label="Enable WhatsApp for this clinic"
+                />
+
+                <Stack spacing={1}>
+                  <Button
+                    variant="contained"
+                    startIcon={waConnecting ? <CircularProgress size={16} color="inherit" /> : <LoginOutlinedIcon />}
+                    disabled={!settings.whatsappEnabled || waConnecting}
+                    onClick={() => {
+                      setWaConnectMsg(null);
+                      setWaConnectOpen(true);
+                    }}
+                    sx={{ alignSelf: 'flex-start', bgcolor: '#1877F2', '&:hover': { bgcolor: '#166fe5' } }}
+                  >
+                    {waConnecting ? 'Connecting…' : 'Connect with Meta'}
+                  </Button>
+                  <Typography variant="caption" color="text.secondary">
+                    Connect with Meta = asli number, OTP, card, token. Popup mein existing CareFlow WhatsApp account mat select karo — naya account + naya profile banao.
+                  </Typography>
+                  {waConnectMsg && (
+                    <Alert severity={waConnectMsg.type} onClose={() => setWaConnectMsg(null)} sx={{ py: 0.25 }}>
+                      {waConnectMsg.msg}
+                    </Alert>
+                  )}
+                  {embeddedMeta && !embeddedMeta.configured && (
+                    <Alert severity="warning" sx={{ py: 0.25 }}>
+                      Embedded Signup env missing — manual fields neeche use kar sakte hain.
+                    </Alert>
+                  )}
+                </Stack>
+
+                <PhoneInputField
+                  label="Clinic WhatsApp number"
+                  size="small"
+                  value={settings.whatsappDisplayNumber || ''}
+                  onChange={(digits) =>
+                    setSettings((s) => s && ({ ...s, whatsappDisplayNumber: digits }))
+                  }
+                  disabled={!settings.whatsappEnabled}
+                  helperText="Flag country code auto. PK → 92300… · US test → 1555… (bina +)"
+                />
+                <TextField
+                  label="Phone Number ID"
+                  size="small"
+                  fullWidth
+                  value={settings.whatsappPhoneNumberId || ''}
+                  onChange={(e) => setSettings((s) => s && ({ ...s, whatsappPhoneNumberId: e.target.value }))}
+                  disabled={!settings.whatsappEnabled}
+                  placeholder="Meta WhatsApp Phone Number ID"
+                  helperText="Connect with Meta ke baad auto-fill"
+                />
+                <TextField
+                  label="Access token"
+                  size="small"
+                  fullWidth
+                  type="password"
+                  autoComplete="off"
+                  value={settings.whatsappToken || ''}
+                  onChange={(e) => setSettings((s) => s && ({ ...s, whatsappToken: e.target.value }))}
+                  disabled={!settings.whatsappEnabled}
+                  helperText="Connect with Meta auto-fill karta hai. Expire ho to button dubara dabao."
+                />
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Button
+                    variant="outlined"
+                    disabled={!settings.whatsappEnabled || waTesting}
+                    onClick={() => void handleTestWhatsApp()}
+                  >
+                    {waTesting ? 'Testing…' : 'Test connection'}
+                  </Button>
+                  {waTest && (
+                    <Alert severity={waTest.ok ? 'success' : 'error'} sx={{ py: 0.25, flex: 1 }}>
+                      {waTest.ok
+                        ? `Connected${waTest.name ? ` — ${waTest.name}` : ''}${waTest.phone ? ` (${waTest.phone})` : ''}`
+                        : waTest.error}
+                    </Alert>
+                  )}
+                </Stack>
+              </Stack>
+
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
+                Campaign
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Doctor + visit date choose karein, text/image likhein — message un tamam patients ko jaye ga jinke WhatsApp numbers hain.
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<CampaignOutlinedIcon />}
+                disabled={!settings.whatsappEnabled}
+                onClick={() => setWaCampaignOpen(true)}
+              >
+                New campaign
+              </Button>
+            </Box>
+          )}
+
           {settingsTab === 'backup' && (
             <Box sx={{ maxWidth: 560 }}>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
@@ -786,6 +1039,20 @@ export function SettingsPage(): React.JSX.Element {
           </Stack>
         </Stack>
       )}
+
+      <WhatsAppConnectMetaDialog
+        open={waConnectOpen}
+        connecting={waConnecting}
+        onClose={() => setWaConnectOpen(false)}
+        onSubmit={handleConnectWithMeta}
+      />
+
+      <WhatsAppCampaignDialog
+        open={waCampaignOpen}
+        onClose={() => setWaCampaignOpen(false)}
+        clinicName={settings?.clinicName || ''}
+        enabled={Boolean(settings?.whatsappEnabled)}
+      />
 
       {/* Primary Notification Toast / Snackbar for Updates & Dynamic Errors */}
       <Snackbar

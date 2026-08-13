@@ -1,4 +1,5 @@
 import { getSettings } from '../config/settings';
+import { isLicenseModuleEnabled } from '../license/license.ipc';
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -88,6 +89,9 @@ async function groqChat(
   onDelta?: (chunk: string) => void,
 ): Promise<GroqResult> {
   const settings = getSettings();
+  if (!isLicenseModuleEnabled('ai')) {
+    return { ok: false, error: 'AI is not enabled for this license.' };
+  }
   if (!settings.aiEnabled) {
     return { ok: false, error: 'AI is disabled. Enable it in Settings.' };
   }

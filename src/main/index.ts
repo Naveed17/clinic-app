@@ -45,6 +45,7 @@ import { registerScheduleIpc } from './doctors/schedule.ipc';
 import { seedDefaultAdmin } from './auth/seed';
 import { initAutoUpdater } from './updater';
 import { registerInventoryIPCHandlers } from './inventory/inventory.ipc';
+import { registerWhatsAppIpc } from './whatsapp/whatsapp.ipc';
 
 let backendServer: BackendServer | undefined;
 
@@ -122,6 +123,23 @@ function createWindow(): void {
 
   window.on('ready-to-show', () => window.show());
   window.webContents.setWindowOpenHandler(({ url }) => {
+    // Facebook Login / Embedded Signup must be a real popup so the SDK
+    // can return the auth code via postMessage. External browser breaks that.
+    if (/^https?:\/\/([a-z0-9-]+\.)*(facebook\.com|fb\.com)\//i.test(url)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 560,
+          height: 760,
+          autoHideMenuBar: true,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
+          },
+        },
+      };
+    }
     // Only real http(s) links — about:blank / empty open must not hit Windows shell
     // (that shows "Get an app to open this 'about' link").
     if (/^https?:\/\//i.test(url)) {
@@ -232,6 +250,7 @@ app.whenReady().then(async () => {
   registerSettingsIpc();
   registerPrintIpc();
   registerAiIpc();
+  registerWhatsAppIpc();
   registerSearchIpc();
   registerMedicineIpc();
   registerInventoryIPCHandlers();

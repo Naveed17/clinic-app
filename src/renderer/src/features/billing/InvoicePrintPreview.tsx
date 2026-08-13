@@ -24,8 +24,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 // cspell:ignore bwipjs
 import bwipjs from 'bwip-js';
 import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
-import { printReactPdfDocument } from '@/utils/printPdf';
-import { POS_PAPER } from '@shared/invoicePaper';
+import { printInvoiceReceipt } from '@/utils/printInvoiceReceipt';
+import { POS_PAPER, POS_RECEIPT } from '@shared/invoicePaper';
+import careflowLogo from '@/assets/careflow-logo.png';
 
 function generateBarcode(text: string): string | null {
   try {
@@ -54,31 +55,34 @@ Font.register({
   ],
 });
 
-const STAR_LINE = '* * * * * * * * * * * * * * * * * * * * * * *';
-
 const styles = StyleSheet.create({
   page: {
     backgroundColor: '#ffffff',
-    paddingHorizontal: 28,
-    paddingVertical: 32,
+    color: POS_RECEIPT.ink,
+    paddingTop: POS_PAPER.pdfPaddingTop,
+    paddingBottom: POS_PAPER.pdfPaddingBottom,
+    paddingLeft: POS_PAPER.pdfPaddingLeft,
+    paddingRight: POS_PAPER.pdfPaddingRight,
     fontFamily: 'Courier',
   },
-  shopName: { fontSize: 16, fontWeight: 'bold', textAlign: 'center', marginBottom: 3 },
-  shopSub: { fontSize: 9, textAlign: 'center', color: '#444', marginBottom: 2 },
-  stars: { fontSize: 8, textAlign: 'center', color: '#888', marginVertical: 6 },
-  receiptTitle: { fontSize: 11, fontWeight: 'bold', textAlign: 'center', marginVertical: 2 },
+  logo: { width: 36, height: 36, alignSelf: 'center', marginBottom: 6 },
+  shopName: { fontSize: 14, fontWeight: 'bold', textAlign: 'center', marginBottom: 3, color: '#000' },
+  shopSub: { fontSize: 9, textAlign: 'center', color: '#000', marginBottom: 2 },
+  stars: { fontSize: 9, textAlign: 'center', color: '#000', marginVertical: 6 },
+  receiptTitle: { fontSize: 11, fontWeight: 'bold', textAlign: 'center', marginVertical: 2, color: '#000' },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
-  headerLabel: { fontSize: 10, fontWeight: 'bold' },
-  itemLabel: { fontSize: 9.5, flex: 1 },
-  itemQty: { fontSize: 9.5, width: 30, textAlign: 'center' },
-  itemPrice: { fontSize: 9.5, width: 55, textAlign: 'right' },
-  totalLabel: { fontSize: 12, fontWeight: 'bold' },
-  totalValue: { fontSize: 12, fontWeight: 'bold' },
-  subLabel: { fontSize: 9.5, color: '#333' },
-  subValue: { fontSize: 9.5, color: '#333' },
-  metaLabel: { fontSize: 9, color: '#555' },
-  metaValue: { fontSize: 9, color: '#555' },
-  thankYou: { fontSize: 12, fontWeight: 'bold', textAlign: 'center', marginTop: 4 },
+  headerLabel: { fontSize: 10, fontWeight: 'bold', color: '#000' },
+  itemLabel: { fontSize: 10, flex: 1, color: '#000' },
+  itemQty: { fontSize: 10, width: 30, textAlign: 'center', color: '#000' },
+  itemPrice: { fontSize: 10, width: 55, textAlign: 'right', color: '#000' },
+  totalLabel: { fontSize: 12, fontWeight: 'bold', color: '#000' },
+  totalValue: { fontSize: 12, fontWeight: 'bold', color: '#000' },
+  subLabel: { fontSize: 10, color: '#000' },
+  subValue: { fontSize: 10, color: '#000' },
+  metaLabel: { fontSize: 10, color: '#000', fontWeight: 'bold' },
+  metaValue: { fontSize: 10, color: '#000' },
+  thankYou: { fontSize: 12, fontWeight: 'bold', textAlign: 'center', marginTop: 4, color: '#000' },
+  brand: { fontSize: 8, color: '#000', textAlign: 'center', marginTop: 8, fontWeight: 'bold', letterSpacing: 1 },
 });
 
 const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(Number(v))}`;
@@ -100,17 +104,20 @@ function ReceiptDocument({
   // database column. Derive it from the medicines subtotal, discount, and total.
   const doctorFee = Math.max(0, invoice.total + invoice.discount - invoice.subtotal);
   const items = invoice.items ?? [];
+  const paid = Number(invoice.amountPaid ?? 0);
+  const due = Math.max(0, Number(invoice.total) - paid);
 
   return (
     <Document>
       <Page size={[POS_PAPER.pdfPageWidth, POS_PAPER.pdfPageHeightInvoice]} style={styles.page} wrap={false}>
-        <Text style={styles.shopName}>{clinicName || 'CLINIC MANAGEMENT'}</Text>
+        <Image src={careflowLogo} style={styles.logo} />
+        <Text style={styles.shopName}>{clinicName || POS_RECEIPT.clinicFallback}</Text>
         {clinicAddress ? <Text style={styles.shopSub}>{clinicAddress}</Text> : null}
         {clinicPhone ? <Text style={styles.shopSub}>Tel: {clinicPhone}</Text> : null}
 
-        <Text style={styles.stars}>{STAR_LINE}</Text>
+        <Text style={styles.stars}>{POS_RECEIPT.starLine}</Text>
         <Text style={styles.receiptTitle}>CASH RECEIPT</Text>
-        <Text style={styles.stars}>{STAR_LINE}</Text>
+        <Text style={styles.stars}>{POS_RECEIPT.starLine}</Text>
 
         <View style={styles.row}>
           <Text style={styles.metaLabel}>Invoice #</Text>
@@ -131,7 +138,7 @@ function ReceiptDocument({
           <Text style={styles.metaValue}>{new Date(invoice.createdAt).toLocaleTimeString()}</Text>
         </View>
 
-        <Text style={styles.stars}>{STAR_LINE}</Text>
+        <Text style={styles.stars}>{POS_RECEIPT.starLine}</Text>
 
         <View style={styles.row}>
           <Text style={[styles.headerLabel, { flex: 1 }]}>Description</Text>
@@ -139,7 +146,7 @@ function ReceiptDocument({
           <Text style={[styles.headerLabel, { width: 55, textAlign: 'right' }]}>Price</Text>
         </View>
 
-        <Text style={styles.stars}>{STAR_LINE}</Text>
+        <Text style={styles.stars}>{POS_RECEIPT.starLine}</Text>
 
         {items.map((item) => (
           <View key={item.id} style={styles.row}>
@@ -156,22 +163,34 @@ function ReceiptDocument({
           </View>
         )}
 
-        <Text style={styles.stars}>{STAR_LINE}</Text>
+        <Text style={styles.stars}>{POS_RECEIPT.starLine}</Text>
 
-        <View style={styles.row}>
-          <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>{money(invoice.total)}</Text>
-        </View>
         {invoice.discount > 0 && (
           <View style={styles.row}>
             <Text style={styles.subLabel}>Discount</Text>
             <Text style={styles.subValue}>- {money(invoice.discount)}</Text>
           </View>
         )}
+        <View style={styles.row}>
+          <Text style={styles.totalLabel}>TOTAL</Text>
+          <Text style={styles.totalValue}>{money(invoice.total)}</Text>
+        </View>
+        {paid > 0 && (
+          <>
+            <View style={styles.row}>
+              <Text style={styles.subLabel}>Paid</Text>
+              <Text style={styles.subValue}>{money(paid)}</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.subLabel}>Balance</Text>
+              <Text style={styles.subValue}>{money(due)}</Text>
+            </View>
+          </>
+        )}
 
         {invoice.notes ? (
           <>
-            <Text style={styles.stars}>{STAR_LINE}</Text>
+            <Text style={styles.stars}>{POS_RECEIPT.starLine}</Text>
             <View style={styles.row}>
               <Text style={styles.metaLabel}>Notes</Text>
               <Text style={styles.metaValue}>{invoice.notes}</Text>
@@ -179,9 +198,9 @@ function ReceiptDocument({
           </>
         ) : null}
 
-        <Text style={styles.stars}>{STAR_LINE}</Text>
-        <Text style={styles.thankYou}>THANK YOU!</Text>
-        <Text style={styles.stars}>{STAR_LINE}</Text>
+        <Text style={styles.stars}>{POS_RECEIPT.starLine}</Text>
+        <Text style={styles.thankYou}>{POS_RECEIPT.thankYou}</Text>
+        <Text style={styles.stars}>{POS_RECEIPT.starLine}</Text>
 
         {barcodeSrc ? (
           <Image
@@ -189,9 +208,10 @@ function ReceiptDocument({
             style={{ width: 160, height: 50, alignSelf: 'center', marginTop: 6 }}
           />
         ) : null}
-        <Text style={{ fontSize: 8, textAlign: 'center', color: '#555', marginTop: 3 }}>
+        <Text style={{ fontSize: 9, textAlign: 'center', color: POS_RECEIPT.ink, marginTop: 3, fontWeight: 'bold' }}>
           {invoice.invoiceNumber}
         </Text>
+        <Text style={styles.brand}>CAREFLOW</Text>
       </Page>
     </Document>
   );
@@ -251,11 +271,10 @@ export function InvoicePrintPreview({
   }, [clinic, invoice, barcodeSrc]);
 
   async function handlePrint(): Promise<void> {
-    if (!pdfDocument) return;
     setPrinting(true);
     setPrintError(null);
     try {
-      await printReactPdfDocument(pdfDocument, { printDialog: true, paper: 'pos80' });
+      await printInvoiceReceipt(invoice);
     } catch (err) {
       setPrintError(err instanceof Error ? err.message : 'Print failed');
     } finally {

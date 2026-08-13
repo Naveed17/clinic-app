@@ -209,6 +209,31 @@ declare global {
           onDelta?: (delta: string) => void,
         ) => Promise<{ ok: boolean; summary?: string; error?: string }>;
       };
+      whatsapp: {
+        status: () => Promise<{ enabled: boolean; configured: boolean; displayNumber: string }>;
+        embeddedConfig: () => Promise<{ configured: boolean; appId: string; configId: string }>;
+        embeddedExchange: (input: {
+          code: string;
+          phoneNumberId?: string | null;
+          wabaId?: string | null;
+        }) => Promise<{
+          success: boolean;
+          token?: string;
+          phoneNumberId?: string;
+          displayNumber?: string;
+          wabaId?: string;
+          error?: string;
+        }>;
+        test: () => Promise<{ ok: boolean; name?: string; phone?: string; error?: string }>;
+        campaign: (input: {
+          text: string;
+          phones: string[];
+          imageBase64?: string;
+          imageMime?: string;
+          imageName?: string;
+        }) => Promise<{ sent: number; failed: number; skipped: number; errors: string[] }>;
+        sendMessage: (input: { phone?: string; text: string }) => Promise<{ success: boolean; error?: string }>;
+      };
       settings: {
         get: () => Promise<{
           serverMode: 'local' | 'lan-server' | 'lan-client';
@@ -218,6 +243,10 @@ declare global {
           clinicAddress?: string;
           clinicPhone?: string;
           setupDone?: boolean;
+          whatsappEnabled?: boolean;
+          whatsappToken?: string;
+          whatsappPhoneNumberId?: string;
+          whatsappDisplayNumber?: string;
         }>;
         save: (patch: unknown) => Promise<{
           serverMode: 'local' | 'lan-server' | 'lan-client';

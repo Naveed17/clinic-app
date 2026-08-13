@@ -10,6 +10,7 @@ import {
   FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogFormSx, dialogPaperProps,
 } from '@/components/DialogUI';
+import { PhoneInputField } from '@/components/PhoneInputField';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -134,7 +135,13 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
               <TextField fullWidth label="Experience (years)" type="number" slotProps={{ htmlInput: { min: 0, max: 60, step: 1 } }}
                 {...form.register('experienceYears', { setValueAs: (v) => (v === '' ? 0 : Number(v)) })} />
             </Box>
-            <TextField fullWidth label="Contact phone" {...form.register('phone')} />
+            <Controller
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <PhoneInputField label="Contact phone" value={field.value} onChange={field.onChange} />
+              )}
+            />
             <TextField fullWidth label="Bio" multiline minRows={2} {...form.register('bio')} />
           </Stack>
         </DialogContent>

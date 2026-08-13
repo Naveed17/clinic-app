@@ -1,5 +1,6 @@
 import type { Patient, Prisma } from '@prisma/client';
 import { getPrisma } from '../database/client';
+import { toWhatsAppNumber } from '../../shared/whatsappPhone';
 
 export interface PatientListInput {
   page: number;
@@ -39,7 +40,7 @@ function mapPatientInput(input: PatientInput): Omit<Prisma.PatientCreateInput, '
     firstName: input.firstName.trim(),
     lastName: input.lastName.trim(),
     dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
-    phone: input.phone?.trim() || null,
+    phone: toWhatsAppNumber(input.phone) || input.phone?.trim() || null,
     email: input.email?.trim() || null,
     address: input.address?.trim() || null,
     emergencyContactName: input.emergencyContactName?.trim() || null,

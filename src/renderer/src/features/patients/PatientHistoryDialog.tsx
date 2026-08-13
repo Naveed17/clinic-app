@@ -1,8 +1,5 @@
 import MonitorHeartOutlinedIcon from '@mui/icons-material/MonitorHeartOutlined';
-import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
 import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import ReceiptOutlinedIcon from '@mui/icons-material/ReceiptOutlined';
 import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
@@ -10,25 +7,22 @@ import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import {
-  Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions,
-  DialogContent, IconButton, Paper, Snackbar, Alert, Stack, Tab, Tabs, Tooltip, Typography,
+  Alert, Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions,
+  DialogContent, IconButton, Paper, Stack, Tab, Tabs, Tooltip, Typography,
 } from '@mui/material';
 import { alpha, darken, useTheme } from '@mui/material/styles';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { Prescription } from '@/types/token';
 import { chipSx } from '@/components/TableUI';
 import { appointmentsService } from '@/services/appointments.service';
 import { invoicesService } from '@/services/invoices.service';
 import type { Patient } from '@/types/patient';
-import { useAuth } from '@/features/auth/AuthContext';
-import { useDatabaseMode } from '@/context/DatabaseModeProvider';
-import { DocViewerDialog, type DocViewerData } from './DocViewerDialog';
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
 import { formatAdvicePreview } from '@/features/tokens/PrescriptionPadPdf';
-import { ConfirmDialog } from '@/components/DialogUI';
-
-type DocItem = { id: string; name: string; filePath: string; uploadedAt: string };
+import { PatientDocumentsPanel } from './PatientDocumentsPanel';
+import { PatientWhatsAppSendDialog } from './PatientWhatsAppSendDialog';
+import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
 
 const apptStatusColor: Record<string, 'default' | 'primary' | 'warning' | 'success' | 'error'> = {
   SCHEDULED: 'primary', CHECKED_IN: 'warning', COMPLETED: 'success', CANCELLED: 'default', NO_SHOW: 'error',
@@ -61,6 +55,7 @@ function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }): Re
 
 function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?: Patient }): React.JSX.Element {
   const theme = useTheme();
+  const modules = useLicenseModules();
   type PrintItem = {
     prescription: Prescription;
     doctor: { firstName: string; lastName: string };
@@ -146,19 +141,21 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
         <Typography variant="caption" color="text.secondary" fontWeight={600}>
           {items.length} prescription{items.length === 1 ? '' : 's'}
         </Typography>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<AutoAwesomeOutlinedIcon />}
-          loading={summaryLoading}
-          onClick={() => void handleSummarize()}
-          sx={{ borderRadius: 1 }}
-        >
-          AI Summarize
-        </Button>
+        {modules.ai && (
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<AutoAwesomeOutlinedIcon />}
+            loading={summaryLoading}
+            onClick={() => void handleSummarize()}
+            sx={{ borderRadius: 1 }}
+          >
+            AI Summarize
+          </Button>
+        )}
       </Stack>
-      {summaryError && <Alert severity="error" onClose={() => setSummaryError(null)}>{summaryError}</Alert>}
-      {summary !== null && (
+      {modules.ai && summaryError && <Alert severity="error" onClose={() => setSummaryError(null)}>{summaryError}</Alert>}
+      {modules.ai && summary !== null && (
         <Alert
           severity="info"
           icon={<AutoAwesomeOutlinedIcon fontSize="inherit" />}
@@ -266,35 +263,13 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
 
 export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; onClose: () => void }): React.JSX.Element {
   const theme = useTheme();
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
-  const qc = useQueryClient();
+  const modules = useLicenseModules();
   const [tab, setTab] = useState(0);
   const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
-  const [viewerDoc, setViewerDoc] = useState<DocViewerData | null>(null);
-  const [waSnack, setWaSnack] = useState<{ open: boolean; success: boolean; msg: string }>({ open: false, success: true, msg: '' });
-  const [waSending, setWaSending] = useState<string | null>(null);
-  const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
-  const { isOnline: isOnlineDb } = useDatabaseMode();
+  const [waOpen, setWaOpen] = useState(false);
 
   const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list });
-  const docs = useQuery<DocItem[]>({
-    queryKey: ['patient-docs', patient.id],
-    queryFn: () => window.clinic.docs.patient.list(patient.id),
-  });
-  const uploadMutation = useMutation({
-    mutationFn: () => window.clinic.docs.patient.upload(patient.id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['patient-docs', patient.id] }),
-  });
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => window.clinic.docs.patient.delete(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['patient-docs', patient.id] });
-      setDeleteDocId(null);
-    },
-  });
-
   const patientAppointments = (appointments.data ?? []).filter((a) => a.patientId === patient.id);
   const patientInvoices = (invoices.data ?? []).filter((i) => i.patient.id === patient.id);
   const initials = `${patient.firstName[0]}${patient.lastName[0]}`.toUpperCase();
@@ -532,112 +507,26 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
           </Box>
         )}
 
-        {tab === 3 && (
-          <Box sx={{ p: 2 }}>
-            {isOnlineDb ? (
-              <Alert severity="info" sx={{ mb: 1.5 }}>
-                File documents are not available in online database mode yet (cloud file storage coming soon).
-              </Alert>
-            ) : !isAdmin ? (
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
-                <Button
-                  startIcon={<AttachFileOutlinedIcon />}
-                  loading={uploadMutation.isPending}
-                  onClick={() => uploadMutation.mutate()}
-                  variant="contained"
-                  size="small"
-                  sx={{ borderRadius: 2, fontWeight: 700 }}
-                >
-                  Upload file
-                </Button>
-              </Box>
-            ) : null}
-            {isOnlineDb ? (
-              <EmptyState icon={<InsertDriveFileOutlinedIcon sx={{ fontSize: 40 }} />} text="Cloud file storage coming soon." />
-            ) : docs.isLoading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
-            ) : (docs.data ?? []).length === 0 ? (
-              <EmptyState icon={<InsertDriveFileOutlinedIcon sx={{ fontSize: 40 }} />} text="No documents uploaded." />
-            ) : (
-              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 1.5 }}>
-                {(docs.data ?? []).map((doc) => (
-                  <Paper key={doc.id} elevation={0} sx={{ ...softCard, borderRadius: 1, overflow: 'hidden', '&:hover .doc-actions': { opacity: 1 } }}>
-                    <Box sx={{ height: 96, bgcolor: alpha(theme.palette.primary.main, 0.05), display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                      <InsertDriveFileOutlinedIcon sx={{ fontSize: 36, color: 'primary.main', opacity: 0.7 }} />
-                      <Box className="doc-actions" sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, opacity: 0, transition: 'opacity 0.15s' }}>
-                        <Tooltip title="Open">
-                          <IconButton size="small" sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.15)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }} onClick={async () => {
-                            const result = await window.clinic.docs.patient.open(doc.id);
-                            if (result) setViewerDoc(result);
-                          }}>
-                            <FolderOpenOutlinedIcon sx={{ fontSize: 16 }} />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Share on WhatsApp">
-                          <IconButton
-                            size="small"
-                            disabled={waSending === doc.id}
-                            sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.15)', '&:hover': { bgcolor: 'rgba(37,211,102,0.8)' } }}
-                            onClick={async () => {
-                              setWaSending(doc.id);
-                              const res = await window.clinic.docs.patient.whatsapp(doc.id, patient.phone ?? '') as { success: boolean; error?: string };
-                              setWaSending(null);
-                              setWaSnack({
-                                open: true,
-                                success: res.success,
-                                msg: res.success ? 'Document sent on WhatsApp!' : (res.error as string) ?? 'Failed to send.',
-                              });
-                            }}
-                          >
-                            {waSending === doc.id
-                              ? <CircularProgress size={14} sx={{ color: '#fff' }} />
-                              : <WhatsAppIcon sx={{ fontSize: 16 }} />}
-                          </IconButton>
-                        </Tooltip>
-                        {!isAdmin && (
-                          <Tooltip title="Delete">
-                            <IconButton size="small" sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.15)', '&:hover': { bgcolor: 'rgba(211,47,47,0.7)' } }} onClick={() => setDeleteDocId(doc.id)}>
-                              <DeleteOutlineIcon sx={{ fontSize: 16 }} />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      </Box>
-                    </Box>
-                    <Box sx={{ px: 1.25, py: 1.1 }}>
-                      <Typography fontSize={12} fontWeight={600} noWrap title={doc.name}>{doc.name}</Typography>
-                      <Typography fontSize={11} color="text.disabled">{new Date(doc.uploadedAt).toLocaleDateString()}</Typography>
-                    </Box>
-                  </Paper>
-                ))}
-              </Box>
-            )}
-          </Box>
-        )}
+        {tab === 3 && <PatientDocumentsPanel patient={patient} />}
         {tab === 4 && <PrescriptionsTab patientId={patient.id} patient={patient} />}
       </DialogContent>
 
-      <DialogActions sx={{ px: 2.5, py: 1.75, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.default', flexShrink: 0 }}>
+      <DialogActions sx={{ px: 2.5, py: 1.75, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.default', flexShrink: 0, gap: 1 }}>
+        {modules.whatsapp && (
+          <Button
+            startIcon={<WhatsAppIcon />}
+            onClick={() => setWaOpen(true)}
+            variant="contained"
+            sx={{ borderRadius: 2, fontWeight: 700, bgcolor: '#25D366', '&:hover': { bgcolor: '#1ebe5a' } }}
+          >
+            WhatsApp
+          </Button>
+        )}
         <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 2, fontWeight: 700 }}>Close</Button>
       </DialogActions>
-      {viewerDoc && <DocViewerDialog doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
-      <ConfirmDialog
-        open={Boolean(deleteDocId)}
-        title="Delete document?"
-        message="Remove this document from the patient record?"
-        loading={deleteMutation.isPending}
-        onClose={() => setDeleteDocId(null)}
-        onConfirm={() => deleteDocId && deleteMutation.mutate(deleteDocId)}
-      />
-      <Snackbar
-        open={waSnack.open}
-        autoHideDuration={4000}
-        onClose={() => setWaSnack((s) => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert severity={waSnack.success ? 'success' : 'error'} onClose={() => setWaSnack((s) => ({ ...s, open: false }))}>
-          {waSnack.msg}
-        </Alert>
-      </Snackbar>
+      {modules.whatsapp && (
+        <PatientWhatsAppSendDialog open={waOpen} patient={patient} onClose={() => setWaOpen(false)} />
+      )}
     </Dialog>
   );
 }

@@ -4,6 +4,35 @@ import { join, basename, extname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { getPrisma } from '../database/client';
 import { getDocsDir, resolveDocPath, toStoredDocPath } from './docs-paths';
+import { sendWhatsAppDocument } from '../whatsapp/whatsapp.service';
+
+type DoctorLike = {
+  firstName: string;
+  lastName: string;
+  doctorProfile?: { specialization?: string | null } | null;
+} | null | undefined;
+
+function formatDoctorName(doctor: DoctorLike): string | null {
+  if (!doctor) return null;
+  const name = `Dr. ${doctor.firstName} ${doctor.lastName}`.replace(/\s+/g, ' ').trim();
+  const spec = doctor.doctorProfile?.specialization?.trim();
+  return spec ? `${name} (${spec})` : name;
+}
+
+function formatVisitDate(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString([], {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
+  const dt = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
 export function registerDocumentsIpc(): void {
   // ── Patient Documents ──
@@ -50,85 +79,57 @@ export function registerDocumentsIpc(): void {
   });
 
   ipcMain.handle('docs:patient:whatsapp', async (_e, id: string, phone?: string) => {
-    const doc = await getPrisma().patientDocument.findUnique({ where: { id } });
+    const prisma = getPrisma();
+    const doctorInclude = { include: { doctorProfile: true } } as const;
+    const doc = await prisma.patientDocument.findUnique({
+      where: { id },
+      include: {
+        patient: {
+          include: { primaryDoctor: doctorInclude },
+        },
+      },
+    });
     const abs = doc ? resolveDocPath(doc.filePath) : '';
     if (!doc || !existsSync(abs)) return { success: false, error: 'File not found.' };
 
-    const token = process.env.WHATSAPP_TOKEN;
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    if (!token || !phoneNumberId) return { success: false, error: 'WhatsApp API not configured.' };
+    const [token, appointment] = await Promise.all([
+      prisma.token.findFirst({
+        where: { patientId: doc.patientId },
+        orderBy: { createdAt: 'desc' },
+        include: { doctor: doctorInclude },
+      }),
+      prisma.appointment.findFirst({
+        where: { patientId: doc.patientId, status: { not: 'CANCELLED' } },
+        orderBy: { startsAt: 'desc' },
+        include: { provider: doctorInclude },
+      }),
+    ]);
 
-    const cleaned = (phone ?? '').replace(/\D/g, '');
-    if (!cleaned) return { success: false, error: 'No phone number.' };
+    const tokenAt = token
+      ? Date.parse(token.date) || new Date(token.createdAt).getTime()
+      : 0;
+    const apptAt = appointment ? new Date(appointment.startsAt).getTime() : 0;
+    const useToken = Boolean(token) && tokenAt >= apptAt;
+    const doctor = useToken
+      ? token?.doctor
+      : appointment?.provider || doc.patient.primaryDoctor;
+    const visitRaw = useToken ? token?.date || token?.createdAt : appointment?.startsAt;
+    const visitDate = formatVisitDate(visitRaw);
+    const doctorName = formatDoctorName(doctor);
+    const tokenNumber = useToken ? token?.tokenNumber : null;
 
-    const ext = extname(abs).toLowerCase();
-    const mimeMap: Record<string, string> = {
-      '.pdf': 'application/pdf',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.doc': 'application/msword',
-      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    };
-    const mimeType = mimeMap[ext] ?? 'application/octet-stream';
-
-    const fileBuffer = readFileSync(abs);
-    const boundary = `----FormBoundary${Date.now()}`;
-    const CRLF = '\r\n';
-    const bodyParts = [
-      `--${boundary}${CRLF}Content-Disposition: form-data; name="messaging_product"${CRLF}${CRLF}whatsapp`,
-      `--${boundary}${CRLF}Content-Disposition: form-data; name="type"${CRLF}${CRLF}${mimeType}`,
-      `--${boundary}${CRLF}Content-Disposition: form-data; name="file"; filename="${doc.name}"${CRLF}Content-Type: ${mimeType}${CRLF}${CRLF}`,
-    ];
-    const closing = `${CRLF}--${boundary}--${CRLF}`;
-    const textBuf = Buffer.from(bodyParts.join(CRLF) + CRLF);
-    const closingBuf = Buffer.from(closing);
-    const formBody = Buffer.concat([textBuf, fileBuffer, closingBuf]);
-
-    const uploadRes = await fetch(
-      `https://graph.facebook.com/v18.0/${phoneNumberId}/media`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': `multipart/form-data; boundary=${boundary}`,
-        },
-        body: formBody,
+    return sendWhatsAppDocument({
+      filePath: abs,
+      fileName: doc.name,
+      phone: phone || doc.patient.phone,
+      context: {
+        patientName: `${doc.patient.firstName} ${doc.patient.lastName}`.trim(),
+        mrNumber: doc.patient.mrNumber,
+        doctorName,
+        visitDate,
+        tokenNumber,
       },
-    );
-    const uploadJson = await uploadRes.json() as { id?: string; error?: { message?: string } | string };
-    if (!uploadRes.ok || !uploadJson.id) {
-      const err = uploadJson.error;
-      return { success: false, error: typeof err === 'object' && err !== null ? (err.message ?? 'Upload failed.') : (err ?? 'Upload failed.') };
-    }
-
-    const sendRes = await fetch(
-      `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: cleaned,
-          type: 'document',
-          document: {
-            id: uploadJson.id,
-            filename: doc.name,
-            caption: 'Aap ki document attached hai.',
-          },
-        }),
-      },
-    );
-    const sendJson = await sendRes.json() as { messages?: unknown[]; error?: { message?: string } | string };
-    if (!sendRes.ok) {
-      const err = sendJson.error;
-      return { success: false, error: typeof err === 'object' && err !== null ? (err.message ?? 'Send failed.') : (err ?? 'Send failed.') };
-    }
-    return { success: true };
+    });
   });
 
   ipcMain.handle('docs:patient:open', async (_e, id: string) => {

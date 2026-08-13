@@ -5,6 +5,8 @@ import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutl
 import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined';
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import CakeOutlinedIcon from '@mui/icons-material/CakeOutlined';
@@ -27,7 +29,10 @@ import { appointmentsService } from '@/services/appointments.service';
 import { invoicesService } from '@/services/invoices.service';
 import { patientsService } from '@/services/patients.service';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
 import { PatientDialog } from './PatientDialog';
+import { PatientDocumentsPanel } from './PatientDocumentsPanel';
+import { PatientWhatsAppSendDialog } from './PatientWhatsAppSendDialog';
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
 
 const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
@@ -215,10 +220,12 @@ export function PatientProfilePage(): React.JSX.Element {
   const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const modules = useLicenseModules();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [tab, setTab] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
+  const [waOpen, setWaOpen] = useState(false);
 
   const patientsQuery = useQuery({
     queryKey: ['patients', { page: 1, pageSize: 1, id }],
@@ -274,6 +281,7 @@ export function PatientProfilePage(): React.JSX.Element {
     { label: 'Appointments', count: patientAppointments.length, icon: <CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} /> },
     { label: 'Billing', count: patientInvoices.length, icon: <ReceiptOutlinedIcon sx={{ fontSize: 18 }} /> },
     { label: 'Lab', count: patientLab.length, icon: <BiotechOutlinedIcon sx={{ fontSize: 18 }} /> },
+    { label: 'Documents', count: null, icon: <InsertDriveFileOutlinedIcon sx={{ fontSize: 18 }} /> },
     { label: 'Prescriptions', count: null, icon: <MedicalServicesOutlinedIcon sx={{ fontSize: 18 }} /> },
   ];
 
@@ -305,16 +313,28 @@ export function PatientProfilePage(): React.JSX.Element {
               </Typography>
             </Box>
           </Stack>
-          {!isAdmin && (
-            <Button
-              startIcon={<EditOutlinedIcon />}
-              variant="contained"
-              sx={{ borderRadius: 2, fontWeight: 700, px: 2.25, py: 1 }}
-              onClick={() => setEditOpen(true)}
-            >
-              Edit Profile
-            </Button>
-          )}
+          <Stack direction="row" spacing={1}>
+            {modules.whatsapp && (
+              <Button
+                startIcon={<WhatsAppIcon />}
+                variant="contained"
+                sx={{ borderRadius: 2, fontWeight: 700, px: 2.25, py: 1, bgcolor: '#25D366', '&:hover': { bgcolor: '#1ebe5a' } }}
+                onClick={() => setWaOpen(true)}
+              >
+                WhatsApp
+              </Button>
+            )}
+            {!isAdmin && (
+              <Button
+                startIcon={<EditOutlinedIcon />}
+                variant="contained"
+                sx={{ borderRadius: 2, fontWeight: 700, px: 2.25, py: 1 }}
+                onClick={() => setEditOpen(true)}
+              >
+                Edit Profile
+              </Button>
+            )}
+          </Stack>
         </Box>
 
         {/* Summary metrics */}
@@ -512,7 +532,8 @@ export function PatientProfilePage(): React.JSX.Element {
                   )
                 )}
 
-                {tab === 3 && <PrescriptionsTabInline patientId={patient.id} patient={patient} />}
+                {tab === 3 && <PatientDocumentsPanel patient={patient} />}
+                {tab === 4 && <PrescriptionsTabInline patientId={patient.id} patient={patient} />}
               </Box>
             </Paper>
           </Stack>
@@ -666,6 +687,9 @@ export function PatientProfilePage(): React.JSX.Element {
 
       {editOpen && patient && (
         <PatientDialog open={editOpen} patient={patient} onClose={() => setEditOpen(false)} />
+      )}
+      {modules.whatsapp && (
+        <PatientWhatsAppSendDialog open={waOpen} patient={patient} onClose={() => setWaOpen(false)} />
       )}
     </>
   );

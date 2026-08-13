@@ -14,6 +14,8 @@ export interface LicenseModules {
   manageMedicines: boolean;
   manageUsers: boolean;
   pharmacy: boolean;
+  whatsapp: boolean;
+  ai: boolean;
 }
 
 const NO_MODULES_ENABLED: LicenseModules = {
@@ -28,6 +30,8 @@ const NO_MODULES_ENABLED: LicenseModules = {
   manageMedicines: false,
   manageUsers: false,
   pharmacy: false,
+  whatsapp: false,
+  ai: false,
 };
 
 interface LicenseModulesContextValue {

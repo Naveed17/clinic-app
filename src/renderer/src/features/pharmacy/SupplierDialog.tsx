@@ -5,6 +5,7 @@ import {
   FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogPaperProps,
 } from '@/components/DialogUI';
+import { PhoneInputField } from '@/components/PhoneInputField';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { INVENTORY_QUERY_KEYS } from './inventoryUtils';
@@ -46,7 +47,7 @@ export function SupplierDialog({ onClose }: Props): React.JSX.Element {
           {error && <Typography color="error" variant="caption">{error}</Typography>}
           <TextField label="Supplier name" value={name} onChange={(e) => setName(e.target.value)} fullWidth autoFocus />
           <TextField label="Company (optional)" value={companyName} onChange={(e) => setCompanyName(e.target.value)} fullWidth />
-          <TextField label="Phone (optional)" value={phone} onChange={(e) => setPhone(e.target.value)} fullWidth />
+          <PhoneInputField label="Phone (optional)" value={phone} onChange={setPhone} />
           <TextField label="Email (optional)" value={email} onChange={(e) => setEmail(e.target.value)} fullWidth />
           <TextField label="Address (optional)" value={address} onChange={(e) => setAddress(e.target.value)} fullWidth multiline minRows={2} />
         </Stack>

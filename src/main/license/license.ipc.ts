@@ -93,6 +93,14 @@ function getCachedModules(key: string): Record<string, boolean> | null {
     return cache.modules;
   } catch { return null; }
 }
+
+/** Sync read of cached license modules (no network). Missing key = disabled. */
+export function isLicenseModuleEnabled(moduleKey: string): boolean {
+  const savedKey = getSavedKey();
+  if (!savedKey) return false;
+  const modules = getCachedModules(savedKey);
+  return modules?.[moduleKey] === true;
+}
 function saveModulesCache(key: string, modules: Record<string, boolean>): void {
   try {
     writeFileSync(getModulesCacheFilePath(), JSON.stringify({ key, modules, updatedAt: new Date().toISOString() }), 'utf-8');

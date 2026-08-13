@@ -171,7 +171,10 @@ declare global {
           base64: string,
           options?: { printDialog?: boolean; paper?: 'pos80' | 'A4' },
         ) => Promise<{ ok: boolean; error?: string }>;
-        html: (html: string, options?: { printDialog?: boolean }) => Promise<{ ok: boolean; error?: string }>;
+        html: (
+          html: string,
+          options?: { printDialog?: boolean; paper?: 'pos80' | 'A4' },
+        ) => Promise<{ ok: boolean; error?: string }>;
         captureHtml: (
           html: string,
           options?: { width?: number; height?: number },
@@ -196,9 +199,34 @@ declare global {
           onDelta?: (delta: string) => void,
         ) => Promise<{ ok: boolean; summary?: string; error?: string }>;
       };
+      whatsapp: {
+        status: () => Promise<{ enabled: boolean; configured: boolean; displayNumber: string }>;
+        embeddedConfig: () => Promise<{ configured: boolean; appId: string; configId: string }>;
+        embeddedExchange: (input: {
+          code: string;
+          phoneNumberId?: string | null;
+          wabaId?: string | null;
+        }) => Promise<{
+          success: boolean;
+          token?: string;
+          phoneNumberId?: string;
+          displayNumber?: string;
+          wabaId?: string;
+          error?: string;
+        }>;
+        test: () => Promise<{ ok: boolean; name?: string; phone?: string; error?: string }>;
+        campaign: (input: {
+          text: string;
+          phones: string[];
+          imageBase64?: string;
+          imageMime?: string;
+          imageName?: string;
+        }) => Promise<{ sent: number; failed: number; skipped: number; errors: string[] }>;
+        sendMessage: (input: { phone?: string; text: string }) => Promise<{ success: boolean; error?: string }>;
+      };
       settings: {
-        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string; aiEnabled?: boolean; groqApiKey?: string; groqModel?: string }>;
-        save: (patch: unknown) => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string; aiEnabled?: boolean; groqApiKey?: string; groqModel?: string }>;
+        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string; aiEnabled?: boolean; groqApiKey?: string; groqModel?: string; whatsappEnabled?: boolean; whatsappToken?: string; whatsappPhoneNumberId?: string; whatsappDisplayNumber?: string }>;
+        save: (patch: unknown) => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string; aiEnabled?: boolean; groqApiKey?: string; groqModel?: string; whatsappEnabled?: boolean; whatsappToken?: string; whatsappPhoneNumberId?: string; whatsappDisplayNumber?: string }>;
         relaunch: () => Promise<void>;
         lanIp: () => Promise<string>;
         testConnection: (url: string) => Promise<boolean>;

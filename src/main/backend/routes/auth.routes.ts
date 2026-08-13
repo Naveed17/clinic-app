@@ -26,7 +26,7 @@ export function createAuthRouter(): Router {
       where: { email: email.trim().toLowerCase() },
       select: { id: true, firstName: true, lastName: true, email: true, role: true, isActive: true, passwordHash: true },
     });
-    if (!user || !user.isActive || !bcrypt.compareSync(password, user.passwordHash)) {
+    if (!user || !user.isActive || !user.passwordHash || !bcrypt.compareSync(password, user.passwordHash)) {
       res.status(401).json({ error: 'Invalid email or password.' });
       return;
     }
@@ -49,7 +49,7 @@ export function createAuthRouter(): Router {
       name: `${user.firstName} ${user.lastName}`.trim(),
       email: user.email,
       role,
-      avatar: `${user.firstName[0]}${user.lastName[0]}`.toUpperCase(),
+      avatar: `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase(),
     });
   }));
 

@@ -39,6 +39,7 @@ import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogFormSx, dialogPaperProps,
 } from '@/components/DialogUI';
+import { PhoneInputField } from '@/components/PhoneInputField';
 import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
 
 const roleLabels: Record<string, string> = {
@@ -226,7 +227,13 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
                   <TextField fullWidth label="Qualification (e.g. MBBS, MD)" {...form.register('doctorProfile.qualification')} />
                   <TextField fullWidth label="Experience (years)" type="number" slotProps={{ htmlInput: { min: 0, max: 60 } }} {...form.register('doctorProfile.experienceYears', { valueAsNumber: true })} />
                 </Box>
-                <TextField fullWidth label="Contact phone" {...form.register('doctorProfile.phone')} />
+                <Controller
+                  control={form.control}
+                  name="doctorProfile.phone"
+                  render={({ field }) => (
+                    <PhoneInputField label="Contact phone" value={field.value} onChange={field.onChange} />
+                  )}
+                />
                 <TextField fullWidth label="Bio" multiline minRows={2} {...form.register('doctorProfile.bio')} />
               </>
             )}

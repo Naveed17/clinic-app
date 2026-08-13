@@ -25,7 +25,7 @@ export function registerAuthIpc(): void {
         passwordHash: true,
       },
     });
-    if (!user || !user.isActive) return null;
+    if (!user || !user.isActive || !user.passwordHash) return null;
     const valid = bcrypt.compareSync(password, user.passwordHash);
     if (!valid) return null;
     const role = user.role.toLowerCase() as import('../backend/types').AppRole;
@@ -47,7 +47,7 @@ export function registerAuthIpc(): void {
       name: `${user.firstName} ${user.lastName}`.trim(),
       email: user.email,
       role,
-      avatar: `${user.firstName[0]}${user.lastName[0]}`.toUpperCase(),
+      avatar: `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase(),
     };
   });
 

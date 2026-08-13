@@ -37,6 +37,7 @@ import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogFormSx, dialogPaperProps,
 } from '@/components/DialogUI';
+import { PhoneInputField } from '@/components/PhoneInputField';
 
 const baseSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.'),
@@ -186,7 +187,13 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
                 })}
               />
             </Box>
-            <TextField fullWidth label="Contact phone" {...form.register('phone')} />
+            <Controller
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <PhoneInputField label="Contact phone" value={field.value} onChange={field.onChange} />
+              )}
+            />
             <TextField fullWidth label="Bio" multiline minRows={2} {...form.register('bio')} />
           </Stack>
         </DialogContent>
