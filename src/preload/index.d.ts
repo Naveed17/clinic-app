@@ -135,6 +135,8 @@ declare global {
         getById: (tokenId: string) => Promise<unknown>;
         list: (date: string) => Promise<unknown>;
         listPrescriptions: (date: string) => Promise<unknown>;
+        pharmacyQueue: (date: string) => Promise<unknown>;
+        pharmacyDispense: (tokenId: string, options?: { invoiceId?: string | null }) => Promise<unknown>;
         doctors: () => Promise<unknown>;
         patients: () => Promise<unknown>;
         create: (input: unknown) => Promise<unknown>;

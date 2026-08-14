@@ -40,7 +40,7 @@ import {
   dialogFormSx, dialogPaperProps,
 } from '@/components/DialogUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
-import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 
 const roleLabels: Record<string, string> = {
   ADMIN: 'Admin',
@@ -91,7 +91,7 @@ const emptyFormValues: FormValues = {
   lastName: '',
   email: '',
   password: '',
-  role: 'DOCTOR',
+  role: 'RECEPTIONIST',
   isActive: true,
   doctorProfile: { specialization: '', qualification: '', experienceYears: 0, phone: '', bio: '' },
 };
@@ -118,7 +118,8 @@ function toFormValues(user?: User): FormValues {
 function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClose: () => void }): React.JSX.Element {
   const queryClient = useQueryClient();
   const isEditing = Boolean(user);
-  const modules = useLicenseModules();
+  const { can } = useLicense();
+  const canManageStaff = can('manageUsers');
   const form = useForm<FormValues>({
     resolver: zodResolver(isEditing ? editSchema : createSchema),
     defaultValues: emptyFormValues,
@@ -193,11 +194,11 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
                   <FormControl fullWidth error={Boolean(errors.role)}>
                     <InputLabel>Role</InputLabel>
                     <Select label="Role" {...field}>
-                      <MenuItem value="ADMIN">Admin</MenuItem>
-                      <MenuItem value="DOCTOR">Doctor</MenuItem>
+                      {(canManageStaff || user?.role === 'ADMIN') && <MenuItem value="ADMIN">Admin</MenuItem>}
+                      {can('doctorDashboard') && <MenuItem value="DOCTOR">Doctor</MenuItem>}
                       <MenuItem value="RECEPTIONIST">Receptionist</MenuItem>
-                      {modules.labDashboard && <MenuItem value="LAB_TECHNICIAN">Lab Technician</MenuItem>}
-                      {modules.pharmacy && <MenuItem value="PHARMACIST">Pharmacist</MenuItem>}
+                      {can('labDashboard') && <MenuItem value="LAB_TECHNICIAN">Lab Technician</MenuItem>}
+                      {can('pharmacy') && <MenuItem value="PHARMACIST">Pharmacist</MenuItem>}
                     </Select>
                     {errors.role && <FormHelperText>{errors.role.message}</FormHelperText>}
                   </FormControl>
@@ -252,6 +253,8 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
 
 export function UsersPage(): React.JSX.Element {
   const queryClient = useQueryClient();
+  const { can } = useLicense();
+  const canManageStaff = can('manageUsers');
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(0);
@@ -338,7 +341,9 @@ export function UsersPage(): React.JSX.Element {
                 <TableCell align="right">
                   <Stack direction="row" gap={0.5} justifyContent="flex-end">
                     <Tooltip title="Edit"><IconButton sx={actionBtnSx} onClick={() => { setDialogUser(user); setDialogOpen(true); }}><EditOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                    <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => setDeleteUser(user)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                    {canManageStaff && (
+                      <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => setDeleteUser(user)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                    )}
                   </Stack>
                 </TableCell>
               </TableRow>

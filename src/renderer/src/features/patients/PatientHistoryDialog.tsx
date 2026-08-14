@@ -22,7 +22,7 @@ import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPre
 import { formatAdvicePreview } from '@/features/tokens/PrescriptionPadPdf';
 import { PatientDocumentsPanel } from './PatientDocumentsPanel';
 import { PatientWhatsAppSendDialog } from './PatientWhatsAppSendDialog';
-import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 
 const apptStatusColor: Record<string, 'default' | 'primary' | 'warning' | 'success' | 'error'> = {
   SCHEDULED: 'primary', CHECKED_IN: 'warning', COMPLETED: 'success', CANCELLED: 'default', NO_SHOW: 'error',
@@ -55,7 +55,7 @@ function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }): Re
 
 function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?: Patient }): React.JSX.Element {
   const theme = useTheme();
-  const modules = useLicenseModules();
+  const { can } = useLicense();
   type PrintItem = {
     prescription: Prescription;
     doctor: { firstName: string; lastName: string };
@@ -141,7 +141,7 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
         <Typography variant="caption" color="text.secondary" fontWeight={600}>
           {items.length} prescription{items.length === 1 ? '' : 's'}
         </Typography>
-        {modules.ai === true && (
+        {can('ai') && (
           <Button
             size="small"
             variant="outlined"
@@ -154,8 +154,8 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
           </Button>
         )}
       </Stack>
-      {modules.ai === true && summaryError && <Alert severity="error" onClose={() => setSummaryError(null)}>{summaryError}</Alert>}
-      {modules.ai === true && summary !== null && (
+      {can('ai') && summaryError && <Alert severity="error" onClose={() => setSummaryError(null)}>{summaryError}</Alert>}
+      {can('ai') && summary !== null && (
         <Alert
           severity="info"
           icon={<AutoAwesomeOutlinedIcon fontSize="inherit" />}
@@ -261,15 +261,16 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
   );
 }
 
-export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; onClose: () => void }): React.JSX.Element {
+export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; onClose: () => void }): React.JSX.Element | null {
   const theme = useTheme();
-  const modules = useLicenseModules();
+  const { can } = useLicense();
   const [tab, setTab] = useState(0);
   const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
   const [waOpen, setWaOpen] = useState(false);
 
-  const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
-  const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list });
+  const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list, enabled: can('managePatients') });
+  const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list, enabled: can('managePatients') });
+  if (!can('managePatients')) return null;
   const patientAppointments = (appointments.data ?? []).filter((a) => a.patientId === patient.id);
   const patientInvoices = (invoices.data ?? []).filter((i) => i.patient.id === patient.id);
   const initials = `${patient.firstName[0]}${patient.lastName[0]}`.toUpperCase();
@@ -512,7 +513,7 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
       </DialogContent>
 
       <DialogActions sx={{ px: 2.5, py: 1.75, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.default', flexShrink: 0, gap: 1 }}>
-        {modules.whatsapp === true && (
+        {can('whatsapp') && (
           <Button
             startIcon={<WhatsAppIcon />}
             onClick={() => setWaOpen(true)}
@@ -524,7 +525,7 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
         )}
         <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 2, fontWeight: 700 }}>Close</Button>
       </DialogActions>
-      {modules.whatsapp === true && (
+      {can('whatsapp') && (
         <PatientWhatsAppSendDialog open={waOpen} patient={patient} onClose={() => setWaOpen(false)} />
       )}
     </Dialog>

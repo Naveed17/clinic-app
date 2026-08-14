@@ -83,6 +83,13 @@ function toQueryString(input: unknown): string {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   await settingsReady;
+  const timeZone = (() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Karachi';
+    } catch {
+      return 'Asia/Karachi';
+    }
+  })();
   const { token } = getAuthContext();
   const response = await fetch(`${apiUrl}${path}`, {
     headers: {
@@ -90,6 +97,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(isOnlineClient && onlineSchemaId ? { 'x-schema-id': onlineSchemaId } : {}),
       ...(isOnlineClient && onlineLicenseKey ? { 'x-license-key': onlineLicenseKey } : {}),
+      ...(isOnlineClient || isLanClient ? { 'x-timezone': timeZone } : {}),
       ...(init?.headers ?? {}),
     },
     ...init,
@@ -303,42 +311,115 @@ const api = {
     patient: {
       list: (patientId: string) =>
         isOnlineClient
-          ? Promise.resolve([])
+          ? request(`/api/docs/patients/${encodeURIComponent(patientId)}`)
           : ipc('docs:patient:list', patientId),
-      upload: (patientId: string) =>
-        isOnlineClient
-          ? Promise.reject(new Error('Document upload is not available in online mode yet.'))
-          : ipc('docs:patient:upload', patientId),
+      upload: async (patientId: string) => {
+        if (!isOnlineClient) return ipc('docs:patient:upload', patientId);
+        const files = await ipc<
+          { name: string; mimeType: string; size: number; fileData: string }[]
+        >('docs:pick-files', {
+          title: 'Select Document',
+          extensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'txt'],
+        });
+        if (!files.length) return [];
+        const results = [];
+        for (const file of files) {
+          results.push(
+            await request(`/api/docs/patients/${encodeURIComponent(patientId)}`, {
+              method: 'POST',
+              body: JSON.stringify(file),
+            }),
+          );
+        }
+        return results;
+      },
       delete: (id: string) =>
         isOnlineClient
-          ? Promise.reject(new Error('Document delete is not available in online mode yet.'))
+          ? request(`/api/docs/${encodeURIComponent(id)}`, { method: 'DELETE' })
           : ipc('docs:patient:delete', id),
-      open: (id: string) =>
-        isOnlineClient
-          ? Promise.reject(new Error('Document open is not available in online mode yet.'))
-          : ipc('docs:patient:open', id),
-      whatsapp: (id: string, phone?: string) =>
-        isOnlineClient
-          ? Promise.reject(new Error('WhatsApp send is not available in online mode yet.'))
-          : ipc('docs:patient:whatsapp', id, phone),
+      open: async (id: string) => {
+        if (!isOnlineClient) return ipc('docs:patient:open', id);
+        const doc = await request<{
+          name: string;
+          mimeType: string;
+          fileData: string | null;
+          open?: { type: string; name: string; data: string };
+        }>(`/api/docs/${encodeURIComponent(id)}`);
+        if (doc.open?.type === 'pdf' || doc.open?.type === 'image') return doc.open;
+        return ipc('docs:open-buffer', {
+          name: doc.name,
+          mimeType: doc.mimeType,
+          fileData: doc.fileData,
+        });
+      },
+      whatsapp: async (id: string, phone?: string) => {
+        if (!isOnlineClient) return ipc('docs:patient:whatsapp', id, phone);
+        const doc = await request<{
+          name: string;
+          mimeType: string;
+          fileData: string | null;
+          patient?: {
+            firstName?: string;
+            lastName?: string;
+            phone?: string | null;
+            mrNumber?: string | null;
+          };
+        }>(`/api/docs/${encodeURIComponent(id)}`);
+        if (!doc.fileData) return { success: false, error: 'File not found.' };
+        return ipc('docs:whatsapp-from-buffer', {
+          fileName: doc.name,
+          mimeType: doc.mimeType,
+          fileData: doc.fileData,
+          phone: phone || doc.patient?.phone,
+          context: {
+            patientName: `${doc.patient?.firstName ?? ''} ${doc.patient?.lastName ?? ''}`.trim(),
+            mrNumber: doc.patient?.mrNumber ?? null,
+          },
+        });
+      },
     },
     lab: {
       list: (labOrderId: string) =>
         isOnlineClient
-          ? Promise.resolve([])
+          ? request(`/api/docs/lab/${encodeURIComponent(labOrderId)}`)
           : ipc('docs:lab:list', labOrderId),
-      upload: (labOrderId: string) =>
-        isOnlineClient
-          ? Promise.reject(new Error('Lab report upload is not available in online mode yet.'))
-          : ipc('docs:lab:upload', labOrderId),
+      upload: async (labOrderId: string) => {
+        if (!isOnlineClient) return ipc('docs:lab:upload', labOrderId);
+        const files = await ipc<
+          { name: string; mimeType: string; size: number; fileData: string }[]
+        >('docs:pick-files', {
+          title: 'Attach Lab Report',
+          extensions: ['pdf', 'jpg', 'jpeg', 'png'],
+        });
+        if (!files.length) return [];
+        const results = [];
+        for (const file of files) {
+          results.push(
+            await request(`/api/docs/lab/${encodeURIComponent(labOrderId)}`, {
+              method: 'POST',
+              body: JSON.stringify(file),
+            }),
+          );
+        }
+        return results;
+      },
       delete: (id: string) =>
         isOnlineClient
-          ? Promise.reject(new Error('Lab report delete is not available in online mode yet.'))
+          ? request(`/api/docs/lab-report/${encodeURIComponent(id)}`, { method: 'DELETE' })
           : ipc('docs:lab:delete', id),
-      open: (id: string) =>
-        isOnlineClient
-          ? Promise.reject(new Error('Lab report open is not available in online mode yet.'))
-          : ipc('docs:lab:open', id),
+      open: async (id: string) => {
+        if (!isOnlineClient) return ipc('docs:lab:open', id);
+        const report = await request<{
+          name: string;
+          mimeType: string;
+          fileData: string | null;
+        }>(`/api/docs/lab-report/${encodeURIComponent(id)}`);
+        await ipc('docs:open-buffer', {
+          name: report.name,
+          mimeType: report.mimeType,
+          fileData: report.fileData,
+        });
+      },
     },
   },
   tokens: {
@@ -356,6 +437,22 @@ const api = {
       call(
         () => request(`/api/tokens/prescriptions?date=${date}`),
         'tokens:list-prescriptions', date,
+      ),
+    pharmacyQueue: (date: string) =>
+      call(
+        () => request(`/api/tokens/pharmacy-queue?date=${date}`),
+        'tokens:pharmacy-queue', date,
+      ),
+    pharmacyDispense: (tokenId: string, options?: { invoiceId?: string | null }) =>
+      call(
+        () =>
+          request(`/api/tokens/${tokenId}/pharmacy-dispense`, {
+            method: 'POST',
+            body: JSON.stringify(options ?? {}),
+          }),
+        'tokens:pharmacy-dispense',
+        tokenId,
+        options,
       ),
     getById: (tokenId: string) =>
       call(
@@ -552,8 +649,44 @@ const api = {
       ipc<{ success: boolean; error?: string }>('whatsapp:sendMessage', input),
   },
   settings: {
-    get: () => ipc('settings:get'),
-    save: (patch: unknown) => ipc('settings:save', patch),
+    get: async () => {
+      const local = await ipc<Record<string, unknown>>('settings:get');
+      if (!isOnlineClient) return local;
+      try {
+        const meta = await request<{
+          clinicName?: string;
+          clinicAddress?: string;
+          clinicPhone?: string;
+        }>('/api/clinic/meta');
+        return {
+          ...local,
+          clinicName: meta.clinicName || local.clinicName || '',
+          clinicAddress: meta.clinicAddress || local.clinicAddress || '',
+          clinicPhone: meta.clinicPhone || local.clinicPhone || '',
+        };
+      } catch {
+        return local;
+      }
+    },
+    save: async (patch: unknown) => {
+      const saved = await ipc<Record<string, unknown>>('settings:save', patch);
+      if (isOnlineClient && patch && typeof patch === 'object') {
+        const p = patch as Record<string, unknown>;
+        try {
+          await request('/api/clinic/meta', {
+            method: 'PUT',
+            body: JSON.stringify({
+              clinicName: p.clinicName ?? saved.clinicName ?? '',
+              clinicAddress: p.clinicAddress ?? saved.clinicAddress ?? '',
+              clinicPhone: p.clinicPhone ?? saved.clinicPhone ?? '',
+            }),
+          });
+        } catch {
+          /* local save still succeeded */
+        }
+      }
+      return saved;
+    },
     relaunch: () => ipc('settings:relaunch'),
     lanIp: () => ipc('settings:lan-ip'),
     testConnection: (url: string) => ipc('settings:test-connection', url),

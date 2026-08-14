@@ -21,6 +21,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { appointmentsService } from '@/services/appointments.service';
 import { AppointmentDialog } from '@/features/appointments/AppointmentsPage';
 import { AppointmentCalendar } from '@/components/AppointmentCalendar';
@@ -46,6 +47,8 @@ const NEXT_STATUS: Partial<Record<string, string>> = {
 
 export function DoctorDashboard(): React.JSX.Element {
   const { user } = useAuth();
+  const { can } = useLicense();
+  const canViewPatientHistory = can('managePatients');
   const qc = useQueryClient();
   const theme = useTheme();
   const greeting = new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening';
@@ -250,19 +253,21 @@ export function DoctorDashboard(): React.JSX.Element {
                         <EditOutlinedIcon sx={{ fontSize: 15 }} />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Patient History">
-                      <span>
-                        <IconButton
-                          size="small"
-                          sx={{ p: 0.4 }}
-                          loading={historyLoadingId === appt.id}
-                          disabled={historyLoadingId === appt.id}
-                          onClick={() => void openPatientHistory(appt)}
-                        >
-                          <HistoryOutlinedIcon sx={{ fontSize: 15 }} />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
+                    {canViewPatientHistory && (
+                      <Tooltip title="Patient History">
+                        <span>
+                          <IconButton
+                            size="small"
+                            sx={{ p: 0.4 }}
+                            loading={historyLoadingId === appt.id}
+                            disabled={historyLoadingId === appt.id}
+                            onClick={() => void openPatientHistory(appt)}
+                          >
+                            <HistoryOutlinedIcon sx={{ fontSize: 15 }} />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    )}
                     {isCompleted && (
                       <Tooltip title="Write Prescription">
                         <IconButton size="small" sx={{ p: 0.4 }} onClick={() => void openPrescription(appt)}>
@@ -423,7 +428,7 @@ export function DoctorDashboard(): React.JSX.Element {
             onAppointmentContextMenu={(appt, anchor) => setApptCtxMenu({ ...anchor, appointment: appt })}
             onAppointmentClick={(appt) => { setEditAppt(appt); setApptDialogOpen(true); }}
             onPrescriptionClick={(appt) => openPrescription(appt)}
-            onPatientHistoryClick={(appt) => openPatientHistory(appt)}
+            onPatientHistoryClick={canViewPatientHistory ? (appt) => openPatientHistory(appt) : undefined}
           />
         </Box>
 
@@ -483,16 +488,18 @@ export function DoctorDashboard(): React.JSX.Element {
           />
         </MenuItem>
         <Divider />
-        <MenuItem
-          onClick={() => {
-            const a = apptCtxMenu!.appointment;
-            setApptCtxMenu(null);
-            void openPatientHistory(a);
-          }}
-        >
-          <ListItemIcon><HistoryOutlinedIcon fontSize="small" /></ListItemIcon>
-          <ListItemText>Patient History</ListItemText>
-        </MenuItem>
+        {canViewPatientHistory && (
+          <MenuItem
+            onClick={() => {
+              const a = apptCtxMenu!.appointment;
+              setApptCtxMenu(null);
+              void openPatientHistory(a);
+            }}
+          >
+            <ListItemIcon><HistoryOutlinedIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Patient History</ListItemText>
+          </MenuItem>
+        )}
         <MenuItem onClick={() => { setEditAppt(apptCtxMenu!.appointment); setApptCtxMenu(null); setApptDialogOpen(true); }}>
           <ListItemIcon><EditOutlinedIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Edit Appointment</ListItemText>
@@ -505,7 +512,7 @@ export function DoctorDashboard(): React.JSX.Element {
         )}
       </Menu>
 
-      {historyPatient && (
+      {canViewPatientHistory && historyPatient && (
         <PatientHistoryDialog patient={historyPatient} onClose={() => setHistoryPatient(undefined)} />
       )}
 

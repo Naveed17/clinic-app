@@ -63,6 +63,32 @@ function withDayToken(appt: Appointment, dayTokens: Token[]): Appointment {
   return { ...appt, tokenNumber: match.tokenNumber };
 }
 
+/** One card per patient+doctor per day (token create must update, not duplicate). */
+function dedupeSameDayVisits(appts: Appointment[]): Appointment[] {
+  const rank = (status: string): number => {
+    if (status === 'CHECKED_IN') return 4;
+    if (status === 'SCHEDULED') return 3;
+    if (status === 'COMPLETED') return 2;
+    return 1;
+  };
+  const best = new Map<string, Appointment>();
+  for (const a of appts) {
+    if (a.status === 'CANCELLED' || a.status === 'NO_SHOW') continue;
+    const key = `${a.patientId}:${a.providerId}`;
+    const prev = best.get(key);
+    if (!prev) {
+      best.set(key, a);
+      continue;
+    }
+    const betterRank = rank(a.status) > rank(prev.status);
+    const newer =
+      rank(a.status) === rank(prev.status) &&
+      new Date(a.startsAt).getTime() >= new Date(prev.startsAt).getTime();
+    if (betterRank || newer) best.set(key, a);
+  }
+  return [...best.values()];
+}
+
 interface Props {
   appointments: Appointment[];
   onStatusChange: (id: string, status: string) => void;
@@ -110,20 +136,20 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
 
   const selectedAppts = useMemo(
     () =>
-      appointments
-        .filter((a) => isSameDay(new Date(a.startsAt), selected))
-        .map((a) => withDayToken(a, dayTokens))
-        .sort(sortByTokenDesc),
+      dedupeSameDayVisits(
+        appointments
+          .filter((a) => isSameDay(new Date(a.startsAt), selected))
+          .map((a) => withDayToken(a, dayTokens)),
+      ).sort(sortByTokenDesc),
     [appointments, selected, dayTokens],
   );
 
   function apptsByDay(d: Date) {
-    return appointments
-      .filter((a) => isSameDay(new Date(a.startsAt), d))
-      .map((a) =>
-        isSameDay(d, selected) ? withDayToken(a, dayTokens) : a,
-      )
-      .sort(sortByTokenDesc);
+    return dedupeSameDayVisits(
+      appointments
+        .filter((a) => isSameDay(new Date(a.startsAt), d))
+        .map((a) => (isSameDay(d, selected) ? withDayToken(a, dayTokens) : a)),
+    ).sort(sortByTokenDesc);
   }
 
   return (

@@ -1,6 +1,7 @@
 import { ipcMain, dialog, shell } from 'electron';
-import { copyFileSync, unlinkSync, existsSync, readFileSync } from 'node:fs';
+import { copyFileSync, unlinkSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, basename, extname } from 'node:path';
+import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { getPrisma } from '../database/client';
 import { getDocsDir, resolveDocPath, toStoredDocPath } from './docs-paths';
@@ -11,6 +12,8 @@ type DoctorLike = {
   lastName: string;
   doctorProfile?: { specialization?: string | null } | null;
 } | null | undefined;
+
+const MAX_CLOUD_BYTES = 3 * 1024 * 1024;
 
 function formatDoctorName(doctor: DoctorLike): string | null {
   if (!doctor) return null;
@@ -34,7 +37,120 @@ function formatVisitDate(value: Date | string | null | undefined): string | null
   return dt.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function stripDataUrl(fileData: string): string {
+  const raw = String(fileData || '');
+  const idx = raw.indexOf('base64,');
+  return idx >= 0 ? raw.slice(idx + 7) : raw;
+}
+
 export function registerDocumentsIpc(): void {
+  /** Pick files and return base64 payloads (used by online cloud upload). */
+  ipcMain.handle(
+    'docs:pick-files',
+    async (
+      _e,
+      opts?: { title?: string; extensions?: string[] },
+    ): Promise<{ name: string; mimeType: string; size: number; fileData: string }[]> => {
+      const extensions = opts?.extensions?.length
+        ? opts.extensions
+        : ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'txt'];
+      const { filePaths, canceled } = await dialog.showOpenDialog({
+        title: opts?.title || 'Select Document',
+        properties: ['openFile', 'multiSelections'],
+        filters: [{ name: 'Documents', extensions }],
+      });
+      if (canceled || !filePaths.length) return [];
+      const results: { name: string; mimeType: string; size: number; fileData: string }[] = [];
+      for (const src of filePaths) {
+        const buf = readFileSync(src);
+        if (buf.length > MAX_CLOUD_BYTES) {
+          throw new Error(`"${basename(src)}" is too large (max 3 MB for online storage).`);
+        }
+        results.push({
+          name: basename(src),
+          mimeType: extname(src).replace('.', '').toLowerCase() || 'bin',
+          size: buf.length,
+          fileData: buf.toString('base64'),
+        });
+      }
+      return results;
+    },
+  );
+
+  /** Open a cloud buffer in-app (pdf/image) or via OS for other types. */
+  ipcMain.handle(
+    'docs:open-buffer',
+    async (
+      _e,
+      input: { name?: string; mimeType?: string; fileData?: string },
+    ): Promise<{ type: 'pdf' | 'image'; name: string; data: string } | null> => {
+      const name = String(input?.name || 'document');
+      const mimeType = String(input?.mimeType || '').toLowerCase().replace(/^\./, '');
+      const data = stripDataUrl(String(input?.fileData || ''));
+      if (!data) return null;
+      if (mimeType === 'pdf' || mimeType.includes('pdf')) {
+        return { type: 'pdf', name, data };
+      }
+      if (
+        ['jpg', 'jpeg', 'png'].includes(mimeType) ||
+        mimeType.includes('png') ||
+        mimeType.includes('jpeg')
+      ) {
+        const mime = mimeType.includes('png') ? 'image/png' : 'image/jpeg';
+        return { type: 'image', name, data: `data:${mime};base64,${data}` };
+      }
+      const ext = mimeType ? `.${mimeType}` : extname(name) || '.bin';
+      const tmp = join(tmpdir(), `careflow-doc-${randomUUID()}${ext}`);
+      writeFileSync(tmp, Buffer.from(data, 'base64'));
+      await shell.openPath(tmp);
+      return null;
+    },
+  );
+
+  /** Send WhatsApp from an in-memory (cloud) file. */
+  ipcMain.handle(
+    'docs:whatsapp-from-buffer',
+    async (
+      _e,
+      input: {
+        fileName: string;
+        fileData: string;
+        mimeType?: string;
+        phone?: string | null;
+        context?: {
+          patientName?: string | null;
+          mrNumber?: string | null;
+          doctorName?: string | null;
+          visitDate?: string | null;
+          tokenNumber?: number | null;
+        };
+      },
+    ) => {
+      const data = stripDataUrl(String(input.fileData || ''));
+      if (!data) return { success: false, error: 'File not found.' };
+      const ext =
+        (input.mimeType ? `.${String(input.mimeType).replace(/^\./, '')}` : '') ||
+        extname(input.fileName) ||
+        '.bin';
+      const tmp = join(tmpdir(), `careflow-wa-${randomUUID()}${ext}`);
+      writeFileSync(tmp, Buffer.from(data, 'base64'));
+      try {
+        return await sendWhatsAppDocument({
+          filePath: tmp,
+          fileName: input.fileName,
+          phone: input.phone,
+          context: input.context,
+        });
+      } finally {
+        try {
+          if (existsSync(tmp)) unlinkSync(tmp);
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+  );
+
   // ── Patient Documents ──
   ipcMain.handle('docs:patient:list', (_e, patientId: string) =>
     getPrisma().patientDocument.findMany({ where: { patientId }, orderBy: { uploadedAt: 'desc' } }),

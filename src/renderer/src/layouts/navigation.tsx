@@ -37,7 +37,7 @@ const ALL_NAV_ITEMS: NavigationItem[] = [
 
 export function getNavItems(role: UserRole, modules: LicenseModules | undefined): NavigationItem[] {
   return ALL_NAV_ITEMS.filter(
-    (item) => canAccess(role, item.path) && isModuleEnabled(modules, item.path),
+    (item) => canAccess(role, item.path) && isModuleEnabled(modules, item.path, role),
   );
 }
 

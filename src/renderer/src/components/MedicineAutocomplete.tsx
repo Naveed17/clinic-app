@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { Medicine } from '@/types/medicine';
 import { MedicinePickerDialog } from './MedicinePickerDialog';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 
 interface Props {
   value: string;
@@ -15,11 +16,24 @@ interface Props {
 export function MedicineAutocomplete({ value, onChange, label = 'Medicine', size = 'medium' }: Props) {
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
+  const catalogOn = useLicense().can('manageMedicines');
 
   const { data: medicines = [] } = useQuery<Medicine[]>({
     queryKey: ['medicines'],
     queryFn: () => window.clinic.medicines.search(''),
+    enabled: catalogOn,
   });
+
+  if (!catalogOn) {
+    return (
+      <TextField
+        label={label}
+        size={size}
+        value={value}
+        onChange={(e) => onChange(e.target.value, 0)}
+      />
+    );
+  }
 
   const selected = medicines.find((m) => m.name === value) ?? null;
 

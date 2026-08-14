@@ -1,12 +1,14 @@
 import { ipcMain } from 'electron';
 import type { Server as SocketIOServer } from 'socket.io';
 import type { TokenStatus } from '@prisma/client';
-import { getPrisma } from '../database/client'; 
+import { getPrisma } from '../database/client';
 import {
   createToken,
   deleteToken,
+  dispensePharmacyPrescription,
   getTokenById,
   getTokenForPatient,
+  listPharmacyQueue,
   listTokenDoctors,
   listTokenPatients,
   listPrescriptionFeed,
@@ -23,6 +25,7 @@ export function registerTokenIpc(io?: SocketIOServer): void {
   ipcMain.handle('tokens:list', (_, date: string) => listTokens(date));
   ipcMain.handle('tokens:get-by-id', (_, tokenId: string) => getTokenById(tokenId));
   ipcMain.handle('tokens:list-prescriptions', (_, date: string) => listPrescriptionFeed(date));
+  ipcMain.handle('tokens:pharmacy-queue', (_, date: string) => listPharmacyQueue(date));
   ipcMain.handle('tokens:doctors', () => listTokenDoctors());
   ipcMain.handle('tokens:patients', () => listTokenPatients());
   ipcMain.handle('tokens:create', async (_, input) => {
@@ -59,12 +62,12 @@ export function registerTokenIpc(io?: SocketIOServer): void {
       const rows = await db.$queryRaw<
         Array<{ tokenNumber: number; firstName: string; lastName: string }>
       >`
-        SELECT t.tokenNumber, p.firstName, p.lastName 
-        FROM "Token" t 
-        JOIN "Patient" p ON p.id = t.patientId 
-        WHERE t.id = ${tokenId} 
+        SELECT t.tokenNumber, p.firstName, p.lastName
+        FROM "Token" t
+        JOIN "Patient" p ON p.id = t.patientId
+        WHERE t.id = ${tokenId}
         LIMIT 1
-      `; 
+      `;
 
       if (rows[0]) {
         const r = rows[0];
@@ -78,4 +81,19 @@ export function registerTokenIpc(io?: SocketIOServer): void {
     }
     return result;
   });
+  ipcMain.handle(
+    'tokens:pharmacy-dispense',
+    async (_, tokenId: string, options?: { invoiceId?: string | null }) => {
+      const item = await dispensePharmacyPrescription(tokenId, options);
+      if (io && item) {
+        emitNotification(io, {
+          kind: 'success',
+          title: 'Pharmacy dispensed',
+          message: `Token #${String(item.tokenNumber).padStart(3, '0')} — ${item.patientName} marked dispensed.`,
+          payload: { entity: 'prescription', tokenId },
+        });
+      }
+      return item;
+    },
+  );
 }

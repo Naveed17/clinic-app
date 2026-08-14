@@ -31,7 +31,6 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
-import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import type { LabOrder, LabOrderStatus } from '@/types/lab';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import {
@@ -72,7 +71,6 @@ export function LabPage(): React.JSX.Element {
   const [resultText, setResultText] = useState('');
   const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
   const [form, setForm] = useState({ patientId: '', test: '', notes: '' });
-  const { isOnline: isOnlineDb } = useDatabaseMode();
 
   const { data: orders = [], isLoading, isError } = useQuery<LabOrder[]>({
     queryKey: ['lab-orders'],
@@ -351,21 +349,17 @@ export function LabPage(): React.JSX.Element {
             <Divider />
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="subtitle2">Attachments</Typography>
-              {!isOnlineDb && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<AttachFileOutlinedIcon />}
-                  loading={uploadReportMutation.isPending}
-                  onClick={() => uploadReportMutation.mutate()}
-                >
-                  Attach file
-                </Button>
-              )}
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<AttachFileOutlinedIcon />}
+                loading={uploadReportMutation.isPending}
+                onClick={() => uploadReportMutation.mutate()}
+              >
+                Attach file
+              </Button>
             </Box>
-            {isOnlineDb ? (
-              <Alert severity="info">File attachments are not available in online mode yet.</Alert>
-            ) : labReports.length === 0 ? (
+            {labReports.length === 0 ? (
               <Typography variant="body2" color="text.secondary">No attachments.</Typography>
             ) : (
               <List dense disablePadding>

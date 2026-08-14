@@ -20,6 +20,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { GlobalSearchResult } from '@/types/search';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 
 interface Props {
   open: boolean;
@@ -57,6 +58,10 @@ function SectionHeader({ icon, label, count }: { icon: React.ReactNode; label: s
 export function GlobalSearchModal({ open, onClose }: Props) {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { can } = useLicense();
+  const canPatients = can('managePatients');
+  const canBilling = can('billing');
+  const canLab = can('labDashboard');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<GlobalSearchResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -92,8 +97,8 @@ export function GlobalSearchModal({ open, onClose }: Props) {
   }
 
   const hasResults = results && (
-    results.patients.length + results.appointments.length +
-    results.invoices.length + results.labOrders.length > 0
+    (canPatients ? results.patients.length : 0) + results.appointments.length +
+    (canBilling ? results.invoices.length : 0) + (canLab ? results.labOrders.length : 0) > 0
   );
 
   return (
@@ -153,7 +158,7 @@ export function GlobalSearchModal({ open, onClose }: Props) {
         <Box sx={{ maxHeight: 480, overflowY: 'auto', '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 } }}>
 
           {/* Patients */}
-          {results!.patients.length > 0 && (
+          {canPatients && results!.patients.length > 0 && (
             <>
               <SectionHeader icon={<PersonOutlinedIcon fontSize="small" />} label="Patients" count={results!.patients.length} />
               <List dense disablePadding>
@@ -201,7 +206,7 @@ export function GlobalSearchModal({ open, onClose }: Props) {
           )}
 
           {/* Invoices */}
-          {results!.invoices.length > 0 && (
+          {canBilling && results!.invoices.length > 0 && (
             <>
               <Divider />
               <SectionHeader icon={<ReceiptOutlinedIcon fontSize="small" />} label="Invoices" count={results!.invoices.length} />
@@ -224,7 +229,7 @@ export function GlobalSearchModal({ open, onClose }: Props) {
           )}
 
           {/* Lab Orders */}
-          {results!.labOrders.length > 0 && (
+          {canLab && results!.labOrders.length > 0 && (
             <>
               <Divider />
               <SectionHeader icon={<BiotechOutlinedIcon fontSize="small" />} label="Lab Orders" count={results!.labOrders.length} />

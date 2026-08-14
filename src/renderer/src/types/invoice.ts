@@ -49,4 +49,5 @@ export interface InvoiceInput {
   discount: number;
   notes?: string | null;
   items: Array<{ description: string; quantity: number; unitPrice: number }>;
+  tokenId?: string | null;
 }

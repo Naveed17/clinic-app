@@ -165,15 +165,20 @@ export async function createAppointment(input: AppointmentInput) {
  * Token / walk-in: same patient + doctor + day → update existing appointment
  * instead of inserting a duplicate card (same token #).
  */
+/** Machine-local calendar day containing `date` (not UTC — avoids midnight PKT duplicates). */
+function localDayBounds(date: Date): { dayStart: Date; dayEnd: Date } {
+  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+  const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+  return { dayStart, dayEnd };
+}
+
 export async function ensureSameDayAppointment(input: AppointmentInput) {
   await assertProviderActive(input.providerId);
   const startsAt = parseDate(input.startsAt, 'startsAt');
   const endsAt = parseDate(input.endsAt, 'endsAt');
   await assertDoctorAvailable(input.providerId, startsAt, endsAt);
 
-  const day = startsAt.toISOString().slice(0, 10);
-  const dayStart = new Date(`${day}T00:00:00.000`);
-  const dayEnd = new Date(`${day}T23:59:59.999`);
+  const { dayStart, dayEnd } = localDayBounds(startsAt);
 
   const existing = await getPrisma().appointment.findMany({
     where: {
@@ -201,6 +206,14 @@ export async function ensureSameDayAppointment(input: AppointmentInput) {
         status: nextStatus,
       },
     });
+    // One visit card per patient+doctor+day — cancel leftover duplicates (e.g. UTC-bound bug).
+    const extras = existing.filter((a) => a.id !== target.id);
+    if (extras.length > 0) {
+      await getPrisma().appointment.updateMany({
+        where: { id: { in: extras.map((a) => a.id) } },
+        data: { status: 'CANCELLED' },
+      });
+    }
     return getAppointmentById(target.id);
   }
 

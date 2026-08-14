@@ -6,8 +6,10 @@ import { getPrisma } from '../../database/client';
 import {
   createToken,
   deleteToken,
+  dispensePharmacyPrescription,
   getTokenById,
   getTokenForPatient,
+  listPharmacyQueue,
   listTokenDoctors,
   listTokenPatients,
   listPrescriptionFeed,
@@ -28,6 +30,10 @@ export function createTokensRouter(io: SocketIOServer): Router {
   router.get('/prescriptions', asyncHandler(async (req, res) => {
     const date = String(req.query.date ?? new Date().toISOString().slice(0, 10));
     res.json(await listPrescriptionFeed(date));
+  }));
+  router.get('/pharmacy-queue', asyncHandler(async (req, res) => {
+    const date = String(req.query.date ?? new Date().toISOString().slice(0, 10));
+    res.json(await listPharmacyQueue(date));
   }));
   router.get('/for-patient', asyncHandler(async (req, res) => {
     const { patientId, date } = req.query as { patientId: string; date: string };
@@ -93,6 +99,13 @@ export function createTokensRouter(io: SocketIOServer): Router {
     }
     emitDataChange(io, 'prescription', 'upserted');
     res.json({ id });
+  }));
+  router.post('/:id/pharmacy-dispense', asyncHandler(async (req, res) => {
+    const tokenId = String(req.params.id);
+    const invoiceId = (req.body as { invoiceId?: string | null })?.invoiceId ?? null;
+    const item = await dispensePharmacyPrescription(tokenId, { invoiceId });
+    emitDataChange(io, 'prescription', 'updated');
+    res.json(item);
   }));
   return router;
 }

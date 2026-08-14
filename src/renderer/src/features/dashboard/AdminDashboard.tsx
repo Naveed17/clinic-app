@@ -11,6 +11,7 @@ import { patientsService } from '@/services/patients.service';
 import { invoicesService } from '@/services/invoices.service';
 import { appointmentsService } from '@/services/appointments.service';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 import type { Token, TokenStatus } from '@/types/token';
 import type { Appointment } from '@/types/appointment';
 import doctorImg from '@/assets/doctor_banner.png';
@@ -21,10 +22,14 @@ const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
 export function AdminDashboard(): React.JSX.Element {
   const theme = useTheme();
   const { user } = useAuth();
+  const { can } = useLicense();
+  const showReports = can('reports');
+  const showBilling = can('billing');
+  const showTokens = can('tokens');
 
-  const summary = useQuery({ queryKey: ['reports:summary'], queryFn: reportsService.summary, refetchInterval: 30_000 });
+  const summary = useQuery({ queryKey: ['reports:summary'], queryFn: reportsService.summary, refetchInterval: 30_000, enabled: showReports });
   const patients = useQuery({ queryKey: ['patients', { page: 1, pageSize: 1, search: '' }], queryFn: () => patientsService.list({ page: 1, pageSize: 1, search: '' }), refetchInterval: 30_000 });
-  const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list, refetchInterval: 30_000 });
+  const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list, refetchInterval: 30_000, enabled: showBilling });
   const appointments = useQuery<Appointment[]>({ queryKey: ['appointments'], queryFn: appointmentsService.list, refetchInterval: 30_000 });
 
   const totalRevenue = (invoices.data ?? []).reduce((s, inv) => s + inv.total, 0);
@@ -49,7 +54,14 @@ export function AdminDashboard(): React.JSX.Element {
   });
   const doctors = Array.from(doctorMap.values()).sort((a, b) => b.count - a.count);
 
-  const todaysPatientsCount = summary.data?.todaysPatients ?? 0;
+  const todaysPatientsCount = showReports
+    ? (summary.data?.todaysPatients ?? 0)
+    : (appointments.data ?? []).filter((a) => {
+        if (a.status === 'CANCELLED' || !a.startsAt) return false;
+        const d = new Date(a.startsAt);
+        const now = new Date();
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+      }).length;
   const paidPercentage = totalInvoices ? Math.round((paidInvoices / totalInvoices) * 100) : 0;
   const apptPercentage = totalAppts ? Math.round((completedAppts / totalAppts) * 100) : 0;
 
@@ -68,21 +80,27 @@ export function AdminDashboard(): React.JSX.Element {
       percent: apptPercentage,
       color: theme.palette.secondary.main,
     },
-    {
+    showReports && {
       label: 'Monthly Revenue',
       value: money(summary.data?.monthlyRevenue ?? 0),
       subtext: 'Current month total',
       percent: summary.data?.monthlyRevenue ? 92 : 0,
       color: theme.palette.success.main,
     },
-    {
+    showBilling && {
       label: 'Total Invoices',
       value: totalInvoices,
       subtext: `${paidInvoices} paid invoices`,
       percent: paidPercentage,
       color: theme.palette.warning.main,
     },
-  ];
+  ].filter(Boolean) as Array<{
+    label: string;
+    value: string | number;
+    subtext: string;
+    percent: number;
+    color: string;
+  }>;
 
   return (
     <Stack spacing={3} sx={{ pb: 3 }}>
@@ -247,6 +265,7 @@ export function AdminDashboard(): React.JSX.Element {
             </Stack>
 
             <Stack spacing={2.5}>
+              {showBilling && (
               <Box
                 sx={{
                   p: 2.5,
@@ -289,6 +308,7 @@ export function AdminDashboard(): React.JSX.Element {
                   </Typography>
                 </Stack>
               </Box>
+              )}
 
               <Box
                 sx={{
@@ -450,7 +470,7 @@ export function AdminDashboard(): React.JSX.Element {
       </Box>
 
       {/* Live Token Queue Panel */}
-      <TokenQueuePanel />
+      {showTokens && <TokenQueuePanel />}
     </Stack>
   );
 }

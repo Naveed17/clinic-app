@@ -210,24 +210,44 @@ export function InvoiceDialog({
   open,
   onClose,
   onCreated,
+  initialValues,
+  tokenId,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated?: (invoice: Invoice) => void;
+  initialValues?: Partial<FormValues>;
+  /** When set, invoice create links & dispenses the pharmacy Rx. */
+  tokenId?: string | null;
 }): React.JSX.Element {
   const client = useQueryClient();
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: defaults });
   const fields = useFieldArray({ control: form.control, name: 'items' });
   const patients = useQuery({ queryKey: ['invoice-patients'], queryFn: invoicesService.patients });
   const mutation = useMutation({
-    mutationFn: (values: FormValues) => invoicesService.create(values as InvoiceInput),
+    mutationFn: (values: FormValues) =>
+      invoicesService.create({
+        ...values,
+        tokenId: tokenId || undefined,
+      } as InvoiceInput),
     onSuccess: async (invoice) => {
       await client.invalidateQueries({ queryKey: ['invoices'] });
+      await client.invalidateQueries({ queryKey: ['pharmacy-queue'] });
       onClose();
       onCreated?.(invoice as Invoice);
     },
   });
-  useEffect(() => { if (open) form.reset(defaults); }, [form, open]);
+  useEffect(() => {
+    if (!open) return;
+    form.reset({
+      ...defaults,
+      ...initialValues,
+      items:
+        initialValues?.items && initialValues.items.length > 0
+          ? initialValues.items
+          : defaults.items,
+    });
+  }, [form, open, initialValues]);
   const items = form.watch('items');
   const discount = form.watch('discount');
   const drFee = form.watch('drFee');

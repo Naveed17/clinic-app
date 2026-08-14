@@ -11,7 +11,7 @@ export function createInvoicesRouter(io: SocketIOServer): Router {
 
   router.get(
     '/',
-    requireRole(['admin', 'receptionist']),
+    requireRole(['admin', 'receptionist', 'pharmacist']),
     asyncHandler(async (_req, res) => {
       res.json(await listInvoices());
     }),
@@ -19,7 +19,7 @@ export function createInvoicesRouter(io: SocketIOServer): Router {
 
   router.get(
     '/patients',
-    requireRole(['admin', 'receptionist']),
+    requireRole(['admin', 'receptionist', 'pharmacist']),
     asyncHandler(async (_req, res) => {
       res.json(await invoicePatients());
     }),
@@ -27,7 +27,7 @@ export function createInvoicesRouter(io: SocketIOServer): Router {
 
   router.post(
     '/',
-    requireRole(['admin', 'receptionist']),
+    requireRole(['admin', 'receptionist', 'pharmacist']),
     asyncHandler(async (req, res) => {
       const invoice = await createInvoice(req.body as InvoiceInput);
       emitNotification(io, {
@@ -43,7 +43,7 @@ export function createInvoicesRouter(io: SocketIOServer): Router {
 
   router.post(
     '/:id/payment',
-    requireRole(['admin', 'receptionist']),
+    requireRole(['admin', 'receptionist', 'pharmacist']),
     asyncHandler(async (req, res) => {
       const { amount, method, reference } = req.body as { amount: number; method: string; reference?: string };
       const invoice = await addPayment(req.params['id'] as string, amount, method, reference);

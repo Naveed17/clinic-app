@@ -55,7 +55,7 @@ const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'pri
 };
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Date().toLocaleDateString('en-CA');
 }
 
 export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaultDoctorId, onSuccess }: {
@@ -619,7 +619,7 @@ export function TokensPage(): React.JSX.Element {
             <LocalizationProvider dateAdapter={AdapterDateFns}>
               <DatePicker
                 value={date ? new Date(date) : null}
-                onChange={(v) => setDate(v ? v.toISOString().slice(0, 10) : todayStr())}
+                onChange={(v) => setDate(v ? v.toLocaleDateString('en-CA') : todayStr())}
                 slotProps={{
                   textField: {
                     size: 'small',

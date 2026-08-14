@@ -29,7 +29,7 @@ import { appointmentsService } from '@/services/appointments.service';
 import { invoicesService } from '@/services/invoices.service';
 import { patientsService } from '@/services/patients.service';
 import { useAuth } from '@/features/auth/AuthContext';
-import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { PatientDialog } from './PatientDialog';
 import { PatientDocumentsPanel } from './PatientDocumentsPanel';
 import { PatientWhatsAppSendDialog } from './PatientWhatsAppSendDialog';
@@ -220,7 +220,7 @@ export function PatientProfilePage(): React.JSX.Element {
   const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const modules = useLicenseModules();
+  const { can } = useLicense();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [tab, setTab] = useState(0);
@@ -314,7 +314,7 @@ export function PatientProfilePage(): React.JSX.Element {
             </Box>
           </Stack>
           <Stack direction="row" spacing={1}>
-            {modules.whatsapp === true && (
+            {can('whatsapp') && (
               <Button
                 startIcon={<WhatsAppIcon />}
                 variant="contained"
@@ -688,7 +688,7 @@ export function PatientProfilePage(): React.JSX.Element {
       {editOpen && patient && (
         <PatientDialog open={editOpen} patient={patient} onClose={() => setEditOpen(false)} />
       )}
-      {modules.whatsapp === true && (
+      {can('whatsapp') && (
         <PatientWhatsAppSendDialog open={waOpen} patient={patient} onClose={() => setWaOpen(false)} />
       )}
     </>

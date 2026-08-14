@@ -4,11 +4,11 @@ import { realtimeService, type RealtimeNotification } from '@/services/realtime.
 
 const ENTITY_QUERY_MAP: Record<string, string[]> = {
   patient: ['patients'],
-  appointment: ['appointments'],
+  appointment: ['appointments', 'pharmacy-queue'],
   doctor: ['doctors'],
-  invoice: ['invoices'],
-  token: ['tokens'],
-  prescription: ['prescription-feed', 'tokens'],
+  invoice: ['invoices', 'pharmacy-queue'],
+  token: ['tokens', 'pharmacy-queue'],
+  prescription: ['prescription-feed', 'tokens', 'pharmacy-queue'],
   lab: ['lab-orders', 'lab-patients', 'lab-orders-token'],
   medicine: ['inventory-medicines', 'inventory-low-stock'],
   'inventory-batch': ['inventory-batches', 'inventory-low-stock', 'inventory-medicines'],

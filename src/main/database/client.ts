@@ -17,6 +17,26 @@ export function getPrisma(): PrismaClient {
   return prisma;
 }
 
+/** Idempotent — safe to call before pharmacy queue / dispense queries. */
+export async function ensurePrescriptionPharmacyColumns(
+  database: PrismaClient = getPrisma(),
+): Promise<void> {
+  const cols = (
+    await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Prescription)')
+  ).map((r) => r.name);
+  if (!cols.includes('pharmacyStatus')) {
+    await database.$executeRawUnsafe(
+      `ALTER TABLE "Prescription" ADD COLUMN "pharmacyStatus" TEXT NOT NULL DEFAULT 'PENDING'`,
+    );
+  }
+  if (!cols.includes('dispensedAt')) {
+    await database.$executeRawUnsafe('ALTER TABLE "Prescription" ADD COLUMN "dispensedAt" DATETIME');
+  }
+  if (!cols.includes('invoiceId')) {
+    await database.$executeRawUnsafe('ALTER TABLE "Prescription" ADD COLUMN "invoiceId" TEXT');
+  }
+}
+
 export async function initializeDatabase(): Promise<void> {
   const database = getPrisma();
 
@@ -336,6 +356,9 @@ export async function initializeDatabase(): Promise<void> {
       "advice" TEXT NOT NULL DEFAULT '',
       "thumbName" TEXT,
       "thumbnail" TEXT,
+      "pharmacyStatus" TEXT NOT NULL DEFAULT 'PENDING',
+      "dispensedAt" DATETIME,
+      "invoiceId" TEXT,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" DATETIME NOT NULL,
       FOREIGN KEY ("tokenId") REFERENCES "Token"("id") ON DELETE CASCADE
@@ -353,6 +376,7 @@ export async function initializeDatabase(): Promise<void> {
   if (!prescriptionCols.includes('thumbnail')) {
     await database.$executeRawUnsafe('ALTER TABLE "Prescription" ADD COLUMN "thumbnail" TEXT');
   }
+  await ensurePrescriptionPharmacyColumns(database);
 
   // ==========================================
   // PHARMACY & INVENTORY TABLES

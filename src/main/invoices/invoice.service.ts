@@ -13,6 +13,8 @@ export interface InvoiceInput {
   discount: number;
   notes?: string | null;
   items: InvoiceItemInput[];
+  /** When set (pharmacy queue bill), link Rx and mark dispensed. */
+  tokenId?: string | null;
 }
 
 const include = { patient: true, items: true } satisfies Prisma.InvoiceInclude;
@@ -114,7 +116,7 @@ export async function createInvoice(input: InvoiceInput) {
   const data = toInvoiceData(input);
   const database = getPrisma();
 
-  return database.$transaction(async (transaction) => {
+  const result = await database.$transaction(async (transaction) => {
     const invoice = await transaction.invoice.create({ data });
     await transaction.invoiceItem.createMany({
       data: input.items.map((item) => ({
@@ -126,7 +128,16 @@ export async function createInvoice(input: InvoiceInput) {
       })),
     });
 
-    const result = await transaction.invoice.findUniqueOrThrow({ where: { id: invoice.id }, include });
-    return serializeInvoice(result);
+    return serializeInvoice(
+      await transaction.invoice.findUniqueOrThrow({ where: { id: invoice.id }, include }),
+    );
   });
+
+  const tokenId = input.tokenId?.trim();
+  if (tokenId) {
+    const { dispensePharmacyPrescription } = await import('../tokens/token.service');
+    await dispensePharmacyPrescription(tokenId, { invoiceId: result.id });
+  }
+
+  return result;
 }

@@ -166,3 +166,15 @@ export function useLicenseModulesLoaded(): boolean {
 export function useRefreshLicenseModules(): () => Promise<void> {
   return useContext(LicenseModulesContext).refreshModules;
 }
+
+/** Feature gate: `can('managePatients')` — explicit true only. */
+export function useLicense(): LicenseModulesContextValue & {
+  can: (key: keyof LicenseModules) => boolean;
+} {
+  const ctx = useContext(LicenseModulesContext);
+  const can = useCallback(
+    (key: keyof LicenseModules) => ctx.modules[key] === true,
+    [ctx.modules],
+  );
+  return useMemo(() => ({ ...ctx, can }), [ctx, can]);
+}

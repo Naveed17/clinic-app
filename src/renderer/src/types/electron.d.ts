@@ -116,6 +116,11 @@ declare global {
         upsertPrescription: any;
         list: (date: string) => Promise<Token[]>;
         listPrescriptions: (date: string) => Promise<import('./token').PrescriptionFeedItem[]>;
+        pharmacyQueue: (date: string) => Promise<import('./token').PharmacyQueueItem[]>;
+        pharmacyDispense: (
+          tokenId: string,
+          options?: { invoiceId?: string | null },
+        ) => Promise<import('./token').PharmacyQueueItem | null>;
         doctors: () => Promise<TokenPerson[]>;
         patients: () => Promise<TokenPerson[]>;
         create: (input: TokenInput) => Promise<Token>;

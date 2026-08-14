@@ -36,7 +36,7 @@ import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
 import { useUpdate } from '@/context/updateProvider';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useAuth } from '@/features/auth/AuthContext';
-import { useLicenseModules, useRefreshLicenseModules } from '@/features/auth/LicenseModulesContext';
+import { useLicense, useRefreshLicenseModules } from '@/features/auth/LicenseModulesContext';
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { WhatsAppCampaignDialog } from '@/features/settings/WhatsAppCampaignDialog';
 import {
@@ -70,7 +70,7 @@ export function SettingsPage(): React.JSX.Element {
   const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const modules = useLicenseModules();
+  const { can } = useLicense();
   const refreshLicenseModules = useRefreshLicenseModules();
   const { isOnline, schemaId, ready: databaseModeReady, refresh: refreshDatabaseMode } = useDatabaseMode();
 
@@ -304,9 +304,9 @@ export function SettingsPage(): React.JSX.Element {
   }, [refreshLicenseModules]);
 
   useEffect(() => {
-    if (settingsTab === 'ai' && modules.ai !== true) setSettingsTab('general');
-    if (settingsTab === 'whatsapp' && modules.whatsapp !== true) setSettingsTab('general');
-  }, [modules.ai, modules.whatsapp, settingsTab]);
+    if (settingsTab === 'ai' && !can('ai')) setSettingsTab('general');
+    if (settingsTab === 'whatsapp' && !can('whatsapp')) setSettingsTab('general');
+  }, [can, settingsTab]);
 
   useEffect(() => {
     if (settingsTab !== 'whatsapp') return;
@@ -538,7 +538,7 @@ export function SettingsPage(): React.JSX.Element {
               iconPosition="start"
               label="General"
             />
-            {modules.ai === true && (
+            {can('ai') && (
               <Tab
                 value="ai"
                 icon={<AutoAwesomeOutlinedIcon sx={{ fontSize: 18 }} />}
@@ -546,7 +546,7 @@ export function SettingsPage(): React.JSX.Element {
                 label="AI"
               />
             )}
-            {modules.whatsapp === true && (
+            {can('whatsapp') && (
               <Tab
                 value="whatsapp"
                 icon={<WhatsAppIcon sx={{ fontSize: 18 }} />}
@@ -578,7 +578,11 @@ export function SettingsPage(): React.JSX.Element {
               {/* Left Side: Clinic Info, Backup & App Update */}
               <Box sx={{ width: 280, flexShrink: 0 }}>
                 <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>Clinic Information</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Shown on printed receipts and invoices.</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  {isOnline
+                    ? 'Shown on printed receipts. Saved to the cloud so every online PC shares the same clinic profile.'
+                    : 'Shown on printed receipts and invoices.'}
+                </Typography>
                 <Stack spacing={1.5} sx={{ mb: 3 }}>
                   <TextField
                     label="Clinic Name"
@@ -830,7 +834,7 @@ export function SettingsPage(): React.JSX.Element {
             </Stack>
           )}
 
-          {settingsTab === 'ai' && modules.ai === true && (
+          {settingsTab === 'ai' && can('ai') && (
             <Box sx={{ maxWidth: 480 }}>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                 <AutoAwesomeOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
@@ -874,7 +878,7 @@ export function SettingsPage(): React.JSX.Element {
             </Box>
           )}
 
-          {settingsTab === 'whatsapp' && modules.whatsapp === true && (
+          {settingsTab === 'whatsapp' && can('whatsapp') && (
             <Box>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                 <WhatsAppIcon sx={{ fontSize: 20, color: 'primary.main' }} />

@@ -31,6 +31,7 @@ import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPre
 import { TokenPrintPreview } from '@/features/tokens/TokensPage';
 import { InvoiceDialog } from '@/features/billing/InvoicesPage';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { useNavigate } from 'react-router-dom';
 import type { TokenPerson, Token, PrescriptionFeedItem } from '@/types/token';
 import type { PatientInput } from '@/types/patient';
@@ -111,7 +112,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   const tokenMutation = useMutation({
     mutationFn: () => window.clinic.tokens.create({
       patientId, doctorId,
-      date: new Date().toISOString().slice(0, 10),
+      date: new Date().toLocaleDateString('en-CA'),
       reason: reason || null,
     }),
     onSuccess: async (token: Token) => {
@@ -298,7 +299,7 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
   const [patientName, setPatientName] = useState('');
   const [useExisting, setUseExisting] = useState(false);
   const [providerId, setProviderId] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
   const [duration, setDuration] = useState(30);
   const [reason, setReason] = useState('');
@@ -357,7 +358,7 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
 
   function handleClose() {
     setStep(0); setPatientId(''); setPatientName(''); setUseExisting(false);
-    setProviderId(''); setDate(new Date().toISOString().slice(0, 10));
+    setProviderId(''); setDate(new Date().toLocaleDateString('en-CA'));
     setTime(new Date().toTimeString().slice(0, 5)); setDuration(30);
     setReason(''); setNotes(''); setDone(false);
     form.reset(patientDefaults);
@@ -515,7 +516,7 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
 function PrescriptionFeed(): React.JSX.Element {
   const theme = useTheme();
   const queryClient = useQueryClient();
-  const date = new Date().toISOString().slice(0, 10);
+  const date = new Date().toLocaleDateString('en-CA');
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const { data: feed = [] } = useQuery<PrescriptionFeedItem[]>({
     queryKey: ['prescription-feed', date],
@@ -755,6 +756,8 @@ export function ReceptionistDashboard(): React.JSX.Element {
   const theme = useTheme();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { can } = useLicense();
+  const showBilling = can('billing');
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [apptDialogOpen, setApptDialogOpen] = useState(false);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
@@ -1106,6 +1109,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
               >
                 Book Appointment
               </Button>
+              {showBilling && (
               <Button
                 variant="outlined"
                 startIcon={<PaymentsOutlinedIcon />}
@@ -1122,6 +1126,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
               >
                 Create Invoice
               </Button>
+              )}
             </Stack>
           </Paper>
 

@@ -19,8 +19,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ConfirmDialog } from '@/components/DialogUI';
 import { useAuth } from '@/features/auth/AuthContext';
-import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
-import { useDatabaseMode } from '@/context/DatabaseModeProvider';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { toWhatsAppNumber } from '@shared/whatsappPhone';
 import type { Patient } from '@/types/patient';
 import { DocViewerDialog, type DocViewerData } from './DocViewerDialog';
@@ -31,9 +30,8 @@ export function PatientDocumentsPanel({ patient }: { patient: Patient }): React.
   const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const modules = useLicenseModules();
+  const { can } = useLicense();
   const qc = useQueryClient();
-  const { isOnline: isOnlineDb } = useDatabaseMode();
   const [viewerDoc, setViewerDoc] = useState<DocViewerData | null>(null);
   const [waSnack, setWaSnack] = useState<{ open: boolean; success: boolean; msg: string }>({
     open: false,
@@ -112,11 +110,7 @@ export function PatientDocumentsPanel({ patient }: { patient: Patient }): React.
           </Alert>
         </Box>
       )}
-      {isOnlineDb ? (
-        <Alert severity="info" sx={{ mb: 1.5 }}>
-          File documents are not available in online database mode yet (cloud file storage coming soon).
-        </Alert>
-      ) : !isAdmin ? (
+      {!isAdmin && (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
           <Button
             startIcon={<AttachFileOutlinedIcon />}
@@ -129,12 +123,8 @@ export function PatientDocumentsPanel({ patient }: { patient: Patient }): React.
             Upload file
           </Button>
         </Box>
-      ) : null}
-      {isOnlineDb ? (
-        <Typography color="text.secondary" textAlign="center" sx={{ py: 4 }}>
-          Cloud file storage coming soon.
-        </Typography>
-      ) : docs.isLoading ? (
+      )}
+      {docs.isLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
       ) : (docs.data ?? []).length === 0 ? (
         <Typography color="text.secondary" textAlign="center" sx={{ py: 4 }}>
@@ -155,7 +145,7 @@ export function PatientDocumentsPanel({ patient }: { patient: Patient }): React.
                       <FolderOpenOutlinedIcon sx={{ fontSize: 16 }} />
                     </IconButton>
                   </Tooltip>
-                  {modules.whatsapp === true && (
+                  {can('whatsapp') && (
                     <Tooltip title={phone ? 'Send on WhatsApp' : 'Patient has no WhatsApp number'}>
                       <span>
                         <IconButton

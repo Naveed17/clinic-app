@@ -1,5 +1,5 @@
 import { useAuth } from '@/features/auth/AuthContext';
-import { useLicenseModules, useLicenseModulesLoaded } from '@/features/auth/LicenseModulesContext';
+import { useLicense, useLicenseModulesLoaded } from '@/features/auth/LicenseModulesContext';
 import { AdminDashboard } from '@/features/dashboard/AdminDashboard';
 import { DoctorDashboard } from '@/features/dashboard/DoctorDashboard';
 import { ReceptionistDashboard } from '@/features/dashboard/ReceptionistDashboard';
@@ -9,7 +9,7 @@ import { Alert, Box, CircularProgress } from '@mui/material';
 
 export function DashboardPage(): React.JSX.Element {
   const { user } = useAuth();
-  const modules = useLicenseModules();
+  const { can } = useLicense();
   const modulesLoaded = useLicenseModulesLoaded();
 
   if (!modulesLoaded) {
@@ -18,10 +18,10 @@ export function DashboardPage(): React.JSX.Element {
 
   switch (user?.role) {
     case 'admin':          return <AdminDashboard />;
-    case 'doctor':         return modules.doctorDashboard ? <DoctorDashboard /> : <Alert severity="error">This role is not enabled for this clinic.</Alert>;
+    case 'doctor':         return can('doctorDashboard') ? <DoctorDashboard /> : <Alert severity="error">This role is not enabled for this clinic.</Alert>;
     case 'receptionist':   return <ReceptionistDashboard />;
-    case 'lab_technician': return modules.labDashboard ? <LabDashboard /> : <Alert severity="error">This role is not enabled for this clinic.</Alert>;
-    case 'pharmacist':     return modules.pharmacy ? <PharmacistDashboard /> : <Alert severity="error">This role is not enabled for this clinic.</Alert>;
+    case 'lab_technician': return can('labDashboard') ? <LabDashboard /> : <Alert severity="error">This role is not enabled for this clinic.</Alert>;
+    case 'pharmacist':     return can('pharmacy') ? <PharmacistDashboard /> : <Alert severity="error">This role is not enabled for this clinic.</Alert>;
     default:               return <AdminDashboard />;
   }
 }

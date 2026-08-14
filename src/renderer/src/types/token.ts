@@ -46,6 +46,9 @@ export interface Prescription {
   advice: string;
   thumbName?: string | null;
   thumbnail?: string | null;
+  pharmacyStatus?: 'PENDING' | 'DISPENSED';
+  dispensedAt?: string | null;
+  invoiceId?: string | null;
   createdAt: string;
 }
 
@@ -65,4 +68,26 @@ export interface PrescriptionFeedItem {
   patientName: string;
   doctorName: string;
   createdAt: string;
+}
+
+export interface PharmacyQueueItem {
+  prescriptionId: string;
+  tokenId: string;
+  tokenNumber: number;
+  date: string;
+  patientId: string;
+  doctorId: string;
+  patientName: string;
+  patientMrNumber: string | null;
+  doctorName: string;
+  diagnosis: string;
+  medicines: PrescriptionMedicine[];
+  tests: string[];
+  advice: string;
+  pharmacyStatus: 'PENDING' | 'DISPENSED';
+  dispensedAt: string | null;
+  invoiceId: string | null;
+  appointmentCompleted: boolean;
+  createdAt: string;
+  updatedAt: string;
 }

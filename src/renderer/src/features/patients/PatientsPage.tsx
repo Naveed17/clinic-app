@@ -14,6 +14,7 @@ import { tableSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, T
 import { ConfirmDialog } from '@/components/DialogUI';
 import { patientsService } from '@/services/patients.service';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 import type { Patient } from '@/types/patient';
 import { PatientDialog } from './PatientDialog';
 import { PatientHistoryDialog } from './PatientHistoryDialog';
@@ -22,9 +23,12 @@ export function PatientsPage(): React.JSX.Element {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { can } = useLicense();
+  const canViewRecords = can('managePatients');
   const isDoctor = user?.role === 'doctor';
   const isLabTech = user?.role === 'lab_technician';
   const isAdmin = user?.role === 'admin';
+  const canManagePatients = canViewRecords && !isAdmin && !isLabTech;
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(0);
@@ -77,7 +81,7 @@ export function PatientsPage(): React.JSX.Element {
       <TablePageShell
         title="Patients"
         subtitle="Manage patient records and contact details."
-        {...(!isLabTech && !isAdmin && {
+        {...(canManagePatients && {
           action: (
             <Button onClick={openCreate} startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }}>
               Add patient
@@ -211,20 +215,26 @@ export function PatientsPage(): React.JSX.Element {
 
                   <TableCell align="right">
                     <Stack direction="row" gap={0.5} justifyContent="flex-end">
+                      {canViewRecords && (
+                      <>
                       <Tooltip title="View profile">
                         <IconButton sx={actionBtnSx} onClick={() => navigate(`/patients/${patient.id}`)}><PersonOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
                       </Tooltip>
                       <Tooltip title="View history">
                         <IconButton sx={actionBtnSx} onClick={() => setHistoryPatient(patient)}><HistoryOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
                       </Tooltip>
-                      {!isAdmin && (<>
+                      </>
+                      )}
+                      {canManagePatients && (
+                      <>
                       <Tooltip title="Edit">
                         <IconButton sx={actionBtnSx} onClick={() => openEdit(patient)}><EditOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
                       </Tooltip>
                       <Tooltip title="Delete">
                         <IconButton sx={{ ...actionBtnSx, '&:hover': { bgcolor: 'error.lighter', color: 'error.main' } }} onClick={() => setDeletePatient(patient)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton>
                       </Tooltip>
-                      </>)}
+                      </>
+                      )}
                     </Stack>
                   </TableCell>
                 </TableRow>
@@ -235,7 +245,7 @@ export function PatientsPage(): React.JSX.Element {
       </TablePageShell>
 
       <PatientDialog open={isDialogOpen} patient={dialogPatient} onClose={() => setDialogOpen(false)} />
-      {historyPatient && <PatientHistoryDialog patient={historyPatient} onClose={() => setHistoryPatient(undefined)} />}
+      {canViewRecords && historyPatient && <PatientHistoryDialog patient={historyPatient} onClose={() => setHistoryPatient(undefined)} />}
 
       <ConfirmDialog
         open={Boolean(deletePatient)}
