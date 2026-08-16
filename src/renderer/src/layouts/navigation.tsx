@@ -1,4 +1,5 @@
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
+import MeetingRoomOutlinedIcon from '@mui/icons-material/MeetingRoomOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
@@ -23,6 +24,7 @@ export interface NavigationItem {
 
 const ALL_NAV_ITEMS: NavigationItem[] = [
   { label: 'Dashboard',    path: '/dashboard',    icon: <DashboardOutlinedIcon /> },
+  { label: 'Waiting Room', path: '/waiting-room', icon: <MeetingRoomOutlinedIcon /> },
   { label: 'Patients',     path: '/patients',     icon: <GroupOutlinedIcon /> },
   { label: 'Appointments', path: '/appointments', icon: <CalendarMonthOutlinedIcon /> },
   { label: 'Tokens',       path: '/tokens',       icon: <ConfirmationNumberOutlinedIcon /> },

@@ -85,6 +85,7 @@ export function PurchaseDialog({ onClose }: Props): React.JSX.Element {
       onClose();
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Failed to create purchase.'),
+    meta: { toast: 'Purchase created', errorToast: 'Failed to create purchase.' },
   });
 
   const canSave =

@@ -8,6 +8,7 @@ export type AppRoute =
   | '/patients/:id'
   | '/appointments'
   | '/tokens'
+  | '/waiting-room'
   | '/billing'
   | '/lab'
   | '/statistics'
@@ -24,6 +25,7 @@ export const ROUTE_ACCESS: Record<AppRoute, UserRole[]> = {
   '/patients/:id': ['admin', 'doctor', 'receptionist', 'lab_technician'],
   '/appointments': ['admin', 'doctor', 'receptionist'],
   '/tokens':       ['admin', 'receptionist'],
+  '/waiting-room': ['doctor'],
   '/billing':      ['admin', 'receptionist', 'pharmacist'],
   '/lab':          ['admin', 'receptionist', 'lab_technician'],
   '/statistics':   ['admin'],
@@ -45,6 +47,7 @@ export const ROUTE_MODULE: Partial<Record<AppRoute, keyof LicenseModules>> = {
   '/lab':        'labDashboard',
   '/statistics': 'statistics',
   '/tokens':     'tokens',
+  '/waiting-room': 'tokens',
   '/doctors':    'manageDoctors',
   '/schedule':   'manageDoctors',
   '/patients/:id': 'managePatients',

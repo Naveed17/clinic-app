@@ -107,6 +107,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       setPatientId(patient.id);
       setStep(1);
     },
+    meta: { toast: 'Patient created', errorToast: 'Could not register patient.' },
   });
 
   const tokenMutation = useMutation({
@@ -128,6 +129,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       setPreviewAutoPrint(true);
       setPreviewToken(token);
     },
+    meta: { silent: true },
   });
 
   function handleClose() {
@@ -334,6 +336,7 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
       setPatientName(`${patient.firstName} ${patient.lastName}`);
       setStep(1);
     },
+    meta: { toast: 'Patient created', errorToast: 'Could not register patient.' },
   });
 
   const appointmentMutation = useMutation({
@@ -354,6 +357,7 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
       await qc.invalidateQueries({ queryKey: ['appointments'] });
       setDone(true);
     },
+    meta: { silent: true },
   });
 
   function handleClose() {

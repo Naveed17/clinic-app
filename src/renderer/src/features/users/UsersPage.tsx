@@ -159,6 +159,10 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
       await queryClient.invalidateQueries({ queryKey: ['users'] });
       onClose();
     },
+    meta: {
+      toast: user ? 'User updated' : 'User created',
+      errorToast: 'Unable to save the user.',
+    },
   });
 
   useEffect(() => {
@@ -271,6 +275,7 @@ export function UsersPage(): React.JSX.Element {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => usersService.delete(id),
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['users'] }); setDeleteUser(undefined); },
+    meta: { toast: 'User deleted', errorToast: 'Unable to delete this user.' },
   });
   const users = usersQuery.data?.data ?? [];
 

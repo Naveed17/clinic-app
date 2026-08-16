@@ -86,6 +86,7 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
       await qc.invalidateQueries({ queryKey: ['doctor', doctorId] });
       onClose();
     },
+    meta: { toast: 'Doctor updated', errorToast: 'Unable to save doctor.' },
   });
 
   const { errors } = form.formState;

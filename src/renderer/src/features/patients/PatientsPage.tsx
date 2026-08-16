@@ -55,6 +55,7 @@ export function PatientsPage(): React.JSX.Element {
       await queryClient.invalidateQueries({ queryKey: ['patients'] });
       setDeletePatient(undefined);
     },
+    meta: { toast: 'Patient deleted', errorToast: 'Unable to delete this patient.' },
   });
 
   const theme = useTheme();

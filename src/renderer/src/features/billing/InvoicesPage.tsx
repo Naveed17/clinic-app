@@ -102,6 +102,7 @@ function VoidDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => voi
   const mutation = useMutation({
     mutationFn: () => window.clinic.invoices.void(invoice.id),
     onSuccess: async () => { await qc.invalidateQueries({ queryKey: ['invoices'] }); onClose(); },
+    meta: { toast: 'Invoice voided', errorToast: 'Failed to void invoice.' },
   });
   return (
     <ConfirmDialog
@@ -123,6 +124,7 @@ function DeleteInvoiceDialog({ invoice, onClose }: { invoice: Invoice; onClose: 
   const mutation = useMutation({
     mutationFn: () => window.clinic.invoices.delete(invoice.id),
     onSuccess: async () => { await qc.invalidateQueries({ queryKey: ['invoices'] }); onClose(); },
+    meta: { toast: 'Invoice deleted', errorToast: 'Failed to delete invoice.' },
   });
   return (
     <ConfirmDialog
@@ -155,6 +157,7 @@ function PaymentDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => 
       await queryClient.invalidateQueries({ queryKey: ['invoices'] });
       onClose();
     },
+    meta: { toast: 'Payment recorded', errorToast: 'Failed to record payment.' },
   });
   return (
     <Dialog open fullWidth maxWidth="xs" onClose={onClose} PaperProps={dialogPaperProps}>
@@ -236,6 +239,7 @@ export function InvoiceDialog({
       onClose();
       onCreated?.(invoice as Invoice);
     },
+    meta: { toast: 'Invoice created', errorToast: 'Unable to create the invoice.' },
   });
   useEffect(() => {
     if (!open) return;

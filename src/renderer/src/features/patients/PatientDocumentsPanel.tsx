@@ -22,6 +22,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { toWhatsAppNumber } from '@shared/whatsappPhone';
 import { openWhatsAppWeb } from '@/utils/whatsappWeb';
+import { showAppToast } from '@/components/AppToast';
 import type { Patient } from '@/types/patient';
 import { DocViewerDialog, type DocViewerData } from './DocViewerDialog';
 
@@ -60,6 +61,7 @@ export function PatientDocumentsPanel({ patient }: { patient: Patient }): React.
   const uploadMutation = useMutation({
     mutationFn: () => window.clinic.docs.patient.upload(patient.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['patient-docs', patient.id] }),
+    meta: { toast: 'Document uploaded', errorToast: 'Unable to upload document.' },
   });
   const deleteMutation = useMutation({
     mutationFn: (id: string) => window.clinic.docs.patient.delete(id),
@@ -67,6 +69,7 @@ export function PatientDocumentsPanel({ patient }: { patient: Patient }): React.
       qc.invalidateQueries({ queryKey: ['patient-docs', patient.id] });
       setDeleteDocId(null);
     },
+    meta: { toast: 'Document deleted', errorToast: 'Unable to delete document.' },
   });
 
   async function sendDoc(docId: string): Promise<void> {
@@ -77,16 +80,15 @@ export function PatientDocumentsPanel({ patient }: { patient: Patient }): React.
     setWaSending(docId);
     try {
       const res = await window.clinic.docs.patient.whatsapp(docId, phone);
-      setWaSnack({
-        open: true,
-        success: Boolean(res.success),
-        msg: res.success ? 'Document sent on WhatsApp!' : res.error || 'Failed to send.',
-      });
+      if (res.success) {
+        showAppToast({ type: 'success', message: 'Document sent on WhatsApp' });
+      } else {
+        showAppToast({ type: 'error', message: res.error || 'Failed to send.' });
+      }
     } catch (err) {
-      setWaSnack({
-        open: true,
-        success: false,
-        msg: err instanceof Error ? err.message : 'Failed to send.',
+      showAppToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to send.',
       });
     } finally {
       setWaSending(null);

@@ -27,6 +27,7 @@ import {
 import { doctorsService } from '@/services/doctors.service';
 import { patientsService } from '@/services/patients.service';
 import { toWhatsAppNumber } from '@shared/whatsappPhone';
+import { showAppToast } from '@/components/AppToast';
 import type { Doctor } from '@/types/doctor';
 import type { Patient } from '@/types/patient';
 
@@ -206,6 +207,10 @@ export function WhatsAppCampaignDialog({
           : {}),
       });
       setResult({ sent: res.sent, failed: res.failed, errors: res.errors ?? [] });
+      showAppToast({
+        type: res.failed ? 'error' : 'success',
+        message: res.failed ? `Campaign sent with ${res.failed} failed` : 'Campaign sent',
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Campaign failed.');
     } finally {

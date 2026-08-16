@@ -2,13 +2,14 @@ import type { PropsWithChildren } from 'react';
 import React, { useMemo, useState, useEffect } from 'react';
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import type { PaletteMode } from '@mui/material';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ColorModeContext, type ColorMode } from './colorMode';
 import { createAppTheme } from './theme';
 import { AuthProvider } from '@/features/auth/AuthContext';
 import { LicenseModulesProvider } from '@/features/auth/LicenseModulesContext';
 import { useSocket, useRealtimeInvalidation } from '@/hooks';
 import { AppointmentToast } from '@/components/AppointmentToast';
+import { AppToastHost, showAppToast } from '@/components/AppToast';
 import { UpdateBanner } from '@/components/UpdateBanner';
 import { UpdateProvider } from '@/context/updateProvider';
 import { DatabaseModeProvider } from '@/context/DatabaseModeProvider';
@@ -24,7 +25,7 @@ function RealtimeBootstrap({ children }: PropsWithChildren): React.JSX.Element {
     return off;
   }, []);
 
-  return <>{children}<AppointmentToast /><UpdateBanner /></>;
+  return <>{children}<AppointmentToast /><AppToastHost /><UpdateBanner /></>;
 }
 
 export function AppProviders({ children }: PropsWithChildren): React.JSX.Element {
@@ -39,6 +40,20 @@ export function AppProviders({ children }: PropsWithChildren): React.JSX.Element
         defaultOptions: {
           queries: { retry: 1, refetchOnWindowFocus: false },
         },
+        mutationCache: new MutationCache({
+          onSuccess: (_data, _vars, _ctx, mutation) => {
+            const meta = mutation.meta;
+            if (meta?.silent || !meta?.toast) return;
+            showAppToast({ type: 'success', message: meta.toast });
+          },
+          onError: (_error, _vars, _ctx, mutation) => {
+            const meta = mutation.meta;
+            if (meta?.silent || meta?.errorToast === false) return;
+            if (typeof meta?.errorToast === 'string') {
+              showAppToast({ type: 'error', message: meta.errorToast });
+            }
+          },
+        }),
       }),
   );
   const colorMode = useMemo(

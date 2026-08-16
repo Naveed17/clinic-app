@@ -17,6 +17,7 @@ export interface Token {
   notes: string | null;
   reason: string | null;
   createdAt: string;
+  updatedAt?: string;
   patient: TokenPerson;
   doctor: TokenPerson;
   prescription: Prescription | null;

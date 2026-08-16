@@ -42,6 +42,7 @@ import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
 import { getNavItems } from './navigation';
 import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
 import { GlobalSearchModal } from '@/components/GlobalSearchModal';
+import { showAppToast } from '@/components/AppToast';
 import {
   FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogPaperProps,
@@ -69,7 +70,6 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
   const [pwNew, setPwNew] = useState('');
   const [pwConfirm, setPwConfirm] = useState('');
   const [pwError, setPwError] = useState('');
-  const [pwSuccess, setPwSuccess] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -92,8 +92,15 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
     setPwLoading(true); setPwError('');
     const result = await window.clinic?.auth.changePassword(user!.id, pwCurrent, pwNew);
     setPwLoading(false);
-    if (result?.ok) { setPwSuccess(true); setTimeout(() => { setPwDialogOpen(false); setPwSuccess(false); setPwCurrent(''); setPwNew(''); setPwConfirm(''); }, 1500); }
-    else { setPwError(result?.error ?? 'Failed to change password.'); }
+    if (result?.ok) {
+      showAppToast({ type: 'success', message: 'Password changed' });
+      setPwDialogOpen(false);
+      setPwCurrent('');
+      setPwNew('');
+      setPwConfirm('');
+    } else {
+      setPwError(result?.error ?? 'Failed to change password.');
+    }
   }
 
   const handleLogout = () => {
@@ -321,7 +328,6 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
             <FormDialogTitle title="Change Password" subtitle="Enter your current and new password." />
             <DialogContent sx={dialogContentSx}>
               <Stack spacing={2} sx={{ mt: 1 }}>
-                {pwSuccess && <Alert severity="success">Password changed successfully!</Alert>}
                 {pwError && <Alert severity="error">{pwError}</Alert>}
                 <TextField label="Current Password" type="password" fullWidth value={pwCurrent} onChange={(e) => setPwCurrent(e.target.value)} />
                 <TextField label="New Password" type="password" fullWidth value={pwNew} onChange={(e) => setPwNew(e.target.value)} />

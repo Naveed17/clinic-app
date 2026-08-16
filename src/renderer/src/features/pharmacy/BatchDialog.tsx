@@ -49,6 +49,7 @@ export function BatchDialog({ onClose, defaultMedicineId }: Props): React.JSX.El
       onClose();
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Failed to create batch.'),
+    meta: { toast: 'Batch created', errorToast: 'Failed to create batch.' },
   });
 
   const canSave = !!medicineId && batchNumber.trim() && !!expiryDate;

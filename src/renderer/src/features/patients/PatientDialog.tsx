@@ -102,6 +102,10 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
       await queryClient.invalidateQueries({ queryKey: ['patients'] });
       onClose();
     },
+    meta: {
+      toast: patient ? 'Patient updated' : 'Patient created',
+      errorToast: 'Unable to save the patient.',
+    },
   });
 
   useEffect(() => {

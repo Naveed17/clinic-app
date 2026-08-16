@@ -11,6 +11,7 @@ import {
 } from '@/components/DialogUI';
 import { toWhatsAppNumber } from '@shared/whatsappPhone';
 import { openWhatsAppWeb } from '@/utils/whatsappWeb';
+import { showAppToast } from '@/components/AppToast';
 import type { Patient } from '@/types/patient';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 
@@ -55,6 +56,7 @@ export function PatientWhatsAppSendDialog({
         return;
       }
       setSent(true);
+      showAppToast({ type: 'success', message: 'WhatsApp message sent' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Send failed.');
     } finally {

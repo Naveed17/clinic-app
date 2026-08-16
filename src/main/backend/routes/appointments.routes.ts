@@ -103,6 +103,9 @@ export function createAppointmentsRouter(io: SocketIOServer): Router {
       if (appointment) {
         emitNotification(io, { kind: 'info', title: 'Appointment updated', message: `Appointment status changed to ${appointment.status}.`, payload: { entity: 'appointment', id: appointment.id } });
         emitDataChange(io, 'appointment', 'updated');
+        if (String((req.body as { status: string }).status) === 'COMPLETED') {
+          emitDataChange(io, 'token', 'updated');
+        }
       }
       res.json(appointment);
     }),

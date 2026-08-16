@@ -30,6 +30,7 @@ export function CategoryDialog({ onClose }: Props): React.JSX.Element {
       onClose();
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Failed to create category.'),
+    meta: { toast: 'Category created', errorToast: 'Failed to create category.' },
   });
 
   return (

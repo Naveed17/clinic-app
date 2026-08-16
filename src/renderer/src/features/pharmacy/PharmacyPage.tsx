@@ -106,6 +106,7 @@ export function PharmacyPage(): React.JSX.Element {
       void qc.invalidateQueries({ queryKey: ['medicines'] });
       setDeleteMed(null);
     },
+    meta: { toast: 'Medicine deleted', errorToast: 'Unable to delete medicine.' },
   });
 
   function changeTab(next: TabKey) {

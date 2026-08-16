@@ -49,6 +49,7 @@ export function MovementDialog({ onClose }: Props): React.JSX.Element {
       onClose();
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Failed to record movement.'),
+    meta: { toast: 'Stock movement recorded', errorToast: 'Failed to record movement.' },
   });
 
   return (

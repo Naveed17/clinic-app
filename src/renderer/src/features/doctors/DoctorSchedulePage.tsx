@@ -25,7 +25,6 @@ export function DoctorSchedulePage(): React.JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
   const [doctorId, setDoctorId] = useState(() => searchParams.get('doctorId') ?? '');
   const [slots, setSlots] = useState<SlotState[]>(emptySlots());
-  const [saved, setSaved] = useState(false);
 
   const doctors = useQuery<{ id: string; firstName: string; lastName: string; isActive: boolean }[]>({
     queryKey: ['schedule-doctors'],
@@ -43,6 +42,7 @@ export function DoctorSchedulePage(): React.JSX.Element {
       void qc.invalidateQueries({ queryKey: ['schedule-doctors'] });
       void qc.invalidateQueries({ queryKey: ['doctors'] });
     },
+    meta: { toast: 'Doctor status updated' },
   });
 
   const scheduleQuery = useQuery({
@@ -79,9 +79,8 @@ export function DoctorSchedulePage(): React.JSX.Element {
       void qc.invalidateQueries({ queryKey: ['schedule', doctorId] });
       void qc.invalidateQueries({ queryKey: ['doctor', doctorId] });
       void qc.invalidateQueries({ queryKey: ['doctors'] });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
     },
+    meta: { toast: 'Schedule saved', errorToast: 'Unable to save schedule.' },
   });
 
   const updateSlot = (day: number, patch: Partial<SlotState>) =>
@@ -209,7 +208,6 @@ export function DoctorSchedulePage(): React.JSX.Element {
                 >
                   Save schedule
                 </Button>
-                {saved && <Alert severity="success" sx={{ py: 0.5, px: 2, borderRadius: 2 }}>Schedule saved!</Alert>}
                 {saveMutation.isError && (
                   <Alert severity="error" sx={{ py: 0.5, px: 2, borderRadius: 2 }}>
                     {(saveMutation.error as Error)?.message || 'Failed to save.'}

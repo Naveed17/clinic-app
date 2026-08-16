@@ -37,6 +37,7 @@ export function SupplierDialog({ onClose }: Props): React.JSX.Element {
       onClose();
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Failed to save supplier.'),
+    meta: { toast: 'Supplier created', errorToast: 'Failed to save supplier.' },
   });
 
   return (

@@ -128,6 +128,7 @@ export function PharmacistDashboard(): React.JSX.Element {
       await qc.invalidateQueries({ queryKey: ['inventory-low-stock'] });
       setSelected(null);
     },
+    meta: { toast: 'Prescription dispensed', errorToast: 'Unable to dispense.' },
   });
 
   const softCard = {

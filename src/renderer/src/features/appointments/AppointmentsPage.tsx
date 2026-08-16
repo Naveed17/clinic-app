@@ -120,6 +120,7 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
       void qc.invalidateQueries({ queryKey: ['tokens'] });
       onIssued(token);
     },
+    meta: { silent: true },
   });
   return (
     <Box sx={{ mt: 1.5, p: 1.5, border: '1px dashed', borderColor: 'warning.main', borderRadius: 2, bgcolor: 'warning.50' }}>
@@ -235,6 +236,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
       onClose();
       onSuccess?.();
     },
+    meta: { silent: true },
   });
 
   useEffect(() => {
@@ -448,6 +450,7 @@ export function AppointmentsPage(): React.JSX.Element {
   const cancelMutation = useMutation({
     mutationFn: appointmentsService.cancel,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['appointments'] }),
+    meta: { silent: true },
   });
   const deleteMutation = useMutation({
     mutationFn: appointmentsService.delete,
@@ -455,11 +458,16 @@ export function AppointmentsPage(): React.JSX.Element {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       setDeleteTarget(undefined);
     },
+    meta: { silent: true },
   });
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       appointmentsService.updateStatus(id, status as Appointment['status']),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['appointments'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      void queryClient.invalidateQueries({ queryKey: ['tokens'] });
+    },
+    meta: { silent: true },
   });
 
   const allData = user?.role === 'doctor'

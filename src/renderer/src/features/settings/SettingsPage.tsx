@@ -39,6 +39,7 @@ import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense, useRefreshLicenseModules } from '@/features/auth/LicenseModulesContext';
 import { PhoneInputField } from '@/components/PhoneInputField';
+import { showAppToast } from '@/components/AppToast';
 import { WhatsAppCampaignDialog } from '@/features/settings/WhatsAppCampaignDialog';
 import {
   WhatsAppConnectMetaDialog,
@@ -108,10 +109,7 @@ export function SettingsPage(): React.JSX.Element {
         : 'Downloading update...';
 
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [restarting, setRestarting] = useState(false);
   const [lanIp, setLanIp] = useState<string>('...');
-  const [backupStatus, setBackupStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -166,28 +164,27 @@ export function SettingsPage(): React.JSX.Element {
   const [testResult, setTestResult] = useState<boolean | null>(null);
 
   async function handleBackup() {
-    setBackupLoading(true); setBackupStatus(null);
+    setBackupLoading(true);
     const result = await window.clinic?.backup.create() as { ok?: boolean; canceled?: boolean; path?: string; mode?: string; error?: string } | undefined;
     setBackupLoading(false);
     if (result?.canceled) return;
     if (result?.ok) {
       const extra = result.mode === 'full' ? ' (database + documents)' : result.mode === 'db' ? ' (database only)' : '';
-      setBackupStatus({ type: 'success', msg: `Backup saved${extra}: ${result.path ?? ''}` });
+      showAppToast({ type: 'success', message: `Backup saved${extra}` });
     } else {
-      setBackupStatus({ type: 'error', msg: result?.error ?? 'Backup failed.' });
+      showAppToast({ type: 'error', message: result?.error ?? 'Backup failed.' });
     }
   }
 
   async function handleRestore() {
-    setRestoreLoading(true); setBackupStatus(null);
+    setRestoreLoading(true);
     const result = await window.clinic?.backup.restore() as { ok?: boolean; canceled?: boolean; mode?: string; error?: string } | undefined;
     setRestoreLoading(false);
     if (result?.canceled) return;
     if (result?.ok) {
-      const extra = result.mode === 'full' ? ' Database and documents restored.' : ' Database restored.';
-      setBackupStatus({ type: 'success', msg: `Restore successful!${extra} Please restart the app.` });
+      showAppToast({ type: 'success', message: 'Restore successful. Please restart the app.' });
     } else {
-      setBackupStatus({ type: 'error', msg: result?.error ?? 'Restore failed.' });
+      showAppToast({ type: 'error', message: result?.error ?? 'Restore failed.' });
     }
   }
 
@@ -285,14 +282,12 @@ export function SettingsPage(): React.JSX.Element {
       setPrevMode(settings.serverMode);
 
       if (needsRelaunch) {
-        setRestarting(true);
-        setSaved(true);
+        showAppToast({ type: 'success', message: 'Settings saved — restarting…' });
         setTimeout(() => {
           void window.clinic?.settings.relaunch?.();
         }, 900);
       } else {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+        showAppToast({ type: 'success', message: 'Settings saved' });
       }
     } finally {
       setSaving(false);
@@ -1110,7 +1105,6 @@ export function SettingsPage(): React.JSX.Element {
                       Restore Backup
                     </Button>
                   </Stack>
-                  {backupStatus && <Alert severity={backupStatus.type}>{backupStatus.msg}</Alert>}
                 </Stack>
               )}
             </Box>
@@ -1123,11 +1117,6 @@ export function SettingsPage(): React.JSX.Element {
             <Button variant="contained" loading={saving} onClick={() => void handleSave()}>
               Save Settings
             </Button>
-            {saved && (
-              <Alert severity="success" sx={{ py: 0.5 }}>
-                {restarting ? 'Saved! Restarting app...' : 'Saved!'}
-              </Alert>
-            )}
           </Stack>
         </Stack>
       )}

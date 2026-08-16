@@ -76,6 +76,10 @@ export function StockDialog({ medicine, onClose }: Props): React.JSX.Element {
       void qc.invalidateQueries({ queryKey: ['medicines'] });
       onClose();
     },
+    meta: {
+      toast: isEdit ? 'Medicine updated' : 'Medicine created',
+      errorToast: 'Unable to save medicine.',
+    },
   });
 
   return (

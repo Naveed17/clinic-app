@@ -20,6 +20,7 @@ import {
 } from '@/components/DialogUI';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { appointmentsService } from '@/services/appointments.service';
@@ -49,6 +50,8 @@ export function DoctorDashboard(): React.JSX.Element {
   const { user } = useAuth();
   const { can } = useLicense();
   const canViewPatientHistory = can('managePatients');
+  const showWaitingRoom = can('tokens');
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const theme = useTheme();
   const greeting = new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening';
@@ -69,6 +72,14 @@ export function DoctorDashboard(): React.JSX.Element {
 
   const { data: raw = [] } = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const appointments = (raw as Appointment[]).filter((a) => a.providerId === user?.id);
+
+  const todayKey = new Date().toLocaleDateString('en-CA');
+  const { data: todayTokens = [] } = useQuery<Token[]>({
+    queryKey: ['tokens', todayKey],
+    queryFn: () => window.clinic.tokens.list(todayKey),
+    enabled: showWaitingRoom,
+  });
+  const waitingRoomCount = todayTokens.filter((t) => t.doctorId === user?.id && t.status === 'WAITING').length;
 
   async function openPrescription(appt: Appointment) {
     const apptDate = new Date(appt.startsAt).toLocaleDateString('en-CA');
@@ -116,7 +127,6 @@ export function DoctorDashboard(): React.JSX.Element {
   }
 
   const now = new Date();
-  const todayKey = now.toLocaleDateString('en-CA');
 
   const byTokenDesc = (a: Appointment, b: Appointment) => {
     const ta = a.tokenNumber ?? -1;
@@ -149,6 +159,7 @@ export function DoctorDashboard(): React.JSX.Element {
     }) => appointmentsService.updateStatus(id, status),
     onSuccess: async (_data, variables) => {
       await qc.invalidateQueries({ queryKey: ['appointments'] });
+      await qc.invalidateQueries({ queryKey: ['tokens'] });
       if (variables.status !== 'COMPLETED') return;
       const appt =
         variables.appt ??
@@ -156,6 +167,7 @@ export function DoctorDashboard(): React.JSX.Element {
         appointments.find((a) => a.id === variables.id);
       if (appt) await openPrescription(appt);
     },
+    meta: { silent: true },
   });
 
   const tabSx = {
@@ -321,7 +333,17 @@ export function DoctorDashboard(): React.JSX.Element {
           </Typography>
         </Box>
         {/* Stats pills */}
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          {showWaitingRoom && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => navigate('/waiting-room')}
+              sx={{ fontWeight: 700, borderRadius: 1, textTransform: 'none', mr: 0.5 }}
+            >
+              Waiting Room{waitingRoomCount > 0 ? ` · ${waitingRoomCount}` : ''}
+            </Button>
+          )}
           {[
             { label: 'Scheduled', value: appointments.filter((a) => a.status === 'SCHEDULED').length, color: theme.palette.primary.main },
             { label: 'Checked In', value: appointments.filter((a) => a.status === 'CHECKED_IN').length, color: theme.palette.warning.main },

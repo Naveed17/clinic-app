@@ -11,7 +11,7 @@ import {
   updateAppointment,
   updateAppointmentStatus,
 } from './appointment.service';
-import { emitNotification } from '../backend/realtime';
+import { emitNotification, emitDataChange } from '../backend/realtime';
 
 export function registerAppointmentIpc(io?: SocketIOServer): void {
   ipcMain.handle('appointments:list', () => listAppointments());
@@ -53,7 +53,15 @@ export function registerAppointmentIpc(io?: SocketIOServer): void {
   });
   ipcMain.handle('appointments:updateStatus', async (_, id, status) => {
     const appointment = await updateAppointmentStatus(id, status);
-    if (io && appointment) emitNotification(io, { kind: 'info', title: 'Appointment updated', message: `Appointment status changed to ${appointment?.status}.`, payload: { entity: 'appointment', id: appointment.id } });
+    if (io && appointment) {
+      emitNotification(io, {
+        kind: 'info',
+        title: 'Appointment updated',
+        message: `Appointment status changed to ${appointment?.status}.`,
+        payload: { entity: 'appointment', id: appointment.id, providerId: appointment.providerId },
+      });
+      if (status === 'COMPLETED') emitDataChange(io, 'token', 'updated');
+    }
     return appointment;
   });
   ipcMain.handle('appointments:delete', async (_, id) => {

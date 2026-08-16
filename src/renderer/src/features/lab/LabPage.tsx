@@ -99,12 +99,14 @@ export function LabPage(): React.JSX.Element {
       setForm({ patientId: '', test: '', notes: '' });
       setDialogOpen(false);
     },
+    meta: { toast: 'Lab order created', errorToast: 'Unable to create lab order.' },
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       window.clinic.lab.updateStatus(id, status),
     onSuccess: invalidate,
+    meta: { toast: 'Lab status updated' },
   });
 
   const resultMutation = useMutation({
@@ -115,6 +117,7 @@ export function LabPage(): React.JSX.Element {
       setResultDialog(null);
       setResultText('');
     },
+    meta: { toast: 'Lab result saved', errorToast: 'Unable to save result.' },
   });
 
   const { data: labReports = [], refetch: refetchReports } = useQuery<{ id: string; name: string; filePath: string; uploadedAt: string }[]>({
@@ -125,6 +128,7 @@ export function LabPage(): React.JSX.Element {
   const uploadReportMutation = useMutation({
     mutationFn: () => window.clinic.docs.lab.upload(resultDialog!.id),
     onSuccess: () => refetchReports(),
+    meta: { toast: 'Report uploaded', errorToast: 'Unable to upload report.' },
   });
   const deleteReportMutation = useMutation({
     mutationFn: (id: string) => window.clinic.docs.lab.delete(id),
@@ -132,6 +136,7 @@ export function LabPage(): React.JSX.Element {
       refetchReports();
       setDeleteReportId(null);
     },
+    meta: { toast: 'Report deleted', errorToast: 'Unable to delete report.' },
   });
 
   const filtered = orders.filter((order) => {

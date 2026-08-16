@@ -39,6 +39,7 @@ export function MedicinePickerDialog({ open, onClose, onAdded }: Props) {
       onClose();
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'Could not save medicine.'),
+    meta: { toast: 'Medicine added', errorToast: 'Could not save medicine.' },
   });
 
   function handleClose() {
@@ -96,6 +97,7 @@ export function MedicineUpdatePriceDialog({ medicine, onClose }: { medicine: Med
       await qc.invalidateQueries({ queryKey: ['medicines'] });
       onClose();
     },
+    meta: { toast: 'Price updated', errorToast: 'Unable to update price.' },
   });
 
   return (

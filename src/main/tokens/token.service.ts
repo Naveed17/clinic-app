@@ -278,6 +278,32 @@ export async function updateTokenStatus(id: string, status: TokenStatus) {
   };
 }
 
+/** Same patient + doctor + local day — used when a visit appointment is completed. */
+export async function completeWaitingTokenForVisit(
+  patientId: string,
+  doctorId: string,
+  visitAt: Date,
+): Promise<string | null> {
+  const date = [
+    visitAt.getFullYear(),
+    String(visitAt.getMonth() + 1).padStart(2, '0'),
+    String(visitAt.getDate()).padStart(2, '0'),
+  ].join('-');
+  const token = await getPrisma().token.findFirst({
+    where: {
+      patientId,
+      doctorId,
+      date,
+      status: 'WAITING',
+    },
+    orderBy: { tokenNumber: 'desc' },
+    select: { id: true },
+  });
+  if (!token) return null;
+  await updateTokenStatus(token.id, 'DONE');
+  return token.id;
+}
+
 export async function upsertPrescription(tokenId: string, input: PrescriptionInput) {
   const db = getPrisma();
   await ensurePrescriptionPharmacyColumns(db);

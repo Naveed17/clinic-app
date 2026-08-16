@@ -126,6 +126,10 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
       await queryClient.invalidateQueries({ queryKey: ['doctors'] });
       onClose();
     },
+    meta: {
+      toast: doctor ? 'Doctor updated' : 'Doctor created',
+      errorToast: 'Unable to save doctor.',
+    },
   });
   const handleSubmit = (values: FormValues) => {
     mutation.mutate(values);
@@ -228,6 +232,7 @@ export function DoctorsPage(): React.JSX.Element {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => doctorsService.delete(id),
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['doctors'] }); setDeleteDoctor(undefined); },
+    meta: { toast: 'Doctor deleted', errorToast: 'Unable to delete this doctor.' },
   });
   const doctors = doctorsQuery.data?.data ?? [];
 

@@ -1,6 +1,7 @@
 import type { AppointmentStatus } from '@prisma/client';
 import { getPrisma } from '../database/client';
 import { assertDoctorAvailable } from '../doctors/schedule.service';
+import { completeWaitingTokenForVisit } from '../tokens/token.service';
 
 export interface AppointmentInput {
   patientId: string;
@@ -238,7 +239,20 @@ export async function cancelAppointment(id: string) {
 
 export async function updateAppointmentStatus(id: string, status: AppointmentStatus) {
   await getPrisma().appointment.update({ where: { id }, data: { status } });
-  return getAppointmentById(id);
+  const appointment = await getAppointmentById(id);
+  if (status === 'COMPLETED' && appointment) {
+    const visitAt = appointment.startsAt instanceof Date
+      ? appointment.startsAt
+      : new Date(String(appointment.startsAt));
+    if (!Number.isNaN(visitAt.getTime())) {
+      await completeWaitingTokenForVisit(
+        String(appointment.patientId),
+        String(appointment.providerId),
+        visitAt,
+      );
+    }
+  }
+  return appointment;
 }
 
 export async function deleteAppointment(id: string) {

@@ -117,6 +117,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
       onClose();
       onSuccess?.(token);
     },
+    meta: { silent: true },
   });
 
   return (
@@ -268,11 +269,13 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
     mutationFn: (test: string) =>
       window.clinic.lab.create({ patientId: token.patientId, orderedById: token.doctorId, tokenId: token.id, test }),
     onSuccess: () => { void refetchLabOrders(); setLabTest(''); },
+    meta: { toast: 'Lab order created' },
   });
 
   const mutation = useMutation({
     mutationFn: () => window.clinic.tokens.upsertPrescription(token.id, { diagnosis, medicines, tests, advice } as PrescriptionInput),
     onSuccess: async () => { await qc.invalidateQueries({ queryKey: ['tokens'] }); onClose(); },
+    meta: { silent: true },
   });
 
   const updateMed = (i: number, field: keyof PrescriptionMedicine, val: string) =>
@@ -542,6 +545,7 @@ export function TokensPage(): React.JSX.Element {
     mutationFn: ({ id, status }: { id: string; status: TokenStatus }) =>
       window.clinic.tokens.updateStatus(id, status),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tokens'] }),
+    meta: { silent: true },
   });
 
   const deleteMutation = useMutation({
@@ -550,6 +554,7 @@ export function TokensPage(): React.JSX.Element {
       qc.invalidateQueries({ queryKey: ['tokens'] });
       setDeleteToken(null);
     },
+    meta: { silent: true },
   });
 
   const roleFiltered = isDoctor ? tokens.filter((t) => t.doctorId === user?.id) : tokens;

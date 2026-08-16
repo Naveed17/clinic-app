@@ -14,6 +14,7 @@ import { DoctorDetailPage } from '@/features/doctors/DoctorDetailPage';
 import { DoctorSchedulePage } from '@/features/doctors/DoctorSchedulePage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { TokensPage } from '@/features/tokens/TokensPage';
+import { WaitingRoomPage } from '@/features/waiting-room/WaitingRoomPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { PharmacyPage } from '@/features/pharmacy/PharmacyPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -126,6 +127,14 @@ const router = createHashRouter([
             element: (
               <RouteAccessGate route="/tokens">
                 <TokensPage />
+              </RouteAccessGate>
+            ),
+          },
+          {
+            path: '/waiting-room',
+            element: (
+              <RouteAccessGate route="/waiting-room">
+                <WaitingRoomPage />
               </RouteAccessGate>
             ),
           },
