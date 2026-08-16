@@ -5,7 +5,6 @@ import ReceiptOutlinedIcon from '@mui/icons-material/ReceiptOutlined';
 import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import {
   Alert, Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, IconButton, Paper, Stack, Tab, Tabs, Tooltip, Typography,
@@ -21,7 +20,7 @@ import type { Patient } from '@/types/patient';
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
 import { formatAdvicePreview } from '@/features/tokens/PrescriptionPadPdf';
 import { PatientDocumentsPanel } from './PatientDocumentsPanel';
-import { PatientWhatsAppSendDialog } from './PatientWhatsAppSendDialog';
+import { PatientWhatsAppButton } from './PatientWhatsAppButton';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 
 const apptStatusColor: Record<string, 'default' | 'primary' | 'warning' | 'success' | 'error'> = {
@@ -266,7 +265,6 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
   const { can } = useLicense();
   const [tab, setTab] = useState(0);
   const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
-  const [waOpen, setWaOpen] = useState(false);
 
   const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list, enabled: can('managePatients') });
   const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list, enabled: can('managePatients') });
@@ -513,21 +511,9 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
       </DialogContent>
 
       <DialogActions sx={{ px: 2.5, py: 1.75, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.default', flexShrink: 0, gap: 1 }}>
-        {can('whatsapp') && (
-          <Button
-            startIcon={<WhatsAppIcon />}
-            onClick={() => setWaOpen(true)}
-            variant="contained"
-            sx={{ borderRadius: 2, fontWeight: 700, bgcolor: '#25D366', '&:hover': { bgcolor: '#1ebe5a' } }}
-          >
-            WhatsApp
-          </Button>
-        )}
+        <PatientWhatsAppButton patient={patient} />
         <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 2, fontWeight: 700 }}>Close</Button>
       </DialogActions>
-      {can('whatsapp') && (
-        <PatientWhatsAppSendDialog open={waOpen} patient={patient} onClose={() => setWaOpen(false)} />
-      )}
     </Dialog>
   );
 }

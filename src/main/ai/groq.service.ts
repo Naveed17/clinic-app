@@ -83,6 +83,26 @@ function escapeText(value: string): string {
 
 type GroqResult = { ok: true; text: string } | { ok: false; error: string };
 
+export async function testGroqConnection(
+  apiKey?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!isLicenseModuleEnabled('ai')) {
+    return { ok: false, error: 'AI is not enabled for this license.' };
+  }
+  const key = (apiKey ?? getSettings().groqApiKey)?.trim();
+  if (!key) return { ok: false, error: 'Groq API key missing.' };
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (res.status === 401) return { ok: false, error: 'Invalid Groq API key.' };
+    if (!res.ok) return { ok: false, error: `Groq error (${res.status})` };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Cannot reach Groq. Check internet connection.' };
+  }
+}
+
 async function groqChat(
   system: string,
   user: string,

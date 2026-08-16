@@ -21,6 +21,7 @@ import { ConfirmDialog } from '@/components/DialogUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { toWhatsAppNumber } from '@shared/whatsappPhone';
+import { openWhatsAppWeb } from '@/utils/whatsappWeb';
 import type { Patient } from '@/types/patient';
 import { DocViewerDialog, type DocViewerData } from './DocViewerDialog';
 
@@ -145,22 +146,26 @@ export function PatientDocumentsPanel({ patient }: { patient: Patient }): React.
                       <FolderOpenOutlinedIcon sx={{ fontSize: 16 }} />
                     </IconButton>
                   </Tooltip>
-                  {can('whatsapp') && (
-                    <Tooltip title={phone ? 'Send on WhatsApp' : 'Patient has no WhatsApp number'}>
-                      <span>
-                        <IconButton
-                          size="small"
-                          disabled={waSending === doc.id || !phone}
-                          sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.15)', '&:hover': { bgcolor: 'rgba(37,211,102,0.8)' } }}
-                          onClick={() => void sendDoc(doc.id)}
-                        >
+                  <Tooltip title={phone ? (can('whatsapp') ? 'Send on WhatsApp' : 'Open WhatsApp Web') : 'Patient has no WhatsApp number'}>
+                    <span>
+                      <IconButton
+                        size="small"
+                        disabled={waSending === doc.id || !phone}
+                        sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.15)', '&:hover': { bgcolor: 'rgba(37,211,102,0.8)' } }}
+                        onClick={() => {
+                          if (can('whatsapp')) {
+                            void sendDoc(doc.id);
+                            return;
+                          }
+                          openWhatsAppWeb(phone);
+                        }}
+                      >
                           {waSending === doc.id
                             ? <CircularProgress size={14} sx={{ color: '#fff' }} />
                             : <WhatsAppIcon sx={{ fontSize: 16 }} />}
                         </IconButton>
                       </span>
                     </Tooltip>
-                  )}
                   {!isAdmin && (
                     <Tooltip title="Delete">
                       <IconButton size="small" sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.15)' }} onClick={() => setDeleteDocId(doc.id)}>

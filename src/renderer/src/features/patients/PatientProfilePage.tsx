@@ -6,7 +6,6 @@ import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined';
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import CakeOutlinedIcon from '@mui/icons-material/CakeOutlined';
@@ -29,10 +28,9 @@ import { appointmentsService } from '@/services/appointments.service';
 import { invoicesService } from '@/services/invoices.service';
 import { patientsService } from '@/services/patients.service';
 import { useAuth } from '@/features/auth/AuthContext';
-import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { PatientDialog } from './PatientDialog';
 import { PatientDocumentsPanel } from './PatientDocumentsPanel';
-import { PatientWhatsAppSendDialog } from './PatientWhatsAppSendDialog';
+import { PatientWhatsAppButton } from './PatientWhatsAppButton';
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
 
 const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
@@ -220,12 +218,10 @@ export function PatientProfilePage(): React.JSX.Element {
   const theme = useTheme();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const { can } = useLicense();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [tab, setTab] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
-  const [waOpen, setWaOpen] = useState(false);
 
   const patientsQuery = useQuery({
     queryKey: ['patients', { page: 1, pageSize: 1, id }],
@@ -314,16 +310,7 @@ export function PatientProfilePage(): React.JSX.Element {
             </Box>
           </Stack>
           <Stack direction="row" spacing={1}>
-            {can('whatsapp') && (
-              <Button
-                startIcon={<WhatsAppIcon />}
-                variant="contained"
-                sx={{ borderRadius: 2, fontWeight: 700, px: 2.25, py: 1, bgcolor: '#25D366', '&:hover': { bgcolor: '#1ebe5a' } }}
-                onClick={() => setWaOpen(true)}
-              >
-                WhatsApp
-              </Button>
-            )}
+            <PatientWhatsAppButton patient={patient} sx={{ px: 2.25, py: 1 }} />
             {!isAdmin && (
               <Button
                 startIcon={<EditOutlinedIcon />}
@@ -687,9 +674,6 @@ export function PatientProfilePage(): React.JSX.Element {
 
       {editOpen && patient && (
         <PatientDialog open={editOpen} patient={patient} onClose={() => setEditOpen(false)} />
-      )}
-      {can('whatsapp') && (
-        <PatientWhatsAppSendDialog open={waOpen} patient={patient} onClose={() => setWaOpen(false)} />
       )}
     </>
   );

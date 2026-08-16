@@ -2,6 +2,7 @@ import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import {
   suggestPrescription,
   summarizePatientHistory,
+  testGroqConnection,
   type SuggestPrescriptionInput,
   type SummarizePatientInput,
 } from './groq.service';
@@ -9,6 +10,10 @@ import {
 type StreamMeta = { requestId?: string };
 
 export function registerAiIpc(): void {
+  ipcMain.handle('ai:test', (_e, input?: { apiKey?: string }) =>
+    testGroqConnection(input?.apiKey),
+  );
+
   ipcMain.handle(
     'ai:suggestPrescription',
     async (event: IpcMainInvokeEvent, input: SuggestPrescriptionInput & StreamMeta) => {

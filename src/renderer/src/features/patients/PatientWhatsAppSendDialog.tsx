@@ -10,7 +10,9 @@ import {
   dialogPaperProps,
 } from '@/components/DialogUI';
 import { toWhatsAppNumber } from '@shared/whatsappPhone';
+import { openWhatsAppWeb } from '@/utils/whatsappWeb';
 import type { Patient } from '@/types/patient';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 
 export function PatientWhatsAppSendDialog({
   open,
@@ -21,6 +23,7 @@ export function PatientWhatsAppSendDialog({
   patient: Patient;
   onClose: () => void;
 }): React.JSX.Element {
+  const { can } = useLicense();
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,20 +83,34 @@ export function PatientWhatsAppSendDialog({
             disabled={sending || sent || !phone}
           />
           <Typography variant="caption" color="text.secondary">
-            Meta test number pe sirf API Setup ke allow-list wale numbers pe message jata hai.
+            Cloud API se in-app send. WhatsApp Web ke liye neeche Open WhatsApp Web dabao.
           </Typography>
         </Stack>
       </DialogContent>
       <DialogActions sx={dialogActionsSx}>
         <Button onClick={onClose} disabled={sending} sx={dialogCancelBtnSx}>{sent ? 'Close' : 'Cancel'}</Button>
-        <SubmitButton
-          loading={sending}
-          disabled={!phone || sent || !text.trim()}
-          onClick={() => void handleSend()}
-          startIcon={<WhatsAppIcon />}
-        >
-          Send
-        </SubmitButton>
+        {phone && (
+          <Button
+            disabled={sending}
+            onClick={() => {
+              openWhatsAppWeb(phone, text);
+              onClose();
+            }}
+            sx={dialogCancelBtnSx}
+          >
+            Open WhatsApp Web
+          </Button>
+        )}
+        {can('whatsapp') && (
+          <SubmitButton
+            loading={sending}
+            disabled={!phone || sent || !text.trim()}
+            onClick={() => void handleSend()}
+            startIcon={<WhatsAppIcon />}
+          >
+            Send
+          </SubmitButton>
+        )}
       </DialogActions>
     </Dialog>
   );

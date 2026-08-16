@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, Stack, TextField } from '@mui/material';
+import { Box, Button, Dialog, DialogActions, DialogContent, Stack, TextField } from '@mui/material';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -82,10 +82,6 @@ export function WhatsAppConnectMetaDialog({
         <FormDialogTitle title="Connect with Meta" />
         <DialogContent sx={dialogContentSx}>
           <Stack spacing={1.5} sx={{ mt: 0.5 }}>
-            <Alert severity="warning">
-              Popup mein existing <strong>CareFlow</strong> WhatsApp account mat select karo — uski Business ID invalid hai.
-              Dono jagah <strong>Create new</strong> choose karo, phir asli number + OTP + card.
-            </Alert>
             <TextField
               label="Business email"
               type="email"

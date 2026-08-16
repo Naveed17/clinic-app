@@ -33,6 +33,7 @@ import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
+import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
 import { useUpdate } from '@/context/updateProvider';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -44,8 +45,19 @@ import {
   type ConnectMetaFormValues,
 } from '@/features/settings/WhatsAppConnectMetaDialog';
 import { launchWhatsAppEmbeddedSignup } from '@/features/settings/whatsappEmbeddedSignup';
+import { GroqConnectDialog } from '@/features/settings/GroqConnectDialog';
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
+
+const META_WA_GET_STARTED =
+  'https://developers.facebook.com/docs/whatsapp/cloud-api/get-started';
+
+function metaWhatsAppApiSetupUrl(appId?: string): string {
+  if (appId) {
+    return `https://developers.facebook.com/apps/${appId}/whatsapp-business/wa-dev-console/`;
+  }
+  return META_WA_GET_STARTED;
+}
 
 interface Settings {
   serverMode: ServerMode;
@@ -142,6 +154,9 @@ export function SettingsPage(): React.JSX.Element {
   const [waConnecting, setWaConnecting] = useState(false);
   const [waConnectOpen, setWaConnectOpen] = useState(false);
   const [waConnectMsg, setWaConnectMsg] = useState<{ type: 'success' | 'error' | 'info'; msg: string } | null>(null);
+  const [groqConnectOpen, setGroqConnectOpen] = useState(false);
+  const [groqConnecting, setGroqConnecting] = useState(false);
+  const [groqConnectMsg, setGroqConnectMsg] = useState<{ type: 'success' | 'error' | 'info'; msg: string } | null>(null);
   const [embeddedMeta, setEmbeddedMeta] = useState<{ configured: boolean; appId: string; configId: string } | null>(null);
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   const [prevMode, setPrevMode] = useState<string | null>(null);
@@ -387,6 +402,40 @@ export function SettingsPage(): React.JSX.Element {
       });
     } finally {
       setWaConnecting(false);
+    }
+  }
+
+  async function handleConnectGroq(values: { apiKey: string; model: string }): Promise<void> {
+    setGroqConnecting(true);
+    setGroqConnectMsg(null);
+    try {
+      const result = await window.clinic.ai.test({ apiKey: values.apiKey });
+      if (!result.ok) {
+        setGroqConnectMsg({ type: 'error', msg: result.error || 'Groq connection failed.' });
+        return;
+      }
+      setSettings((s) =>
+        s
+          ? {
+              ...s,
+              aiEnabled: true,
+              groqApiKey: values.apiKey,
+              groqModel: values.model,
+            }
+          : s,
+      );
+      setGroqConnectOpen(false);
+      setGroqConnectMsg({
+        type: 'success',
+        msg: 'Connected to Groq — key filled for this clinic. Click Save Settings.',
+      });
+    } catch (err) {
+      setGroqConnectMsg({
+        type: 'error',
+        msg: err instanceof Error ? err.message : 'Connect Groq failed.',
+      });
+    } finally {
+      setGroqConnecting(false);
     }
   }
 
@@ -838,10 +887,10 @@ export function SettingsPage(): React.JSX.Element {
             <Box sx={{ maxWidth: 480 }}>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                 <AutoAwesomeOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
-                <Typography variant="h6" fontWeight={700}>AI Assist (Groq)</Typography>
+                <Typography variant="h6" fontWeight={700}>AI Assist (this clinic)</Typography>
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-                Free Groq API for prescription drafts and patient history summaries. Get a key at console.groq.com — no model install on each PC.
+                Prescription drafts and patient history summaries via Groq.
               </Typography>
               <Stack spacing={2}>
                 <FormControlLabel
@@ -854,6 +903,27 @@ export function SettingsPage(): React.JSX.Element {
                   }
                   label="Enable AI features"
                 />
+
+                <Stack spacing={1}>
+                  <Button
+                    variant="contained"
+                    startIcon={groqConnecting ? <CircularProgress size={16} color="inherit" /> : <LoginOutlinedIcon />}
+                    disabled={groqConnecting}
+                    onClick={() => {
+                      setGroqConnectMsg(null);
+                      setGroqConnectOpen(true);
+                    }}
+                    sx={{ alignSelf: 'flex-start' }}
+                  >
+                    {groqConnecting ? 'Connecting…' : 'Connect Groq'}
+                  </Button>
+                  {groqConnectMsg && (
+                    <Alert severity={groqConnectMsg.type} onClose={() => setGroqConnectMsg(null)} sx={{ py: 0.25 }}>
+                      {groqConnectMsg.msg}
+                    </Alert>
+                  )}
+                </Stack>
+
                 <TextField
                   label="Groq API key"
                   size="small"
@@ -864,6 +934,7 @@ export function SettingsPage(): React.JSX.Element {
                   onChange={(e) => setSettings((s) => s && ({ ...s, groqApiKey: e.target.value }))}
                   disabled={!settings.aiEnabled}
                   placeholder="gsk_..."
+                  helperText="Connect Groq ke baad auto-fill, ya manually paste"
                 />
                 <TextField
                   label="Model"
@@ -885,7 +956,7 @@ export function SettingsPage(): React.JSX.Element {
                 <Typography variant="h6" fontWeight={700}>WhatsApp (this clinic)</Typography>
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-                Har clinic ki apni Meta Cloud API. Patient add/delete pe number automatically WhatsApp pe lag jata hai / hat jata hai — yahan table nahi.
+                Patient profile pe WhatsApp Web (wa.me) hamesha free hai. Yeh tab Cloud API ke liye hai — in-app send, documents aur campaigns. Sirf is module wale clinics.
               </Typography>
               <Stack spacing={2} sx={{ maxWidth: 520, mb: 3 }}>
                 <FormControlLabel
@@ -912,9 +983,6 @@ export function SettingsPage(): React.JSX.Element {
                   >
                     {waConnecting ? 'Connecting…' : 'Connect with Meta'}
                   </Button>
-                  <Typography variant="caption" color="text.secondary">
-                    Connect with Meta = asli number, OTP, card, token. Popup mein existing CareFlow WhatsApp account mat select karo — naya account + naya profile banao.
-                  </Typography>
                   {waConnectMsg && (
                     <Alert severity={waConnectMsg.type} onClose={() => setWaConnectMsg(null)} sx={{ py: 0.25 }}>
                       {waConnectMsg.msg}
@@ -956,8 +1024,23 @@ export function SettingsPage(): React.JSX.Element {
                   value={settings.whatsappToken || ''}
                   onChange={(e) => setSettings((s) => s && ({ ...s, whatsappToken: e.target.value }))}
                   disabled={!settings.whatsappEnabled}
-                  helperText="Connect with Meta auto-fill karta hai. Expire ho to button dubara dabao."
+                  helperText="Connect with Meta auto-fill karta hai. Test number ke liye neeche link se Temporary access token copy karo."
                 />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<OpenInNewOutlinedIcon />}
+                  onClick={() =>
+                    window.open(
+                      metaWhatsAppApiSetupUrl(embeddedMeta?.appId),
+                      '_blank',
+                      'noopener,noreferrer',
+                    )
+                  }
+                  sx={{ alignSelf: 'flex-start' }}
+                >
+                  Generate test number token
+                </Button>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Button
                     variant="outlined"
@@ -1054,6 +1137,15 @@ export function SettingsPage(): React.JSX.Element {
         connecting={waConnecting}
         onClose={() => setWaConnectOpen(false)}
         onSubmit={handleConnectWithMeta}
+      />
+
+      <GroqConnectDialog
+        open={groqConnectOpen}
+        connecting={groqConnecting}
+        initialKey={settings?.groqApiKey}
+        initialModel={settings?.groqModel}
+        onClose={() => setGroqConnectOpen(false)}
+        onSubmit={handleConnectGroq}
       />
 
       <WhatsAppCampaignDialog

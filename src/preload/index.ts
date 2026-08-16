@@ -572,6 +572,8 @@ const api = {
       ipc<{ ok: boolean; base64?: string; error?: string }>('print:captureHtml', html, options),
   },
   ai: {
+    test: (input?: { apiKey?: string }) =>
+      ipc<{ ok: boolean; error?: string }>('ai:test', input),
     suggestPrescription: (
       input: {
         diagnosis?: string;

@@ -193,6 +193,7 @@ declare global {
         ) => Promise<{ ok: boolean; base64?: string; error?: string }>;
       };
       ai: {
+        test: (input?: { apiKey?: string }) => Promise<{ ok: boolean; error?: string }>;
         suggestPrescription: (
           input: {
             diagnosis?: string;
