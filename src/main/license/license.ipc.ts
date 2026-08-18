@@ -30,6 +30,35 @@ function getModulesCacheFilePath(): string {
 function getLicenseCacheFilePath(): string {
   return join(app.getPath('userData'), 'license-cache.json');
 }
+function getSupportCacheFilePath(): string {
+  return join(app.getPath('userData'), 'careflow-support.json');
+}
+
+export type CareFlowSupportContact = { phone: string; email: string };
+
+export async function getCareFlowSupport(): Promise<CareFlowSupportContact> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/support`);
+    const data = (await response.json()) as { ok?: boolean; phone?: string; email?: string };
+    const phone = String(data.phone || '').trim();
+    const email = String(data.email || '').trim();
+    if (phone || email) {
+      try {
+        writeFileSync(getSupportCacheFilePath(), JSON.stringify({ phone, email }), 'utf-8');
+      } catch { /* ignore */ }
+      return { phone, email };
+    }
+  } catch { /* offline — use cache */ }
+  try {
+    const cached = JSON.parse(readFileSync(getSupportCacheFilePath(), 'utf-8')) as CareFlowSupportContact;
+    return {
+      phone: String(cached.phone || '').trim(),
+      email: String(cached.email || '').trim(),
+    };
+  } catch {
+    return { phone: '', email: '' };
+  }
+}
 
 type ModulesCache = { key: string; modules: Record<string, boolean>; updatedAt: string };
 type LicenseCache = {
@@ -40,7 +69,17 @@ type LicenseCache = {
   databaseMode?: DatabaseMode;
   clinicalApiUrl?: string | null;
   schemaId?: string | null;
+  lastGate?: 'ok' | 'blocked';
+  lastReason?: string;
 };
+
+export type LicenseGate =
+  | { state: 'ok' }
+  | { state: 'none' }
+  | { state: 'blocked'; reason: string };
+
+const DISABLED_FALLBACK =
+  'This license has been disabled. Contact CareFlow customer support.';
 
 function getHWID(): string {
   try { return machineIdSync(); } catch { return 'UNKNOWN_HWID'; }
@@ -61,9 +100,22 @@ function getDeviceName(): string {
 function getSavedKey(): string | null {
   try {
     const file = getLicenseFilePath();
-    if (!existsSync(file)) return null;
-    return readFileSync(file, 'utf-8').trim();
-  } catch { return null; }
+    if (existsSync(file)) {
+      const key = readFileSync(file, 'utf-8').trim();
+      if (key) return key;
+    }
+  } catch { /* ignore */ }
+  try {
+    const cacheFile = getLicenseCacheFilePath();
+    if (!existsSync(cacheFile)) return null;
+    const cache = JSON.parse(readFileSync(cacheFile, 'utf-8')) as LicenseCache;
+    const key = String(cache.key || '').trim();
+    if (!key) return null;
+    try { writeFileSync(getLicenseFilePath(), key, 'utf-8'); } catch { /* still use cache key */ }
+    return key;
+  } catch {
+    return null;
+  }
 }
 function getLicenseCache(key: string): LicenseCache | null {
   try {
@@ -74,10 +126,34 @@ function getLicenseCache(key: string): LicenseCache | null {
     return cache;
   } catch { return null; }
 }
+function rememberGate(key: string, lastGate: 'ok' | 'blocked', lastReason?: string): void {
+  try {
+    const existing = getLicenseCache(key);
+    const cache: LicenseCache = {
+      key,
+      expiresAt: existing?.expiresAt ?? null,
+      activatedAt: existing?.activatedAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      databaseMode: existing?.databaseMode ?? 'local',
+      clinicalApiUrl: existing?.clinicalApiUrl ?? null,
+      schemaId: existing?.schemaId ?? null,
+      lastGate,
+      lastReason: lastGate === 'ok' ? undefined : (lastReason || existing?.lastReason),
+    };
+    writeFileSync(getLicenseCacheFilePath(), JSON.stringify(cache, null, 2), 'utf-8');
+  } catch { /* ignore */ }
+}
+
 function saveLicenseCache(
   key: string,
   expiresAt: string | null,
-  extra?: { databaseMode?: DatabaseMode; clinicalApiUrl?: string | null; schemaId?: string | null },
+  extra?: {
+    databaseMode?: DatabaseMode;
+    clinicalApiUrl?: string | null;
+    schemaId?: string | null;
+    lastGate?: 'ok' | 'blocked';
+    lastReason?: string;
+  },
 ): void {
   try {
     const existing = getLicenseCache(key);
@@ -89,6 +165,8 @@ function saveLicenseCache(
       databaseMode: extra?.databaseMode ?? existing?.databaseMode ?? 'local',
       clinicalApiUrl: extra?.clinicalApiUrl ?? existing?.clinicalApiUrl ?? null,
       schemaId: extra?.schemaId ?? existing?.schemaId ?? null,
+      lastGate: extra?.lastGate ?? existing?.lastGate,
+      lastReason: extra?.lastGate === 'ok' ? undefined : (extra?.lastReason ?? existing?.lastReason),
     };
     writeFileSync(getLicenseCacheFilePath(), JSON.stringify(cache, null, 2), 'utf-8');
   } catch { /* ignore */ }
@@ -142,6 +220,7 @@ function applyDatabaseModeFromApi(key: string, data: LicenseApiExtras & { expire
     databaseMode,
     clinicalApiUrl: databaseMode === 'online' ? clinicalApiUrl || null : null,
     schemaId: schemaId || null,
+    lastGate: 'ok',
   });
 
   saveDatabaseModeSettings({
@@ -207,9 +286,9 @@ export async function getLicenseModules(): Promise<Record<string, boolean> | nul
 }
 
 // ── Validate ──────────────────────────────────────────────────────────────────
-export async function isLicenseActivated(): Promise<boolean> {
+export async function getLicenseGate(): Promise<LicenseGate> {
   const savedKey = getSavedKey();
-  if (!savedKey) return false;
+  if (!savedKey) return { state: 'none' };
   try {
     const hwid = getHWID();
     const response = await fetch(`${API_BASE_URL}/license/validate`, {
@@ -220,21 +299,31 @@ export async function isLicenseActivated(): Promise<boolean> {
     const data = (await response.json()) as {
       ok: boolean;
       valid: boolean;
+      error?: string;
       expiresAt?: string | null;
     } & LicenseApiExtras;
     if (!data.valid) {
-      try { unlinkSync(getLicenseFilePath()); } catch { /* ignore */ }
-      return false;
+      const reason = String(data.error || '').trim() || DISABLED_FALLBACK;
+      rememberGate(savedKey, 'blocked', reason);
+      return { state: 'blocked', reason };
     }
     applyDatabaseModeFromApi(savedKey, data);
-    return true;
+    return { state: 'ok' };
   } catch {
+    const cache = getLicenseCache(savedKey);
+    if (cache?.lastGate === 'blocked') {
+      return { state: 'blocked', reason: cache.lastReason || DISABLED_FALLBACK };
+    }
     if (isLocallyExpired(savedKey)) {
       console.warn('[License] Offline — license expiry date has passed.');
-      return false;
+      return { state: 'blocked', reason: 'License has expired. Contact CareFlow customer support.' };
     }
-    return true;
+    return { state: 'ok' };
   }
+}
+
+export async function isLicenseActivated(): Promise<boolean> {
+  return (await getLicenseGate()).state === 'ok';
 }
 
 export function getLicenseRuntimeMeta(): {
@@ -258,6 +347,8 @@ export function getLicenseRuntimeMeta(): {
 // ── IPC ───────────────────────────────────────────────────────────────────────
 export function registerLicenseIpc(): void {
   ipcMain.handle('license:status', () => isLicenseActivated());
+  ipcMain.handle('license:gate', () => getLicenseGate());
+  ipcMain.handle('license:support', () => getCareFlowSupport());
   ipcMain.handle('license:modules', () => getLicenseModules());
   ipcMain.handle('license:database-mode', () => {
     const meta = getLicenseRuntimeMeta();

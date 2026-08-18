@@ -20,8 +20,9 @@ import { PharmacyPage } from '@/features/pharmacy/PharmacyPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { RouteAccessGate } from '@/components/RouteAccessGate';
 import { LicensePage } from '@/features/auth/LicensePage';
+import { LicenseDisabledOverlay } from '@/features/auth/LicenseDisabledOverlay';
 import { SetupWizard } from '@/features/auth/SetupWizard';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import { CircularProgress } from '@mui/material';
 
@@ -163,21 +164,40 @@ const router = createHashRouter([
 
 
 export function AppRouter(): React.JSX.Element {
-  const [licensed, setLicensed] = useState<boolean | null>(null);
+  const [gate, setGate] = useState<{ state: 'ok' | 'none' | 'blocked'; reason?: string } | null>(null);
   const [setupDone, setSetupDone] = useState<boolean | null>(null);
+  const [checking, setChecking] = useState(false);
 
-  useEffect(() => {
-    window.clinic.license.status()
-      .then((isOk) => {
-        setLicensed(Boolean(isOk));
-        if (isOk) {
-          void window.clinic.settings.get().then((s) => setSetupDone(Boolean(s.setupDone)));
-        }
-      })
-      .catch(() => setLicensed(false));
+  const loadSetup = useCallback(() => {
+    void window.clinic.settings.get().then((s) => setSetupDone(Boolean(s.setupDone)));
   }, []);
 
-  if (licensed === null || (licensed && setupDone === null)) {
+  const refreshGate = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setChecking(true);
+    try {
+      const next = await window.clinic.license.gate();
+      setGate(next);
+      if (next.state === 'ok') loadSetup();
+    } catch {
+      setGate((prev) => prev ?? { state: 'none' });
+    } finally {
+      if (!opts?.silent) setChecking(false);
+    }
+  }, [loadSetup]);
+
+  useEffect(() => {
+    void refreshGate();
+  }, [refreshGate]);
+
+  useEffect(() => {
+    if (gate?.state !== 'blocked') return;
+    const id = window.setInterval(() => {
+      void refreshGate({ silent: true });
+    }, 12_000);
+    return () => window.clearInterval(id);
+  }, [gate?.state, refreshGate]);
+
+  if (gate === null || (gate.state === 'ok' && setupDone === null)) {
     return (
       <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default' }}>
         <CircularProgress />
@@ -185,11 +205,21 @@ export function AppRouter(): React.JSX.Element {
     );
   }
 
-  if (!licensed) {
+  if (gate.state === 'none') {
     return <LicensePage onActivated={() => {
-      setLicensed(true);
-      void window.clinic.settings.get().then((s) => setSetupDone(Boolean(s.setupDone)));
+      setGate({ state: 'ok' });
+      loadSetup();
     }} />;
+  }
+
+  if (gate.state === 'blocked') {
+    return (
+      <LicenseDisabledOverlay
+        reason={gate.reason || 'This license has been disabled. Contact CareFlow customer support.'}
+        checking={checking}
+        onCheck={() => void refreshGate()}
+      />
+    );
   }
 
   if (!setupDone) {

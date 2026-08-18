@@ -35,13 +35,13 @@ export function createLabRouter(io: SocketIOServer): Router {
   });
 
   router.patch('/:id/status', labStaff, async (req, res) => {
-    const order = await updateLabOrderStatus(req.params.id, req.body.status);
+    const order = await updateLabOrderStatus(String(req.params.id), req.body.status);
     emitDataChange(io, 'lab', 'updated');
     res.json(order);
   });
 
   router.patch('/:id/result', labStaff, async (req, res) => {
-    const order = await saveLabResult(req.params.id, req.body.result);
+    const order = await saveLabResult(String(req.params.id), req.body.result);
     emitDataChange(io, 'lab', 'updated');
     res.json(order);
   });

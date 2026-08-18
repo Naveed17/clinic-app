@@ -131,7 +131,7 @@ export function registerDocumentsIpc(): void {
       const extensions = opts?.extensions?.length
         ? opts.extensions
         : ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'txt'];
-      const maxBytes = Number(opts?.maxBytes) > 0 ? Number(opts.maxBytes) : MAX_CLOUD_BYTES;
+      const maxBytes = Number(opts?.maxBytes) > 0 ? Number(opts?.maxBytes) : MAX_CLOUD_BYTES;
       const { filePaths, canceled } = await dialog.showOpenDialog({
         title: opts?.title || 'Select Document',
         properties: ['openFile', 'multiSelections'],

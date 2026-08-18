@@ -272,6 +272,8 @@ declare global {
       };
       license: {
         status: () => Promise<boolean>;
+        gate: () => Promise<{ state: 'ok' | 'none' | 'blocked'; reason?: string }>;
+        support: () => Promise<{ phone: string; email: string }>;
         activate: (key: string) => Promise<{ ok: boolean; error?: string; databaseMode?: 'local' | 'online' }>;
         modules: () => Promise<Record<string, boolean> | null>;
         databaseMode: () => Promise<{

@@ -24,6 +24,7 @@ export interface LicenseModules {
   pharmacy: boolean;
   whatsapp: boolean;
   ai: boolean;
+  [key: string]: boolean;
 }
 
 const MODULE_KEYS = [

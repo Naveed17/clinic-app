@@ -795,6 +795,8 @@ const api = {
   },
   license: {
     status: () => ipc('license:status'),
+    gate: () => ipc<{ state: 'ok' | 'none' | 'blocked'; reason?: string }>('license:gate'),
+    support: () => ipc<{ phone: string; email: string }>('license:support'),
     activate: (key: string) => ipc('license:activate', key),
     modules: () => ipc<Record<string, boolean>>('license:modules'),
     databaseMode: () =>
