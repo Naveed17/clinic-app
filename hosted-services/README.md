@@ -1,6 +1,6 @@
-# CareFlow hosted AI + WhatsApp (license-server)
+# CareFlow hosted AI + WhatsApp (`hosted-services`)
 
-Copy these routes into **clinic-license-six** (same app that already serves `/api/license/validate`).
+Reference copy of hosted AI and WhatsApp Cloud API routes. Copy these into **clinic-license-six** (the same app that already serves `/api/license/validate`).
 
 Clinics do **not** put Groq or Meta keys in the Electron app. AI and WhatsApp Cloud API are **paid add-ons** (`ai` / `whatsapp` license modules). Without the WhatsApp add-on, the desktop app still uses WhatsApp Web (wa.me). Without the AI add-on, AI buttons are hidden.
 
@@ -9,8 +9,8 @@ Clinics do **not** put Groq or Meta keys in the Electron app. AI and WhatsApp Cl
 Copy:
 
 ```
-license-server/lib/*                 →  src/lib/hosted/   (or similar)
-license-server/nest/*.ts             →  a Nest module in the license API
+hosted-services/lib/*                 →  src/lib/hosted/   (or similar)
+hosted-services/nest/*.ts             →  a Nest module in the license API
 ```
 
 Register `HostedServicesModule` in `AppModule`. Controllers are:
@@ -28,9 +28,9 @@ If the Nest global prefix is `api`, the desktop app already calls `https://clini
 ## Next.js / Vercel `/api` folder
 
 ```
-license-server/api/ai/*          →  api/ai/*
-license-server/api/whatsapp/*    →  api/whatsapp/*
-license-server/lib/*             →  lib/
+hosted-services/api/ai/*          →  api/ai/*
+hosted-services/api/whatsapp/*    →  api/whatsapp/*
+hosted-services/lib/*             →  lib/
 ```
 
 ## Env vars (Vercel → Project → Settings → Environment Variables)
