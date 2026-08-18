@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo, useRef, useState } from 'react';
 import type { Appointment } from '@/types/appointment';
 import type { Token } from '@/types/token';
+import { CalendarSkeleton, FetchingBar } from '@/components/LoadingUI';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -100,9 +101,12 @@ interface Props {
   onPatientHistoryClick?: (appointment: Appointment) => void | Promise<void>;
   readOnly?: boolean;
   hideCheckIn?: boolean;
+  loading?: boolean;
+  fetching?: boolean;
+  statusPendingId?: string | null;
 }
 
-export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu, onPrescriptionClick, onPatientHistoryClick, readOnly = false, hideCheckIn = false }: Props): React.JSX.Element {
+export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu, onPrescriptionClick, onPatientHistoryClick, readOnly = false, hideCheckIn = false, loading = false, fetching = false, statusPendingId = null }: Props): React.JSX.Element {
   const theme = useTheme();
   const today = new Date();
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
@@ -165,8 +169,12 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
         border: 'none',
         bgcolor: 'transparent',
         backgroundImage: 'none',
+        position: 'relative',
       }}
     >
+      <FetchingBar show={Boolean(fetching && !loading)} />
+      {loading ? <CalendarSkeleton /> : (
+      <>
       {/* ── Left: Calendar grid ── */}
       <Box sx={{ flex: 1, p: 3, overflow: 'auto', minWidth: 0, minHeight: 0 }}>
         {/* Month nav */}
@@ -521,6 +529,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                           <Button
                             size="small"
                             variant="outlined"
+                            loading={statusPendingId === a.id}
                             endIcon={next === 'COMPLETED' ? <CheckCircleOutlineIcon /> : <ArrowForwardIcon />}
                             onClick={(event) => {
                               event.stopPropagation();
@@ -546,6 +555,8 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
           </Stack>
         )}
       </Box>
+      </>
+      )}
     </Paper>
   );
 }

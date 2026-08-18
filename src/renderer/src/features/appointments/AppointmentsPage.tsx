@@ -32,7 +32,7 @@ import {
   Autocomplete
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { AppointmentCalendar } from '@/components/AppointmentCalendar';
@@ -40,7 +40,9 @@ import { appointmentsService } from '@/services/appointments.service';
 import { patientsService } from '@/services/patients.service';
 import type { Appointment, AppointmentInput, AppointmentPerson } from '@/types/appointment';
 import type { Token } from '@/types/token';
+import { nextFreeSlot, doctorOfflineReason, type SlotAdjustReason } from '@/utils/appointmentSlot';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogFormSx, dialogPaperProps,
@@ -111,6 +113,8 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
   onIssued: (token: Token) => void;
 }) {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const showLabReason = user?.role !== 'receptionist';
   const [reason, setReason] = useState('');
   const mutation = useMutation({
     mutationFn: () =>
@@ -137,7 +141,7 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
           <MenuItem value="Follow-up">Follow-up</MenuItem>
           <MenuItem value="Urgent">Urgent</MenuItem>
           <MenuItem value="Consultation">Consultation</MenuItem>
-          <MenuItem value="Lab Results">Lab Results</MenuItem>
+          {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
           <MenuItem value="Vaccination">Vaccination</MenuItem>
         </TextField>
         <Button
@@ -167,6 +171,9 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   onSuccess?: () => void;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const showLabReason = user?.role !== 'receptionist';
+  const [slotNotice, setSlotNotice] = useState<SlotAdjustReason | null>(null);
   const isEdit = !!appointment;
   const schema = z.object({
     patientId: z.string().min(1, 'Select a patient.'),
@@ -205,12 +212,35 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   const doctorOptions = asArray<AppointmentPerson>(doctors.data);
   const patientId = form.watch('patientId');
   const date = form.watch('date');
+  const providerId = form.watch('providerId');
+  const duration = form.watch('duration');
 
   const { data: tokenForPatient } = useQuery<Token | null>({
     queryKey: ['token-for-patient', patientId, date],
     queryFn: () => window.clinic.tokens.getForPatient(patientId, date) as Promise<Token | null>,
     enabled: !appointment && !!patientId && !!date,
   });
+
+  const { data: schedule = [], isFetched: scheduleFetched } = useQuery({
+    queryKey: ['schedule', providerId],
+    queryFn: () => window.clinic.schedule.get(providerId),
+    enabled: open && Boolean(providerId),
+  });
+  const { data: allAppts = [] } = useQuery({
+    queryKey: ['appointments'],
+    queryFn: appointmentsService.list,
+    enabled: open,
+  });
+  const doctorAppts = allAppts as Appointment[];
+  const hoursLabel = useMemo(() => {
+    if (!date || schedule.length === 0) return null;
+    const day = new Date(`${date}T12:00:00`).getDay();
+    const slot = schedule.find((s) => s.dayOfWeek === day);
+    return slot?.isActive ? `${slot.startTime}–${slot.endTime}` : null;
+  }, [schedule, date]);
+  const offlineReason = open && providerId && date && scheduleFetched
+    ? doctorOfflineReason(schedule, date)
+    : null;
 
   useEffect(() => {
     if (!appointment) form.setValue('tokenId', tokenForPatient?.id ?? '');
@@ -231,8 +261,29 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
       };
       return appointment ? appointmentsService.update(appointment.id, input) : appointmentsService.create(input);
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    onSuccess: (saved, values) => {
+      if (saved && typeof saved === 'object' && 'id' in saved) {
+        const patient = patientOptions.find((p) => p.id === values.patientId);
+        const provider = doctorOptions.find((d) => d.id === values.providerId);
+        queryClient.setQueryData(['appointments'], (old: Appointment[] | undefined) => {
+          const list = old ?? [];
+          const raw = saved as Appointment;
+          const next: Appointment = {
+            ...raw,
+            patient: raw.patient ?? patient ?? { id: values.patientId, firstName: '', lastName: '', role: 'patient' },
+            provider: raw.provider ?? provider ?? { id: values.providerId, firstName: '', lastName: '', role: 'doctor' },
+            status: raw.status ?? 'SCHEDULED',
+          };
+          const idx = list.findIndex((a) => a.id === next.id);
+          if (idx >= 0) {
+            const copy = [...list];
+            copy[idx] = { ...list[idx], ...next };
+            return copy;
+          }
+          return [next, ...list];
+        });
+      }
+      void queryClient.invalidateQueries({ queryKey: ['appointments'] });
       onClose();
       onSuccess?.();
     },
@@ -241,12 +292,28 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
 
   useEffect(() => {
     if (!open) return;
+    setSlotNotice(null);
     if (appointment) {
       form.reset(appointmentValues(appointment));
     } else {
       form.reset({ ...empty, date: defaultDate ?? empty.date, providerId: defaultProviderId ?? empty.providerId });
     }
   }, [appointment, defaultDate, defaultProviderId, form, open]);
+
+  useEffect(() => {
+    if (!open || appointment || !providerId) return;
+    const next = nextFreeSlot({
+      schedule,
+      appointments: doctorAppts,
+      providerId,
+      durationMin: duration || 30,
+      from: defaultDate ? new Date(`${defaultDate}T00:00:00`) : new Date(),
+    });
+    if (!next) return;
+    form.setValue('date', next.date);
+    form.setValue('time', next.time);
+    setSlotNotice(null);
+  }, [open, appointment, providerId, duration, schedule, doctorAppts, defaultDate, form]);
 
   const { errors } = form.formState;
 
@@ -256,12 +323,27 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
         title={appointment ? 'Update appointment' : 'Create appointment'}
         subtitle={appointment ? 'Edit schedule, doctor, and visit details.' : 'Book a new patient visit.'}
       />
-      <Box component="form" onSubmit={form.handleSubmit((v) => mutation.mutate(v))} sx={dialogFormSx}>
+      <Box component="form" onSubmit={form.handleSubmit((v) => { if (offlineReason) return; mutation.mutate(v); })} sx={dialogFormSx}>
         <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.25}>
             {mutation.isError && (
               <Alert severity="error">
                 {(mutation.error as Error)?.message || 'Unable to save the appointment.'}
+              </Alert>
+            )}
+            {offlineReason && (
+              <Alert severity="warning">{offlineReason}</Alert>
+            )}
+            {slotNotice === 'busy' && (
+              <Alert severity="warning">
+                This time is already booked. Moved 30 minutes forward, or to the end of the current visit.
+              </Alert>
+            )}
+            {slotNotice === 'schedule' && (
+              <Alert severity="info">
+                {hoursLabel
+                  ? `Outside doctor hours (${hoursLabel}). Moved to the next available time.`
+                  : 'This day is off in Doctor Schedule. Moved to the next working day.'}
               </Alert>
             )}
 
@@ -327,7 +409,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
                   helperText={form.formState.errors.tokenId?.message ?? (tokenForPatient ? 'Token auto-linked' : '')}
                   color={tokenForPatient ? 'success' : undefined}
                 />
-                {patientId && date && !tokenForPatient && (
+                {patientId && date && !tokenForPatient && !offlineReason && (
                   <IssueTokenInline patientId={patientId} date={date} providerId={form.watch('providerId')} onIssued={(t) => form.setValue('tokenId', t.id)} />
                 )}
               </Box>
@@ -341,8 +423,33 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
                   render={({ field }) => (
                     <DatePicker
                       label="Date"
-                      value={field.value ? new Date(field.value) : null}
-                      onChange={(value) => field.onChange(value ? value.toLocaleDateString('en-CA') : '')}
+                      value={field.value ? new Date(`${field.value}T12:00:00`) : null}
+                      onChange={(value) => {
+                        if (!value) {
+                          field.onChange('');
+                          return;
+                        }
+                        if (!providerId) {
+                          field.onChange(value.toLocaleDateString('en-CA'));
+                          return;
+                        }
+                        const from = new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0);
+                        const next = nextFreeSlot({
+                          schedule,
+                          appointments: doctorAppts,
+                          providerId,
+                          durationMin: duration || 30,
+                          from,
+                          excludeId: appointment?.id,
+                        });
+                        if (next) {
+                          field.onChange(next.date);
+                          form.setValue('time', next.time);
+                          setSlotNotice(next.reason);
+                        } else {
+                          field.onChange(value.toLocaleDateString('en-CA'));
+                        }
+                      }}
                       slotProps={{
                         textField: {
                           fullWidth: true,
@@ -361,7 +468,28 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
                     <TimePicker
                       label="Time"
                       value={field.value ? new Date(`1970-01-01T${field.value}:00`) : null}
-                      onChange={(value) => field.onChange(value ? value.toTimeString().slice(0, 5) : '')}
+                      onChange={(value) => {
+                        const picked = value ? value.toTimeString().slice(0, 5) : '';
+                        if (!picked || !providerId || !date) {
+                          field.onChange(picked);
+                          return;
+                        }
+                        const next = nextFreeSlot({
+                          schedule,
+                          appointments: doctorAppts,
+                          providerId,
+                          durationMin: duration || 30,
+                          from: new Date(`${date}T${picked}:00`),
+                          excludeId: appointment?.id,
+                        });
+                        if (next) {
+                          form.setValue('date', next.date);
+                          field.onChange(next.time);
+                          setSlotNotice(next.reason);
+                        } else {
+                          field.onChange(picked);
+                        }
+                      }}
                       slotProps={{
                         textField: {
                           fullWidth: true,
@@ -386,7 +514,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
                   <MenuItem value="Follow-up">Follow-up</MenuItem>
                   <MenuItem value="Urgent">Urgent</MenuItem>
                   <MenuItem value="Consultation">Consultation</MenuItem>
-                  <MenuItem value="Lab Results">Lab Results</MenuItem>
+                  {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
                   <MenuItem value="Vaccination">Vaccination</MenuItem>
                 </TextField>
               )}
@@ -424,7 +552,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
 
         <DialogActions sx={dialogActionsSx}>
           <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
-          <SubmitButton type="submit" loading={mutation.isPending}>
+          <SubmitButton type="submit" loading={mutation.isPending} disabled={Boolean(offlineReason)}>
             {appointment ? 'Save changes' : 'Create appointment'}
           </SubmitButton>
         </DialogActions>
@@ -449,21 +577,56 @@ export function AppointmentsPage(): React.JSX.Element {
   const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const cancelMutation = useMutation({
     mutationFn: appointmentsService.cancel,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['appointments'] }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['appointments'] });
+      const prev = queryClient.getQueryData<Appointment[]>(['appointments']);
+      queryClient.setQueryData(['appointments'], (old: Appointment[] | undefined) =>
+        (old ?? []).map((a) => (a.id === id ? { ...a, status: 'CANCELLED' as const } : a)),
+      );
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['appointments'], ctx.prev);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    },
     meta: { silent: true },
   });
   const deleteMutation = useMutation({
     mutationFn: appointmentsService.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      setDeleteTarget(undefined);
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['appointments'] });
+      const prev = queryClient.getQueryData<Appointment[]>(['appointments']);
+      queryClient.setQueryData(['appointments'], (old: Appointment[] | undefined) =>
+        (old ?? []).filter((a) => a.id !== id),
+      );
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['appointments'], ctx.prev);
+    },
+    onSuccess: () => setDeleteTarget(undefined),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['appointments'] });
     },
     meta: { silent: true },
   });
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       appointmentsService.updateStatus(id, status as Appointment['status']),
-    onSuccess: () => {
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['appointments'] });
+      const prev = queryClient.getQueryData<Appointment[]>(['appointments']);
+      queryClient.setQueryData(['appointments'], (old: Appointment[] | undefined) =>
+        (old ?? []).map((a) => (a.id === id ? { ...a, status: status as Appointment['status'] } : a)),
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['appointments'], ctx.prev);
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['appointments'] });
       void queryClient.invalidateQueries({ queryKey: ['tokens'] });
     },
@@ -529,10 +692,13 @@ export function AppointmentsPage(): React.JSX.Element {
               {!isAdmin && <Button startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }} onClick={() => { setActive(undefined); setDefaultDate(undefined); setOpen(true); }}>Create appointment</Button>}
             </Stack>
           </Box>
-          <Paper variant="outlined" sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <Paper variant="outlined" sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
             <AppointmentCalendar
               appointments={allData}
+              loading={appointments.isLoading}
+              fetching={appointments.isFetching && !appointments.isLoading}
               onStatusChange={(id, status) => statusMutation.mutate({ id, status })}
+              statusPendingId={statusMutation.isPending ? statusMutation.variables?.id : null}
               onDateClick={isAdmin ? undefined : (date) => { setActive(undefined); setDefaultDate(date); setOpen(true); }}
               onAppointmentClick={isAdmin ? undefined : (appt) => { setActive(appt); setOpen(true); }}
               readOnly={isAdmin}
@@ -557,6 +723,7 @@ export function AppointmentsPage(): React.JSX.Element {
             ) : undefined
           }
           error={appointments.isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load appointments.</Alert>}
+          fetching={appointments.isFetching && !appointments.isLoading}
         >
           <TableHead sx={tableSx.head}>
             <TableRow>
@@ -572,7 +739,7 @@ export function AppointmentsPage(): React.JSX.Element {
           </TableHead>
           <TableBody>
             {appointments.isLoading ? (
-              <TableRow><TableCell colSpan={isAdmin ? 7 : 8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>Loading appointments...</TableCell></TableRow>
+              <TableRowsSkeleton cols={isAdmin ? 7 : 8} />
             ) : filtered.length === 0 ? (
               <TableRow><TableCell colSpan={isAdmin ? 7 : 8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No appointments scheduled.</TableCell></TableRow>
             ) : (
@@ -626,16 +793,16 @@ export function AppointmentsPage(): React.JSX.Element {
                           </IconButton>
                         </span></Tooltip>
                         {a.status === 'SCHEDULED' && (
-                          <Tooltip title="Check In"><IconButton sx={actionBtnSx} disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' })}><LoginOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                          <Tooltip title="Check In"><IconButton sx={actionBtnSx} loading={statusMutation.isPending && statusMutation.variables?.id === a.id} onClick={() => statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' })}><LoginOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                         )}
                         {a.status === 'CHECKED_IN' && (
-                          <Tooltip title="Mark Completed"><IconButton sx={actionBtnSx} disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: a.id, status: 'COMPLETED' })}><CheckCircleOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                          <Tooltip title="Mark Completed"><IconButton sx={actionBtnSx} loading={statusMutation.isPending && statusMutation.variables?.id === a.id} onClick={() => statusMutation.mutate({ id: a.id, status: 'COMPLETED' })}><CheckCircleOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                         )}
                         {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
-                          <Tooltip title="No Show"><IconButton sx={actionBtnSx} disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: a.id, status: 'NO_SHOW' })}><PersonOffOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                          <Tooltip title="No Show"><IconButton sx={actionBtnSx} loading={statusMutation.isPending && statusMutation.variables?.id === a.id} onClick={() => statusMutation.mutate({ id: a.id, status: 'NO_SHOW' })}><PersonOffOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                         )}
                         {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
-                          <Tooltip title="Cancel"><IconButton sx={actionBtnSx} disabled={cancelMutation.isPending} onClick={() => cancelMutation.mutate(a.id)}><CancelOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                          <Tooltip title="Cancel"><IconButton sx={actionBtnSx} loading={cancelMutation.isPending && cancelMutation.variables === a.id} onClick={() => cancelMutation.mutate(a.id)}><CancelOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                         )}
                         <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => setDeleteTarget(a)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                       </Stack>

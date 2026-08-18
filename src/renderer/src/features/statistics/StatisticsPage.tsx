@@ -21,6 +21,7 @@ import {
   Menu,
   MenuItem,
   Paper,
+  Skeleton,
   Stack,
   Typography,
 } from '@mui/material';
@@ -31,6 +32,7 @@ import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
 import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import { useQuery } from '@tanstack/react-query';
+import { StatCardsSkeleton } from '@/components/LoadingUI';
 import { appointmentsService } from '@/services/appointments.service';
 import { invoicesService } from '@/services/invoices.service';
 import { patientsService } from '@/services/patients.service';
@@ -321,18 +323,19 @@ export function StatisticsPage(): React.JSX.Element {
   const [reasonYearMenuEl, setReasonYearMenuEl] = useState<null | HTMLElement>(null);
   const [activeReasonIdx, setActiveReasonIdx] = useState(0);
 
-  const { data: appointments = [] } = useQuery({
+  const { data: appointments = [], isLoading: apptsLoading } = useQuery({
     queryKey: ['appointments'],
     queryFn: appointmentsService.list,
   });
-  const { data: invoices = [] } = useQuery({
+  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
     queryKey: ['invoices'],
     queryFn: invoicesService.list,
   });
-  const { data: patientsData } = useQuery({
+  const { data: patientsData, isLoading: patientsLoading } = useQuery({
     queryKey: ['patients', { page: 1, pageSize: 1, search: '' }],
     queryFn: () => patientsService.list({ page: 1, pageSize: 1, search: '' }),
   });
+  const statsLoading = apptsLoading || invoicesLoading || patientsLoading;
 
   const year = new Date().getFullYear();
 
@@ -485,6 +488,24 @@ export function StatisticsPage(): React.JSX.Element {
     (mi, m, idx, arr) => (m.appointments > arr[mi].appointments ? idx : mi),
     0,
   );
+
+  if (statsLoading) {
+    return (
+      <Stack spacing={2.5} sx={{ pb: 2 }}>
+        <Box>
+          <Typography variant="body2" color="text.secondary" fontWeight={600}>
+            Clinic analytics
+          </Typography>
+          <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
+            Statistics
+          </Typography>
+        </Box>
+        <StatCardsSkeleton count={4} />
+        <Skeleton variant="rounded" height={280} sx={{ borderRadius: 3 }} />
+        <Skeleton variant="rounded" height={280} sx={{ borderRadius: 3 }} />
+      </Stack>
+    );
+  }
 
   return (
     <Stack spacing={2.5} sx={{ pb: 2 }}>

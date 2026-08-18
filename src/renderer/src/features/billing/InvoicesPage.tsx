@@ -18,6 +18,7 @@ import {
   IconButton,
   MenuItem,
   Paper,
+  Skeleton,
   Stack,
   TextField,
   Tooltip,
@@ -37,6 +38,7 @@ import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
 import type { Invoice, InvoiceInput, InvoicePerson, Payment } from '@/types/invoice';
 import { printInvoiceReceipt } from '@/utils/printInvoiceReceipt';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import { TableRowsSkeleton } from '@/components/LoadingUI';
 import { useAuth } from '@/features/auth/AuthContext';
 
 const statusConfig: Record<string, { label: string; color: 'default' | 'warning' | 'info' | 'success' | 'error' }> = {
@@ -69,7 +71,11 @@ function PaymentHistoryDialog({ invoice, onClose }: { invoice: Invoice; onClose:
         </Box>
         <Divider />
         {isLoading ? (
-          <Typography sx={{ p: 3 }} color="text.secondary">Loading...</Typography>
+          <Stack spacing={1.2} sx={{ p: 2 }}>
+            {Array.from({ length: 4 }, (_, i) => (
+              <Skeleton key={i} variant="rounded" height={48} />
+            ))}
+          </Stack>
         ) : payments.length === 0 ? (
           <Typography sx={{ p: 3 }} color="text.secondary">No payments recorded.</Typography>
         ) : (
@@ -384,6 +390,7 @@ export function InvoicesPage(): React.JSX.Element {
           ) : undefined
         }
         error={invoices.isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load invoices.</Alert>}
+        fetching={invoices.isFetching && !invoices.isLoading}
       >
         <TableHead sx={tableSx.head}>
           <TableRow>
@@ -398,7 +405,7 @@ export function InvoicesPage(): React.JSX.Element {
         </TableHead>
         <TableBody>
           {invoices.isLoading ? (
-            <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>Loading invoices...</TableCell></TableRow>
+            <TableRowsSkeleton cols={7} />
           ) : filtered.length === 0 ? (
             <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No invoices created.</TableCell></TableRow>
           ) : (

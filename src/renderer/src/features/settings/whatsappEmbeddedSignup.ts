@@ -266,7 +266,7 @@ export async function launchWhatsAppEmbeddedSignup(input: {
       return {
         ok: false,
         error: /valid Business ID|1690130/i.test(flowError)
-          ? 'Meta ne galat Business ID use ki. Popup mein CREATE a new business portfolio choose karo — existing WhatsApp/CareFlow account ko business mat banao. Phir asli number + OTP + card isi popup mein add karo.'
+          ? 'Meta used the wrong Business ID. In the popup, choose CREATE a new business portfolio — do not convert an existing WhatsApp/CareFlow account. Then add the real number, OTP, and card in the same popup.'
           : flowError,
       };
     }

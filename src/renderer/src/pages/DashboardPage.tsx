@@ -5,7 +5,8 @@ import { DoctorDashboard } from '@/features/dashboard/DoctorDashboard';
 import { ReceptionistDashboard } from '@/features/dashboard/ReceptionistDashboard';
 import { LabDashboard } from '@/features/dashboard/LabDashboard';
 import { PharmacistDashboard } from '@/features/dashboard/PharmacistDashboard';
-import { Alert, Box, CircularProgress } from '@mui/material';
+import { Alert, Box } from '@mui/material';
+import { StatCardsSkeleton } from '@/components/LoadingUI';
 
 export function DashboardPage(): React.JSX.Element {
   const { user } = useAuth();
@@ -13,7 +14,11 @@ export function DashboardPage(): React.JSX.Element {
   const modulesLoaded = useLicenseModulesLoaded();
 
   if (!modulesLoaded) {
-    return <Box sx={{ minHeight: 240, display: 'grid', placeItems: 'center' }}><CircularProgress /></Box>;
+    return (
+      <Box sx={{ p: 1 }}>
+        <StatCardsSkeleton count={4} />
+      </Box>
+    );
   }
 
   switch (user?.role) {

@@ -70,7 +70,7 @@ export function DoctorDashboard(): React.JSX.Element {
   const [historyPatient, setHistoryPatient] = useState<Patient | undefined>();
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
 
-  const { data: raw = [] } = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
+  const { data: raw = [], isLoading: apptsLoading, isFetching: apptsFetching } = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const appointments = (raw as Appointment[]).filter((a) => a.providerId === user?.id);
 
   const todayKey = new Date().toLocaleDateString('en-CA');
@@ -157,6 +157,17 @@ export function DoctorDashboard(): React.JSX.Element {
       status: Appointment['status'];
       appt?: Appointment;
     }) => appointmentsService.updateStatus(id, status),
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: ['appointments'] });
+      const prev = qc.getQueryData<Appointment[]>(['appointments']);
+      qc.setQueryData(['appointments'], (old: Appointment[] | undefined) =>
+        (old ?? []).map((a) => (a.id === id ? { ...a, status } : a)),
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['appointments'], ctx.prev);
+    },
     onSuccess: async (_data, variables) => {
       await qc.invalidateQueries({ queryKey: ['appointments'] });
       await qc.invalidateQueries({ queryKey: ['tokens'] });
@@ -292,7 +303,7 @@ export function DoctorDashboard(): React.JSX.Element {
                         size="small"
                         variant="outlined"
                         endIcon={next === 'COMPLETED' ? <CheckCircleOutlineIcon sx={{ fontSize: '13px !important' }} /> : <ArrowForwardIcon sx={{ fontSize: '13px !important' }} />}
-                        loading={appointmentStatusMutation.isPending}
+                        loading={appointmentStatusMutation.isPending && appointmentStatusMutation.variables?.id === appt.id}
                         onClick={() =>
                           appointmentStatusMutation.mutate({
                             id: appt.id,
@@ -438,6 +449,9 @@ export function DoctorDashboard(): React.JSX.Element {
         <Box sx={{ flex: 1, minHeight: 0, display: activeTab === 0 ? 'flex' : 'none', flexDirection: 'column', overflow: 'hidden' }}>
           <AppointmentCalendar
             appointments={appointments}
+            loading={apptsLoading}
+            fetching={apptsFetching && !apptsLoading}
+            statusPendingId={appointmentStatusMutation.isPending ? appointmentStatusMutation.variables?.id : null}
             onStatusChange={(id, status) => {
               const appt = appointments.find((a) => a.id === id);
               appointmentStatusMutation.mutate({

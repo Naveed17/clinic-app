@@ -90,7 +90,7 @@ export function WhatsAppConnectMetaDialog({
               required
               disabled={connecting}
               error={Boolean(errors.email)}
-              helperText={errors.email?.message || 'Meta naya Business portfolio isi email se banata hai'}
+              helperText={errors.email?.message || 'Meta uses this email to create the new business portfolio.'}
               {...register('email')}
             />
             <TextField
@@ -101,7 +101,7 @@ export function WhatsAppConnectMetaDialog({
               placeholder="https://yourclinic.com"
               disabled={connecting}
               error={Boolean(errors.website)}
-              helperText={errors.website?.message || 'https ke sath. Instagram/Facebook page URL bhi chalega'}
+              helperText={errors.website?.message || 'Include https://. An Instagram or Facebook page URL also works.'}
               {...register('website')}
             />
           </Stack>

@@ -1,7 +1,7 @@
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import {
-  Alert, Box, Button, Chip, CircularProgress, FormControl, FormControlLabel,
-  InputLabel, MenuItem, Paper, Select, Stack, Switch, TextField, Typography,
+  Alert, Box, Button, Chip, FormControl, FormControlLabel,
+  InputLabel, MenuItem, Paper, Select, Skeleton, Stack, Switch, TextField, Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { doctorsService } from '@/services/doctors.service';
@@ -76,7 +76,7 @@ export function DoctorSchedulePage(): React.JSX.Element {
   const saveMutation = useMutation({
     mutationFn: () => window.clinic.schedule.upsert(doctorId, slots),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['schedule', doctorId] });
+      void qc.invalidateQueries({ queryKey: ['schedule'] });
       void qc.invalidateQueries({ queryKey: ['doctor', doctorId] });
       void qc.invalidateQueries({ queryKey: ['doctors'] });
     },
@@ -140,7 +140,13 @@ export function DoctorSchedulePage(): React.JSX.Element {
       {doctorId && (
         <>
           {scheduleQuery.isLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
+            <Paper sx={{ p: 3 }}>
+              <Stack spacing={1.5}>
+                {Array.from({ length: 7 }, (_, i) => (
+                  <Skeleton key={i} variant="rounded" height={56} sx={{ borderRadius: 2 }} />
+                ))}
+              </Stack>
+            </Paper>
           ) : (
             <Paper sx={{ p: 3 }}>
               <Stack spacing={1.5}>

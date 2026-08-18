@@ -60,7 +60,7 @@ export function buildTokenSlipHtml(
   <style>
     @page { size: ${css.pageSize}; margin: ${css.pageMargin}; }
     * { box-sizing: border-box; }
-    html, body {
+    html {
       margin: 0;
       padding: 0;
       background: #fff;
@@ -68,16 +68,18 @@ export function buildTokenSlipHtml(
       overflow-x: hidden;
     }
     @media print {
-      html, body, * { color: #000 !important; background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      html, body { color: #000 !important; background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .sub, .val, .footer { color: ${POS_RECEIPT.muted} !important; }
     }
     body {
       padding: ${css.bodyPadding};
       font-family: ${css.fontName};
       font-size: ${css.fontSize};
+      line-height: 1.2;
       color: #000;
       width: ${css.bodyWidth};
       max-width: ${css.bodyMaxWidth};
-      margin: 0;
+      margin: ${css.bodyMargin};
       overflow-x: hidden;
     }
     .center { text-align: center; }
@@ -90,30 +92,31 @@ export function buildTokenSlipHtml(
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-    .name { font-size: ${css.nameSize}; font-weight: 700; margin-bottom: 4px; }
-    .sub { font-size: 0.9em; text-align: center; margin-bottom: 2px; word-break: break-word; }
+    .name { font-size: ${css.nameSize}; font-weight: 700; margin-bottom: 4px; color: #000; }
+    .sub { font-size: 12px; text-align: center; margin-bottom: 2px; word-break: break-word; color: ${POS_RECEIPT.muted}; }
     .stars {
       text-align: center;
       margin: 8px 0;
       overflow: hidden;
       white-space: nowrap;
+      color: #000;
     }
-    .title { font-size: 1.05em; font-weight: 700; text-align: center; letter-spacing: 0.04em; }
+    .title { font-size: 1.05em; font-weight: 700; text-align: center; letter-spacing: 0.04em; color: #000; }
     .box {
       border: 2px solid #000;
-      margin: 8px 0;
+      margin: 8px 2px;
       padding: 8px 4px;
       text-align: center;
-      width: 100%;
+      width: auto;
       overflow: hidden;
     }
-    .box-label { font-size: 0.85em; font-weight: 700; letter-spacing: 0.08em; }
-    .box-num { font-size: 36px; font-weight: 700; line-height: 1.1; letter-spacing: 0.04em; }
+    .box-label { font-size: 0.85em; font-weight: 700; letter-spacing: 0.08em; color: #000; }
+    .box-num { font-size: 36px; font-weight: 700; line-height: 1.1; letter-spacing: 0.04em; color: #000; }
     .row { display: flex; justify-content: space-between; gap: 6px; margin: 4px 0; }
-    .lbl { font-weight: 700; flex-shrink: 0; }
-    .val { text-align: right; min-width: 0; flex: 1; overflow-wrap: anywhere; word-break: break-word; }
-    .footer { text-align: center; margin-top: 10px; }
-    .brand { text-align: center; margin-top: 8px; font-size: 0.8em; font-weight: 700; letter-spacing: 0.08em; }
+    .lbl { font-weight: 700; flex-shrink: 0; color: #000; }
+    .val { font-size: 12px; text-align: right; min-width: 0; flex: 1; overflow-wrap: anywhere; word-break: break-word; color: ${POS_RECEIPT.muted}; }
+    .footer { text-align: center; margin-top: 10px; color: ${POS_RECEIPT.muted}; }
+    .brand { text-align: center; margin-top: 8px; font-size: 0.8em; font-weight: 700; letter-spacing: 0.04em; color: #000; }
   </style>
 </head>
 <body>
@@ -138,7 +141,7 @@ export function buildTokenSlipHtml(
   ${reason}
   <div class="stars">${stars}</div>
   <div class="footer">Please wait for your token to be called.<br/>${POS_RECEIPT.thankYou}</div>
-  <div class="brand">CAREFLOW</div>
+  <div class="brand">${POS_RECEIPT.poweredBy}</div>
 </body>
 </html>`;
 }

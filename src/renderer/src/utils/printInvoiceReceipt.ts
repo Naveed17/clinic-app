@@ -130,18 +130,20 @@ export function buildInvoiceReceiptHtml(
       margin: ${css.pageMargin};
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; background: #fff; color: #000; overflow-x: hidden; }
+    html { margin: 0; padding: 0; background: #fff; color: #000; overflow-x: hidden; }
     @media print {
-      html, body, * { color: #000 !important; background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      html, body { color: #000 !important; background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .sub { color: ${POS_RECEIPT.muted} !important; }
     }
     body {
       padding: ${css.bodyPadding};
       font-family: ${css.fontName};
       font-size: ${css.fontSize};
+      line-height: 1.2;
       color: #000;
       width: ${css.bodyWidth};
       max-width: ${css.bodyMaxWidth};
-      margin: 0;
+      margin: ${css.bodyMargin};
       overflow-x: hidden;
     }
     .center { text-align: center; }
@@ -155,7 +157,7 @@ export function buildInvoiceReceiptHtml(
       print-color-adjust: exact;
     }
     .name { font-size: ${css.nameSize}; font-weight: 700; margin-bottom: 4px; color: #000; }
-    .sub { font-size: 0.9em; color: #000; margin-bottom: 2px; text-align: center; }
+    .sub { font-size: 0.9em; color: ${POS_RECEIPT.muted}; margin-bottom: 2px; text-align: center; }
     .stars { font-size: 0.95em; color: #000; text-align: center; margin: 8px 0; overflow: hidden; white-space: nowrap; }
     .title { font-size: 1.05em; font-weight: 700; text-align: center; color: #000; }
     .row { display: flex; justify-content: space-between; gap: 6px; margin: 3px 0; color: #000; }
@@ -168,7 +170,7 @@ export function buildInvoiceReceiptHtml(
     .thanks { font-size: 1.1em; font-weight: 700; text-align: center; margin-top: 4px; color: #000; }
     .barcode { display: block; width: min(170px, 90%); height: 48px; margin: 8px auto 4px; object-fit: contain; }
     .code { font-size: 0.9em; color: #000; font-weight: 700; text-align: center; }
-    .brand { text-align: center; margin-top: 8px; font-size: 0.8em; font-weight: 700; letter-spacing: 0.08em; }
+    .brand { text-align: center; margin-top: 8px; font-size: 0.8em; font-weight: 700; letter-spacing: 0.04em; }
   </style>
 </head>
 <body>
@@ -198,7 +200,7 @@ export function buildInvoiceReceiptHtml(
   <div class="stars">${stars}</div>
   ${barcodeBlock}
   <div class="code">${escapeHtml(invoice.invoiceNumber)}</div>
-  <div class="brand">CAREFLOW</div>
+  <div class="brand">${POS_RECEIPT.poweredBy}</div>
 </body>
 </html>`;
 }

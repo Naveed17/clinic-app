@@ -1,7 +1,5 @@
-import { getSettings } from '../config/settings';
 import { isLicenseModuleEnabled } from '../license/license.ipc';
-
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+import { licenseApi, LicenseApiError } from '../license/licenseApi';
 
 export type SuggestPrescriptionInput = {
   diagnosis?: string;
@@ -84,127 +82,61 @@ function escapeText(value: string): string {
 type GroqResult = { ok: true; text: string } | { ok: false; error: string };
 
 export async function testGroqConnection(
-  apiKey?: string,
+  _apiKey?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   if (!isLicenseModuleEnabled('ai')) {
-    return { ok: false, error: 'AI is not enabled for this license.' };
+    return { ok: false, error: 'AI add-on is not enabled for this license.' };
   }
-  const key = (apiKey ?? getSettings().groqApiKey)?.trim();
-  if (!key) return { ok: false, error: 'Groq API key missing.' };
   try {
-    const res = await fetch('https://api.groq.com/openai/v1/models', {
-      headers: { Authorization: `Bearer ${key}` },
-    });
-    if (res.status === 401) return { ok: false, error: 'Invalid Groq API key.' };
-    if (!res.ok) return { ok: false, error: `Groq error (${res.status})` };
+    await licenseApi<{ ok: boolean }>('/ai/test');
     return { ok: true };
-  } catch {
-    return { ok: false, error: 'Cannot reach Groq. Check internet connection.' };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof LicenseApiError ? err.message : 'Cannot reach CareFlow AI.',
+    };
   }
 }
 
-async function groqChat(
+async function hostedChat(
   system: string,
   user: string,
   onDelta?: (chunk: string) => void,
+  fallback?: { path: '/ai/suggest' | '/ai/summarize'; body: Record<string, unknown> },
 ): Promise<GroqResult> {
-  const settings = getSettings();
   if (!isLicenseModuleEnabled('ai')) {
-    return { ok: false, error: 'AI is not enabled for this license.' };
+    return { ok: false, error: 'AI add-on is not enabled for this license.' };
   }
-  if (!settings.aiEnabled) {
-    return { ok: false, error: 'AI is disabled. Enable it in Settings.' };
-  }
-  const key = settings.groqApiKey?.trim();
-  if (!key) {
-    return { ok: false, error: 'Groq API key missing. Add it in Settings.' };
-  }
-  const model = settings.groqModel?.trim() || 'llama-3.1-8b-instant';
-  const useStream = typeof onDelta === 'function';
-
-  let res: Response;
   try {
-    res = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.4,
-        max_tokens: 1024,
-        stream: useStream,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-      }),
-    });
-  } catch {
-    return { ok: false, error: 'Cannot reach Groq. Check internet connection.' };
-  }
-
-  if (!res.ok) {
-    let detail = `Groq error (${res.status})`;
-    try {
-      const body = (await res.json()) as { error?: { message?: string } };
-      if (body?.error?.message) detail = body.error.message;
-    } catch {
-      /* ignore */
-    }
-    if (res.status === 401) detail = 'Invalid Groq API key.';
-    if (res.status === 429) detail = 'Groq rate limit — try again in a moment.';
-    return { ok: false, error: detail };
-  }
-
-  if (!useStream) {
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const text = data.choices?.[0]?.message?.content?.trim() || '';
+    const data = await licenseApi<{ ok: boolean; text?: string }>('/ai/chat', { system, user });
+    const text = data.text?.trim() || '';
     if (!text) return { ok: false, error: 'Empty AI response.' };
+    onDelta?.(text);
     return { ok: true, text };
-  }
-
-  if (!res.body) {
-    return { ok: false, error: 'Empty AI stream.' };
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let full = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() ?? '';
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith('data:')) continue;
-      const payload = trimmed.slice(5).trim();
-      if (!payload || payload === '[DONE]') continue;
+  } catch (err) {
+    if (err instanceof LicenseApiError && err.status === 404 && fallback) {
       try {
-        const json = JSON.parse(payload) as {
-          choices?: Array<{ delta?: { content?: string } }>;
+        const data = await licenseApi<{ ok: boolean; text?: string }>(fallback.path, {
+          system,
+          user,
+          ...fallback.body,
+        });
+        const text = data.text?.trim() || '';
+        if (!text) return { ok: false, error: 'Empty AI response.' };
+        onDelta?.(text);
+        return { ok: true, text };
+      } catch (fallbackErr) {
+        return {
+          ok: false,
+          error: fallbackErr instanceof LicenseApiError ? fallbackErr.message : 'Cannot reach CareFlow AI.',
         };
-        const chunk = json.choices?.[0]?.delta?.content;
-        if (chunk) {
-          full += chunk;
-          onDelta(chunk);
-        }
-      } catch {
-        /* skip bad SSE chunk */
       }
     }
+    return {
+      ok: false,
+      error: err instanceof LicenseApiError ? err.message : 'Cannot reach CareFlow AI.',
+    };
   }
-
-  if (!full.trim()) return { ok: false, error: 'Empty AI response.' };
-  return { ok: true, text: full };
 }
 
 export async function suggestPrescription(
@@ -237,7 +169,15 @@ Do not add titles or headings such as "Prescription Draft", "Draft:", or similar
     .filter(Boolean)
     .join('\n');
 
-  const result = await groqChat(system, user, onDelta);
+  const result = await hostedChat(system, user, onDelta, {
+    path: '/ai/suggest',
+    body: {
+      diagnosis: input.diagnosis,
+      age: input.age,
+      sex: input.sex,
+      currentText: input.currentText,
+    },
+  });
   if (!result.ok) return result;
   return { ok: true, html: sanitizeAiHtml(result.text) };
 }
@@ -267,7 +207,13 @@ Mark uncertainty; do not invent labs or diagnoses not in the data.`;
           .join('\n\n');
 
   const user = `Patient: ${input.patientName || 'Unknown'}\n\nVisits:\n${visitsBlock}`;
-  const result = await groqChat(system, user, onDelta);
+  const result = await hostedChat(system, user, onDelta, {
+    path: '/ai/summarize',
+    body: {
+      patientName: input.patientName,
+      visits: input.visits.slice(0, 12),
+    },
+  });
   if (!result.ok) return result;
   return { ok: true, summary: stripCodeFences(result.text) };
 }

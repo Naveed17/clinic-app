@@ -381,7 +381,7 @@ declare global {
         changePassword: (userId: string, current: string, next: string) => Promise<{ ok: boolean; error?: string }>;
       };
       search: {
-        global: (query: string) => Promise<GlobalSearchResult>;
+        global: (query: string, role?: string) => Promise<GlobalSearchResult>;
       };
     };
   }

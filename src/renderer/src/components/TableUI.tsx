@@ -2,6 +2,7 @@ import {
   Box,
   Button,
   InputAdornment,
+  LinearProgress,
   Paper,
   Table,
   TableBody,
@@ -123,10 +124,11 @@ interface TablePageShellProps {
   children: ReactNode;
   error?: ReactNode;
   pager?: ReactNode;
+  fetching?: boolean;
   sx?: SxProps<Theme>;
 }
 
-export function TablePageShell({ title, subtitle, action, toolbar, children, error, pager, sx }: TablePageShellProps): React.JSX.Element {
+export function TablePageShell({ title, subtitle, action, toolbar, children, error, pager, fetching, sx }: TablePageShellProps): React.JSX.Element {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, ...sx }}>
       <Box sx={{ display: 'flex', alignItems: { sm: 'flex-end' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between' }}>
@@ -141,7 +143,10 @@ export function TablePageShell({ title, subtitle, action, toolbar, children, err
         {action}
       </Box>
 
-      <Paper elevation={0} sx={{ ...softCardSx, overflow: 'hidden', bgcolor: 'background.paper' }}>
+      <Paper elevation={0} sx={{ ...softCardSx, overflow: 'hidden', bgcolor: 'background.paper', position: 'relative' }}>
+        {fetching ? (
+          <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, zIndex: 2 }} />
+        ) : null}
         {toolbar && (
           <Box sx={{
             px: 2.5,

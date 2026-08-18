@@ -216,6 +216,29 @@ export async function listTokenPatients() {
   });
 }
 
+function localDayBoundsFromDateStr(dateStr: string): { dayStart: Date; dayEnd: Date } {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) throw new Error('Invalid token date.');
+  return {
+    dayStart: new Date(y, m - 1, d, 0, 0, 0, 0),
+    dayEnd: new Date(y, m - 1, d, 23, 59, 59, 999),
+  };
+}
+
+async function hasBookedVisitOnDate(patientId: string, doctorId: string, dateStr: string): Promise<boolean> {
+  const { dayStart, dayEnd } = localDayBoundsFromDateStr(dateStr);
+  const found = await getPrisma().appointment.findFirst({
+    where: {
+      patientId,
+      providerId: doctorId,
+      startsAt: { gte: dayStart, lte: dayEnd },
+      status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+    },
+    select: { id: true },
+  });
+  return Boolean(found);
+}
+
 export async function createToken(input: TokenInput) {
   const doctor = await getPrisma().user.findFirst({
     where: { id: input.doctorId, role: 'DOCTOR' },
@@ -223,13 +246,20 @@ export async function createToken(input: TokenInput) {
   });
   if (!doctor) throw new Error('Doctor not found.');
   if (!doctor.isActive) throw new Error('This doctor is inactive. Activate them in Doctor Schedule first.');
-  await assertDoctorAvailableOnDate(input.doctorId, input.date);
+  if (!(await hasBookedVisitOnDate(input.patientId, input.doctorId, input.date))) {
+    await assertDoctorAvailableOnDate(input.doctorId, input.date);
+  }
 
   const existing = await getPrisma().token.findFirst({
-    where: { patientId: input.patientId, date: input.date },
+    where: { patientId: input.patientId, date: input.date, doctorId: input.doctorId },
     include: tokenInclude,
   });
-  if (existing) return { ...existing, prescription: null };
+  if (existing) {
+    if (existing.status !== 'WAITING') {
+      return updateTokenStatus(existing.id, 'WAITING');
+    }
+    return { ...existing, prescription: null };
+  }
   const last = await getPrisma().token.findFirst({
     where: { date: input.date, doctorId: input.doctorId },
     orderBy: { tokenNumber: 'desc' },

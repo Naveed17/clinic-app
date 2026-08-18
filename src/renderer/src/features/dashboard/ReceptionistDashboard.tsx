@@ -7,13 +7,14 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
   Alert, Autocomplete, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent,
-  Divider, FormControl, IconButton, InputLabel, MenuItem, Paper, Select,
+  Divider, FormControl, IconButton, InputLabel, MenuItem, Paper, Select, Skeleton,
   Step, StepLabel, Stepper, Stack, TextField, Typography, Chip, Avatar,
 } from '@mui/material';
 import {
   FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogPaperProps,
 } from '@/components/DialogUI';
+import { ListCardsSkeleton } from '@/components/LoadingUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
@@ -36,6 +37,7 @@ import { useNavigate } from 'react-router-dom';
 import type { TokenPerson, Token, PrescriptionFeedItem } from '@/types/token';
 import type { PatientInput } from '@/types/patient';
 import type { Appointment, AppointmentPerson } from '@/types/appointment';
+import { nextFreeSlot, doctorOfflineReason, type SlotAdjustReason } from '@/utils/appointmentSlot';
 import imgMask from '@/assets/dashboard/clinic-mask.svg';
 import imgCapsule from '@/assets/dashboard/clinic-capsule.svg';
 import imgVirus from '@/assets/dashboard/clinic-virus.svg';
@@ -93,6 +95,20 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   });
 
   const selectedPatient = useMemo(() => patients.find((p) => p.id === patientId) ?? null, [patients, patientId]);
+  const todayStr = new Date().toLocaleDateString('en-CA');
+  const {
+    data: walkSchedule = [],
+    isFetched: walkScheduleFetched,
+    isFetching: walkScheduleFetching,
+  } = useQuery({
+    queryKey: ['schedule', doctorId],
+    queryFn: () => window.clinic.schedule.get(doctorId),
+    enabled: open && Boolean(doctorId) && step === 1,
+  });
+  const walkOfflineReason = doctorId && walkScheduleFetched && !walkScheduleFetching
+    ? doctorOfflineReason(walkSchedule, todayStr)
+    : null;
+  const walkScheduleReady = Boolean(doctorId) && walkScheduleFetched && !walkScheduleFetching;
 
   const createPatientMutation = useMutation({
     mutationFn: (values: PatientForm) => patientsService.create({
@@ -111,11 +127,17 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   });
 
   const tokenMutation = useMutation({
-    mutationFn: () => window.clinic.tokens.create({
-      patientId, doctorId,
-      date: new Date().toLocaleDateString('en-CA'),
-      reason: reason || null,
-    }),
+    mutationFn: async () => {
+      if (!patientId || !doctorId) throw new Error('Select a patient and doctor first.');
+      const schedule = await window.clinic.schedule.get(doctorId);
+      const offline = doctorOfflineReason(schedule, todayStr);
+      if (offline) throw new Error(offline);
+      return window.clinic.tokens.create({
+        patientId, doctorId,
+        date: todayStr,
+        reason: reason || null,
+      }) as Promise<Token>;
+    },
     onSuccess: async (token: Token) => {
       await window.clinic.tokens.updateStatus(token.id, 'WAITING');
       const startsAt = new Date(token.createdAt).toISOString();
@@ -204,6 +226,9 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
                 {(tokenMutation.error as Error)?.message || 'Could not issue token.'}
               </Alert>
             )}
+            {walkOfflineReason && (
+              <Alert severity="error">{walkOfflineReason}</Alert>
+            )}
             <FormControl fullWidth>
               <InputLabel>Doctor</InputLabel>
               <Select label="Doctor" value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
@@ -214,7 +239,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
               <InputLabel>Reason (optional)</InputLabel>
               <Select label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)}>
                 <MenuItem value="">— None —</MenuItem>
-                {['Checkup', 'Follow-up', 'Urgent', 'Consultation', 'Lab Results', 'Vaccination'].map((r) => (
+                {['Checkup', 'Follow-up', 'Urgent', 'Consultation', 'Vaccination'].map((r) => (
                   <MenuItem key={r} value={r}>{r}</MenuItem>
                 ))}
               </Select>
@@ -257,7 +282,11 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
           </SubmitButton>
         )}
         {step === 1 && (
-          <SubmitButton disabled={!doctorId} loading={tokenMutation.isPending} onClick={() => tokenMutation.mutate()}>
+          <SubmitButton
+            disabled={!doctorId || !walkScheduleReady || Boolean(walkOfflineReason)}
+            loading={tokenMutation.isPending || Boolean(doctorId && !walkScheduleReady)}
+            onClick={() => tokenMutation.mutate()}
+          >
             Issue Token & Print
           </SubmitButton>
         )}
@@ -307,6 +336,7 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [done, setDone] = useState(false);
+  const [slotNotice, setSlotNotice] = useState<SlotAdjustReason | null>(null);
 
   const form = useForm<PatientForm>({ resolver: zodResolver(patientSchema), defaultValues: patientDefaults });
 
@@ -320,7 +350,45 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
     queryFn: appointmentsService.doctors,
     enabled: open,
   });
+  const { data: schedule = [], isFetched: scheduleFetched } = useQuery({
+    queryKey: ['schedule', providerId],
+    queryFn: () => window.clinic.schedule.get(providerId),
+    enabled: open && Boolean(providerId),
+  });
+  const { data: rawAppts = [] } = useQuery({
+    queryKey: ['appointments'],
+    queryFn: appointmentsService.list,
+    enabled: open,
+  });
+  const doctorAppts = rawAppts as Appointment[];
   const selectedPatient = useMemo(() => patients.find((p) => p.id === patientId) ?? null, [patients, patientId]);
+
+  const daySlot = useMemo(() => {
+    if (!date || schedule.length === 0) return undefined;
+    const day = new Date(`${date}T12:00:00`).getDay();
+    return schedule.find((s) => s.dayOfWeek === day);
+  }, [schedule, date]);
+  const hoursLabel = daySlot?.isActive
+    ? `${daySlot.startTime}–${daySlot.endTime}`
+    : null;
+  const offlineReason = providerId && date && scheduleFetched
+    ? doctorOfflineReason(schedule, date)
+    : null;
+
+  useEffect(() => {
+    if (!open || !providerId) return;
+    const next = nextFreeSlot({
+      schedule,
+      appointments: doctorAppts,
+      providerId,
+      durationMin: duration,
+      from: new Date(),
+    });
+    if (!next) return;
+    setDate(next.date);
+    setTime(next.time);
+    setSlotNotice(null);
+  }, [open, providerId, duration, schedule, doctorAppts]);
 
   const createPatientMutation = useMutation({
     mutationFn: (values: PatientForm) => patientsService.create({
@@ -365,11 +433,12 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
     setProviderId(''); setDate(new Date().toLocaleDateString('en-CA'));
     setTime(new Date().toTimeString().slice(0, 5)); setDuration(30);
     setReason(''); setNotes(''); setDone(false);
+    setSlotNotice(null);
     form.reset(patientDefaults);
     onClose();
   }
 
-  const canSubmitAppt = !!patientId && !!providerId && !!date && !!time;
+  const canSubmitAppt = !!patientId && !!providerId && !!date && !!time && !offlineReason;
 
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
@@ -432,7 +501,26 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
         {/* Step 1 — Create Appointment */}
         {step === 1 && !done && (
           <Stack spacing={2}>
-            {appointmentMutation.isError && <Alert severity="error">Could not create appointment.</Alert>}
+            {appointmentMutation.isError && (
+              <Alert severity="error">
+                {(appointmentMutation.error as Error)?.message || 'Could not create appointment.'}
+              </Alert>
+            )}
+            {offlineReason && (
+              <Alert severity="warning">{offlineReason}</Alert>
+            )}
+            {slotNotice === 'busy' && (
+              <Alert severity="warning">
+                This time is already booked. Moved 30 minutes forward, or to the end of the current visit.
+              </Alert>
+            )}
+            {slotNotice === 'schedule' && (
+              <Alert severity="info">
+                {hoursLabel
+                  ? `Outside doctor hours (${hoursLabel}). Moved to the next available time.`
+                  : 'This day is off in Doctor Schedule. Moved to the next working day.'}
+              </Alert>
+            )}
             {patientName && (
               <Typography variant="body2" color="text.secondary">
                 Patient: <strong>{patientName}</strong>
@@ -448,15 +536,57 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
               <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
                 <DatePicker
                   label="Date"
-                  value={date ? new Date(date) : null}
-                  onChange={(v) => setDate(v ? v.toLocaleDateString('en-CA') : '')}
+                  value={date ? new Date(`${date}T12:00:00`) : null}
+                  onChange={(v) => {
+                    if (!v || !providerId) {
+                      setDate(v ? v.toLocaleDateString('en-CA') : '');
+                      return;
+                    }
+                    const from = new Date(v.getFullYear(), v.getMonth(), v.getDate(), 0, 0, 0, 0);
+                    const next = nextFreeSlot({
+                      schedule,
+                      appointments: doctorAppts,
+                      providerId,
+                      durationMin: duration,
+                      from,
+                    });
+                    if (next) {
+                      setDate(next.date);
+                      setTime(next.time);
+                      setSlotNotice(next.reason);
+                    } else {
+                      setDate(v.toLocaleDateString('en-CA'));
+                    }
+                  }}
                   slotProps={{ textField: { fullWidth: true } }}
                 />
                 <TimePicker
                   label="Time"
                   value={time ? new Date(`1970-01-01T${time}:00`) : null}
-                  onChange={(v) => setTime(v ? v.toTimeString().slice(0, 5) : '')}
-                  slotProps={{ textField: { fullWidth: true } }}
+                  onChange={(v) => {
+                    const picked = v ? v.toTimeString().slice(0, 5) : '';
+                    if (!picked || !providerId || !date) {
+                      setTime(picked);
+                      return;
+                    }
+                    const next = nextFreeSlot({
+                      schedule,
+                      appointments: doctorAppts,
+                      providerId,
+                      durationMin: duration,
+                      from: new Date(`${date}T${picked}:00`),
+                    });
+                    if (next) {
+                      setDate(next.date);
+                      setTime(next.time);
+                      setSlotNotice(next.reason);
+                    } else {
+                      setTime(picked);
+                    }
+                  }}
+                  slotProps={{
+                    textField: { fullWidth: true },
+                  }}
                 />
               </Box>
             </LocalizationProvider>
@@ -473,7 +603,7 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
               <InputLabel>Reason (optional)</InputLabel>
               <Select label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)}>
                 <MenuItem value="">— None —</MenuItem>
-                {['Checkup', 'Follow-up', 'Urgent', 'Consultation', 'Lab Results', 'Vaccination'].map((r) => (
+                {['Checkup', 'Follow-up', 'Urgent', 'Consultation', 'Vaccination'].map((r) => (
                   <MenuItem key={r} value={r}>{r}</MenuItem>
                 ))}
               </Select>
@@ -508,7 +638,11 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
           </SubmitButton>
         )}
         {step === 1 && !done && (
-          <SubmitButton disabled={!canSubmitAppt} loading={appointmentMutation.isPending} onClick={() => appointmentMutation.mutate()}>
+          <SubmitButton
+            disabled={!canSubmitAppt}
+            loading={appointmentMutation.isPending}
+            onClick={() => appointmentMutation.mutate()}
+          >
             Book Appointment
           </SubmitButton>
         )}
@@ -785,6 +919,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
     queryKey: ['invoices'],
     queryFn: invoicesService.list,
     refetchInterval: 30_000,
+    enabled: showBilling,
   });
   const { data: doctors = [] } = useQuery<AppointmentPerson[]>({
     queryKey: ['appointment-doctors'],
@@ -961,10 +1096,20 @@ export function ReceptionistDashboard(): React.JSX.Element {
             </Paper>
 
             <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: '1fr 1fr' }}>
-              {[
+              {isLoading ? (
+                Array.from({ length: 4 }, (_, i) => (
+                  <Paper key={i} elevation={0} sx={{ p: 2, borderRadius: '16px', minHeight: 88 }}>
+                    <Skeleton variant="text" width={56} height={28} />
+                    <Skeleton variant="text" width={90} height={16} />
+                  </Paper>
+                ))
+              ) : (
+              [
                 { label: 'Total Patients', value: patientsData?.total ?? 0, bg: alpha(theme.palette.grey[500], 0.12) },
                 { label: 'Patients Today', value: todaysAppts.length, bg: alpha(theme.palette.success.main, 0.14), accent: theme.palette.success.dark },
-                { label: 'Pending Billing', value: pendingBilling, bg: alpha(theme.palette.info.main, 0.12), accent: theme.palette.info.dark },
+                ...(showBilling
+                  ? [{ label: 'Pending Billing', value: pendingBilling, bg: alpha(theme.palette.info.main, 0.12), accent: theme.palette.info.dark }]
+                  : []),
                 { label: 'Completion Rate', value: recoveryRate, bg: alpha(theme.palette.secondary.main, 0.12), accent: theme.palette.secondary.dark },
               ].map((m) => (
                 <Paper
@@ -988,7 +1133,8 @@ export function ReceptionistDashboard(): React.JSX.Element {
                     {m.label}
                   </Typography>
                 </Paper>
-              ))}
+              ))
+              )}
             </Box>
           </Box>
 
@@ -1001,7 +1147,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {selectedDate.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
-                  {paidToday > 0 && isSelectedToday ? ` · ${paidToday} paid invoice${paidToday === 1 ? '' : 's'} today` : ''}
+                  {showBilling && paidToday > 0 && isSelectedToday ? ` · ${paidToday} paid invoice${paidToday === 1 ? '' : 's'} today` : ''}
                 </Typography>
               </Box>
               <Button size="small" onClick={() => navigate('/appointments')} sx={{ fontWeight: 700 }}>
@@ -1009,7 +1155,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
               </Button>
             </Stack>
             {isLoading ? (
-              <Typography variant="body2" color="text.secondary">Loading…</Typography>
+              <ListCardsSkeleton count={5} />
             ) : selectedDayAppts.length === 0 ? (
               <Box sx={{ display: 'grid', minHeight: 100, placeItems: 'center' }}>
                 <Typography variant="body2" color="text.secondary">No appointments for this day.</Typography>

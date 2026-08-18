@@ -50,6 +50,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 24,
   },
+  headerText: {
+    flex: 1,
+    paddingRight: 16,
+    maxWidth: 400,
+  },
   doctorName: {
     fontSize: 18,
     fontFamily: 'Helvetica-Bold',
@@ -60,8 +65,13 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: 'Helvetica-Bold',
     color: PAD_BLUE,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  specialization: {
+    fontSize: 9,
+    fontFamily: 'Helvetica-Bold',
+    color: PAD_BLUE,
+    lineHeight: 1.35,
     marginBottom: 3,
   },
   certification: {
@@ -247,10 +257,29 @@ export interface PrescriptionPadClinic {
   clinicPhone: string;
 }
 
+export type DoctorPadLines = {
+  qualification: string;
+  specialization: string;
+};
+
+/** Separate lines from the doctor profile — never a static title, never one jammed line. */
+export function doctorPadLines(profile?: {
+  qualification?: string | null;
+  specialization?: string | null;
+} | null): DoctorPadLines {
+  const qualification = profile?.qualification?.trim() || '';
+  const specialization = profile?.specialization?.trim() || '';
+  if (qualification && specialization && qualification.toLowerCase() === specialization.toLowerCase()) {
+    return { qualification: '', specialization };
+  }
+  return { qualification, specialization };
+}
+
 export interface PrescriptionPadPdfProps {
   clinic: PrescriptionPadClinic;
   doctorName: string;
   qualification?: string;
+  specialization?: string;
   certification?: string;
   patientName: string;
   patientAddress?: string;
@@ -476,7 +505,8 @@ function FieldLine({ label, value, width }: { label: string; value: string; widt
 export function PrescriptionPadDocument({
   clinic,
   doctorName,
-  qualification = 'CONSULTING PHYSICIAN',
+  qualification = '',
+  specialization = '',
   certification,
   patientName,
   patientAddress = '',
@@ -492,9 +522,10 @@ export function PrescriptionPadDocument({
       <Page size="A4" orientation="portrait" style={styles.page}>
         <View style={styles.content}>
           <View style={styles.header}>
-            <View>
+            <View style={styles.headerText}>
               <Text style={styles.doctorName}>{doctorName}</Text>
-              <Text style={styles.qualification}>{qualification}</Text>
+              {qualification ? <Text style={styles.qualification}>{qualification}</Text> : null}
+              {specialization ? <Text style={styles.specialization}>{specialization}</Text> : null}
               {certification ? <Text style={styles.certification}>{certification}</Text> : null}
             </View>
             <Image src={careflowLogo} style={styles.headerLogo} />
@@ -573,6 +604,9 @@ export function PrescriptionPadPdfPreview({
     docProps.patientAddress,
     docProps.diagnosis,
     docProps.clinic.clinicName,
+    docProps.doctorName,
+    docProps.qualification,
+    docProps.specialization,
   ].join('|');
 
   const pdfDocument = useMemo(

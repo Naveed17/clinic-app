@@ -20,7 +20,9 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { GlobalSearchResult } from '@/types/search';
+import { getSearchScope, searchPlaceholder } from '@shared/searchAccess';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
+import { useAuth } from '@/features/auth/AuthContext';
 
 interface Props {
   open: boolean;
@@ -58,10 +60,13 @@ function SectionHeader({ icon, label, count }: { icon: React.ReactNode; label: s
 export function GlobalSearchModal({ open, onClose }: Props) {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { can } = useLicense();
-  const canPatients = can('managePatients');
-  const canBilling = can('billing');
-  const canLab = can('labDashboard');
+  const { user } = useAuth();
+  const { modules } = useLicense();
+  const scope = getSearchScope(user?.role, modules);
+  const canPatients = scope.patients;
+  const canBilling = scope.invoices;
+  const canLab = scope.labOrders;
+  const canAppointments = scope.appointments;
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<GlobalSearchResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -82,14 +87,14 @@ export function GlobalSearchModal({ open, onClose }: Props) {
     setLoading(true);
     debounceRef.current = setTimeout(async () => {
       try {
-        const data = await window.clinic.search.global(query.trim()) as GlobalSearchResult;
+        const data = await window.clinic.search.global(query.trim(), user?.role) as GlobalSearchResult;
         setResults(data);
       } finally {
         setLoading(false);
       }
     }, 300);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [query]);
+  }, [query, user?.role]);
 
   function go(path: string) {
     onClose();
@@ -97,8 +102,10 @@ export function GlobalSearchModal({ open, onClose }: Props) {
   }
 
   const hasResults = results && (
-    (canPatients ? results.patients.length : 0) + results.appointments.length +
-    (canBilling ? results.invoices.length : 0) + (canLab ? results.labOrders.length : 0) > 0
+    (canPatients ? results.patients.length : 0) +
+    (canAppointments ? results.appointments.length : 0) +
+    (canBilling ? results.invoices.length : 0) +
+    (canLab ? results.labOrders.length : 0) > 0
   );
 
   return (
@@ -113,7 +120,7 @@ export function GlobalSearchModal({ open, onClose }: Props) {
         <TextField
           inputRef={inputRef}
           fullWidth
-          placeholder="Search patients, appointments, invoices, lab orders…"
+          placeholder={searchPlaceholder(scope)}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           variant="standard"
@@ -183,7 +190,7 @@ export function GlobalSearchModal({ open, onClose }: Props) {
           )}
 
           {/* Appointments */}
-          {results!.appointments.length > 0 && (
+          {canAppointments && results!.appointments.length > 0 && (
             <>
               <Divider />
               <SectionHeader icon={<CalendarMonthOutlinedIcon fontSize="small" />} label="Appointments" count={results!.appointments.length} />

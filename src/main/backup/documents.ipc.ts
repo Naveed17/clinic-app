@@ -1,8 +1,10 @@
 import { ipcMain, dialog, shell } from 'electron';
 import { copyFileSync, unlinkSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { request as httpsRequest } from 'node:https';
 import { join, basename, extname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { URL } from 'node:url';
 import { getPrisma } from '../database/client';
 import { getDocsDir, resolveDocPath, toStoredDocPath } from './docs-paths';
 import { sendWhatsAppDocument } from '../whatsapp/whatsapp.service';
@@ -13,7 +15,7 @@ type DoctorLike = {
   doctorProfile?: { specialization?: string | null } | null;
 } | null | undefined;
 
-const MAX_CLOUD_BYTES = 3 * 1024 * 1024;
+const MAX_CLOUD_BYTES = 25 * 1024 * 1024;
 
 function formatDoctorName(doctor: DoctorLike): string | null {
   if (!doctor) return null;
@@ -43,17 +45,93 @@ function stripDataUrl(fileData: string): string {
   return idx >= 0 ? raw.slice(idx + 7) : raw;
 }
 
+function signedHeaderSet(uploadUrl: string): Set<string> {
+  try {
+    const raw = new URL(uploadUrl).searchParams.get('X-Amz-SignedHeaders') || '';
+    return new Set(
+      raw
+        .split(';')
+        .map((h) => h.trim().toLowerCase())
+        .filter(Boolean),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function r2ErrorMessage(status: number, body: string): string {
+  const code = body.match(/<Code>([^<]+)<\/Code>/i)?.[1];
+  const msg = body.match(/<Message>([^<]+)<\/Message>/i)?.[1];
+  if (code === 'AccessDenied') {
+    return 'Cloud upload failed (403 AccessDenied): R2 token cannot write. Give it Object Read & Write, update Vercel R2 keys, and redeploy.';
+  }
+  if (code && msg) return `Cloud upload failed (${status} ${code}): ${msg}`;
+  if (code) return `Cloud upload failed (${status} ${code}).`;
+  return `Cloud upload failed (${status}).`;
+}
+
+/** PUT to R2 with only the headers the presigned URL actually signed. */
+function putPresignedObject(
+  uploadUrl: string,
+  body: Buffer,
+  contentType: string,
+): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    let parsed: URL;
+    try {
+      parsed = new URL(uploadUrl);
+    } catch {
+      resolve({ ok: false, error: 'Invalid upload URL.' });
+      return;
+    }
+    const signed = signedHeaderSet(uploadUrl);
+    const headers: Record<string, string | number> = {
+      'Content-Length': body.length,
+    };
+    // R2 returns 403 SignatureDoesNotMatch if Content-Type is sent but not signed.
+    if (signed.has('content-type')) {
+      headers['Content-Type'] = contentType || 'application/octet-stream';
+    }
+    const req = httpsRequest(
+      {
+        protocol: parsed.protocol,
+        hostname: parsed.hostname,
+        port: parsed.port || 443,
+        path: `${parsed.pathname}${parsed.search}`,
+        method: 'PUT',
+        headers,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk) => chunks.push(chunk as Buffer));
+        res.on('end', () => {
+          const status = res.statusCode || 0;
+          if (status >= 200 && status < 300) {
+            resolve({ ok: true });
+            return;
+          }
+          const text = Buffer.concat(chunks).toString('utf8').slice(0, 800);
+          resolve({ ok: false, error: r2ErrorMessage(status, text) });
+        });
+      },
+    );
+    req.on('error', (err) => resolve({ ok: false, error: err.message || 'Cloud upload failed.' }));
+    req.end(body);
+  });
+}
+
 export function registerDocumentsIpc(): void {
   /** Pick files and return base64 payloads (used by online cloud upload). */
   ipcMain.handle(
     'docs:pick-files',
     async (
       _e,
-      opts?: { title?: string; extensions?: string[] },
+      opts?: { title?: string; extensions?: string[]; maxBytes?: number },
     ): Promise<{ name: string; mimeType: string; size: number; fileData: string }[]> => {
       const extensions = opts?.extensions?.length
         ? opts.extensions
         : ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'txt'];
+      const maxBytes = Number(opts?.maxBytes) > 0 ? Number(opts.maxBytes) : MAX_CLOUD_BYTES;
       const { filePaths, canceled } = await dialog.showOpenDialog({
         title: opts?.title || 'Select Document',
         properties: ['openFile', 'multiSelections'],
@@ -63,8 +141,9 @@ export function registerDocumentsIpc(): void {
       const results: { name: string; mimeType: string; size: number; fileData: string }[] = [];
       for (const src of filePaths) {
         const buf = readFileSync(src);
-        if (buf.length > MAX_CLOUD_BYTES) {
-          throw new Error(`"${basename(src)}" is too large (max 3 MB for online storage).`);
+        if (buf.length > maxBytes) {
+          const mb = Math.round(maxBytes / (1024 * 1024));
+          throw new Error(`"${basename(src)}" is too large (max ${mb} MB).`);
         }
         results.push({
           name: basename(src),
@@ -104,6 +183,39 @@ export function registerDocumentsIpc(): void {
       writeFileSync(tmp, Buffer.from(data, 'base64'));
       await shell.openPath(tmp);
       return null;
+    },
+  );
+
+  ipcMain.handle(
+    'docs:put-url',
+    async (
+      _e,
+      input: { url: string; contentType?: string; fileData: string },
+    ): Promise<{ ok: boolean; error?: string }> => {
+      try {
+        const data = stripDataUrl(String(input?.fileData || ''));
+        const url = String(input?.url || '').trim();
+        if (!data || !url) return { ok: false, error: 'Missing file or upload URL.' };
+        return await putPresignedObject(
+          url,
+          Buffer.from(data, 'base64'),
+          String(input.contentType || 'application/octet-stream'),
+        );
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : 'Cloud upload failed.' };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    'docs:fetch-url',
+    async (_e, url: string): Promise<{ ok: boolean; fileData?: string; error?: string }> => {
+      const href = String(url || '').trim();
+      if (!href) return { ok: false, error: 'Missing download URL.' };
+      const res = await fetch(href);
+      if (!res.ok) return { ok: false, error: `Download failed (${res.status}).` };
+      const buf = Buffer.from(await res.arrayBuffer());
+      return { ok: true, fileData: buf.toString('base64') };
     },
   );
 

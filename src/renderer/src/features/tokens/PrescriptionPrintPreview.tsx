@@ -4,7 +4,7 @@ import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import type { Prescription, Token } from '@/types/token';
 import { useEffect, useMemo, useState } from 'react';
-import { PrescriptionPadDocument, parsePadMeta, stripAdviceHtml } from './PrescriptionPadPdf';
+import { PrescriptionPadDocument, parsePadMeta, stripAdviceHtml, doctorPadLines } from './PrescriptionPadPdf';
 import { printReactPdfDocument } from '@/utils/printPdf';
 import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
 
@@ -351,6 +351,8 @@ export function PrescriptionPrintPreview({
   onClose,
 }: PrescriptionPrintPreviewProps): React.JSX.Element {
   const [clinic, setClinic] = useState({ clinicName: '', clinicAddress: '', clinicPhone: '' });
+  const [qualification, setQualification] = useState('');
+  const [specialization, setSpecialization] = useState('');
   const [printing, setPrinting] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
 
@@ -365,6 +367,19 @@ export function PrescriptionPrintPreview({
       }
     });
   }, []);
+
+  const doctorId = token?.doctorId;
+  useEffect(() => {
+    if (!doctorId) return;
+    void window.clinic.doctors
+      .getOne(doctorId)
+      .then((doctor) => {
+        const lines = doctorPadLines(doctor?.doctorProfile);
+        setQualification(lines.qualification);
+        setSpecialization(lines.specialization);
+      })
+      .catch(() => undefined);
+  }, [doctorId]);
 
   const activePrescription = prescriptionProp || token?.prescription;
 
@@ -426,7 +441,8 @@ export function PrescriptionPrintPreview({
         <PrescriptionPadDocument
           clinic={clinic}
           doctorName={doctorDisplay}
-          qualification="CONSULTING PHYSICIAN"
+          qualification={qualification}
+          specialization={specialization}
           patientName={patientName}
           patientAddress={padAddress}
           patientAge={padAge}
@@ -466,6 +482,8 @@ export function PrescriptionPrintPreview({
     padSex,
     patientName,
     patientPhone,
+    qualification,
+    specialization,
   ]);
 
   async function handlePrint(): Promise<void> {

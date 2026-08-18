@@ -20,11 +20,11 @@ export interface AppSettings {
   /** Cloud API origin when databaseMode=online (no trailing /api — paths already include /api/...) */
   clinicalApiUrl: string;
   schemaId: string;
-  /** Groq free API — Prescription AI Suggest / history summary */
+  /** Hosted Groq via license-server — clinics do not store API keys */
   aiEnabled: boolean;
   groqApiKey: string;
   groqModel: string;
-  /** Per-clinic Meta WhatsApp Cloud API (not the shared .env fallback). */
+  /** Hosted WhatsApp Cloud API via license-server — one shared CareFlow number */
   whatsappEnabled: boolean;
   whatsappToken: string;
   whatsappPhoneNumberId: string;

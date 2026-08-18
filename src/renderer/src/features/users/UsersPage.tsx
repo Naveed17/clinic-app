@@ -35,6 +35,7 @@ import { z } from 'zod';
 import { usersService } from '@/services/users.service';
 import type { User, UserInput, UserUpdateInput } from '@/types/user';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogFormSx, dialogPaperProps,
@@ -294,6 +295,7 @@ export function UsersPage(): React.JSX.Element {
           ) : undefined
         }
         error={usersQuery.isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load users.</Alert>}
+        fetching={usersQuery.isFetching && !usersQuery.isLoading}
       >
         <TableHead sx={tableSx.head}>
           <TableRow>
@@ -307,7 +309,7 @@ export function UsersPage(): React.JSX.Element {
         </TableHead>
         <TableBody>
           {usersQuery.isLoading ? (
-            <TableRow><TableCell colSpan={6} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>Loading users...</TableCell></TableRow>
+            <TableRowsSkeleton cols={6} />
           ) : users.length === 0 ? (
             <TableRow><TableCell colSpan={6} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No users found.</TableCell></TableRow>
           ) : (

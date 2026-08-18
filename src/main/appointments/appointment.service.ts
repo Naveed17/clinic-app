@@ -1,6 +1,6 @@
 import type { AppointmentStatus } from '@prisma/client';
 import { getPrisma } from '../database/client';
-import { assertDoctorAvailable } from '../doctors/schedule.service';
+import { assertDoctorAvailable, assertDoctorAvailableOnDate, getDoctorSchedule } from '../doctors/schedule.service';
 import { completeWaitingTokenForVisit } from '../tokens/token.service';
 
 export interface AppointmentInput {
@@ -116,11 +116,97 @@ async function getAppointmentById(id: string) {
   };
 }
 
+const SLOT_STEP_MS = 30 * 60 * 1000;
+
+/** Machine-local calendar day containing `date` (not UTC — avoids midnight PKT duplicates). */
+function localDayBounds(date: Date): { dayStart: Date; dayEnd: Date } {
+  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+  const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+  return { dayStart, dayEnd };
+}
+
+function asDate(value: Date | string): Date {
+  return value instanceof Date ? value : new Date(value);
+}
+
+async function findClash(
+  providerId: string,
+  startsAt: Date,
+  endsAt: Date,
+  excludeId?: string,
+) {
+  return getPrisma().appointment.findFirst({
+    where: {
+      providerId,
+      status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+      startsAt: { lt: endsAt },
+      endsAt: { gt: startsAt },
+    },
+    select: { id: true, startsAt: true, endsAt: true },
+    orderBy: { endsAt: 'asc' },
+  });
+}
+
+async function assertSlotFree(
+  providerId: string,
+  startsAt: Date,
+  endsAt: Date,
+  excludeId?: string,
+): Promise<void> {
+  const clash = await findClash(providerId, startsAt, endsAt, excludeId);
+  if (clash) {
+    throw new Error('This time slot is busy. The next free slot is 30 minutes later or after the current visit ends.');
+  }
+}
+
+/** Walk-in / token: if this start is taken, jump +30 min or to the overlapping visit end. */
+async function resolveFreeSlot(
+  providerId: string,
+  startsAt: Date,
+  endsAt: Date,
+  excludeId?: string,
+): Promise<{ startsAt: Date; endsAt: Date }> {
+  const durationMs = Math.max(endsAt.getTime() - startsAt.getTime(), 15 * 60 * 1000);
+  const { dayEnd } = localDayBounds(startsAt);
+  let windowStart = new Date(startsAt.getFullYear(), startsAt.getMonth(), startsAt.getDate(), 0, 0, 0, 0);
+  let windowEnd = dayEnd;
+
+  const y = startsAt.getFullYear();
+  const m = String(startsAt.getMonth() + 1).padStart(2, '0');
+  const d = String(startsAt.getDate()).padStart(2, '0');
+  await assertDoctorAvailableOnDate(providerId, `${y}-${m}-${d}`);
+  const slots = await getDoctorSchedule(providerId);
+  const slot = slots.find((s) => s.dayOfWeek === startsAt.getDay());
+  if (slot?.isActive) {
+    const [sh, sm] = slot.startTime.split(':').map(Number);
+    const [eh, em] = slot.endTime.split(':').map(Number);
+    windowStart = new Date(startsAt.getFullYear(), startsAt.getMonth(), startsAt.getDate(), sh, sm, 0, 0);
+    windowEnd = new Date(startsAt.getFullYear(), startsAt.getMonth(), startsAt.getDate(), eh, em, 0, 0);
+  }
+
+  let cursor = startsAt.getTime() > windowStart.getTime() ? new Date(startsAt.getTime()) : windowStart;
+
+  for (let i = 0; i < 48; i++) {
+    const candidateEnd = new Date(cursor.getTime() + durationMs);
+    if (candidateEnd.getTime() > windowEnd.getTime()) {
+      throw new Error('No free slot left in doctor hours today. Pick another time or doctor.');
+    }
+    const clash = await findClash(providerId, cursor, candidateEnd, excludeId);
+    if (!clash) return { startsAt: cursor, endsAt: candidateEnd };
+    const afterHit = asDate(clash.endsAt).getTime();
+    const plusStep = cursor.getTime() + SLOT_STEP_MS;
+    cursor = new Date(Math.max(afterHit, plusStep));
+  }
+  throw new Error('This time slot is busy. No free slot found today.');
+}
+
 export async function createAppointment(input: AppointmentInput) {
   await assertProviderActive(input.providerId);
   const startsAt = parseDate(input.startsAt, 'startsAt');
   const endsAt = parseDate(input.endsAt, 'endsAt');
   await assertDoctorAvailable(input.providerId, startsAt, endsAt);
+  await assertSlotFree(input.providerId, startsAt, endsAt);
 
   if (input.recurrenceRule) {
     const [freq, countStr] = input.recurrenceRule.split(':');
@@ -131,6 +217,7 @@ export async function createAppointment(input: AppointmentInput) {
         const occStart = new Date(startsAt.getTime() + i * 7 * 24 * 60 * 60 * 1000);
         const occEnd = new Date(occStart.getTime() + durationMs);
         await assertDoctorAvailable(input.providerId, occStart, occEnd);
+        await assertSlotFree(input.providerId, occStart, occEnd);
       }
     }
   }
@@ -165,19 +252,12 @@ export async function createAppointment(input: AppointmentInput) {
 /**
  * Token / walk-in: same patient + doctor + day → update existing appointment
  * instead of inserting a duplicate card (same token #).
+ * New walk-ins auto-shift to the next free 30-min slot (or after the overlapping visit).
  */
-/** Machine-local calendar day containing `date` (not UTC — avoids midnight PKT duplicates). */
-function localDayBounds(date: Date): { dayStart: Date; dayEnd: Date } {
-  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
-  const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
-  return { dayStart, dayEnd };
-}
-
 export async function ensureSameDayAppointment(input: AppointmentInput) {
   await assertProviderActive(input.providerId);
   const startsAt = parseDate(input.startsAt, 'startsAt');
   const endsAt = parseDate(input.endsAt, 'endsAt');
-  await assertDoctorAvailable(input.providerId, startsAt, endsAt);
 
   const { dayStart, dayEnd } = localDayBounds(startsAt);
 
@@ -218,16 +298,21 @@ export async function ensureSameDayAppointment(input: AppointmentInput) {
     return getAppointmentById(target.id);
   }
 
-  return createAppointment({ ...input, recurrenceRule: null });
+  const resolved = await resolveFreeSlot(input.providerId, startsAt, endsAt);
+  return createAppointment({
+    ...input,
+    startsAt: resolved.startsAt.toISOString(),
+    endsAt: resolved.endsAt.toISOString(),
+    recurrenceRule: null,
+  });
 }
 
 export async function updateAppointment(id: string, input: AppointmentInput) {
   await assertProviderActive(input.providerId);
-  await assertDoctorAvailable(
-    input.providerId,
-    parseDate(input.startsAt, 'startsAt'),
-    parseDate(input.endsAt, 'endsAt'),
-  );
+  const startsAt = parseDate(input.startsAt, 'startsAt');
+  const endsAt = parseDate(input.endsAt, 'endsAt');
+  await assertDoctorAvailable(input.providerId, startsAt, endsAt);
+  await assertSlotFree(input.providerId, startsAt, endsAt, id);
   await getPrisma().appointment.update({ where: { id }, data: toData(input) });
   return getAppointmentById(id);
 }

@@ -19,6 +19,7 @@ import {
   chipSx,
   actionBtnSx,
 } from '@/components/TableUI';
+import { TableRowsSkeleton } from '@/components/LoadingUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { StockDialog, type InventoryMedicineRow } from './StockDialog';
 import { ConfirmDialog } from '@/components/DialogUI';
@@ -63,7 +64,7 @@ export function PharmacyPage(): React.JSX.Element {
   const [movementOpen, setMovementOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
 
-  const { data: rawMedicines = [], isLoading: medLoading } = useQuery<InventoryMedicine[]>({
+  const { data: rawMedicines = [], isLoading: medLoading, isFetching: medFetching } = useQuery<InventoryMedicine[]>({
     queryKey: ['inventory-medicines'],
     queryFn: () => window.clinic.inventory.medicines.list(),
   });
@@ -71,23 +72,23 @@ export function PharmacyPage(): React.JSX.Element {
     queryKey: ['inventory-low-stock'],
     queryFn: () => window.clinic.inventory.medicines.lowStock(),
   });
-  const { data: batches = [], isLoading: batchLoading } = useQuery<InventoryBatch[]>({
+  const { data: batches = [], isLoading: batchLoading, isFetching: batchFetching } = useQuery<InventoryBatch[]>({
     queryKey: ['inventory-batches'],
     queryFn: () => window.clinic.inventory.batches.list(),
   });
-  const { data: suppliers = [], isLoading: supplierLoading } = useQuery<InventorySupplier[]>({
+  const { data: suppliers = [], isLoading: supplierLoading, isFetching: supplierFetching } = useQuery<InventorySupplier[]>({
     queryKey: ['inventory-suppliers'],
     queryFn: () => window.clinic.inventory.suppliers.list(),
   });
-  const { data: purchases = [], isLoading: purchaseLoading } = useQuery<InventoryPurchaseOrder[]>({
+  const { data: purchases = [], isLoading: purchaseLoading, isFetching: purchaseFetching } = useQuery<InventoryPurchaseOrder[]>({
     queryKey: ['inventory-purchases'],
     queryFn: () => window.clinic.inventory.purchases.list(),
   });
-  const { data: movements = [], isLoading: movementLoading } = useQuery<InventoryStockMovement[]>({
+  const { data: movements = [], isLoading: movementLoading, isFetching: movementFetching } = useQuery<InventoryStockMovement[]>({
     queryKey: ['inventory-movements'],
     queryFn: () => window.clinic.inventory.movements.list(),
   });
-  const { data: categories = [], isLoading: categoryLoading } = useQuery<InventoryCategory[]>({
+  const { data: categories = [], isLoading: categoryLoading, isFetching: categoryFetching } = useQuery<InventoryCategory[]>({
     queryKey: ['inventory-categories'],
     queryFn: () => window.clinic.inventory.categories.list(),
   });
@@ -161,6 +162,15 @@ export function PharmacyPage(): React.JSX.Element {
     categories: categoryLoading,
   };
 
+  const fetchingByTab: Record<TabKey, boolean> = {
+    medicines: medFetching && !medLoading,
+    batches: batchFetching && !batchLoading,
+    suppliers: supplierFetching && !supplierLoading,
+    purchases: purchaseFetching && !purchaseLoading,
+    movements: movementFetching && !movementLoading,
+    categories: categoryFetching && !categoryLoading,
+  };
+
   const filtered = listByTab[tab];
   const isLoading = loadingByTab[tab];
   const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
@@ -222,6 +232,7 @@ export function PharmacyPage(): React.JSX.Element {
             <TablePager page={page} rowsPerPage={rowsPerPage} total={filtered.length} onPageChange={setPage} />
           ) : undefined
         }
+        fetching={fetchingByTab[tab]}
       >
         {tab === 'medicines' && lowStock.length > 0 && (
           <Alert severity="warning" icon={<WarningAmberOutlinedIcon />} sx={{ mx: 2, mt: 1.5, mb: 1 }}>
@@ -245,7 +256,7 @@ export function PharmacyPage(): React.JSX.Element {
             </TableHead>
             <TableBody>
               {isLoading ? (
-                <EmptyRow cols={canManage ? 7 : 6} text="Loading medicines..." />
+                <TableRowsSkeleton cols={canManage ? 7 : 6} />
               ) : paginated.length === 0 ? (
                 <EmptyRow cols={canManage ? 7 : 6} text="No medicines found." />
               ) : (
@@ -308,7 +319,7 @@ export function PharmacyPage(): React.JSX.Element {
             </TableHead>
             <TableBody>
               {isLoading ? (
-                <EmptyRow cols={6} text="Loading batches..." />
+                <TableRowsSkeleton cols={6} />
               ) : paginated.length === 0 ? (
                 <EmptyRow cols={6} text="No batches found." />
               ) : (
@@ -355,7 +366,7 @@ export function PharmacyPage(): React.JSX.Element {
             </TableHead>
             <TableBody>
               {isLoading ? (
-                <EmptyRow cols={5} text="Loading suppliers..." />
+                <TableRowsSkeleton cols={5} />
               ) : paginated.length === 0 ? (
                 <EmptyRow cols={5} text="No suppliers found." />
               ) : (
@@ -386,7 +397,7 @@ export function PharmacyPage(): React.JSX.Element {
             </TableHead>
             <TableBody>
               {isLoading ? (
-                <EmptyRow cols={5} text="Loading purchases..." />
+                <TableRowsSkeleton cols={5} />
               ) : paginated.length === 0 ? (
                 <EmptyRow cols={5} text="No purchases found." />
               ) : (
@@ -417,7 +428,7 @@ export function PharmacyPage(): React.JSX.Element {
             </TableHead>
             <TableBody>
               {isLoading ? (
-                <EmptyRow cols={5} text="Loading movements..." />
+                <TableRowsSkeleton cols={5} />
               ) : paginated.length === 0 ? (
                 <EmptyRow cols={5} text="No stock movements yet." />
               ) : (
@@ -461,7 +472,7 @@ export function PharmacyPage(): React.JSX.Element {
             </TableHead>
             <TableBody>
               {isLoading ? (
-                <EmptyRow cols={3} text="Loading categories..." />
+                <TableRowsSkeleton cols={3} />
               ) : paginated.length === 0 ? (
                 <EmptyRow cols={3} text="No categories found." />
               ) : (

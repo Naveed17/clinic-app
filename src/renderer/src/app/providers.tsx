@@ -46,12 +46,13 @@ export function AppProviders({ children }: PropsWithChildren): React.JSX.Element
             if (meta?.silent || !meta?.toast) return;
             showAppToast({ type: 'success', message: meta.toast });
           },
-          onError: (_error, _vars, _ctx, mutation) => {
+          onError: (error, _vars, _ctx, mutation) => {
             const meta = mutation.meta;
             if (meta?.silent || meta?.errorToast === false) return;
-            if (typeof meta?.errorToast === 'string') {
-              showAppToast({ type: 'error', message: meta.errorToast });
-            }
+            const fromErr = error instanceof Error ? error.message.trim() : '';
+            const fallback = typeof meta?.errorToast === 'string' ? meta.errorToast : '';
+            const message = fromErr || fallback;
+            if (message) showAppToast({ type: 'error', message });
           },
         }),
       }),

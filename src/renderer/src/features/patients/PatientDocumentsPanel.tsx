@@ -10,6 +10,7 @@ import {
   CircularProgress,
   IconButton,
   Paper,
+  Skeleton,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -128,7 +129,11 @@ export function PatientDocumentsPanel({ patient }: { patient: Patient }): React.
         </Box>
       )}
       {docs.isLoading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 1.5 }}>
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} variant="rounded" height={140} sx={{ borderRadius: 2 }} />
+          ))}
+        </Box>
       ) : (docs.data ?? []).length === 0 ? (
         <Typography color="text.secondary" textAlign="center" sx={{ py: 4 }}>
           No documents uploaded.

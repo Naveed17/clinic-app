@@ -81,6 +81,25 @@ function toQueryString(input: unknown): string {
   return params.toString();
 }
 
+function onlineErrorMessage(raw: string, status: number): string {
+  const text = String(raw || '').trim();
+  if (text) {
+    try {
+      const json = JSON.parse(text) as { message?: unknown; error?: unknown };
+      const msg = json.message ?? json.error;
+      if (Array.isArray(msg)) {
+        const joined = msg.map(String).filter(Boolean).join(' ');
+        if (joined) return joined;
+      } else if (typeof msg === 'string' && msg.trim()) {
+        return msg.trim();
+      }
+    } catch {
+      if (!text.startsWith('{')) return text;
+    }
+  }
+  return `Request failed with status ${status}.`;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   await settingsReady;
   const timeZone = (() => {
@@ -107,17 +126,84 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error('Session expired.');
   }
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Request failed with status ${response.status}.`);
+    const raw = await response.text();
+    throw new Error(onlineErrorMessage(raw, response.status));
   }
   if (response.status === 204) return undefined as T;
   if (response.status === 205) return true as T;
-  return (await response.json()) as T;
+  const raw = await response.text();
+  if (!raw) return undefined as T;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return raw as T;
+  }
 }
 
 // LAN client: HTTP to remote server. Local/server: IPC to main process.
 function ipc<T>(channel: string, ...args: unknown[]): Promise<T> {
   return ipcRenderer.invoke(channel, ...args) as Promise<T>;
+}
+
+type CloudFile = { name: string; mimeType: string; size: number; fileData: string };
+type UploadPlan = {
+  storage: 'r2' | 'inline';
+  id?: string;
+  uploadUrl?: string;
+  contentType?: string;
+  maxBytes?: number;
+};
+
+async function resolveCloudFileData(doc: {
+  fileData?: string | null;
+  downloadUrl?: string | null;
+}): Promise<string | null> {
+  if (doc.fileData) return doc.fileData;
+  if (doc.downloadUrl) {
+    const fetched = await ipc<{ ok: boolean; fileData?: string; error?: string }>(
+      'docs:fetch-url',
+      doc.downloadUrl,
+    );
+    if (!fetched.ok || !fetched.fileData) return null;
+    return fetched.fileData;
+  }
+  return null;
+}
+
+async function uploadOnlineFiles(
+  files: CloudFile[],
+  beginPath: string,
+  completePath: (id: string) => string,
+  inlinePath: string,
+  deletePath: (id: string) => string,
+): Promise<{ id: string; name: string }[]> {
+  const results: { id: string; name: string }[] = [];
+  for (const file of files) {
+    const plan = await request<UploadPlan>(beginPath, {
+      method: 'POST',
+      body: JSON.stringify({ name: file.name, mimeType: file.mimeType, size: file.size }),
+    });
+    if (plan.storage === 'r2' && plan.uploadUrl && plan.id) {
+      const put = await ipc<{ ok: boolean; error?: string }>('docs:put-url', {
+        url: plan.uploadUrl,
+        contentType: plan.contentType,
+        fileData: file.fileData,
+      });
+      if (!put.ok) {
+        await request(deletePath(plan.id), { method: 'DELETE' }).catch(() => undefined);
+        throw new Error(put.error || 'Cloud upload failed.');
+      }
+      results.push(await request(completePath(plan.id), { method: 'POST' }));
+    } else {
+      results.push(
+        await request(inlinePath, {
+          method: 'POST',
+          body: JSON.stringify(file),
+        }),
+      );
+    }
+  }
+  return results;
 }
 
 function call<T>(httpFn: () => Promise<T>, ipcChannel: string, ...ipcArgs: unknown[]): Promise<T> {
@@ -315,23 +401,19 @@ const api = {
           : ipc('docs:patient:list', patientId),
       upload: async (patientId: string) => {
         if (!isOnlineClient) return ipc('docs:patient:upload', patientId);
-        const files = await ipc<
-          { name: string; mimeType: string; size: number; fileData: string }[]
-        >('docs:pick-files', {
+        const files = await ipc<CloudFile[]>('docs:pick-files', {
           title: 'Select Document',
           extensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'txt'],
+          maxBytes: 25 * 1024 * 1024,
         });
         if (!files.length) return [];
-        const results = [];
-        for (const file of files) {
-          results.push(
-            await request(`/api/docs/patients/${encodeURIComponent(patientId)}`, {
-              method: 'POST',
-              body: JSON.stringify(file),
-            }),
-          );
-        }
-        return results;
+        return uploadOnlineFiles(
+          files,
+          `/api/docs/patients/${encodeURIComponent(patientId)}/uploads`,
+          (id) => `/api/docs/${encodeURIComponent(id)}/complete`,
+          `/api/docs/patients/${encodeURIComponent(patientId)}`,
+          (id) => `/api/docs/${encodeURIComponent(id)}`,
+        );
       },
       delete: (id: string) =>
         isOnlineClient
@@ -343,13 +425,15 @@ const api = {
           name: string;
           mimeType: string;
           fileData: string | null;
+          downloadUrl?: string | null;
           open?: { type: string; name: string; data: string };
         }>(`/api/docs/${encodeURIComponent(id)}`);
         if (doc.open?.type === 'pdf' || doc.open?.type === 'image') return doc.open;
+        const fileData = await resolveCloudFileData(doc);
         return ipc('docs:open-buffer', {
           name: doc.name,
           mimeType: doc.mimeType,
-          fileData: doc.fileData,
+          fileData,
         });
       },
       whatsapp: async (id: string, phone?: string) => {
@@ -358,6 +442,7 @@ const api = {
           name: string;
           mimeType: string;
           fileData: string | null;
+          downloadUrl?: string | null;
           patient?: {
             firstName?: string;
             lastName?: string;
@@ -365,11 +450,12 @@ const api = {
             mrNumber?: string | null;
           };
         }>(`/api/docs/${encodeURIComponent(id)}`);
-        if (!doc.fileData) return { success: false, error: 'File not found.' };
+        const fileData = await resolveCloudFileData(doc);
+        if (!fileData) return { success: false, error: 'File not found.' };
         return ipc('docs:whatsapp-from-buffer', {
           fileName: doc.name,
           mimeType: doc.mimeType,
-          fileData: doc.fileData,
+          fileData,
           phone: phone || doc.patient?.phone,
           context: {
             patientName: `${doc.patient?.firstName ?? ''} ${doc.patient?.lastName ?? ''}`.trim(),
@@ -385,23 +471,19 @@ const api = {
           : ipc('docs:lab:list', labOrderId),
       upload: async (labOrderId: string) => {
         if (!isOnlineClient) return ipc('docs:lab:upload', labOrderId);
-        const files = await ipc<
-          { name: string; mimeType: string; size: number; fileData: string }[]
-        >('docs:pick-files', {
+        const files = await ipc<CloudFile[]>('docs:pick-files', {
           title: 'Attach Lab Report',
           extensions: ['pdf', 'jpg', 'jpeg', 'png'],
+          maxBytes: 25 * 1024 * 1024,
         });
         if (!files.length) return [];
-        const results = [];
-        for (const file of files) {
-          results.push(
-            await request(`/api/docs/lab/${encodeURIComponent(labOrderId)}`, {
-              method: 'POST',
-              body: JSON.stringify(file),
-            }),
-          );
-        }
-        return results;
+        return uploadOnlineFiles(
+          files,
+          `/api/docs/lab/${encodeURIComponent(labOrderId)}/uploads`,
+          (id) => `/api/docs/lab-report/${encodeURIComponent(id)}/complete`,
+          `/api/docs/lab/${encodeURIComponent(labOrderId)}`,
+          (id) => `/api/docs/lab-report/${encodeURIComponent(id)}`,
+        );
       },
       delete: (id: string) =>
         isOnlineClient
@@ -413,11 +495,15 @@ const api = {
           name: string;
           mimeType: string;
           fileData: string | null;
+          downloadUrl?: string | null;
+          open?: { type: string; name: string; data: string };
         }>(`/api/docs/lab-report/${encodeURIComponent(id)}`);
+        if (report.open?.type === 'pdf' || report.open?.type === 'image') return report.open;
+        const fileData = await resolveCloudFileData(report);
         await ipc('docs:open-buffer', {
           name: report.name,
           mimeType: report.mimeType,
-          fileData: report.fileData,
+          fileData,
         });
       },
     },
@@ -815,10 +901,10 @@ const api = {
     },
   },
   search: {
-    global: (query: string) =>
+    global: (query: string, role?: string) =>
       call(
         () => request(`/api/search?q=${encodeURIComponent(query)}`),
-        'search:global', query,
+        'search:global', query, role,
       ),
   },
   update: {

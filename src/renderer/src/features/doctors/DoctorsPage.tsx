@@ -33,6 +33,7 @@ import { doctorsService } from '@/services/doctors.service';
 import { useAuth } from '@/features/auth/AuthContext';
 import type { Doctor, DoctorInput, DoctorUpdateInput } from '@/types/doctor';
 import { tableSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogFormSx, dialogPaperProps,
@@ -251,6 +252,7 @@ export function DoctorsPage(): React.JSX.Element {
           ) : undefined
         }
         error={doctorsQuery.isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load doctors.</Alert>}
+        fetching={doctorsQuery.isFetching && !doctorsQuery.isLoading}
       >
         <TableHead sx={tableSx.head}>
           <TableRow>
@@ -264,7 +266,7 @@ export function DoctorsPage(): React.JSX.Element {
         </TableHead>
         <TableBody>
           {doctorsQuery.isLoading ? (
-            <TableRow><TableCell colSpan={6} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>Loading doctors...</TableCell></TableRow>
+            <TableRowsSkeleton cols={6} />
           ) : doctors.length === 0 ? (
             <TableRow><TableCell colSpan={6} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No doctors found.</TableCell></TableRow>
           ) : (

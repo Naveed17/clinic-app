@@ -7,7 +7,7 @@ import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HourglassEmptyOutlinedIcon from '@mui/icons-material/HourglassEmptyOutlined';
 import {
-  Alert, Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
+  Alert, Avatar, Box, Button, Chip, Dialog, DialogActions, DialogContent,
   Divider, Paper, Stack, Tab, Tabs, Typography,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/AuthContext';
 import { InvoiceDialog } from '@/features/billing/InvoicesPage';
 import { formatAdvicePreview } from '@/features/tokens/PrescriptionPadPdf';
+import { ListCardsSkeleton, StatCardsSkeleton } from '@/components/LoadingUI';
 import { chipSx } from '@/components/TableUI';
 import { dialogActionsSx, dialogCancelBtnSx, dialogContentSx, dialogPaperProps, FormDialogTitle, SubmitButton } from '@/components/DialogUI';
 import type { PharmacyQueueItem } from '@/types/token';
@@ -245,6 +246,9 @@ export function PharmacistDashboard(): React.JSX.Element {
             </Box>
           </Paper>
 
+          {showQueueLoading ? (
+            <StatCardsSkeleton count={4} />
+          ) : (
           <Box sx={{ display: 'grid', gap: 1.75, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
             {[
               { label: 'Pending Rx', value: pending.length, icon: <HourglassEmptyOutlinedIcon />, color: theme.palette.warning.main, bg: alpha(theme.palette.warning.main, 0.12) },
@@ -267,6 +271,7 @@ export function PharmacistDashboard(): React.JSX.Element {
               </Paper>
             ))}
           </Box>
+          )}
 
           <Paper elevation={0} sx={{ ...softCard, overflow: 'hidden' }}>
             <Box sx={{ px: 2.25, pt: 1.5, pb: 0 }}>
@@ -293,7 +298,7 @@ export function PharmacistDashboard(): React.JSX.Element {
                   {queueErr instanceof Error ? queueErr.message : 'Unable to load pharmacy queue.'}
                 </Alert>
               ) : showQueueLoading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress size={28} /></Box>
+                <ListCardsSkeleton count={5} />
               ) : visibleQueue.length === 0 ? (
                 <Typography color="text.secondary" textAlign="center" sx={{ py: 5 }}>
                   No prescriptions in this list yet.

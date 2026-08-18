@@ -63,9 +63,13 @@ export async function upsertDoctorSchedule(doctorId: string, slots: ScheduleInpu
   return getDoctorSchedule(doctorId);
 }
 
+function doctorOfflineMessage(dayName: string): string {
+  return `Doctor is offline on ${dayName}. Turn that day on in Doctor Schedule, then try again.`;
+}
+
 /**
  * Enforce weekly DoctorSchedule for a timed visit.
- * If the doctor has no schedule rows yet, allow (not configured).
+ * Missing schedule or an Off day both mean the doctor is offline.
  */
 export async function assertDoctorAvailable(
   doctorId: string,
@@ -79,21 +83,17 @@ export async function assertDoctorAvailable(
     throw new Error('Appointment end must be after start.');
   }
 
-  const slots = await getDoctorSchedule(doctorId);
-  if (slots.length === 0) return;
-
   if (startsAt.toDateString() !== endsAt.toDateString()) {
     throw new Error('Appointment must stay within a single day inside doctor hours.');
   }
 
+  const slots = await getDoctorSchedule(doctorId);
   const day = startsAt.getDay();
   const dayName = DAY_NAMES[day];
   const slot = slots.find((s) => s.dayOfWeek === day);
 
   if (!slot || !slot.isActive) {
-    throw new Error(
-      `Doctor is not available on ${dayName}. Update Doctor Schedule or choose another day.`,
-    );
+    throw new Error(doctorOfflineMessage(dayName));
   }
 
   const startM = timeToMinutes(formatHm(startsAt));
@@ -114,16 +114,12 @@ export async function assertDoctorAvailable(
  */
 export async function assertDoctorAvailableOnDate(doctorId: string, dateStr: string): Promise<void> {
   const slots = await getDoctorSchedule(doctorId);
-  if (slots.length === 0) return;
-
   const d = new Date(`${dateStr}T12:00:00`);
   if (Number.isNaN(d.getTime())) throw new Error('Invalid token date.');
 
   const day = d.getDay();
   const slot = slots.find((s) => s.dayOfWeek === day);
   if (!slot || !slot.isActive) {
-    throw new Error(
-      `Doctor is not available on ${DAY_NAMES[day]}. Update Doctor Schedule or choose another day.`,
-    );
+    throw new Error(doctorOfflineMessage(DAY_NAMES[day]));
   }
 }

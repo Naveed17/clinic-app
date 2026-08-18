@@ -63,26 +63,26 @@ const styles = StyleSheet.create({
     paddingBottom: POS_PAPER.pdfPaddingBottom,
     paddingLeft: POS_PAPER.pdfPaddingLeft,
     paddingRight: POS_PAPER.pdfPaddingRight,
-    fontFamily: 'Courier',
+    fontFamily: POS_PAPER.pdfFontFamily,
   },
   logo: { width: 36, height: 36, alignSelf: 'center', marginBottom: 6 },
   shopName: { fontSize: 14, fontWeight: 'bold', textAlign: 'center', marginBottom: 3, color: '#000' },
-  shopSub: { fontSize: 9, textAlign: 'center', color: '#000', marginBottom: 2 },
+  shopSub: { fontSize: 9, textAlign: 'center', color: POS_RECEIPT.muted, marginBottom: 2 },
   stars: { fontSize: 9, textAlign: 'center', color: '#000', marginVertical: 6 },
   receiptTitle: { fontSize: 11, fontWeight: 'bold', textAlign: 'center', marginVertical: 2, color: '#000' },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
   headerLabel: { fontSize: 10, fontWeight: 'bold', color: '#000' },
-  itemLabel: { fontSize: 10, flex: 1, color: '#000' },
-  itemQty: { fontSize: 10, width: 30, textAlign: 'center', color: '#000' },
-  itemPrice: { fontSize: 10, width: 55, textAlign: 'right', color: '#000' },
+  itemLabel: { fontSize: 9, flex: 1, color: '#000', fontWeight: 'bold' },
+  itemQty: { fontSize: 9, width: 30, textAlign: 'center', color: '#000', fontWeight: 'bold' },
+  itemPrice: { fontSize: 9, width: 55, textAlign: 'right', color: '#000', fontWeight: 'bold' },
   totalLabel: { fontSize: 12, fontWeight: 'bold', color: '#000' },
   totalValue: { fontSize: 12, fontWeight: 'bold', color: '#000' },
-  subLabel: { fontSize: 10, color: '#000' },
-  subValue: { fontSize: 10, color: '#000' },
+  subLabel: { fontSize: 9, color: '#000', fontWeight: 'bold' },
+  subValue: { fontSize: 9, color: '#000', fontWeight: 'bold' },
   metaLabel: { fontSize: 10, color: '#000', fontWeight: 'bold' },
-  metaValue: { fontSize: 10, color: '#000' },
+  metaValue: { fontSize: 9, color: '#000', fontWeight: 'bold' },
   thankYou: { fontSize: 12, fontWeight: 'bold', textAlign: 'center', marginTop: 4, color: '#000' },
-  brand: { fontSize: 8, color: '#000', textAlign: 'center', marginTop: 8, fontWeight: 'bold', letterSpacing: 1 },
+  brand: { fontSize: 8, color: '#000', textAlign: 'center', marginTop: 8, fontWeight: 'bold', letterSpacing: 0.5 },
 });
 
 const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(Number(v))}`;
@@ -211,7 +211,7 @@ function ReceiptDocument({
         <Text style={{ fontSize: 9, textAlign: 'center', color: POS_RECEIPT.ink, marginTop: 3, fontWeight: 'bold' }}>
           {invoice.invoiceNumber}
         </Text>
-        <Text style={styles.brand}>CAREFLOW</Text>
+        <Text style={styles.brand}>{POS_RECEIPT.poweredBy}</Text>
       </Page>
     </Document>
   );

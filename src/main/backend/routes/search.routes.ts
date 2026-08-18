@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { asyncHandler } from '../utils/async-handler';
 import { requireRole } from '../middleware/auth';
+import { isLicenseModuleEnabled } from '../../license/license.ipc';
+import { getSearchScope } from '../../../shared/searchAccess';
 import { globalSearch } from '../../search/search.service';
 
 export function createSearchRouter(): Router {
@@ -11,7 +13,12 @@ export function createSearchRouter(): Router {
     requireRole(['admin', 'doctor', 'receptionist', 'lab_technician', 'pharmacist']),
     asyncHandler(async (req, res) => {
       const q = typeof req.query.q === 'string' ? req.query.q : '';
-      res.json(await globalSearch(q));
+      const scope = getSearchScope(req.user?.role, {
+        billing: isLicenseModuleEnabled('billing'),
+        pharmacy: isLicenseModuleEnabled('pharmacy'),
+        labDashboard: isLicenseModuleEnabled('labDashboard'),
+      });
+      res.json(await globalSearch(q, scope));
     }),
   );
 

@@ -381,7 +381,7 @@ declare global {
         };
       };
       search: {
-        global: (query: string) => Promise<unknown>;
+        global: (query: string, role?: string) => Promise<unknown>;
       };
       update: {
         check: () => Promise<'available' | 'latest' | 'error' | { error?: string }>;

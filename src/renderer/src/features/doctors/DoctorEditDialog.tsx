@@ -2,7 +2,7 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent,
+  Alert, Box, Button, Dialog, DialogActions, DialogContent, Skeleton,
   Divider, FormControlLabel, IconButton, InputAdornment,
   Stack, Switch, TextField, Typography,
 } from '@mui/material';
@@ -95,9 +95,11 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
     return (
       <Dialog open={open} onClose={onClose} PaperProps={dialogPaperProps}>
         <DialogContent sx={dialogContentSx}>
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
-          </Box>
+          <Stack spacing={1.5} sx={{ py: 1 }}>
+            <Skeleton variant="rounded" height={40} />
+            <Skeleton variant="rounded" height={40} />
+            <Skeleton variant="rounded" height={40} />
+          </Stack>
         </DialogContent>
       </Dialog>
     );

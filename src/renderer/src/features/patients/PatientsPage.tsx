@@ -11,6 +11,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useDeferredValue, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tableSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import { TableRowsSkeleton } from '@/components/LoadingUI';
 import { ConfirmDialog } from '@/components/DialogUI';
 import { patientsService } from '@/services/patients.service';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -111,6 +112,7 @@ export function PatientsPage(): React.JSX.Element {
         error={patientsQuery.isError && (
           <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load patients.</Alert>
         )}
+        fetching={patientsQuery.isFetching && !patientsQuery.isLoading}
       >
         <TableHead sx={tableSx.head}>
           <TableRow>
@@ -125,7 +127,7 @@ export function PatientsPage(): React.JSX.Element {
         </TableHead>
         <TableBody>
           {patientsQuery.isLoading ? (
-            <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>Loading patients...</TableCell></TableRow>
+            <TableRowsSkeleton cols={7} />
           ) : patients.length === 0 ? (
             <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No patients found.</TableCell></TableRow>
           ) : (

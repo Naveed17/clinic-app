@@ -15,7 +15,7 @@ import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import HealthAndSafetyOutlinedIcon from '@mui/icons-material/HealthAndSafetyOutlined';
 import ContactPhoneOutlinedIcon from '@mui/icons-material/ContactPhoneOutlined';
 import {
-  Alert, Avatar, Box, Button, Chip, CircularProgress, IconButton, Paper, Stack,
+  Alert, Avatar, Box, Button, Chip, IconButton, Paper, Skeleton, Stack,
   Tab, Tabs, Tooltip, Typography,
 } from '@mui/material';
 import { alpha, darken, useTheme } from '@mui/material/styles';
@@ -23,11 +23,13 @@ import { useQuery } from '@tanstack/react-query';
 import type { Prescription } from '@/types/token';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { ListCardsSkeleton, StatCardsSkeleton } from '@/components/LoadingUI';
 import { chipSx } from '@/components/TableUI';
 import { appointmentsService } from '@/services/appointments.service';
 import { invoicesService } from '@/services/invoices.service';
 import { patientsService } from '@/services/patients.service';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { PatientDialog } from './PatientDialog';
 import { PatientDocumentsPanel } from './PatientDocumentsPanel';
 import { PatientWhatsAppButton } from './PatientWhatsAppButton';
@@ -99,7 +101,7 @@ function PrescriptionsTabInline({ patientId, patient }: {
     },
   });
 
-  if (isLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress size={28} /></Box>;
+  if (isLoading) return <Box sx={{ p: 1 }}><ListCardsSkeleton count={4} /></Box>;
   if (items.length === 0) {
     return (
       <EmptyState
@@ -217,7 +219,12 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
 export function PatientProfilePage(): React.JSX.Element {
   const theme = useTheme();
   const { user } = useAuth();
+  const { can } = useLicense();
   const isAdmin = user?.role === 'admin';
+  const showLab =
+    can('labDashboard') &&
+    (user?.role === 'admin' || user?.role === 'doctor' || user?.role === 'lab_technician');
+  const showBilling = can('billing');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [tab, setTab] = useState(0);
@@ -230,10 +237,11 @@ export function PatientProfilePage(): React.JSX.Element {
   const patient = (patientsQuery.data?.data ?? []).find((p) => p.id === id);
 
   const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
-  const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list });
+  const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list, enabled: showBilling });
   const labOrders = useQuery<{ id: string; test: string; status: string; result: string | null; orderedAt: string; patientId: string }[]>({
     queryKey: ['lab-orders'],
     queryFn: () => window.clinic.lab.list() as Promise<{ id: string; test: string; status: string; result: string | null; orderedAt: string; patientId: string }[]>,
+    enabled: showLab,
   });
 
   const softCard = {
@@ -244,7 +252,13 @@ export function PatientProfilePage(): React.JSX.Element {
   } as const;
 
   if (patientsQuery.isLoading) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>;
+    return (
+      <Stack spacing={2} sx={{ p: 2 }}>
+        <Skeleton variant="rounded" height={72} sx={{ borderRadius: 3 }} />
+        <StatCardsSkeleton count={4} />
+        <Skeleton variant="rounded" height={320} sx={{ borderRadius: 3 }} />
+      </Stack>
+    );
   }
   if (!patient) {
     return (
@@ -269,16 +283,24 @@ export function PatientProfilePage(): React.JSX.Element {
   const summaryCards = [
     { label: 'Appointments', value: patientAppointments.length, icon: <CalendarMonthOutlinedIcon />, bg: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main },
     { label: 'Completed Visits', value: completedAppts, icon: <MedicalServicesOutlinedIcon />, bg: alpha(theme.palette.success.main, 0.12), color: theme.palette.success.dark },
-    { label: 'Lab Orders', value: patientLab.length, icon: <BiotechOutlinedIcon />, bg: alpha(theme.palette.info.main, 0.12), color: theme.palette.info.dark },
-    { label: 'Total Billed', value: money(totalBilled), icon: <ReceiptOutlinedIcon />, bg: alpha(theme.palette.warning.main, 0.12), color: theme.palette.warning.dark },
+    ...(showLab
+      ? [{ label: 'Lab Orders', value: patientLab.length, icon: <BiotechOutlinedIcon />, bg: alpha(theme.palette.info.main, 0.12), color: theme.palette.info.dark }]
+      : []),
+    ...(showBilling
+      ? [{ label: 'Total Billed', value: money(totalBilled), icon: <ReceiptOutlinedIcon />, bg: alpha(theme.palette.warning.main, 0.12), color: theme.palette.warning.dark }]
+      : []),
   ];
 
   const tabs = [
-    { label: 'Appointments', count: patientAppointments.length, icon: <CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} /> },
-    { label: 'Billing', count: patientInvoices.length, icon: <ReceiptOutlinedIcon sx={{ fontSize: 18 }} /> },
-    { label: 'Lab', count: patientLab.length, icon: <BiotechOutlinedIcon sx={{ fontSize: 18 }} /> },
-    { label: 'Documents', count: null, icon: <InsertDriveFileOutlinedIcon sx={{ fontSize: 18 }} /> },
-    { label: 'Prescriptions', count: null, icon: <MedicalServicesOutlinedIcon sx={{ fontSize: 18 }} /> },
+    { label: 'Appointments', count: patientAppointments.length, icon: <CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} />, value: 0 },
+    ...(showBilling
+      ? [{ label: 'Billing', count: patientInvoices.length, icon: <ReceiptOutlinedIcon sx={{ fontSize: 18 }} />, value: 1 }]
+      : []),
+    ...(showLab
+      ? [{ label: 'Lab', count: patientLab.length, icon: <BiotechOutlinedIcon sx={{ fontSize: 18 }} />, value: 2 }]
+      : []),
+    { label: 'Documents', count: null, icon: <InsertDriveFileOutlinedIcon sx={{ fontSize: 18 }} />, value: 3 },
+    { label: 'Prescriptions', count: null, icon: <MedicalServicesOutlinedIcon sx={{ fontSize: 18 }} />, value: 4 },
   ];
 
   return (
@@ -361,13 +383,13 @@ export function PatientProfilePage(): React.JSX.Element {
                   '& .MuiTab-root': { minHeight: 48, fontSize: 13, fontWeight: 700, textTransform: 'none', gap: 0.75 },
                 }}
               >
-                {tabs.map((t, i) => (
+                {tabs.map((t) => (
                   <Tab
                     key={t.label}
                     icon={t.icon}
                     iconPosition="start"
                     label={t.count !== null ? `${t.label} (${t.count})` : t.label}
-                    value={i}
+                    value={t.value}
                   />
                 ))}
               </Tabs>
@@ -419,7 +441,7 @@ export function PatientProfilePage(): React.JSX.Element {
                   )
                 )}
 
-                {tab === 1 && (
+                {showBilling && tab === 1 && (
                   patientInvoices.length === 0 ? (
                     <EmptyState
                       icon={<ReceiptOutlinedIcon sx={{ fontSize: 30 }} />}
@@ -470,7 +492,7 @@ export function PatientProfilePage(): React.JSX.Element {
                   )
                 )}
 
-                {tab === 2 && (
+                {showLab && tab === 2 && (
                   patientLab.length === 0 ? (
                     <EmptyState
                       icon={<BiotechOutlinedIcon sx={{ fontSize: 30 }} />}
@@ -601,8 +623,8 @@ export function PatientProfilePage(): React.JSX.Element {
               <Typography fontWeight={800} fontSize={15} sx={{ mb: 1.75 }}>Overview</Typography>
               <Stack spacing={1.25}>
                 {[
-                  { label: 'Total Paid', value: money(totalPaid), color: 'success.main' },
-                  { label: 'Pending Lab', value: pendingLab, color: 'warning.main' },
+                  ...(showBilling ? [{ label: 'Total Paid', value: money(totalPaid), color: 'success.main' }] : []),
+                  ...(showLab ? [{ label: 'Pending Lab', value: pendingLab, color: 'warning.main' }] : []),
                   { label: 'Completed Visits', value: completedAppts, color: 'primary.main' },
                 ].map((s) => (
                   <Stack key={s.label} direction="row" justifyContent="space-between" alignItems="center">

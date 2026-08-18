@@ -38,7 +38,10 @@ import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/
 import careflowLogo from '@/assets/careflow-logo.png';
 import type { Token, TokenInput, TokenPerson, TokenStatus, PrescriptionInput, PrescriptionMedicine } from '@/types/token';
 import { useAuth } from '@/features/auth/AuthContext';
+import { FetchingBar, ListCardsSkeleton, StatCardsSkeleton } from '@/components/LoadingUI';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { appointmentsService } from '@/services/appointments.service';
+import { doctorOfflineReason } from '@/utils/appointmentSlot';
 import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
@@ -67,6 +70,8 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   onSuccess?: (token: Token) => void;
 }) {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const showLabReason = user?.role !== 'receptionist';
   const [patientId, setPatientId] = useState(defaultPatientId ?? '');
   const [doctorId, setDoctorId] = useState(defaultDoctorId ?? '');
   const [notes, setNotes] = useState('');
@@ -94,6 +99,14 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
     () => patients.find((p) => p.id === patientId) ?? null,
     [patients, patientId]
   );
+  const { data: tokenSchedule = [], isFetched: tokenScheduleFetched } = useQuery({
+    queryKey: ['schedule', doctorId],
+    queryFn: () => window.clinic.schedule.get(doctorId),
+    enabled: open && Boolean(doctorId),
+  });
+  const offlineReason = doctorId && date && tokenScheduleFetched
+    ? doctorOfflineReason(tokenSchedule, date)
+    : null;
 
   const mutation = useMutation({
     mutationFn: () => window.clinic.tokens.create({ patientId, doctorId, date, notes, reason }),
@@ -130,6 +143,9 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
               {(mutation.error as Error)?.message || 'Failed to issue token.'}
             </Alert>
           )}
+          {offlineReason && (
+            <Alert severity="warning">{offlineReason}</Alert>
+          )}
           <Autocomplete
             options={patients}
             getOptionLabel={(p) => `${p.firstName} ${p.lastName}`}
@@ -154,7 +170,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
               <MenuItem value="Follow-up">Follow-up</MenuItem>
               <MenuItem value="Urgent">Urgent</MenuItem>
               <MenuItem value="Consultation">Consultation</MenuItem>
-              <MenuItem value="Lab Results">Lab Results</MenuItem>
+              {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
               <MenuItem value="Vaccination">Vaccination</MenuItem>
             </Select>
           </FormControl>
@@ -169,7 +185,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
       <DialogActions sx={dialogActionsSx}>
         <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
         <SubmitButton
-          disabled={!patientId || !doctorId}
+          disabled={!patientId || !doctorId || Boolean(offlineReason)}
           loading={mutation.isPending}
           onClick={() => mutation.mutate()}
         >
@@ -196,11 +212,11 @@ const ts = StyleSheet.create({
     paddingBottom: POS_PAPER.pdfPaddingBottom,
     paddingLeft: POS_PAPER.pdfPaddingLeft,
     paddingRight: POS_PAPER.pdfPaddingRight,
-    fontFamily: 'Courier',
+    fontFamily: POS_PAPER.pdfFontFamily,
   },
   logo: { width: 36, height: 36, alignSelf: 'center', marginBottom: 6 },
   shopName: { fontSize: 14, fontWeight: 'bold', textAlign: 'center', marginBottom: 2, color: '#000' },
-  shopSub: { fontSize: 9, textAlign: 'center', color: '#000', marginBottom: 1 },
+  shopSub: { fontSize: 10, textAlign: 'center', color: POS_RECEIPT.muted, marginBottom: 1 },
   stars: { fontSize: 9, textAlign: 'center', color: '#000', marginVertical: 5 },
   title: { fontSize: 11, fontWeight: 'bold', textAlign: 'center', marginVertical: 2, letterSpacing: 1, color: '#000' },
   tokenBox: { borderWidth: 2, borderColor: '#000', marginVertical: 8, paddingVertical: 8, alignItems: 'center' },
@@ -208,9 +224,9 @@ const ts = StyleSheet.create({
   tokenNum: { fontSize: 48, fontWeight: 'bold', lineHeight: 1, letterSpacing: 3, color: '#000' },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
   lbl: { fontSize: 10, color: '#000', fontWeight: 'bold' },
-  val: { fontSize: 10, color: '#000' },
-  footer: { fontSize: 9, color: '#000', textAlign: 'center', marginTop: 10 },
-  brand: { fontSize: 8, color: '#000', textAlign: 'center', marginTop: 8, fontWeight: 'bold', letterSpacing: 1 },
+  val: { fontSize: 10, color: POS_RECEIPT.muted },
+  footer: { fontSize: 9, color: POS_RECEIPT.muted, textAlign: 'center', marginTop: 10 },
+  brand: { fontSize: 8, color: '#000', textAlign: 'center', marginTop: 8, fontWeight: 'bold', letterSpacing: 0.5 },
 });
 
 export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone }: {
@@ -242,7 +258,7 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
         {token.reason ? <View style={ts.row}><Text style={ts.lbl}>Reason</Text><Text style={ts.val}>{token.reason}</Text></View> : null}
         <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
         <Text style={ts.footer}>Please wait for your token to be called.{`\n`}{POS_RECEIPT.thankYou}</Text>
-        <Text style={ts.brand}>CAREFLOW</Text>
+        <Text style={ts.brand}>{POS_RECEIPT.poweredBy}</Text>
       </Page>
     </Document>
   );
@@ -250,6 +266,9 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
 
 export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: () => void }) {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const { can } = useLicense();
+  const showLab = can('labDashboard') && user?.role !== 'receptionist';
   const emptyMed = (): PrescriptionMedicine => ({ name: '', dosage: '', duration: '', instructions: '' });
   const [diagnosis, setDiagnosis] = useState(token.prescription?.diagnosis ?? '');
   const [medicines, setMedicines] = useState<PrescriptionMedicine[]>(
@@ -263,6 +282,7 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
   const { data: labOrders = [], refetch: refetchLabOrders } = useQuery<import('@/types/lab').LabOrder[]>({
     queryKey: ['lab-orders-token', token.id],
     queryFn: () => window.clinic.lab.listByToken(token.id),
+    enabled: showLab,
   });
 
   const createLabOrderMutation = useMutation({
@@ -318,6 +338,7 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
               </Stack>
             </Box>
 
+            {showLab && (
             <Box>
               <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Lab Orders</Typography>
               <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
@@ -356,6 +377,7 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
                 </Stack>
               )}
             </Box>
+            )}
 
             <Box>
               <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Notes / Tests (text)</Typography>
@@ -530,7 +552,7 @@ export function TokensPage(): React.JSX.Element {
   const [printToken, setPrintToken] = useState<Token | null>(null);
   const [deleteToken, setDeleteToken] = useState<Token | null>(null);
 
-  const { data: tokens = [], isLoading, isError } = useQuery<Token[]>({
+  const { data: tokens = [], isLoading, isFetching, isError } = useQuery<Token[]>({
     queryKey: ['tokens', date],
     queryFn: () => window.clinic.tokens.list(date),
     refetchInterval: 10_000,
@@ -652,6 +674,9 @@ export function TokensPage(): React.JSX.Element {
         </Box>
 
         {/* Summary metrics */}
+        {isLoading ? (
+          <StatCardsSkeleton count={4} />
+        ) : (
         <Box sx={{ display: 'grid', gap: 1.75, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
           {summaryCards.map((c) => (
             <Paper
@@ -688,6 +713,7 @@ export function TokensPage(): React.JSX.Element {
             </Paper>
           ))}
         </Box>
+        )}
 
         {/* Now serving + queue */}
         <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', lg: currentToken ? 'minmax(0, 1fr) 300px' : '1fr' }, alignItems: 'start' }}>
@@ -723,7 +749,8 @@ export function TokensPage(): React.JSX.Element {
 
             {isError && <Alert severity="error">Failed to load tokens.</Alert>}
 
-            <Paper elevation={0} sx={{ p: 2.25, ...softCard }}>
+            <Paper elevation={0} sx={{ p: 2.25, ...softCard, position: 'relative' }}>
+              <FetchingBar show={isFetching && !isLoading} />
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.75 }}>
                 <Box>
                   <Typography fontWeight={800} fontSize={16}>Queue</Typography>
@@ -733,11 +760,10 @@ export function TokensPage(): React.JSX.Element {
                     {filtered.length} token{filtered.length === 1 ? '' : 's'}
                   </Typography>
                 </Box>
-                {isLoading && <CircularProgress size={18} />}
               </Stack>
 
               {isLoading && filtered.length === 0 ? (
-                <Typography color="text.secondary" variant="body2">Loading queue…</Typography>
+                <ListCardsSkeleton count={6} />
               ) : filtered.length === 0 ? (
                 <Box sx={{ py: 5, textAlign: 'center' }}>
                   <Box

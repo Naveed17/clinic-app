@@ -16,9 +16,9 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   IconButton,
   Paper,
+  Skeleton,
   Stack,
   Tooltip,
   Typography,
@@ -27,6 +27,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { StatCardsSkeleton } from '@/components/LoadingUI';
 import type { Doctor } from '@/types/doctor';
 import { DoctorEditDialog } from './DoctorEditDialog';
 
@@ -112,9 +113,11 @@ export function DoctorDetailPage(): React.JSX.Element {
 
   if (doctorQuery.isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
-        <CircularProgress />
-      </Box>
+      <Stack spacing={2} sx={{ p: 1 }}>
+        <Skeleton variant="rounded" height={88} sx={{ borderRadius: 3 }} />
+        <StatCardsSkeleton count={4} />
+        <Skeleton variant="rounded" height={280} sx={{ borderRadius: 3 }} />
+      </Stack>
     );
   }
 
@@ -489,8 +492,10 @@ export function DoctorDetailPage(): React.JSX.Element {
               </Stack>
 
               {attendanceQuery.isLoading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
-                  <CircularProgress size={24} />
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5 }}>
+                  {Array.from({ length: 35 }, (_, i) => (
+                    <Skeleton key={i} variant="rounded" height={36} />
+                  ))}
                 </Box>
               ) : attendance.length === 0 ? (
                 <Box

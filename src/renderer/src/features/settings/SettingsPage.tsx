@@ -4,12 +4,10 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   Divider,
-  FormControlLabel,
   Paper,
+  Skeleton,
   Stack,
-  Switch,
   Tab,
   Tabs,
   TextField,
@@ -32,8 +30,6 @@ import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
-import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
-import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
 import { useUpdate } from '@/context/updateProvider';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -41,24 +37,8 @@ import { useLicense, useRefreshLicenseModules } from '@/features/auth/LicenseMod
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { showAppToast } from '@/components/AppToast';
 import { WhatsAppCampaignDialog } from '@/features/settings/WhatsAppCampaignDialog';
-import {
-  WhatsAppConnectMetaDialog,
-  type ConnectMetaFormValues,
-} from '@/features/settings/WhatsAppConnectMetaDialog';
-import { launchWhatsAppEmbeddedSignup } from '@/features/settings/whatsappEmbeddedSignup';
-import { GroqConnectDialog } from '@/features/settings/GroqConnectDialog';
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
-
-const META_WA_GET_STARTED =
-  'https://developers.facebook.com/docs/whatsapp/cloud-api/get-started';
-
-function metaWhatsAppApiSetupUrl(appId?: string): string {
-  if (appId) {
-    return `https://developers.facebook.com/apps/${appId}/whatsapp-business/wa-dev-console/`;
-  }
-  return META_WA_GET_STARTED;
-}
 
 interface Settings {
   serverMode: ServerMode;
@@ -149,13 +129,8 @@ export function SettingsPage(): React.JSX.Element {
   const [waTesting, setWaTesting] = useState(false);
   const [waTest, setWaTest] = useState<{ ok: boolean; name?: string; phone?: string; error?: string } | null>(null);
   const [waCampaignOpen, setWaCampaignOpen] = useState(false);
-  const [waConnecting, setWaConnecting] = useState(false);
-  const [waConnectOpen, setWaConnectOpen] = useState(false);
-  const [waConnectMsg, setWaConnectMsg] = useState<{ type: 'success' | 'error' | 'info'; msg: string } | null>(null);
-  const [groqConnectOpen, setGroqConnectOpen] = useState(false);
-  const [groqConnecting, setGroqConnecting] = useState(false);
-  const [groqConnectMsg, setGroqConnectMsg] = useState<{ type: 'success' | 'error' | 'info'; msg: string } | null>(null);
-  const [embeddedMeta, setEmbeddedMeta] = useState<{ configured: boolean; appId: string; configId: string } | null>(null);
+  const [aiTesting, setAiTesting] = useState(false);
+  const [aiTest, setAiTest] = useState<{ ok: boolean; error?: string } | null>(null);
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   const [prevMode, setPrevMode] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -309,6 +284,21 @@ export function SettingsPage(): React.JSX.Element {
     }
   }
 
+  async function handleTestAi(): Promise<void> {
+    if (!settings) return;
+    setAiTesting(true);
+    setAiTest(null);
+    try {
+      await window.clinic.settings.save(settings);
+      const result = await window.clinic.ai.test();
+      setAiTest(result);
+    } catch (err) {
+      setAiTest({ ok: false, error: err instanceof Error ? err.message : 'Test failed.' });
+    } finally {
+      setAiTesting(false);
+    }
+  }
+
   useEffect(() => {
     void refreshLicenseModules();
   }, [refreshLicenseModules]);
@@ -317,122 +307,6 @@ export function SettingsPage(): React.JSX.Element {
     if (settingsTab === 'ai' && !can('ai')) setSettingsTab('general');
     if (settingsTab === 'whatsapp' && !can('whatsapp')) setSettingsTab('general');
   }, [can, settingsTab]);
-
-  useEffect(() => {
-    if (settingsTab !== 'whatsapp') return;
-    void window.clinic.whatsapp.embeddedConfig().then(setEmbeddedMeta).catch(() => {
-      setEmbeddedMeta({ configured: false, appId: '', configId: '' });
-    });
-  }, [settingsTab]);
-
-  async function handleConnectWithMeta(values: ConnectMetaFormValues): Promise<void> {
-    if (!settings) return;
-    setWaConnectOpen(false);
-    setWaConnecting(true);
-    setWaConnectMsg(null);
-    setWaTest(null);
-    try {
-      const cfg = embeddedMeta ?? (await window.clinic.whatsapp.embeddedConfig());
-      setEmbeddedMeta(cfg);
-      if (!cfg.configured) {
-        setWaConnectMsg({
-          type: 'error',
-          msg: 'Set META_APP_ID, META_APP_SECRET, and META_EMBEDDED_CONFIG_ID in .env, then restart the app.',
-        });
-        return;
-      }
-
-      const launched = await launchWhatsAppEmbeddedSignup({
-        appId: cfg.appId,
-        configId: cfg.configId,
-        clinic: {
-          clinicName: settings.clinicName,
-          clinicAddress: settings.clinicAddress,
-          clinicPhone: settings.clinicPhone || settings.whatsappDisplayNumber,
-          email: values.email,
-          website: values.website,
-        },
-      });
-      if (!launched.ok) {
-        setWaConnectMsg({
-          type: launched.canceled ? 'info' : 'error',
-          msg: launched.error,
-        });
-        return;
-      }
-
-      const exchanged = await window.clinic.whatsapp.embeddedExchange({
-        code: launched.code,
-        phoneNumberId: launched.session.phoneNumberId,
-        wabaId: launched.session.wabaId,
-      });
-      if (!exchanged.success || !exchanged.token || !exchanged.phoneNumberId) {
-        setWaConnectMsg({
-          type: 'error',
-          msg: exchanged.error || 'Failed to exchange Meta authorization code.',
-        });
-        return;
-      }
-
-      setSettings((s) =>
-        s
-          ? {
-              ...s,
-              whatsappEnabled: true,
-              whatsappToken: exchanged.token!,
-              whatsappPhoneNumberId: exchanged.phoneNumberId!,
-              whatsappDisplayNumber:
-                exchanged.displayNumber || s.whatsappDisplayNumber || '',
-            }
-          : s,
-      );
-      setWaConnectMsg({
-        type: 'success',
-        msg: 'Connected with Meta — token and Phone Number ID filled. Click Save Settings.',
-      });
-    } catch (err) {
-      setWaConnectMsg({
-        type: 'error',
-        msg: err instanceof Error ? err.message : 'Connect with Meta failed.',
-      });
-    } finally {
-      setWaConnecting(false);
-    }
-  }
-
-  async function handleConnectGroq(values: { apiKey: string; model: string }): Promise<void> {
-    setGroqConnecting(true);
-    setGroqConnectMsg(null);
-    try {
-      const result = await window.clinic.ai.test({ apiKey: values.apiKey });
-      if (!result.ok) {
-        setGroqConnectMsg({ type: 'error', msg: result.error || 'Groq connection failed.' });
-        return;
-      }
-      setSettings((s) =>
-        s
-          ? {
-              ...s,
-              aiEnabled: true,
-              groqApiKey: values.apiKey,
-              groqModel: values.model,
-            }
-          : s,
-      );
-      setGroqConnectOpen(false);
-      setGroqConnectMsg({
-        type: 'success',
-        msg: 'Connected to Groq — key filled for this clinic. Click Save Settings.',
-      });
-    } catch (err) {
-      setGroqConnectMsg({
-        type: 'error',
-        msg: err instanceof Error ? err.message : 'Connect Groq failed.',
-      });
-    } finally {
-      setGroqConnecting(false);
-    }
-  }
 
   if (!isAdmin) {
     return (
@@ -555,7 +429,11 @@ export function SettingsPage(): React.JSX.Element {
       }}
     >
       {!settings ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
+        <Stack spacing={2} sx={{ py: 2 }}>
+          <Skeleton variant="rounded" height={48} sx={{ borderRadius: 2 }} />
+          <Skeleton variant="rounded" height={220} sx={{ borderRadius: 3 }} />
+          <Skeleton variant="rounded" height={160} sx={{ borderRadius: 3 }} />
+        </Stack>
       ) : (
         <Stack spacing={0} sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <Tabs
@@ -879,67 +757,33 @@ export function SettingsPage(): React.JSX.Element {
           )}
 
           {settingsTab === 'ai' && can('ai') && (
-            <Box sx={{ maxWidth: 480 }}>
+            <Box sx={{ maxWidth: 520 }}>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                 <AutoAwesomeOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
-                <Typography variant="h6" fontWeight={700}>AI Assist (this clinic)</Typography>
+                <Typography variant="h6" fontWeight={700}>AI Assist (add-on)</Typography>
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-                Prescription drafts and patient history summaries via Groq.
+                Paid add-on. Prescription drafts and history summaries use CareFlow&apos;s hosted model.
+                Clinics without this add-on do not see AI buttons.
               </Typography>
               <Stack spacing={2}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={Boolean(settings.aiEnabled)}
-                      onChange={(e) => setSettings((s) => s && ({ ...s, aiEnabled: e.target.checked }))}
-                      size="small"
-                    />
-                  }
-                  label="Enable AI features"
-                />
-
-                <Stack spacing={1}>
+                <Alert severity="info" sx={{ py: 0.5 }}>
+                  This clinic&apos;s license includes the AI add-on. No API key is stored on this PC.
+                </Alert>
+                <Stack direction="row" spacing={1} alignItems="center">
                   <Button
-                    variant="contained"
-                    startIcon={groqConnecting ? <CircularProgress size={16} color="inherit" /> : <LoginOutlinedIcon />}
-                    disabled={groqConnecting}
-                    onClick={() => {
-                      setGroqConnectMsg(null);
-                      setGroqConnectOpen(true);
-                    }}
-                    sx={{ alignSelf: 'flex-start' }}
+                    variant="outlined"
+                    disabled={aiTesting}
+                    onClick={() => void handleTestAi()}
                   >
-                    {groqConnecting ? 'Connecting…' : 'Connect Groq'}
+                    {aiTesting ? 'Testing…' : 'Test connection'}
                   </Button>
-                  {groqConnectMsg && (
-                    <Alert severity={groqConnectMsg.type} onClose={() => setGroqConnectMsg(null)} sx={{ py: 0.25 }}>
-                      {groqConnectMsg.msg}
+                  {aiTest && (
+                    <Alert severity={aiTest.ok ? 'success' : 'error'} sx={{ py: 0.25, flex: 1 }}>
+                      {aiTest.ok ? 'CareFlow AI is ready.' : aiTest.error}
                     </Alert>
                   )}
                 </Stack>
-
-                <TextField
-                  label="Groq API key"
-                  size="small"
-                  fullWidth
-                  type="password"
-                  autoComplete="off"
-                  value={settings.groqApiKey || ''}
-                  onChange={(e) => setSettings((s) => s && ({ ...s, groqApiKey: e.target.value }))}
-                  disabled={!settings.aiEnabled}
-                  placeholder="gsk_..."
-                  helperText="Connect Groq ke baad auto-fill, ya manually paste"
-                />
-                <TextField
-                  label="Model"
-                  size="small"
-                  fullWidth
-                  value={settings.groqModel || 'llama-3.1-8b-instant'}
-                  onChange={(e) => setSettings((s) => s && ({ ...s, groqModel: e.target.value }))}
-                  disabled={!settings.aiEnabled}
-                  helperText="Default: llama-3.1-8b-instant"
-                />
               </Stack>
             </Box>
           )}
@@ -948,98 +792,20 @@ export function SettingsPage(): React.JSX.Element {
             <Box>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                 <WhatsAppIcon sx={{ fontSize: 20, color: 'primary.main' }} />
-                <Typography variant="h6" fontWeight={700}>WhatsApp (this clinic)</Typography>
+                <Typography variant="h6" fontWeight={700}>WhatsApp Cloud API (add-on)</Typography>
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-                Patient profile pe WhatsApp Web (wa.me) hamesha free hai. Yeh tab Cloud API ke liye hai — in-app send, documents aur campaigns. Sirf is module wale clinics.
+                Paid add-on for in-app send, documents, and campaigns from CareFlow&apos;s shared number.
+                Without this add-on, WhatsApp still opens WhatsApp Web (wa.me) as usual.
               </Typography>
               <Stack spacing={2} sx={{ maxWidth: 520, mb: 3 }}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={Boolean(settings.whatsappEnabled)}
-                      onChange={(e) => setSettings((s) => s && ({ ...s, whatsappEnabled: e.target.checked }))}
-                      size="small"
-                    />
-                  }
-                  label="Enable WhatsApp for this clinic"
-                />
-
-                <Stack spacing={1}>
-                  <Button
-                    variant="contained"
-                    startIcon={waConnecting ? <CircularProgress size={16} color="inherit" /> : <LoginOutlinedIcon />}
-                    disabled={!settings.whatsappEnabled || waConnecting}
-                    onClick={() => {
-                      setWaConnectMsg(null);
-                      setWaConnectOpen(true);
-                    }}
-                    sx={{ alignSelf: 'flex-start', bgcolor: '#1877F2', '&:hover': { bgcolor: '#166fe5' } }}
-                  >
-                    {waConnecting ? 'Connecting…' : 'Connect with Meta'}
-                  </Button>
-                  {waConnectMsg && (
-                    <Alert severity={waConnectMsg.type} onClose={() => setWaConnectMsg(null)} sx={{ py: 0.25 }}>
-                      {waConnectMsg.msg}
-                    </Alert>
-                  )}
-                  {embeddedMeta && !embeddedMeta.configured && (
-                    <Alert severity="warning" sx={{ py: 0.25 }}>
-                      Embedded Signup env missing — manual fields neeche use kar sakte hain.
-                    </Alert>
-                  )}
-                </Stack>
-
-                <PhoneInputField
-                  label="Clinic WhatsApp number"
-                  size="small"
-                  value={settings.whatsappDisplayNumber || ''}
-                  onChange={(digits) =>
-                    setSettings((s) => s && ({ ...s, whatsappDisplayNumber: digits }))
-                  }
-                  disabled={!settings.whatsappEnabled}
-                  helperText="Flag country code auto. PK → 92300… · US test → 1555… (bina +)"
-                />
-                <TextField
-                  label="Phone Number ID"
-                  size="small"
-                  fullWidth
-                  value={settings.whatsappPhoneNumberId || ''}
-                  onChange={(e) => setSettings((s) => s && ({ ...s, whatsappPhoneNumberId: e.target.value }))}
-                  disabled={!settings.whatsappEnabled}
-                  placeholder="Meta WhatsApp Phone Number ID"
-                  helperText="Connect with Meta ke baad auto-fill"
-                />
-                <TextField
-                  label="Access token"
-                  size="small"
-                  fullWidth
-                  type="password"
-                  autoComplete="off"
-                  value={settings.whatsappToken || ''}
-                  onChange={(e) => setSettings((s) => s && ({ ...s, whatsappToken: e.target.value }))}
-                  disabled={!settings.whatsappEnabled}
-                  helperText="Connect with Meta auto-fill karta hai. Test number ke liye neeche link se Temporary access token copy karo."
-                />
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<OpenInNewOutlinedIcon />}
-                  onClick={() =>
-                    window.open(
-                      metaWhatsAppApiSetupUrl(embeddedMeta?.appId),
-                      '_blank',
-                      'noopener,noreferrer',
-                    )
-                  }
-                  sx={{ alignSelf: 'flex-start' }}
-                >
-                  Generate test number token
-                </Button>
+                <Alert severity="info" sx={{ py: 0.5 }}>
+                  This clinic&apos;s license includes the WhatsApp Cloud API add-on. No Meta token is stored on this PC.
+                </Alert>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Button
                     variant="outlined"
-                    disabled={!settings.whatsappEnabled || waTesting}
+                    disabled={waTesting}
                     onClick={() => void handleTestWhatsApp()}
                   >
                     {waTesting ? 'Testing…' : 'Test connection'}
@@ -1047,7 +813,7 @@ export function SettingsPage(): React.JSX.Element {
                   {waTest && (
                     <Alert severity={waTest.ok ? 'success' : 'error'} sx={{ py: 0.25, flex: 1 }}>
                       {waTest.ok
-                        ? `Connected${waTest.name ? ` — ${waTest.name}` : ''}${waTest.phone ? ` (${waTest.phone})` : ''}`
+                        ? `CareFlow WhatsApp ready${waTest.name ? ` — ${waTest.name}` : ''}${waTest.phone ? ` (${waTest.phone})` : ''}`
                         : waTest.error}
                     </Alert>
                   )}
@@ -1058,12 +824,11 @@ export function SettingsPage(): React.JSX.Element {
                 Campaign
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                Doctor + visit date choose karein, text/image likhein — message un tamam patients ko jaye ga jinke WhatsApp numbers hain.
+                Choose a doctor and visit date, then write text or add an image. The message is sent to every patient with a WhatsApp number.
               </Typography>
               <Button
                 variant="contained"
                 startIcon={<CampaignOutlinedIcon />}
-                disabled={!settings.whatsappEnabled}
                 onClick={() => setWaCampaignOpen(true)}
               >
                 New campaign
@@ -1121,27 +886,11 @@ export function SettingsPage(): React.JSX.Element {
         </Stack>
       )}
 
-      <WhatsAppConnectMetaDialog
-        open={waConnectOpen}
-        connecting={waConnecting}
-        onClose={() => setWaConnectOpen(false)}
-        onSubmit={handleConnectWithMeta}
-      />
-
-      <GroqConnectDialog
-        open={groqConnectOpen}
-        connecting={groqConnecting}
-        initialKey={settings?.groqApiKey}
-        initialModel={settings?.groqModel}
-        onClose={() => setGroqConnectOpen(false)}
-        onSubmit={handleConnectGroq}
-      />
-
       <WhatsAppCampaignDialog
         open={waCampaignOpen}
         onClose={() => setWaCampaignOpen(false)}
         clinicName={settings?.clinicName || ''}
-        enabled={Boolean(settings?.whatsappEnabled)}
+        enabled={can('whatsapp')}
       />
 
       {/* Primary Notification Toast / Snackbar for Updates & Dynamic Errors */}

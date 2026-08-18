@@ -27,7 +27,7 @@ export const ROUTE_ACCESS: Record<AppRoute, UserRole[]> = {
   '/tokens':       ['admin', 'receptionist'],
   '/waiting-room': ['doctor'],
   '/billing':      ['admin', 'receptionist', 'pharmacist'],
-  '/lab':          ['admin', 'receptionist', 'lab_technician'],
+  '/lab':          ['admin', 'lab_technician'],
   '/statistics':   ['admin'],
   '/users':        ['admin'],
   '/doctors':      ['admin'],

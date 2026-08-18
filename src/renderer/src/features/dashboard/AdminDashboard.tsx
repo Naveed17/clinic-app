@@ -15,6 +15,7 @@ import { useLicense } from '@/features/auth/LicenseModulesContext';
 import type { Token, TokenStatus } from '@/types/token';
 import type { Appointment } from '@/types/appointment';
 import doctorImg from '@/assets/doctor_banner.png';
+import { ListCardsSkeleton, StatCardsSkeleton } from '@/components/LoadingUI';
 
 const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
 
@@ -185,7 +186,12 @@ export function AdminDashboard(): React.JSX.Element {
         <Stack spacing={2.5}>
           {/* 2x2 Stat Cards */}
           <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,1fr)' } }}>
-            {statCards.map((c) => (
+            {patients.isLoading || appointments.isLoading || (showReports && summary.isLoading) || (showBilling && invoices.isLoading) ? (
+              <Box sx={{ gridColumn: '1 / -1' }}>
+                <StatCardsSkeleton count={statCards.length || 4} />
+              </Box>
+            ) : (
+            statCards.map((c) => (
               <Paper
                 key={c.label}
                 elevation={0}
@@ -232,7 +238,8 @@ export function AdminDashboard(): React.JSX.Element {
                   </Box>
                 </Stack>
               </Paper>
-            ))}
+            ))
+            )}
           </Box>
 
           {/* Billing & Appointment Health Card */}
@@ -717,7 +724,7 @@ function TokenQueuePanel(): React.JSX.Element {
 
       {/* Token List */}
       {isLoading ? (
-        <Typography variant="body2" color="text.secondary">Loading live queue...</Typography>
+        <ListCardsSkeleton count={5} />
       ) : tokens.length === 0 ? (
         <Box sx={{ py: 5, textAlign: 'center' }}>
           <ConfirmationNumberOutlinedIcon sx={{ fontSize: 44, color: 'text.disabled', mb: 1 }} />

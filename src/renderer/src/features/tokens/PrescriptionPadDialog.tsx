@@ -33,6 +33,7 @@ import {
   PrescriptionPadPdfPreview,
   parsePadMeta,
   stripAdviceHtml,
+  doctorPadLines,
   type PrescriptionPadClinic,
 } from './PrescriptionPadPdf';
 import careflowLogo from '@/assets/careflow-logo.png';
@@ -153,7 +154,8 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
   const [patientDob, setPatientDob] = useState('');
   const [patientSex, setPatientSex] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
-  const [qualification, setQualification] = useState('CONSULTING PHYSICIAN');
+  const [qualification, setQualification] = useState('');
+  const [specialization, setSpecialization] = useState('');
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiHint, setAiHint] = useState(false);
@@ -183,6 +185,19 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
       });
     });
   }, []);
+
+  useEffect(() => {
+    const doctorId = token.doctorId;
+    if (!doctorId) return;
+    void window.clinic.doctors
+      .getOne(doctorId)
+      .then((doctor) => {
+        const lines = doctorPadLines(doctor?.doctorProfile);
+        setQualification(lines.qualification);
+        setSpecialization(lines.specialization);
+      })
+      .catch(() => undefined);
+  }, [token.doctorId]);
 
   useEffect(() => {
     const parsed = parsePadMeta(token.prescription?.advice ?? '');
@@ -445,27 +460,16 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
                 <Typography sx={{ fontWeight: 800, color: `${PAD_BLUE} !important`, fontSize: 26, lineHeight: 1.15 }}>
                   {displayDoctor}
                 </Typography>
-                <TextField
-                  variant="standard"
-                  value={qualification}
-                  onChange={(e) => setQualification(e.target.value.toUpperCase())}
-                  sx={{
-                    ...underlineFieldSx,
-                    mt: 0.5,
-                    maxWidth: 280,
-                    '& .MuiInputBase-input': {
-                      color: `${PAD_BLUE} !important`,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      letterSpacing: 1.2,
-                      textTransform: 'uppercase',
-                      py: 0.25,
-                    },
-                    '& .MuiInput-underline:before': { borderBottom: 'none' },
-                    '& .MuiInput-underline:after': { borderBottom: 'none' },
-                    '& .MuiInput-underline:hover:before': { borderBottom: 'none !important' },
-                  }}
-                />
+                {qualification ? (
+                  <Typography sx={{ mt: 0.5, color: `${PAD_BLUE} !important`, fontSize: 12, fontWeight: 700, lineHeight: 1.35 }}>
+                    {qualification}
+                  </Typography>
+                ) : null}
+                {specialization ? (
+                  <Typography sx={{ mt: 0.25, color: `${PAD_BLUE} !important`, fontSize: 12, fontWeight: 700, lineHeight: 1.35, pr: 2 }}>
+                    {specialization}
+                  </Typography>
+                ) : null}
               </Box>
               <Box
                 component="img"
@@ -667,6 +671,7 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
           clinic={clinic}
           doctorName={displayDoctor}
           qualification={qualification}
+          specialization={specialization}
           patientName={patientName}
           patientAddress={patientAddress}
           patientAge={patientAge || '—'}

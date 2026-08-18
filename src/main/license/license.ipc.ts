@@ -45,6 +45,16 @@ type LicenseCache = {
 function getHWID(): string {
   try { return machineIdSync(); } catch { return 'UNKNOWN_HWID'; }
 }
+
+export function getLicenseApiBase(): string {
+  return API_BASE_URL;
+}
+
+export function getLicenseAuth(): { key: string; hwid: string } | null {
+  const key = getSavedKey();
+  if (!key) return null;
+  return { key, hwid: getHWID() };
+}
 function getDeviceName(): string {
   try { return os.hostname() || 'Unknown Device'; } catch { return 'Unknown Device'; }
 }
@@ -220,7 +230,7 @@ export async function isLicenseActivated(): Promise<boolean> {
     return true;
   } catch {
     if (isLocallyExpired(savedKey)) {
-      console.warn('[License] Offline — expiry date guzar chuki hai.');
+      console.warn('[License] Offline — license expiry date has passed.');
       return false;
     }
     return true;

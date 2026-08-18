@@ -1,8 +1,8 @@
 import { ipcMain } from 'electron';
 import {
   getWhatsAppConfig,
-  isWhatsAppReady,
   testWhatsAppConnection,
+  getHostedWhatsAppStatus,
   sendWhatsAppCampaign,
   sendWhatsAppText,
   getMetaEmbeddedSignupPublicConfig,
@@ -12,12 +12,16 @@ import {
 } from './whatsapp.service';
 
 export function registerWhatsAppIpc(): void {
-  ipcMain.handle('whatsapp:status', () => {
+  ipcMain.handle('whatsapp:status', async () => {
     const config = getWhatsAppConfig();
+    if (!config.enabled) {
+      return { enabled: false, configured: false, displayNumber: config.displayNumber };
+    }
+    const hosted = await getHostedWhatsAppStatus();
     return {
-      enabled: config.enabled,
-      configured: isWhatsAppReady(config),
-      displayNumber: config.displayNumber,
+      enabled: true,
+      configured: hosted.configured,
+      displayNumber: hosted.phone || config.displayNumber,
     };
   });
 

@@ -1,18 +1,29 @@
-import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
-import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
 import {
   Alert,
   Avatar,
   Box,
   Button,
-  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
   Paper,
+  Skeleton,
   Stack,
   Typography,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import { showAppToast } from '@/components/AppToast';
+import {
+  dialogActionsSx,
+  dialogCancelBtnSx,
+  dialogContentSx,
+  dialogPaperProps,
+  dialogSubmitBtnSx,
+  FormDialogTitle,
+} from '@/components/DialogUI';
+import { FetchingBar, ListCardsSkeleton } from '@/components/LoadingUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { PatientHistoryDialog } from '@/features/patients/PatientHistoryDialog';
@@ -24,6 +35,7 @@ import type { Token } from '@/types/token';
 
 const DEFAULT_CONSULT_MIN = 30;
 const MIN_AVG_SAMPLES = 3;
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 function todayStr(): string {
   return new Date().toLocaleDateString('en-CA');
@@ -39,12 +51,6 @@ function formatElapsed(fromIso: string, nowMs: number): string {
 
 function formatClock(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function visitDuration(token: Token): string | null {
-  if (!token.updatedAt) return null;
-  const mins = Math.round((new Date(token.updatedAt).getTime() - new Date(token.createdAt).getTime()) / 60_000);
-  return mins > 0 ? `${mins} min` : null;
 }
 
 function sameDayAppt(appt: Appointment, token: Token): boolean {
@@ -73,12 +79,12 @@ function avgConsultMinutes(done: Token[]): number {
   return Math.round(Math.min(60, Math.max(8, avg)));
 }
 
-function fallbackPatient(token: Token): Patient {
+function fallbackPatient(patientId: string, firstName: string, lastName: string): Patient {
   return {
-    id: token.patientId,
-    mrNumber: token.patient.mrNumber ?? '',
-    firstName: token.patient.firstName,
-    lastName: token.patient.lastName,
+    id: patientId,
+    mrNumber: '',
+    firstName,
+    lastName,
     dateOfBirth: null,
     phone: null,
     email: null,
@@ -105,13 +111,15 @@ export function WaitingRoomPage(): React.JSX.Element {
   const [prescriptionToken, setPrescriptionToken] = useState<Token | null>(null);
   const [historyPatient, setHistoryPatient] = useState<Patient | undefined>();
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
+  const [offDayOpen, setOffDayOpen] = useState(false);
+  const [pendingIssue, setPendingIssue] = useState<Appointment | null>(null);
 
   useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 30_000);
     return () => window.clearInterval(id);
   }, []);
 
-  const { data: tokens = [], isLoading, isError } = useQuery<Token[]>({
+  const { data: tokens = [], isLoading, isFetching, isError } = useQuery<Token[]>({
     queryKey: ['tokens', date],
     queryFn: () => window.clinic.tokens.list(date),
   });
@@ -136,12 +144,20 @@ export function WaitingRoomPage(): React.JSX.Element {
   );
   const currentToken = waitingAll[0] ?? null;
   const waitingRest = waitingAll.slice(1);
-  const finished = useMemo(
-    () => mine.filter((t) => t.status === 'DONE' || t.status === 'SKIPPED')
-      .sort((a, b) => b.tokenNumber - a.tokenNumber),
-    [mine],
+  const pendingAppointments = useMemo(
+    () => {
+      const tokened = new Set(mine.map((t) => t.patientId));
+      return appointments
+        .filter((a) => {
+          if (['CANCELLED', 'NO_SHOW', 'COMPLETED'].includes(a.status)) return false;
+          if (new Date(a.startsAt).toLocaleDateString('en-CA') !== date) return false;
+          if (tokened.has(a.patientId)) return false;
+          return a.tokenNumber == null;
+        })
+        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+    },
+    [appointments, date, mine],
   );
-  const doneCount = mine.filter((t) => t.status === 'DONE').length;
   const avgMinutes = useMemo(
     () => avgConsultMinutes(mine.filter((t) => t.status === 'DONE')),
     [mine],
@@ -172,11 +188,6 @@ export function WaitingRoomPage(): React.JSX.Element {
     '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06), borderColor: theme.palette.primary.main },
   } as const;
 
-  const mutedBtn = {
-    ...outlineBtn,
-    color: 'text.secondary',
-    borderColor: 'divider',
-  } as const;
 
   async function ensureLinkedAppointment(token: Token): Promise<Appointment> {
     const existing = linkedAppointment(token, appointments);
@@ -231,20 +242,62 @@ export function WaitingRoomPage(): React.JSX.Element {
     meta: { silent: true },
   });
 
+  const issueTokenMutation = useMutation({
+    mutationFn: async (appt: Appointment) => {
+      const tokenDate = date;
+      const token = await window.clinic.tokens.create({
+        patientId: appt.patientId,
+        doctorId: appt.providerId,
+        date: tokenDate,
+        reason: appt.reason,
+        notes: appt.notes,
+      }) as Token;
+      const waiting = token.status === 'WAITING'
+        ? token
+        : await window.clinic.tokens.updateStatus(token.id, 'WAITING') as Token;
+      return waiting;
+    },
+    onSuccess: async (token) => {
+      setOffDayOpen(false);
+      setPendingIssue(null);
+      qc.setQueryData<Token[]>(['tokens', date], (prev) => {
+        const list = prev ?? [];
+        const next = list.some((t) => t.id === token.id)
+          ? list.map((t) => (t.id === token.id ? token : t))
+          : [...list, token];
+        return next;
+      });
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ['tokens'] }),
+        qc.refetchQueries({ queryKey: ['appointments'] }),
+      ]);
+    },
+    onError: (err, appt) => {
+      const msg = String((err as Error)?.message ?? '');
+      if (/offline|not available/i.test(msg)) {
+        setPendingIssue(appt);
+        setOffDayOpen(true);
+        return;
+      }
+      showAppToast({ type: 'error', message: msg || 'Could not issue token.' });
+    },
+    meta: { silent: true },
+  });
+
   const busy =
     startVisitMutation.isPending || completeMutation.isPending || skipMutation.isPending;
 
-  async function openPatientHistory(token: Token): Promise<void> {
-    setHistoryLoadingId(token.id);
+  async function openPatientHistory(patientId: string, firstName: string, lastName: string, rowId: string): Promise<void> {
+    setHistoryLoadingId(rowId);
     try {
       const res = await window.clinic.patients.list({
         page: 1,
         pageSize: 50,
-        search: token.patient.firstName || token.patientId,
+        search: firstName || patientId,
       });
-      setHistoryPatient(res.data.find((p) => p.id === token.patientId) ?? fallbackPatient(token));
+      setHistoryPatient(res.data.find((p) => p.id === patientId) ?? fallbackPatient(patientId, firstName, lastName));
     } catch {
-      setHistoryPatient(fallbackPatient(token));
+      setHistoryPatient(fallbackPatient(patientId, firstName, lastName));
     } finally {
       setHistoryLoadingId(null);
     }
@@ -259,6 +312,36 @@ export function WaitingRoomPage(): React.JSX.Element {
   const waitingTime = currentToken
     ? formatElapsed(currentToken.createdAt, nowMs)
     : '—';
+
+  const visitStarted = Boolean(
+    currentToken && linkedAppointment(currentToken, appointments)?.status === 'CHECKED_IN',
+  );
+  const heroFilledSx = {
+    borderRadius: 2,
+    fontWeight: 700,
+    bgcolor: '#fff',
+    color: theme.palette.primary.dark,
+    boxShadow: 'none',
+    '&:hover': { bgcolor: alpha('#fff', 0.92), boxShadow: 'none' },
+  } as const;
+  const heroOutlineSx = {
+    borderRadius: 2,
+    fontWeight: 700,
+    borderColor: alpha('#fff', 0.5),
+    color: '#fff',
+    '&:hover': { borderColor: '#fff', bgcolor: alpha('#fff', 0.08) },
+  } as const;
+
+  const todayDayName = DAY_NAMES[new Date().getDay()];
+
+  function issueForAppointment(appt: Appointment): void {
+    issueTokenMutation.mutate(appt);
+  }
+
+  function closeOffDayDialog(): void {
+    setOffDayOpen(false);
+    setPendingIssue(null);
+  }
 
   return (
     <>
@@ -306,7 +389,12 @@ export function WaitingRoomPage(): React.JSX.Element {
               <Typography variant="body2" sx={{ opacity: 0.88, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                 Now Serving
               </Typography>
-              {currentToken ? (
+              {isLoading ? (
+                <>
+                  <Skeleton variant="text" width={260} height={52} sx={{ bgcolor: alpha('#fff', 0.28), mt: 1 }} />
+                  <Skeleton variant="text" width={180} height={24} sx={{ bgcolor: alpha('#fff', 0.18) }} />
+                </>
+              ) : currentToken ? (
                 <>
                   <Typography variant="h3" fontWeight={800} sx={{ letterSpacing: '-0.02em', mt: 0.75, mb: 0.5, lineHeight: 1.2, textShadow: `0 2px 4px ${alpha(theme.palette.common.black, 0.1)}` }}>
                     #{String(currentToken.tokenNumber).padStart(3, '0')}
@@ -318,34 +406,27 @@ export function WaitingRoomPage(): React.JSX.Element {
                   </Typography>
                   <Stack direction="row" spacing={1} sx={{ mt: 2.25 }} flexWrap="wrap" useFlexGap>
                     <Button
-                      variant="contained"
+                      variant={visitStarted ? 'outlined' : 'contained'}
                       loading={startVisitMutation.isPending}
-                      disabled={busy}
+                      disabled={busy || visitStarted}
                       onClick={() => startVisitMutation.mutate(currentToken)}
-                      sx={{
-                        borderRadius: 2,
-                        fontWeight: 700,
-                        bgcolor: '#fff',
-                        color: theme.palette.primary.dark,
-                        boxShadow: 'none',
-                        '&:hover': { bgcolor: alpha('#fff', 0.92), boxShadow: 'none' },
-                      }}
+                      sx={visitStarted ? heroOutlineSx : heroFilledSx}
                     >
                       Start visit
                     </Button>
                     <Button
-                      variant="outlined"
+                      variant={visitStarted ? 'contained' : 'outlined'}
                       loading={completeMutation.isPending}
                       disabled={busy}
                       onClick={() => completeMutation.mutate(currentToken)}
-                      sx={{ borderRadius: 2, fontWeight: 700, borderColor: alpha('#fff', 0.5), color: '#fff', '&:hover': { borderColor: '#fff', bgcolor: alpha('#fff', 0.08) } }}
+                      sx={visitStarted ? heroFilledSx : heroOutlineSx}
                     >
                       Complete
                     </Button>
                     <Button
                       variant="outlined"
                       onClick={() => setPrescriptionToken(currentToken)}
-                      sx={{ borderRadius: 2, fontWeight: 700, borderColor: alpha('#fff', 0.5), color: '#fff', '&:hover': { borderColor: '#fff', bgcolor: alpha('#fff', 0.08) } }}
+                      sx={heroOutlineSx}
                     >
                       Write Rx
                     </Button>
@@ -354,7 +435,7 @@ export function WaitingRoomPage(): React.JSX.Element {
                       loading={skipMutation.isPending}
                       disabled={busy}
                       onClick={() => skipMutation.mutate(currentToken.id)}
-                      sx={{ borderRadius: 2, fontWeight: 700, borderColor: alpha('#fff', 0.5), color: '#fff', '&:hover': { borderColor: '#fff', bgcolor: alpha('#fff', 0.08) } }}
+                      sx={heroOutlineSx}
                     >
                       Skip
                     </Button>
@@ -362,8 +443,8 @@ export function WaitingRoomPage(): React.JSX.Element {
                       <Button
                         variant="outlined"
                         loading={historyLoadingId === currentToken.id}
-                        onClick={() => void openPatientHistory(currentToken)}
-                        sx={{ borderRadius: 2, fontWeight: 700, borderColor: alpha('#fff', 0.5), color: '#fff', '&:hover': { borderColor: '#fff', bgcolor: alpha('#fff', 0.08) } }}
+                        onClick={() => void openPatientHistory(currentToken.patientId, currentToken.patient.firstName, currentToken.patient.lastName, currentToken.id)}
+                        sx={heroOutlineSx}
                       >
                         History
                       </Button>
@@ -401,37 +482,49 @@ export function WaitingRoomPage(): React.JSX.Element {
           </Paper>
 
           <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
-            {[
-              { label: 'Waiting', value: waitingAll.length, bg: alpha(theme.palette.warning.main, 0.12), accent: theme.palette.warning.dark },
-              { label: 'Now serving', value: currentToken ? 1 : 0, bg: alpha(theme.palette.info.main, 0.12), accent: theme.palette.info.dark },
-              { label: 'Done today', value: doneCount, bg: alpha(theme.palette.success.main, 0.14), accent: theme.palette.success.dark },
-              { label: 'Waiting time', value: waitingTime, bg: alpha(theme.palette.secondary.main, 0.12), accent: theme.palette.secondary.dark },
-            ].map((m) => (
-              <Paper
-                key={m.label}
-                elevation={0}
-                sx={{
-                  p: 2,
-                  borderRadius: '16px',
-                  border: 'none',
-                  bgcolor: m.bg,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  minHeight: 88,
-                }}
-              >
-                <Typography fontWeight={800} fontSize={22} sx={{ color: m.accent ?? 'text.primary', lineHeight: 1.1 }}>
-                  {m.value}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mt: 0.5 }}>
-                  {m.label}
-                </Typography>
-              </Paper>
-            ))}
+            {isLoading ? (
+              Array.from({ length: 4 }, (_, i) => (
+                <Paper key={i} elevation={0} sx={{ p: 2, borderRadius: '16px', minHeight: 88 }}>
+                  <Skeleton variant="text" width={56} height={28} />
+                  <Skeleton variant="text" width={90} height={16} />
+                </Paper>
+              ))
+            ) : (
+              <>
+                {[
+                  { label: 'Waiting', value: waitingAll.length, bg: alpha(theme.palette.warning.main, 0.12), accent: theme.palette.warning.dark },
+                  { label: 'Now serving', value: currentToken ? 1 : 0, bg: alpha(theme.palette.info.main, 0.12), accent: theme.palette.info.dark },
+                  { label: 'No token', value: pendingAppointments.length, bg: alpha(theme.palette.success.main, 0.14), accent: theme.palette.success.dark },
+                  { label: 'Waiting time', value: waitingTime, bg: alpha(theme.palette.secondary.main, 0.12), accent: theme.palette.secondary.dark },
+                ].map((m) => (
+                  <Paper
+                    key={m.label}
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      borderRadius: '16px',
+                      border: 'none',
+                      bgcolor: m.bg,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      minHeight: 88,
+                    }}
+                  >
+                    <Typography fontWeight={800} fontSize={22} sx={{ color: m.accent ?? 'text.primary', lineHeight: 1.1 }}>
+                      {m.value}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mt: 0.5 }}>
+                      {m.label}
+                    </Typography>
+                  </Paper>
+                ))}
+              </>
+            )}
           </Box>
 
-          <Paper elevation={0} sx={{ p: 2.5, ...softCard, borderRadius: 1 }}>
+          <Paper elevation={0} sx={{ p: 2.5, ...softCard, borderRadius: 1, position: 'relative' }}>
+            <FetchingBar show={isFetching && !isLoading} />
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
               <Box>
                 <Typography fontWeight={800} fontSize={16}>Waiting</Typography>
@@ -440,10 +533,9 @@ export function WaitingRoomPage(): React.JSX.Element {
                   {waitingRest.length > 0 ? ` · ${waitingRest.length} next in line` : ''}
                 </Typography>
               </Box>
-              {isLoading && <CircularProgress size={18} />}
             </Stack>
             {isLoading && mine.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">Loading…</Typography>
+              <ListCardsSkeleton count={4} />
             ) : waitingRest.length === 0 ? (
               <Box sx={{ display: 'grid', minHeight: 100, placeItems: 'center' }}>
                 <Typography variant="body2" color="text.secondary">
@@ -510,7 +602,7 @@ export function WaitingRoomPage(): React.JSX.Element {
                           Skip
                         </Button>
                         {canViewPatientHistory && (
-                          <Button size="small" variant="outlined" loading={historyLoadingId === token.id} onClick={() => void openPatientHistory(token)} sx={outlineBtn}>
+                          <Button size="small" variant="outlined" loading={historyLoadingId === token.id} onClick={() => void openPatientHistory(token.patientId, token.patient.firstName, token.patient.lastName, token.id)} sx={outlineBtn}>
                             History
                           </Button>
                         )}
@@ -555,11 +647,13 @@ export function WaitingRoomPage(): React.JSX.Element {
 
           <Paper elevation={0} sx={{ p: 2, ...softCard }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-              <Typography fontWeight={800} fontSize={14}>Done today</Typography>
-              <Typography variant="caption" color="text.secondary">{finished.length} visit{finished.length === 1 ? '' : 's'}</Typography>
+              <Typography fontWeight={800} fontSize={14}>Appointments</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {pendingAppointments.length} without token
+              </Typography>
             </Stack>
-            {finished.length === 0 ? (
-              <Typography variant="caption" color="text.disabled">No completed visits yet.</Typography>
+            {pendingAppointments.length === 0 ? (
+              <Typography variant="caption" color="text.disabled">All today&apos;s appointments have a token.</Typography>
             ) : (
               <Stack
                 spacing={1}
@@ -571,63 +665,70 @@ export function WaitingRoomPage(): React.JSX.Element {
                   '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
                 }}
               >
-                {finished.map((token) => {
-                  const skipped = token.status === 'SKIPPED';
-                  const duration = visitDuration(token);
-                  return (
-                    <Box
-                      key={token.id}
+                {pendingAppointments.map((appt) => (
+                  <Box
+                    key={appt.id}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      p: 1.5,
+                      borderRadius: 1,
+                      bgcolor: alpha(theme.palette.primary.main, 0.03),
+                      border: `1px solid ${theme.palette.divider}`,
+                      borderLeft: '4px solid',
+                      borderLeftColor: 'info.main',
+                    }}
+                  >
+                    <Avatar
                       sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1.25,
-                        p: 1.25,
+                        width: 36,
+                        height: 36,
                         borderRadius: 1,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        borderLeft: '4px solid',
-                        borderLeftColor: skipped ? 'divider' : 'success.main',
-                        bgcolor: skipped ? alpha(theme.palette.text.primary, 0.04) : alpha(theme.palette.primary.main, 0.03),
+                        bgcolor: alpha(theme.palette.primary.main, 0.12),
+                        color: 'primary.main',
+                        fontSize: 12,
+                        fontWeight: 700,
                       }}
                     >
-                      <Avatar
-                        sx={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 1,
-                          bgcolor: skipped ? alpha(theme.palette.text.primary, 0.1) : alpha(theme.palette.primary.main, 0.14),
-                          color: skipped ? 'text.secondary' : 'primary.main',
-                          fontWeight: 800,
-                          fontSize: 12,
-                        }}
-                      >
-                        {String(token.tokenNumber).padStart(3, '0')}
-                      </Avatar>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography fontWeight={700} fontSize={13} noWrap>
-                          {token.patient.firstName} {token.patient.lastName}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
-                          {skipped
-                            ? `Skipped · ${formatClock(token.updatedAt ?? token.createdAt)}`
-                            : [token.reason || 'OPD', formatClock(token.updatedAt ?? token.createdAt), duration].filter(Boolean).join(' · ')}
-                        </Typography>
-                      </Box>
-                      <Stack spacing={0.5} flexShrink={0}>
-                        {!skipped && (
-                          <Button size="small" variant="outlined" startIcon={<MedicalServicesOutlinedIcon sx={{ fontSize: '14px !important' }} />} onClick={() => setPrescriptionToken(token)} sx={outlineBtn}>
-                            Rx
-                          </Button>
-                        )}
-                        {canViewPatientHistory && (
-                          <Button size="small" variant="outlined" startIcon={<HistoryOutlinedIcon sx={{ fontSize: '14px !important' }} />} loading={historyLoadingId === token.id} onClick={() => void openPatientHistory(token)} sx={skipped ? mutedBtn : outlineBtn}>
-                            History
-                          </Button>
-                        )}
-                      </Stack>
+                      {appt.patient.firstName[0]}
+                      {appt.patient.lastName[0]}
+                    </Avatar>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" fontWeight={700} noWrap>
+                        {appt.patient.firstName} {appt.patient.lastName}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {formatClock(appt.startsAt)}
+                        {' · '}
+                        {appt.reason || 'Appointment'}
+                      </Typography>
                     </Box>
-                  );
-                })}
+                    <Stack direction="row" spacing={0.75} flexShrink={0}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        loading={issueTokenMutation.isPending && issueTokenMutation.variables?.id === appt.id}
+                        disabled={issueTokenMutation.isPending}
+                        onClick={() => issueForAppointment(appt)}
+                        sx={outlineBtn}
+                      >
+                        Issue
+                      </Button>
+                      {canViewPatientHistory && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          loading={historyLoadingId === appt.id}
+                          onClick={() => void openPatientHistory(appt.patientId, appt.patient.firstName, appt.patient.lastName, appt.id)}
+                          sx={outlineBtn}
+                        >
+                          History
+                        </Button>
+                      )}
+                    </Stack>
+                  </Box>
+                ))}
               </Stack>
             )}
           </Paper>
@@ -640,6 +741,32 @@ export function WaitingRoomPage(): React.JSX.Element {
       {historyPatient && (
         <PatientHistoryDialog patient={historyPatient} onClose={() => setHistoryPatient(undefined)} />
       )}
+      <Dialog open={offDayOpen} onClose={closeOffDayDialog} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
+        <FormDialogTitle title="Not available today" subtitle={todayDayName} />
+        <DialogContent sx={dialogContentSx}>
+          <Typography variant="body2" color="text.secondary">
+            Today is {todayDayName}. This day is marked as a holiday / off in Doctor Schedule.
+            {pendingIssue
+              ? ` ${pendingIssue.patient.firstName} ${pendingIssue.patient.lastName} already has a booked appointment — issue a token to add them to the queue?`
+              : ' A token cannot be issued for a walk-in today.'}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={dialogActionsSx}>
+          <Button onClick={closeOffDayDialog} sx={dialogCancelBtnSx}>
+            Cancel
+          </Button>
+          {pendingIssue && (
+            <Button
+              variant="contained"
+              loading={issueTokenMutation.isPending}
+              onClick={() => issueTokenMutation.mutate(pendingIssue)}
+              sx={dialogSubmitBtnSx}
+            >
+              Issue token
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

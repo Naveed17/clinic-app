@@ -6,13 +6,14 @@ import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutl
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import {
-  Alert, Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions,
+  Alert, Avatar, Box, Button, Chip, Dialog, DialogActions,
   DialogContent, IconButton, Paper, Stack, Tab, Tabs, Tooltip, Typography,
 } from '@mui/material';
 import { alpha, darken, useTheme } from '@mui/material/styles';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { Prescription } from '@/types/token';
+import { ListCardsSkeleton } from '@/components/LoadingUI';
 import { chipSx } from '@/components/TableUI';
 import { appointmentsService } from '@/services/appointments.service';
 import { invoicesService } from '@/services/invoices.service';
@@ -130,7 +131,7 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
     }
   }
 
-  if (isLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>;
+  if (isLoading) return <Box sx={{ p: 2 }}><ListCardsSkeleton count={5} /></Box>;
   if (items.length === 0) return <EmptyState icon={<MedicalServicesOutlinedIcon sx={{ fontSize: 40 }} />} text="No prescriptions found." />;
 
   return (

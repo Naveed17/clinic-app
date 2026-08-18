@@ -33,7 +33,7 @@ export function PatientWhatsAppButton({
         title={
           hasPhone
             ? useApi
-              ? 'Send via WhatsApp Cloud API'
+              ? 'Send via WhatsApp Cloud API (add-on)'
               : 'Open WhatsApp Web'
             : 'Patient has no phone number'
         }

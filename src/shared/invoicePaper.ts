@@ -14,11 +14,17 @@ export const POS_PAPER = {
    * 80mm roll printable width is ~72mm. Full 80mm body clips the right
    * border/text on thermal drivers (printableArea + left dead zone).
    */
-  bodyMaxWidth: '68mm',
-  /** Extra right inset so the token box stroke is not cut off. */
-  bodyPadding: '6px 12px 28px 4px',
-  fontName: '"Courier New", Courier, monospace',
-  fontSize: '11px',
+  bodyMaxWidth: '66mm',
+  /** Left-align in the printable area — auto-centering leaves a large left gap on POS. */
+  bodyMargin: '0',
+  /**
+   * Left 10px (between old 4px and centered 8px+auto).
+   * Extra right so the token box stroke is not clipped.
+   */
+  bodyPadding: '6px 18px 28px 10px',
+  fontName: "'Courier New', Courier, monospace",
+  pdfFontFamily: 'Courier',
+  fontSize: '12px',
   nameSize: '15px',
   previewWidth: 340,
   previewHeight: 780,
@@ -28,9 +34,8 @@ export const POS_PAPER = {
   pdfPageWidth: 226,
   pdfPageHeightToken: 460,
   pdfPageHeightInvoice: 720,
-  /** Optical center on 80mm roll (pts). Left smaller to cancel driver left gutter. */
-  pdfPaddingLeft: 8,
-  pdfPaddingRight: 16,
+  pdfPaddingLeft: 10,
+  pdfPaddingRight: 18,
   pdfPaddingTop: 16,
   /** Extra bottom gap so the slip can be torn at the cutter. */
   pdfPaddingBottom: 36,
@@ -40,8 +45,11 @@ export const POS_PAPER = {
 export const POS_RECEIPT = {
   starLine: '* * * * * * * * * * * * * * *',
   clinicFallback: 'CLINIC',
-  ink: '#000',
+  /** Headings / token number stay pure black. Secondary lines use dark grey. */
+  ink: '#000000',
+  muted: '#2a2a2a',
   thankYou: 'THANK YOU!',
+  poweredBy: 'Powered by CareFlow',
 };
 
 /** Prescription pad — A4 portrait. */

@@ -47,14 +47,14 @@ function formatVisitDate(date: string): string {
 function buildVisitMessage(doctorName: string, date: string, clinicName: string): string {
   const when = formatVisitDate(date);
   const visit = doctorName && when
-    ? `Dr. ${doctorName} ${when} ko clinic visit karenge.`
+    ? `Dr. ${doctorName} has a clinic visit on ${when}.`
     : doctorName
-      ? `Dr. ${doctorName} clinic visit karenge.`
+      ? `Dr. ${doctorName} has a clinic visit.`
       : when
-        ? `${when} ko clinic visit hai.`
-        : 'Clinic visit ki maloomat.';
+        ? `Clinic visit on ${when}.`
+        : 'Clinic visit details.';
   const clinic = clinicName.trim() ? `\n${clinicName.trim()}` : '';
-  return `Assalam o Alaikum,\n\n${visit}${clinic}\n\nShukriya.`;
+  return `Hello,\n\n${visit}${clinic}\n\nThank you.`;
 }
 
 async function listAllPatients(): Promise<Patient[]> {

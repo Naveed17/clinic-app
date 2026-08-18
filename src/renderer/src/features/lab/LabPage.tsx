@@ -10,7 +10,6 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -33,6 +32,7 @@ import { useState } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
 import type { LabOrder, LabOrderStatus } from '@/types/lab';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogPaperProps,
@@ -72,7 +72,7 @@ export function LabPage(): React.JSX.Element {
   const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
   const [form, setForm] = useState({ patientId: '', test: '', notes: '' });
 
-  const { data: orders = [], isLoading, isError } = useQuery<LabOrder[]>({
+  const { data: orders = [], isLoading, isFetching, isError } = useQuery<LabOrder[]>({
     queryKey: ['lab-orders'],
     queryFn: () => window.clinic.lab.list(),
     refetchInterval: 15_000,
@@ -195,6 +195,7 @@ export function LabPage(): React.JSX.Element {
           </>
         }
         error={isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Failed to load lab orders.</Alert>}
+        fetching={isFetching && !isLoading}
         pager={
           filtered.length > rowsPerPage ? (
             <TablePager page={page} rowsPerPage={rowsPerPage} total={filtered.length} onPageChange={setPage} />
@@ -215,7 +216,7 @@ export function LabPage(): React.JSX.Element {
         </TableHead>
         <TableBody>
           {isLoading ? (
-            <TableRow><TableCell colSpan={8} sx={{ py: 6, textAlign: 'center' }}><CircularProgress size={24} /></TableCell></TableRow>
+            <TableRowsSkeleton cols={8} />
           ) : filtered.length === 0 ? (
             <TableRow><TableCell colSpan={8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No lab orders found.</TableCell></TableRow>
           ) : (

@@ -1,4 +1,5 @@
 import { getPrisma } from '../database/client';
+import type { SearchScope } from '../../shared/searchAccess';
 
 export interface GlobalSearchResult {
   patients: Array<{
@@ -43,107 +44,119 @@ export interface GlobalSearchResult {
   }>;
 }
 
-export async function globalSearch(query: string): Promise<GlobalSearchResult> {
+export async function globalSearch(
+  query: string,
+  scope: SearchScope,
+): Promise<GlobalSearchResult> {
+  const empty: GlobalSearchResult = { patients: [], appointments: [], invoices: [], labOrders: [] };
   if (!query || query.trim().length < 2) {
-    return { patients: [], appointments: [], invoices: [], labOrders: [] };
+    return empty;
   }
 
   const q = query.trim();
   const prisma = getPrisma();
 
   const [patients, appointments, invoices, labOrders] = await Promise.all([
-    prisma.patient.findMany({
-      where: {
-        OR: [
-          { firstName: { contains: q } },
-          { lastName: { contains: q } },
-          { phone: { contains: q } },
-          { email: { contains: q } },
-          { mrNumber: { contains: q } },
-        ],
-      },
-      select: {
-        id: true,
-        mrNumber: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        email: true,
-        bloodGroup: true,
-        createdAt: true,
-      },
-      take: 8,
-      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-    }),
+    scope.patients
+      ? prisma.patient.findMany({
+          where: {
+            OR: [
+              { firstName: { contains: q } },
+              { lastName: { contains: q } },
+              { phone: { contains: q } },
+              { email: { contains: q } },
+              { mrNumber: { contains: q } },
+            ],
+          },
+          select: {
+            id: true,
+            mrNumber: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            email: true,
+            bloodGroup: true,
+            createdAt: true,
+          },
+          take: 8,
+          orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        })
+      : Promise.resolve([]),
 
-    prisma.appointment.findMany({
-      where: {
-        OR: [
-          { reason: { contains: q } },
-          { patient: { firstName: { contains: q } } },
-          { patient: { lastName: { contains: q } } },
-          { patient: { mrNumber: { contains: q } } },
-          { patient: { phone: { contains: q } } },
-        ],
-      },
-      select: {
-        id: true,
-        reason: true,
-        status: true,
-        startsAt: true,
-        patientId: true,
-        patient: { select: { firstName: true, lastName: true, mrNumber: true } },
-        provider: { select: { firstName: true, lastName: true } },
-      },
-      take: 5,
-      orderBy: { startsAt: 'desc' },
-    }),
+    scope.appointments
+      ? prisma.appointment.findMany({
+          where: {
+            OR: [
+              { reason: { contains: q } },
+              { patient: { firstName: { contains: q } } },
+              { patient: { lastName: { contains: q } } },
+              { patient: { mrNumber: { contains: q } } },
+              { patient: { phone: { contains: q } } },
+            ],
+          },
+          select: {
+            id: true,
+            reason: true,
+            status: true,
+            startsAt: true,
+            patientId: true,
+            patient: { select: { firstName: true, lastName: true, mrNumber: true } },
+            provider: { select: { firstName: true, lastName: true } },
+          },
+          take: 5,
+          orderBy: { startsAt: 'desc' },
+        })
+      : Promise.resolve([]),
 
-    prisma.invoice.findMany({
-      where: {
-        OR: [
-          { invoiceNumber: { contains: q } },
-          { patient: { firstName: { contains: q } } },
-          { patient: { lastName: { contains: q } } },
-          { patient: { mrNumber: { contains: q } } },
-          { patient: { phone: { contains: q } } },
-        ],
-      },
-      select: {
-        id: true,
-        invoiceNumber: true,
-        status: true,
-        total: true,
-        amountPaid: true,
-        patientId: true,
-        createdAt: true,
-        patient: { select: { firstName: true, lastName: true, mrNumber: true } },
-      },
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-    }),
+    scope.invoices
+      ? prisma.invoice.findMany({
+          where: {
+            OR: [
+              { invoiceNumber: { contains: q } },
+              { patient: { firstName: { contains: q } } },
+              { patient: { lastName: { contains: q } } },
+              { patient: { mrNumber: { contains: q } } },
+              { patient: { phone: { contains: q } } },
+            ],
+          },
+          select: {
+            id: true,
+            invoiceNumber: true,
+            status: true,
+            total: true,
+            amountPaid: true,
+            patientId: true,
+            createdAt: true,
+            patient: { select: { firstName: true, lastName: true, mrNumber: true } },
+          },
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+        })
+      : Promise.resolve([]),
 
-    prisma.labOrder.findMany({
-      where: {
-        OR: [
-          { test: { contains: q } },
-          { patient: { firstName: { contains: q } } },
-          { patient: { lastName: { contains: q } } },
-          { patient: { mrNumber: { contains: q } } },
-          { patient: { phone: { contains: q } } },
-        ],
-      },
-      select: {
-        id: true,
-        test: true,
-        status: true,
-        patientId: true,
-        orderedAt: true,
-        patient: { select: { firstName: true, lastName: true, mrNumber: true } },
-      },
-      take: 5,
-      orderBy: { orderedAt: 'desc' },
-    }),
+    scope.labOrders
+      ? prisma.labOrder.findMany({
+          where: {
+            OR: [
+              { test: { contains: q } },
+              { patient: { firstName: { contains: q } } },
+              { patient: { lastName: { contains: q } } },
+              { patient: { mrNumber: { contains: q } } },
+              { patient: { phone: { contains: q } } },
+            ],
+          },
+          select: {
+            id: true,
+            test: true,
+            status: true,
+            patientId: true,
+            orderedAt: true,
+            patient: { select: { firstName: true, lastName: true, mrNumber: true } },
+          },
+          take: 5,
+          orderBy: { orderedAt: 'desc' },
+        })
+      : Promise.resolve([]),
   ]);
 
   return {
