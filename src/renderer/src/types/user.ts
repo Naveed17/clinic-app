@@ -8,6 +8,7 @@ export interface DoctorProfile {
   experienceYears: number;
   phone: string | null;
   bio: string | null;
+  avatar: string | null;
 }
 
 export interface User {
@@ -28,6 +29,7 @@ export interface DoctorProfileInput {
   experienceYears?: number;
   phone?: string;
   bio?: string;
+  avatar?: string | null;
 }
 
 export interface UserInput {

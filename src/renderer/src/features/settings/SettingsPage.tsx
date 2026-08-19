@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Alert,
   Box,
@@ -37,6 +37,9 @@ import { useLicense, useRefreshLicenseModules } from '@/features/auth/LicenseMod
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { showAppToast } from '@/components/AppToast';
 import { WhatsAppCampaignDialog } from '@/features/settings/WhatsAppCampaignDialog';
+import { fileToClinicLogoDataUrl } from '@/utils/avatarImage';
+import { invalidateClinicLogoCache, notifyClinicBrandChanged, resolveClinicLogoSrc } from '@/utils/clinicBrandLogo';
+import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
 
@@ -47,6 +50,7 @@ interface Settings {
   clinicName: string;
   clinicAddress: string;
   clinicPhone: string;
+  clinicLogo?: string;
   databaseMode?: 'local' | 'online';
   clinicalApiUrl?: string;
   schemaId?: string;
@@ -93,6 +97,8 @@ export function SettingsPage(): React.JSX.Element {
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoError, setLogoError] = useState('');
 
   // Update States & Notifications
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'latest' | 'error'>('idle');
@@ -214,6 +220,7 @@ export function SettingsPage(): React.JSX.Element {
         clinicName: '',
         clinicAddress: '',
         clinicPhone: '',
+        clinicLogo: '',
         databaseMode: 'local',
         aiEnabled: false,
         groqApiKey: '',
@@ -253,6 +260,8 @@ export function SettingsPage(): React.JSX.Element {
         (settings.serverMode === 'lan-client' && prev?.clientApiUrl !== settings.clientApiUrl);
 
       await window.clinic?.settings.save(settings);
+      invalidateClinicLogoCache();
+      notifyClinicBrandChanged();
       await refreshDatabaseMode();
       setPrevMode(settings.serverMode);
 
@@ -502,8 +511,8 @@ export function SettingsPage(): React.JSX.Element {
                 <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>Clinic Information</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   {isOnline
-                    ? 'Shown on printed receipts. Saved to the cloud so every online PC shares the same clinic profile.'
-                    : 'Shown on printed receipts and invoices.'}
+                    ? 'Name, contact, and logo on prints. Saved to the cloud so every online PC shares the same clinic profile.'
+                    : 'Name, contact, and logo on prints, receipts, and the app sidebar.'}
                 </Typography>
                 <Stack spacing={1.5} sx={{ mb: 3 }}>
                   <TextField
@@ -526,6 +535,80 @@ export function SettingsPage(): React.JSX.Element {
                     value={settings.clinicPhone}
                     onChange={(digits) => setSettings((s) => s && ({ ...s, clinicPhone: digits }))}
                   />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" sx={{ mb: 0.75 }}>
+                      Clinic logo
+                    </Typography>
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Box
+                        sx={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          bgcolor: '#fff',
+                          overflow: 'hidden',
+                          p: 0.5,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Box
+                          component="img"
+                          src={resolveClinicLogoSrc(settings.clinicLogo)}
+                          alt="Clinic logo"
+                          sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                        />
+                      </Box>
+                      <Box>
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<ImageOutlinedIcon />}
+                            onClick={() => logoInputRef.current?.click()}
+                            sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2 }}
+                          >
+                            {settings.clinicLogo ? 'Change' : 'Upload'}
+                          </Button>
+                          {settings.clinicLogo ? (
+                            <Button
+                              size="small"
+                              onClick={() => { setSettings((s) => s && ({ ...s, clinicLogo: '' })); setLogoError(''); }}
+                              sx={{ textTransform: 'none', fontWeight: 600 }}
+                            >
+                              Use CareFlow
+                            </Button>
+                          ) : null}
+                        </Stack>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                          Optional. If you skip this, the CareFlow logo stays everywhere.
+                        </Typography>
+                        {logoError ? (
+                          <Typography variant="caption" color="error" display="block">{logoError}</Typography>
+                        ) : null}
+                      </Box>
+                    </Stack>
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!file) return;
+                        void fileToClinicLogoDataUrl(file)
+                          .then((dataUrl) => {
+                            setLogoError('');
+                            setSettings((s) => s && ({ ...s, clinicLogo: dataUrl }));
+                          })
+                          .catch((err: unknown) => {
+                            setLogoError(err instanceof Error ? err.message : 'Unable to use that image.');
+                          });
+                      }}
+                    />
+                  </Box>
                 </Stack>
 
                 <Divider sx={{ my: 2 }} />

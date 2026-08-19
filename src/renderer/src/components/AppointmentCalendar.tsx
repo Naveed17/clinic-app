@@ -10,15 +10,19 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
+import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
+import EventBusyOutlinedIcon from '@mui/icons-material/EventBusyOutlined';
+import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
 import {
-  alpha, Avatar, Box, Button, Chip, Divider, Fade, IconButton,
-  Paper, Popper, Stack, Typography, useTheme,
+  alpha, Avatar, Box, Button, Chip, Dialog, Divider, Fade, IconButton,
+  LinearProgress, Paper, Popper, Stack, Typography, useTheme,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Appointment } from '@/types/appointment';
 import type { Token } from '@/types/token';
-import { CalendarSkeleton, FetchingBar } from '@/components/LoadingUI';
+import { CalendarSkeleton } from '@/components/LoadingUI';
+import { DoctorAvatar } from '@/components/DoctorAvatar';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -99,6 +103,7 @@ interface Props {
   onAppointmentContextMenu?: (appointment: Appointment, anchor: { mouseX: number; mouseY: number }) => void;
   onPrescriptionClick?: (appointment: Appointment) => void | Promise<void>;
   onPatientHistoryClick?: (appointment: Appointment) => void | Promise<void>;
+  onLabOrderClick?: (appointment: Appointment) => void | Promise<void>;
   readOnly?: boolean;
   hideCheckIn?: boolean;
   loading?: boolean;
@@ -106,10 +111,11 @@ interface Props {
   statusPendingId?: string | null;
 }
 
-export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu, onPrescriptionClick, onPatientHistoryClick, readOnly = false, hideCheckIn = false, loading = false, fetching = false, statusPendingId = null }: Props): React.JSX.Element {
+export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu, onPrescriptionClick, onPatientHistoryClick, onLabOrderClick, readOnly = false, hideCheckIn = false, loading = false, fetching = false, statusPendingId = null }: Props): React.JSX.Element {
   const theme = useTheme();
   const today = new Date();
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
+  const [labLoadingId, setLabLoadingId] = useState<string | null>(null);
 
   const STATUS_COLOR: Record<string, string> = {
     SCHEDULED: theme.palette.primary.main,
@@ -126,6 +132,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
 
   const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selected, setSelected] = useState<Date>(today);
+  const [dayListOpen, setDayListOpen] = useState(false);
   const [hoveredAppt, setHoveredAppt] = useState<Appointment | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -137,6 +144,10 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
     queryKey: ['tokens', selectedDateKey],
     queryFn: () => window.clinic.tokens.list(selectedDateKey) as Promise<Token[]>,
   });
+
+  useEffect(() => {
+    if (loading) setDayListOpen(false);
+  }, [loading]);
 
   const selectedAppts = useMemo(
     () =>
@@ -172,34 +183,45 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
         position: 'relative',
       }}
     >
-      <FetchingBar show={Boolean(fetching && !loading)} />
+      {fetching && !loading ? (
+        <LinearProgress
+          sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, zIndex: 2, borderRadius: 0 }}
+        />
+      ) : null}
       {loading ? <CalendarSkeleton /> : (
       <>
       {/* ── Left: Calendar grid ── */}
-      <Box sx={{ flex: 1, p: 3, overflow: 'auto', minWidth: 0, minHeight: 0 }}>
-        {/* Month nav */}
-        <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2.5 }}>
-          <Typography variant="h6" fontWeight={700}>{MONTHS[cursor.getMonth()]}</Typography>
-          <Typography variant="h6" fontWeight={700} color="text.secondary">{cursor.getFullYear()}</Typography>
-          <Box sx={{ flex: 1 }} />
-          <IconButton size="small" onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}>
-            <ChevronLeftIcon />
-          </IconButton>
-          <IconButton size="small" onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}>
-            <ChevronRightIcon />
-          </IconButton>
-        </Stack>
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 3, pt: 2.5, overflow: 'hidden', minWidth: 0, minHeight: 0 }}>
+        <Box
+          sx={{
+            flexShrink: 0,
+            zIndex: 3,
+            bgcolor: 'transparent',
+            pb: 0.75,
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 1.5 }}>
+            <Typography variant="h6" fontWeight={700}>{MONTHS[cursor.getMonth()]}</Typography>
+            <Typography variant="h6" fontWeight={700} color="text.secondary">{cursor.getFullYear()}</Typography>
+            <Box sx={{ flex: 1 }} />
+            <IconButton size="small" onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}>
+              <ChevronLeftIcon />
+            </IconButton>
+            <IconButton size="small" onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}>
+              <ChevronRightIcon />
+            </IconButton>
+          </Stack>
 
-        {/* Day headers */}
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', mb: 1 }}>
-          {DAYS.map((d) => (
-            <Typography key={d} variant="caption" color="text.disabled" fontWeight={600}
-              sx={{ textAlign: 'center', py: 0.5 }}>{d}</Typography>
-          ))}
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
+            {DAYS.map((d) => (
+              <Typography key={d} variant="caption" color="text.disabled" fontWeight={700}
+                sx={{ textAlign: 'center', py: 0.75, letterSpacing: '0.04em' }}>{d}</Typography>
+            ))}
+          </Box>
         </Box>
 
-        {/* Calendar grid */}
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 0.5 }}>
+        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gridAutoRows: 100, gap: 0.5 }}>
           {calDays.map((day, i) => {
             const isCurrentMonth = day.getMonth() === cursor.getMonth();
             const isToday = isSameDay(day, today);
@@ -211,7 +233,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                 key={i}
                 onClick={() => {
                   setSelected(day);
-                  onDateClick?.(day.toLocaleDateString('en-CA'));
+                  setDayListOpen(true);
                 }}
                 onContextMenu={(e) => {
                   if (!onDayContextMenu) return;
@@ -220,10 +242,14 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                   onDayContextMenu(day.toLocaleDateString('en-CA'), { mouseX: e.clientX, mouseY: e.clientY });
                 }}
                 sx={{
-                  minHeight: 72,
+                  height: '100%',
+                  minHeight: 0,
                   p: 0.75,
                   borderRadius: 1,
                   cursor: 'pointer',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
                   backdropFilter: 'blur(8px)',
                   bgcolor: isSelected
                     ? alpha(theme.palette.primary.main, 0.22)
@@ -256,7 +282,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                   {day.getDate()}
                 </Typography>
                 <Stack spacing={0.25}>
-                  {dayAppts.slice(0, 2).map((a) => (
+                  {dayAppts.slice(0, 3).map((a) => (
                     <Box
                       key={a.id}
                       onMouseEnter={(e) => {
@@ -287,15 +313,16 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                       </Typography>
                     </Box>
                   ))}
-                  {dayAppts.length > 2 && (
+                  {dayAppts.length > 3 && (
                     <Typography variant="caption" sx={{ fontSize: '0.6rem', color: 'text.disabled' }}>
-                      +{dayAppts.length - 2} more
+                      +{dayAppts.length - 3} more
                     </Typography>
                   )}
                 </Stack>
               </Box>
             );
           })}
+        </Box>
         </Box>
 
         {/* Hover Popper */}
@@ -383,9 +410,11 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                             <Typography variant="caption" color="text.disabled" fontWeight={500}>Doctor</Typography>
                           </Stack>
                           <Stack direction="row" alignItems="center" spacing={0.75}>
-                            <Avatar sx={{ width: 20, height: 20, fontSize: 9, fontWeight: 700, bgcolor: alpha(color, 0.25), color }}>
-                              {hoveredAppt.provider.firstName[0]}{hoveredAppt.provider.lastName[0]}
-                            </Avatar>
+                            <DoctorAvatar
+                              src={hoveredAppt.provider.avatar}
+                              name={`Dr. ${hoveredAppt.provider.firstName} ${hoveredAppt.provider.lastName}`}
+                              size={20}
+                            />
                             <Typography variant="caption" color="text.secondary">
                               Dr. {hoveredAppt.provider.firstName} {hoveredAppt.provider.lastName}
                             </Typography>
@@ -400,44 +429,152 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
           )}
         </Popper>
       </Box>
+      </>
+      )}
 
-      <Divider orientation="vertical" flexItem />
-
-      {/* ── Right: Day schedule ── */}
-      <Box sx={{ width: 340, flexShrink: 0, p: 3, display: 'flex', flexDirection: 'column', gap: 2, overflow: 'hidden', minHeight: 0, alignSelf: 'stretch' }}>
-        <Box>
-          <Typography variant="subtitle1" fontWeight={700}>Scheduled</Typography>
-          <Typography variant="caption" color="text.secondary">
-            {selected.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })}
-          </Typography>
+      <Dialog
+        open={dayListOpen && !loading}
+        onClose={() => setDayListOpen(false)}
+        fullWidth
+        maxWidth={false}
+        slotProps={{
+          backdrop: { sx: { bgcolor: alpha('#0b1f14', 0.45), backdropFilter: 'blur(6px)' } },
+        }}
+        PaperProps={{
+          sx: {
+            width: { xs: '94vw', sm: 820 },
+            maxWidth: 820,
+            height: { xs: '88vh', sm: '80vh' },
+            maxHeight: '88vh',
+            borderRadius: '28px',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            bgcolor: 'background.paper',
+            backgroundImage: 'none',
+            boxShadow: `0 28px 80px ${alpha('#052e16', 0.28)}`,
+            border: '1px solid',
+            borderColor: alpha(theme.palette.primary.main, 0.12),
+          },
+        }}
+      >
+        <Box
+          sx={{
+            position: 'relative',
+            px: 3,
+            pt: 2.75,
+            pb: 2.5,
+            color: '#fff',
+            background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 58%, ${theme.palette.primary.light} 100%)`,
+            overflow: 'hidden',
+            flexShrink: 0,
+          }}
+        >
+          <Box sx={{ position: 'absolute', right: -28, top: -48, width: 160, height: 160, borderRadius: '50%', border: `2px solid ${alpha('#fff', 0.14)}` }} />
+          <Box sx={{ position: 'absolute', right: 70, bottom: -70, width: 140, height: 140, borderRadius: '50%', border: `2px solid ${alpha('#fff', 0.08)}` }} />
+          <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ position: 'relative', zIndex: 1 }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Box
+                sx={{
+                  width: 64,
+                  height: 72,
+                  borderRadius: '16px',
+                  bgcolor: alpha('#fff', 0.16),
+                  border: `1px solid ${alpha('#fff', 0.28)}`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backdropFilter: 'blur(8px)',
+                }}
+              >
+                <Typography sx={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', opacity: 0.85 }}>
+                  {selected.toLocaleDateString([], { month: 'short' }).toUpperCase()}
+                </Typography>
+                <Typography sx={{ fontSize: 28, fontWeight: 900, lineHeight: 1, letterSpacing: '-0.04em' }}>
+                  {selected.getDate()}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', opacity: 0.8 }}>
+                  Day schedule
+                </Typography>
+                <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: '-0.03em', mt: 0.25, lineHeight: 1.2 }}>
+                  {selected.toLocaleDateString([], { weekday: 'long' })}
+                </Typography>
+                <Typography sx={{ mt: 0.4, fontWeight: 600, opacity: 0.88, fontSize: 13 }}>
+                  {selectedAppts.length} visit{selectedAppts.length === 1 ? '' : 's'}
+                  {' · '}
+                  {selected.toLocaleDateString([], { month: 'long', year: 'numeric' })}
+                </Typography>
+              </Box>
+            </Stack>
+            <IconButton
+              onClick={() => setDayListOpen(false)}
+              sx={{
+                color: '#fff',
+                bgcolor: alpha('#fff', 0.12),
+                '&:hover': { bgcolor: alpha('#fff', 0.22) },
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </Stack>
         </Box>
 
-        {selectedAppts.length === 0 ? (
-          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Typography variant="body2" color="text.disabled">No appointments.</Typography>
-          </Box>
-        ) : (
-          <Stack spacing={0} sx={{
-            overflowY: 'auto', flex: 1, pr: 0.5,
-            '&::-webkit-scrollbar': { width: 4 },
-            '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
-            '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
-          }}>
-            {selectedAppts.map((a) => {
-              const start = new Date(a.startsAt);
-              const end = new Date(a.endsAt);
-              const mins = Math.round((end.getTime() - start.getTime()) / 60000);
-              const next = NEXT_STATUS[a.status];
-              const initials = `${a.patient.firstName[0]}${a.patient.lastName[0]}`.toUpperCase();
-              const color = STATUS_COLOR[a.status];
-              const tok = tokenNum(a.tokenNumber);
+        <Box
+          sx={{
+            px: 2.5,
+            py: 2.25,
+            flex: '1 1 auto',
+            minHeight: 0,
+            overflowY: 'auto',
+            bgcolor: (t) => (t.palette.mode === 'light' ? '#f4f7f5' : alpha(t.palette.common.white, 0.03)),
+          }}
+        >
+          {selectedAppts.length === 0 ? (
+            <Box
+              sx={{
+                py: 6,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
+              }}
+            >
+              <Box
+                sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: '20px',
+                  display: 'grid',
+                  placeItems: 'center',
+                  mb: 1.5,
+                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                  color: 'primary.main',
+                }}
+              >
+                <EventBusyOutlinedIcon sx={{ fontSize: 30 }} />
+              </Box>
+              <Typography fontWeight={800}>No visits this day</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, maxWidth: 260 }}>
+                This date is free. Book a patient or pick another day on the calendar.
+              </Typography>
+            </Box>
+          ) : (
+            <Stack spacing={1.25}>
+              {selectedAppts.map((a, index) => {
+                const start = new Date(a.startsAt);
+                const end = new Date(a.endsAt);
+                const mins = Math.round((end.getTime() - start.getTime()) / 60000);
+                const next = NEXT_STATUS[a.status];
+                const initials = `${a.patient.firstName[0]}${a.patient.lastName[0]}`.toUpperCase();
+                const color = STATUS_COLOR[a.status];
+                const tok = tokenNum(a.tokenNumber);
 
-              return (
-                <Box key={a.id} sx={{ mb: 2 }}>
-                  <Typography variant="caption" color="text.disabled" fontWeight={600}>
-                    {start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </Typography>
+                return (
                   <Box
+                    key={a.id}
                     onContextMenu={(e) => {
                       if (!onAppointmentContextMenu) return;
                       e.preventDefault();
@@ -445,118 +582,232 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                       onAppointmentContextMenu(a, { mouseX: e.clientX, mouseY: e.clientY });
                     }}
                     sx={{
-                      mt: 0.5, p: 2, borderRadius: 1,
-                      bgcolor: alpha(color, 0.08),
-                      borderLeft: `4px solid ${color}`,
-                      transition: 'bgcolor 0.15s',
+                      display: 'grid',
+                      gridTemplateColumns: '76px 1fr',
+                      gap: 1.5,
+                      alignItems: 'center',
                     }}
                   >
-                    <Box sx={{ height: 4, borderRadius: 2, bgcolor: color, mb: 1.5 }} />
-                    <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Typography variant="subtitle2" fontWeight={700} noWrap sx={{ mb: 0.25 }}>
-                          {a.patient.firstName} {a.patient.lastName}
-                          {tok > 0 && (
-                            <Box
-                              component="span"
+                    <Box sx={{ textAlign: 'right', pr: 0.5, whiteSpace: 'nowrap' }}>
+                      <Typography
+                        component="span"
+                        sx={{
+                          fontSize: 13,
+                          fontWeight: 800,
+                          color: 'text.primary',
+                          fontVariantNumeric: 'tabular-nums',
+                          letterSpacing: '-0.02em',
+                          lineHeight: 1,
+                        }}
+                      >
+                        {start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                      </Typography>
+                      {index < selectedAppts.length - 1 && (
+                        <Box sx={{ mt: 1, mr: 0.5, ml: 'auto', width: 2, height: 18, borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, 0.18) }} />
+                      )}
+                    </Box>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        py: 1.1,
+                        px: 1.5,
+                        pl: 2,
+                        borderRadius: '16px',
+                        bgcolor: 'background.paper',
+                        border: '1px solid',
+                        borderColor: alpha(color, 0.22),
+                        boxShadow: `0 8px 24px ${alpha('#052e16', 0.06)}`,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        '&::before': {
+                          content: '""',
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: 4,
+                          bgcolor: color,
+                        },
+                      }}
+                    >
+                      <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0 }}>
+                        <Stack
+                          direction="row"
+                          alignItems="center"
+                          spacing={1.25}
+                          sx={{ minWidth: 0, flex: 1 }}
+                        >
+                          <Avatar sx={{ width: 34, height: 34, fontSize: 12, fontWeight: 800, bgcolor: alpha(color, 0.18), color, flexShrink: 0 }}>
+                            {initials}
+                          </Avatar>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Stack direction="row" spacing={0.75} alignItems="center">
+                              <Typography fontWeight={800} fontSize={14} noWrap title={a.reason || undefined}>
+                                {a.patient.firstName} {a.patient.lastName}
+                              </Typography>
+                              {tok > 0 && (
+                                <Chip
+                                  size="small"
+                                  label={`#${String(tok).padStart(3, '0')}`}
+                                  sx={{
+                                    height: 20,
+                                    fontWeight: 800,
+                                    fontFamily: 'ui-monospace, Consolas, monospace',
+                                    bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                    color: 'primary.dark',
+                                  }}
+                                />
+                              )}
+                            </Stack>
+                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                              <AccessTimeOutlinedIcon sx={{ fontSize: 13, color: 'text.disabled' }} />
+                              <Typography variant="caption" color="text.secondary" fontWeight={600} noWrap>
+                                {start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                {' – '}
+                                {end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                {' · '}
+                                {mins} min
+                              </Typography>
+                            </Stack>
+                          </Box>
+                          <Chip
+                            size="small"
+                            label={a.status.replace('_', ' ')}
+                            sx={{
+                              bgcolor: alpha(color, 0.14),
+                              color,
+                              fontWeight: 800,
+                              borderRadius: 99,
+                              fontSize: '0.68rem',
+                              textTransform: 'capitalize',
+                              flexShrink: 0,
+                            }}
+                          />
+                        </Stack>
+
+                        <Stack direction="row" alignItems="center" gap={0.5} flexShrink={0}>
+                          {!readOnly && onAppointmentClick && (
+                            <IconButton size="small" onClick={() => onAppointmentClick(a)}
+                              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 0.45 }}>
+                              <EditOutlinedIcon sx={{ fontSize: 15 }} />
+                            </IconButton>
+                          )}
+                          {onPatientHistoryClick && (
+                            <IconButton
+                              size="small"
+                              title="Patient History"
+                              loading={historyLoadingId === a.id}
+                              disabled={historyLoadingId === a.id}
+                              onClick={() => {
+                                void (async () => {
+                                  setHistoryLoadingId(a.id);
+                                  try {
+                                    await onPatientHistoryClick(a);
+                                  } finally {
+                                    setHistoryLoadingId(null);
+                                  }
+                                })();
+                              }}
+                              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 0.45 }}
+                            >
+                              <HistoryOutlinedIcon sx={{ fontSize: 15 }} />
+                            </IconButton>
+                          )}
+                          {onLabOrderClick && a.status !== 'CANCELLED' && a.status !== 'NO_SHOW' && (
+                            <IconButton
+                              size="small"
+                              title="Order lab"
+                              loading={labLoadingId === a.id}
+                              disabled={labLoadingId === a.id}
+                              onClick={() => {
+                                void (async () => {
+                                  setLabLoadingId(a.id);
+                                  try {
+                                    await onLabOrderClick(a);
+                                  } finally {
+                                    setLabLoadingId(null);
+                                  }
+                                })();
+                              }}
+                              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 0.45 }}
+                            >
+                              <BiotechOutlinedIcon sx={{ fontSize: 15 }} />
+                            </IconButton>
+                          )}
+                          {onPrescriptionClick && a.status === 'COMPLETED' && (
+                            <IconButton size="small" onClick={() => onPrescriptionClick(a)}
+                              sx={{ border: '1px solid', borderColor: 'success.main', borderRadius: 2, p: 0.45, color: 'success.main' }}>
+                              <MedicalServicesOutlinedIcon sx={{ fontSize: 15 }} />
+                            </IconButton>
+                          )}
+                          {!readOnly && next && !(hideCheckIn && next === 'CHECKED_IN') && (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              loading={statusPendingId === a.id}
+                              endIcon={next === 'COMPLETED' ? <CheckCircleOutlineIcon /> : <ArrowForwardIcon />}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                event.preventDefault();
+                                onStatusChange(a.id, next);
+                              }}
                               sx={{
-                                color: 'primary.main',
-                                fontFamily: 'monospace',
+                                fontSize: '0.72rem',
+                                py: 0.4,
+                                px: 1.2,
+                                borderRadius: 99,
                                 fontWeight: 800,
-                                ml: 0.75,
+                                textTransform: 'none',
+                                bgcolor: STATUS_COLOR[next],
+                                boxShadow: 'none',
+                                '&:hover': { bgcolor: STATUS_COLOR[next], filter: 'brightness(0.94)', boxShadow: 'none' },
                               }}
                             >
-                              #{String(tok).padStart(3, '0')}
-                            </Box>
+                              {next === 'CHECKED_IN' ? 'Check In' : 'Complete'}
+                            </Button>
                           )}
-                        </Typography>
-                        {a.reason && (
-                          <Typography variant="caption" color="text.secondary">{a.reason}</Typography>
-                        )}
-                      </Box>
-                      <Avatar sx={{ width: 26, height: 26, fontSize: 11, fontWeight: 700, bgcolor: alpha(color, 0.3), color, flexShrink: 0 }}>
-                        {initials}
-                      </Avatar>
-                    </Stack>
-                    <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 1 }}>
-                      <AccessTimeOutlinedIcon sx={{ fontSize: 13, color: 'text.disabled' }} />
-                      <Typography variant="caption" color="text.secondary">
-                        {start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        {' – '}
-                        {end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </Typography>
-                      <Box sx={{ flex: 1 }} />
-                      <Typography variant="caption" color="text.disabled">{mins} min</Typography>
-                    </Stack>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1.5 }}>
-                      <Chip size="small" label={a.status.replace('_', ' ')}
-                        sx={{ bgcolor: alpha(color, 0.15), color, fontWeight: 600, borderRadius: 1, fontSize: '0.65rem' }} />
-                      <Stack direction="row" gap={0.5}>
-                        {!readOnly && onAppointmentClick && (
-                          <IconButton size="small" onClick={() => onAppointmentClick(a)}
-                            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, p: 0.4 }}>
-                            <EditOutlinedIcon sx={{ fontSize: 14 }} />
-                          </IconButton>
-                        )}
-                        {onPatientHistoryClick && (
-                          <IconButton
-                            size="small"
-                            title="Patient History"
-                            loading={historyLoadingId === a.id}
-                            disabled={historyLoadingId === a.id}
-                            onClick={() => {
-                              void (async () => {
-                                setHistoryLoadingId(a.id);
-                                try {
-                                  await onPatientHistoryClick(a);
-                                } finally {
-                                  setHistoryLoadingId(null);
-                                }
-                              })();
-                            }}
-                            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, p: 0.4 }}
-                          >
-                            <HistoryOutlinedIcon sx={{ fontSize: 14 }} />
-                          </IconButton>
-                        )}
-                        {onPrescriptionClick && a.status === 'COMPLETED' && (
-                          <IconButton size="small" onClick={() => onPrescriptionClick(a)}
-                            sx={{ border: '1px solid', borderColor: 'success.main', borderRadius: 1.5, p: 0.4, color: 'success.main' }}>
-                            <MedicalServicesOutlinedIcon sx={{ fontSize: 14 }} />
-                          </IconButton>
-                        )}
-                        {!readOnly && next && !(hideCheckIn && next === 'CHECKED_IN') && (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            loading={statusPendingId === a.id}
-                            endIcon={next === 'COMPLETED' ? <CheckCircleOutlineIcon /> : <ArrowForwardIcon />}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              event.preventDefault();
-                              onStatusChange(a.id, next);
-                            }}
-                            sx={{
-                              fontSize: '0.7rem', py: 0.3, px: 1, borderRadius: 1.5,
-                              borderColor: STATUS_COLOR[next],
-                              color: STATUS_COLOR[next],
-                              '&:hover': { bgcolor: alpha(STATUS_COLOR[next], 0.1), borderColor: STATUS_COLOR[next] },
-                            }}
-                          >
-                            {next === 'CHECKED_IN' ? 'Check In' : 'Complete'}
-                          </Button>
-                        )}
+                        </Stack>
                       </Stack>
-                    </Stack>
+                    </Paper>
                   </Box>
-                </Box>
-              );
-            })}
-          </Stack>
-        )}
-      </Box>
-      </>
-      )}
+                );
+              })}
+            </Stack>
+          )}
+        </Box>
+
+        <Box
+          sx={{
+            px: 2.5,
+            py: 1.75,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 1,
+            flexShrink: 0,
+            bgcolor: 'background.paper',
+          }}
+        >
+          <Button
+            onClick={() => setDayListOpen(false)}
+            sx={{ borderRadius: 99, fontWeight: 700, textTransform: 'none', px: 2 }}
+          >
+            Close
+          </Button>
+          {onDateClick && (
+            <Button
+              variant="contained"
+              startIcon={<AddOutlinedIcon />}
+              onClick={() => {
+                setDayListOpen(false);
+                onDateClick(selected.toLocaleDateString('en-CA'));
+              }}
+              sx={{ borderRadius: 99, fontWeight: 800, textTransform: 'none', px: 2.25, boxShadow: 'none' }}
+            >
+              New appointment
+            </Button>
+          )}
+        </Box>
+      </Dialog>
     </Paper>
   );
 }

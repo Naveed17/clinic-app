@@ -8,7 +8,6 @@ import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   Dialog,
@@ -39,6 +38,7 @@ import {
   dialogFormSx, dialogPaperProps,
 } from '@/components/DialogUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
+import { DoctorAvatar, DoctorAvatarPicker } from '@/components/DoctorAvatar';
 
 const baseSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.'),
@@ -102,6 +102,7 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
   });
 
   const [showPw, setShowPw] = useState(false);
+  const [avatar, setAvatar] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
@@ -111,6 +112,7 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
         experienceYears: values.experienceYears,
         phone: values.phone || undefined,
         bio: values.bio || undefined,
+        avatar,
       };
       if (doctor) {
         const input: DoctorUpdateInput = {
@@ -137,7 +139,11 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
   };
 
   useEffect(() => {
-    if (open) { form.reset(toFormValues(doctor)); setShowPw(false); }
+    if (open) {
+      form.reset(toFormValues(doctor));
+      setShowPw(false);
+      setAvatar(doctor?.doctorProfile?.avatar ?? null);
+    }
   }, [form, open, doctor]);
 
   const { errors } = form.formState;
@@ -178,6 +184,7 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
 
             <Divider />
             <Typography variant="subtitle2" color="text.secondary">Doctor Profile</Typography>
+            <DoctorAvatarPicker value={avatar} onChange={setAvatar} />
 
             <TextField fullWidth label="Specialization" error={Boolean(errors.specialization)} helperText={errors.specialization?.message} {...form.register('specialization')} />
             <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
@@ -271,12 +278,11 @@ export function DoctorsPage(): React.JSX.Element {
             <TableRow><TableCell colSpan={6} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No doctors found.</TableCell></TableRow>
           ) : (
             doctors.map((doc: Doctor) => {
-              const initials = `${doc.firstName[0]}${doc.lastName[0]}`.toUpperCase();
               return (
                 <TableRow key={doc.id} sx={tableSx.row}>
                   <TableCell>
                     <Stack direction="row" alignItems="center" spacing={1.5}>
-                      <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: 12, fontWeight: 700 }}>{initials}</Avatar>
+                      <DoctorAvatar src={doc.doctorProfile?.avatar} name={`Dr. ${doc.firstName} ${doc.lastName}`} size={32} />
                       <Box>
                         <Typography fontSize={13.5} fontWeight={600}>Dr. {doc.firstName} {doc.lastName}</Typography>
                         <Typography variant="caption" color="text.secondary">{doc.email}</Typography>

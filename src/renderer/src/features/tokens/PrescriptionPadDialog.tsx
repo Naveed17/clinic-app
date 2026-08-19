@@ -36,7 +36,7 @@ import {
   doctorPadLines,
   type PrescriptionPadClinic,
 } from './PrescriptionPadPdf';
-import careflowLogo from '@/assets/careflow-logo.png';
+import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 
 function escapeHtml(value: string): string {
   return value
@@ -141,6 +141,7 @@ interface PrescriptionPadDialogProps {
 export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogProps): React.JSX.Element {
   const { user } = useAuth();
   const { can } = useLicense();
+  const brandLogo = useClinicBrandLogo();
   const [clinic, setClinic] = useState<PrescriptionPadClinic>({
     clinicName: '',
     clinicAddress: '',
@@ -473,8 +474,8 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
               </Box>
               <Box
                 component="img"
-                src={careflowLogo}
-                alt="CareFlow"
+                src={brandLogo}
+                alt="Clinic"
                 sx={{ width: 56, height: 56, objectFit: 'contain', display: 'block', pt: 0.5 }}
               />
             </Box>
@@ -564,7 +565,7 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
             <Box sx={{ position: 'relative', flex: 1, px: 5, pt: 1, pb: 2, minHeight: 380 }}>
               <Box
                 component="img"
-                src={careflowLogo}
+                src={brandLogo}
                 alt=""
                 sx={{
                   position: 'absolute',
@@ -679,6 +680,7 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
           dateStr={dateStr}
           diagnosis={diagnosis}
           bodyText={bodyTextForPdf}
+          logoSrc={brandLogo}
         />
       )}
     </>

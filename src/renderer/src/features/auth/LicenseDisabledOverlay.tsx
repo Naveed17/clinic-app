@@ -3,8 +3,8 @@ import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
 import { Box, Button, CircularProgress, Link, Paper, Stack, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useEffect, useState } from 'react';
-import careflowLogo from '@/assets/careflow-logo.png';
 import { CAREFLOW_BRAND, supportTelHref, supportWhatsAppHref } from '@shared/careflowSupport';
+import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 
 export function LicenseDisabledOverlay({
   reason,
@@ -16,6 +16,7 @@ export function LicenseDisabledOverlay({
   onCheck: () => void;
 }): React.JSX.Element {
   const theme = useTheme();
+  const brandLogo = useClinicBrandLogo();
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
 
@@ -74,7 +75,7 @@ export function LicenseDisabledOverlay({
           >
             <Box
               component="img"
-              src={careflowLogo}
+              src={brandLogo}
               alt={CAREFLOW_BRAND}
               sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
             />

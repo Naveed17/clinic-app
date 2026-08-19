@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Server as SocketIOServer } from 'socket.io';
-import { emitDataChange } from '../realtime';
+import { emitDataChange, emitNotification } from '../realtime';
 import { requireRole } from '../middleware/auth';
 import {
   createLabOrder,
@@ -31,6 +31,17 @@ export function createLabRouter(io: SocketIOServer): Router {
   router.post('/', labReaders, async (req, res) => {
     const order = await createLabOrder(req.body);
     emitDataChange(io, 'lab', 'created');
+    emitNotification(io, {
+      kind: 'success',
+      title: 'New lab order',
+      message: `${order.test} — ${order.patientName} · ${order.orderedByName}`,
+      payload: {
+        entity: 'lab',
+        id: order.id,
+        patientId: order.patientId,
+        orderedById: order.orderedById,
+      },
+    });
     res.status(201).json(order);
   });
 
@@ -43,6 +54,16 @@ export function createLabRouter(io: SocketIOServer): Router {
   router.patch('/:id/result', labStaff, async (req, res) => {
     const order = await saveLabResult(String(req.params.id), req.body.result);
     emitDataChange(io, 'lab', 'updated');
+    emitNotification(io, {
+      kind: 'success',
+      title: 'Lab result ready',
+      message: `${order.test} — ${order.patientName}`,
+      payload: {
+        entity: 'lab',
+        id: order.id,
+        orderedById: order.orderedById,
+      },
+    });
     res.json(order);
   });
 

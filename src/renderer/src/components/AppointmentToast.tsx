@@ -1,4 +1,4 @@
-import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
+import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
@@ -36,6 +36,7 @@ function ToastIcon({ entity, kind }: { entity?: string; kind: RealtimeNotificati
   if (entity === 'patient')      return <PersonOutlinedIcon sx={sx} />;
   if (entity === 'token')        return <ConfirmationNumberOutlinedIcon sx={sx} />;
   if (entity === 'prescription') return <MedicalServicesOutlinedIcon sx={sx} />;
+  if (entity === 'lab')          return <BiotechOutlinedIcon sx={sx} />;
   if (kind === 'success')       return <CheckCircleOutlineIcon sx={sx} />;
   if (kind === 'warning')       return <WarningAmberOutlinedIcon sx={sx} />;
   if (kind === 'error')         return <ErrorOutlineIcon sx={sx} />;
@@ -75,7 +76,10 @@ function shouldShowNotification(
     const providerId = n.payload?.providerId as string | undefined;
     return !providerId || providerId === userId;
   }
-  // Hide pharmacy/invoice noise on doctor PC
+  if (entity === 'lab') {
+    const orderedById = n.payload?.orderedById as string | undefined;
+    return !orderedById || orderedById === userId;
+  }
   if (entity === 'invoice' || entity === 'medicine' || entity === 'inventory-batch') return false;
   return true;
 }

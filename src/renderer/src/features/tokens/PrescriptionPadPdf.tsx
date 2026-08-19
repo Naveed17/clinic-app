@@ -16,7 +16,7 @@ import { Alert, Box, Button, Dialog, DialogContent, Typography } from '@mui/mate
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import { useMemo, useState } from 'react';
-import careflowLogo from '@/assets/careflow-logo.png';
+import { DEFAULT_CLINIC_LOGO } from '@/utils/clinicBrandLogo';
 import { printReactPdfDocument } from '@/utils/printPdf';
 import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
 
@@ -288,6 +288,7 @@ export interface PrescriptionPadPdfProps {
   dateStr: string;
   diagnosis?: string;
   bodyText: string;
+  logoSrc?: string;
 }
 
 export type PadInline = { text: string; bold?: boolean };
@@ -514,6 +515,7 @@ export function PrescriptionPadDocument({
   dateStr,
   diagnosis = '',
   bodyText,
+  logoSrc = DEFAULT_CLINIC_LOGO,
 }: PrescriptionPadPdfProps): React.JSX.Element {
   const brand = clinic.clinicName?.trim() || 'HOSPITAL';
 
@@ -528,7 +530,7 @@ export function PrescriptionPadDocument({
               {specialization ? <Text style={styles.specialization}>{specialization}</Text> : null}
               {certification ? <Text style={styles.certification}>{certification}</Text> : null}
             </View>
-            <Image src={careflowLogo} style={styles.headerLogo} />
+            <Image src={logoSrc} style={styles.headerLogo} />
           </View>
 
           <FieldLine label="Patient Name:" value={patientName} />
@@ -549,7 +551,7 @@ export function PrescriptionPadDocument({
 
           <View style={styles.body}>
             <View style={styles.watermarkWrap}>
-              <Image src={careflowLogo} style={styles.watermarkLogo} />
+              <Image src={logoSrc} style={styles.watermarkLogo} />
             </View>
             <Text style={styles.rx}>Rx</Text>
             <PadBodyContent html={bodyText || ''} />
@@ -607,6 +609,7 @@ export function PrescriptionPadPdfPreview({
     docProps.doctorName,
     docProps.qualification,
     docProps.specialization,
+    docProps.logoSrc ?? '',
   ].join('|');
 
   const pdfDocument = useMemo(

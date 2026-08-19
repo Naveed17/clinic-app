@@ -200,6 +200,33 @@ function isLocallyExpired(key: string): boolean {
   return new Date() > new Date(cache.expiresAt);
 }
 
+function clearLocalLicense(): void {
+  for (const file of [getLicenseFilePath(), getModulesCacheFilePath(), getLicenseCacheFilePath()]) {
+    try {
+      if (existsSync(file)) unlinkSync(file);
+    } catch { /* ignore */ }
+  }
+}
+
+/** Backend deleted the key (as opposed to merely disabling it). */
+function isLicenseMissingOnServer(
+  data: { valid?: boolean; error?: string; code?: string; message?: string },
+  httpStatus: number,
+): boolean {
+  const code = String(data.code || '').trim().toLowerCase();
+  if (code === 'not_found' || code === 'missing') return true;
+  if (httpStatus === 404) return true;
+  const err = String(data.error || data.message || '').trim().toLowerCase();
+  if (!err) return false;
+  if (err.includes('has been disabled')) return false;
+  if (err.includes('not found') || err.includes('does not exist') || err.includes('no such license')) {
+    return true;
+  }
+  // Current / previous validate payload when the key row was deleted
+  if (err === 'license invalid or disabled.') return true;
+  return false;
+}
+
 type LicenseApiExtras = {
   databaseMode?: DatabaseMode;
   clinicalApiUrl?: string | null;
@@ -253,6 +280,9 @@ function normalizeModulesPayload(modules?: Record<string, boolean> | null): Reco
   for (const key of KNOWN_MODULE_KEYS) {
     out[key] = modules?.[key] === true;
   }
+  out.pharmacy = false;
+  out.billing = true;
+  out.manageMedicines = true;
   return out;
 }
 
@@ -300,10 +330,16 @@ export async function getLicenseGate(): Promise<LicenseGate> {
       ok: boolean;
       valid: boolean;
       error?: string;
+      code?: string;
+      message?: string;
       expiresAt?: string | null;
     } & LicenseApiExtras;
+    if (isLicenseMissingOnServer(data, response.status)) {
+      clearLocalLicense();
+      return { state: 'none' };
+    }
     if (!data.valid) {
-      const reason = String(data.error || '').trim() || DISABLED_FALLBACK;
+      const reason = String(data.error || data.message || '').trim() || DISABLED_FALLBACK;
       rememberGate(savedKey, 'blocked', reason);
       return { state: 'blocked', reason };
     }

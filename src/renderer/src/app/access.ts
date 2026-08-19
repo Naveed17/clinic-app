@@ -15,8 +15,7 @@ export type AppRoute =
   | '/users'
   | '/doctors'
   | '/schedule'
-  | '/settings'
-  | '/pharmacy';
+  | '/settings';
 
 /** Which roles can access each route */
 export const ROUTE_ACCESS: Record<AppRoute, UserRole[]> = {
@@ -26,32 +25,29 @@ export const ROUTE_ACCESS: Record<AppRoute, UserRole[]> = {
   '/appointments': ['admin', 'doctor', 'receptionist'],
   '/tokens':       ['admin', 'receptionist'],
   '/waiting-room': ['doctor'],
-  '/billing':      ['admin', 'receptionist', 'pharmacist'],
+  '/billing':      ['admin', 'receptionist'],
   '/lab':          ['admin', 'lab_technician'],
   '/statistics':   ['admin'],
   '/users':        ['admin'],
   '/doctors':      ['admin'],
   '/schedule':     ['admin'],
   '/settings':     ['admin', 'doctor', 'receptionist', 'lab_technician', 'pharmacist'],
-  '/pharmacy':     ['pharmacist'],
 };
 
 /**
  * Which module key gates each route.
  * Routes not listed here are always accessible (no module gate).
- * Users list is core (admin can always add Receptionist). manageUsers only
- * gates extra admins + delete on the Users page itself.
+ * `/waiting-room` is core doctor queue (not the Token System add-on).
+ * `/tokens` (reception desk) stays gated by `tokens`.
  */
 export const ROUTE_MODULE: Partial<Record<AppRoute, keyof LicenseModules>> = {
   '/billing':    'billing',
   '/lab':        'labDashboard',
   '/statistics': 'statistics',
   '/tokens':     'tokens',
-  '/waiting-room': 'tokens',
   '/doctors':    'manageDoctors',
   '/schedule':   'manageDoctors',
   '/patients/:id': 'managePatients',
-  '/pharmacy':   'pharmacy',
 };
 
 /** First route a role lands on after login */
@@ -78,13 +74,9 @@ export function isLicensed(
 export function isModuleEnabled(
   modules: LicenseModules | undefined,
   route: AppRoute,
-  role?: UserRole,
+  _role?: UserRole,
 ): boolean {
   if (!modules) return true;
-  // Pharmacist billing is part of the pharmacy chain (meds + doctor fee invoice).
-  if (route === '/billing' && role === 'pharmacist') {
-    return isLicensed(modules, 'pharmacy') || isLicensed(modules, 'billing');
-  }
   const key = ROUTE_MODULE[route];
   if (!key) return true;
   return isLicensed(modules, key);

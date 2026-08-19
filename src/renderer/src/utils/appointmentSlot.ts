@@ -20,6 +20,14 @@ export function localDateStr(d: Date): string {
   return d.toLocaleDateString('en-CA');
 }
 
+/** Today → now. Future date → start of that day so hours (e.g. 09:00) still apply. */
+export function slotSearchFrom(defaultDate?: string): Date {
+  const now = new Date();
+  if (!defaultDate) return now;
+  if (defaultDate <= localDateStr(now)) return now;
+  return new Date(`${defaultDate}T00:00:00`);
+}
+
 function atLocal(dateStr: string, hm: string): Date {
   return new Date(`${dateStr}T${hm}:00`);
 }
@@ -80,6 +88,12 @@ function findTimeOnDay(opts: {
   const stepMs = STEP_MIN * 60_000;
 
   let cursor = windowStart.getTime() > earliest.getTime() ? windowStart : earliest;
+  // If we started after clinic open (e.g. booking at 11:41), jump to the next 30-min step
+  // instead of filling leftover morning slots like 09:00 / 09:30.
+  if (cursor.getTime() > windowStart.getTime()) {
+    const snapped = Math.ceil(cursor.getTime() / stepMs) * stepMs;
+    cursor = new Date(snapped);
+  }
 
   while (cursor.getTime() + durMs <= windowEnd.getTime()) {
     const start = cursor;

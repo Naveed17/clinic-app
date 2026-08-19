@@ -57,15 +57,6 @@ enum TokenStatus {
   SKIPPED
 }
 
-enum MovementType {
-  PURCHASE
-  RETURN
-  ADJUSTMENT
-  EXPIRED
-  DAMAGE
-  DISPENSE
-}
-
 // ==========================================
 // USER & DOCTOR MANAGEMENT
 // ==========================================
@@ -100,6 +91,7 @@ model DoctorProfile {
   experienceYears Int      @default(0)
   phone           String?
   bio             String?
+  avatar          String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -344,30 +336,8 @@ model LabReport {
 }
 
 // ==========================================
-// PHARMACY INVENTORY & STOCK MODULE
+// MEDICINE CATALOG (invoice / Rx picker)
 // ==========================================
-
-model Supplier {
-  id          String   @id @default(uuid())
-  name        String
-  companyName String?
-  phone       String?
-  email       String?
-  address     String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  purchases PurchaseOrder[]
-
-  @@index([name])
-}
-
-model MedicineCategory {
-  id          String     @id @default(uuid())
-  name        String     @unique
-  description String?
-  medicines   Medicine[]
-}
 
 model Medicine {
   id            String   @id @default(uuid())
@@ -375,13 +345,12 @@ model Medicine {
   genericName   String?
   categoryId    String?
   barcode       String?  @unique
-  unit          String   @default("Tablet") // Strip, Bottle, Box, Tablet, Syrup
+  unit          String   @default("Tablet")
   rackNumber    String?
   minStockAlert Int      @default(10)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  category MedicineCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   batches  MedicineBatch[]
 
   @@index([name])
@@ -400,56 +369,9 @@ model MedicineBatch {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  medicine      Medicine            @relation(fields: [medicineId], references: [id], onDelete: Cascade)
-  purchaseItems PurchaseOrderItem[]
-  movements     StockMovement[]
+  medicine      Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
 
   @@unique([medicineId, batchNumber])
   @@index([expiryDate])
   @@index([quantity])
-}
-
-model PurchaseOrder {
-  id            String   @id @default(uuid())
-  invoiceNumber String   @unique
-  supplierId    String
-  totalAmount   Decimal  @default(0)
-  purchaseDate  DateTime @default(now())
-  notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  supplier Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  items    PurchaseOrderItem[]
-
-  @@index([supplierId])
-}
-
-model PurchaseOrderItem {
-  id         String  @id @default(uuid())
-  purchaseId String
-  batchId    String
-  quantity   Int
-  unitPrice  Decimal @default(0)
-  lineTotal  Decimal @default(0)
-
-  purchase PurchaseOrder @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  batch    MedicineBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
-
-  @@index([purchaseId])
-  @@index([batchId])
-}
-
-model StockMovement {
-  id        String       @id @default(uuid())
-  batchId   String
-  type      MovementType
-  quantity  Int // Positive for Addition, Negative for Deduction/Adjustment
-  reference String? // e.g., Purchase Ref, Expiry Reason, Manual Adjustment
-  createdAt DateTime     @default(now())
-
-  batch MedicineBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-
-  @@index([batchId])
-  @@index([type])
 }

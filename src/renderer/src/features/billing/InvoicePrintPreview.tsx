@@ -26,7 +26,7 @@ import bwipjs from 'bwip-js';
 import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
 import { printInvoiceReceipt } from '@/utils/printInvoiceReceipt';
 import { POS_PAPER, POS_RECEIPT } from '@shared/invoicePaper';
-import careflowLogo from '@/assets/careflow-logo.png';
+import { DEFAULT_CLINIC_LOGO, useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 
 function generateBarcode(text: string): string | null {
   try {
@@ -93,12 +93,14 @@ function ReceiptDocument({
   clinicAddress,
   clinicPhone,
   barcodeSrc,
+  logoSrc = DEFAULT_CLINIC_LOGO,
 }: {
   invoice: Invoice;
   clinicName: string;
   clinicAddress: string;
   clinicPhone: string;
   barcodeSrc: string | null;
+  logoSrc?: string;
 }) {
   // Doctor fee is included in the invoice total but is not stored as a separate
   // database column. Derive it from the medicines subtotal, discount, and total.
@@ -110,7 +112,7 @@ function ReceiptDocument({
   return (
     <Document>
       <Page size={[POS_PAPER.pdfPageWidth, POS_PAPER.pdfPageHeightInvoice]} style={styles.page} wrap={false}>
-        <Image src={careflowLogo} style={styles.logo} />
+        <Image src={logoSrc} style={styles.logo} />
         <Text style={styles.shopName}>{clinicName || POS_RECEIPT.clinicFallback}</Text>
         {clinicAddress ? <Text style={styles.shopSub}>{clinicAddress}</Text> : null}
         {clinicPhone ? <Text style={styles.shopSub}>Tel: {clinicPhone}</Text> : null}
@@ -227,6 +229,7 @@ export function InvoicePrintPreview({
   /** After create: open preview and start the system print dialog */
   autoPrint?: boolean;
 }): React.JSX.Element {
+  const brandLogo = useClinicBrandLogo();
   const [clinic, setClinic] = useState<{
     clinicName: string;
     clinicAddress: string;
@@ -257,6 +260,7 @@ export function InvoicePrintPreview({
     invoice.total,
     clinic?.clinicName ?? '',
     barcodeSrc ? '1' : '0',
+    brandLogo,
   ].join('|');
 
   const pdfDocument = useMemo(() => {
@@ -265,10 +269,11 @@ export function InvoicePrintPreview({
       <ReceiptDocument
         invoice={invoice}
         barcodeSrc={barcodeSrc}
+        logoSrc={brandLogo}
         {...clinic}
       />
     );
-  }, [clinic, invoice, barcodeSrc]);
+  }, [clinic, invoice, barcodeSrc, brandLogo]);
 
   async function handlePrint(): Promise<void> {
     setPrinting(true);

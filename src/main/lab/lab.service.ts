@@ -9,7 +9,17 @@ export interface LabOrderInput {
 }
 
 const include = {
-  patient: { select: { id: true, firstName: true, lastName: true } },
+  patient: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      mrNumber: true,
+      dateOfBirth: true,
+      phone: true,
+      bloodGroup: true,
+    },
+  },
   orderedBy: { select: { id: true, firstName: true, lastName: true } },
   token: { select: { id: true, tokenNumber: true } },
 } as const;
@@ -26,7 +36,15 @@ type LabOrderWithRelations = {
   orderedAt: Date;
   createdAt: Date;
   updatedAt: Date;
-  patient: { id: string; firstName: string; lastName: string };
+  patient: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    mrNumber: string;
+    dateOfBirth: Date | null;
+    phone: string | null;
+    bloodGroup: string | null;
+  };
   orderedBy: { id: string; firstName: string; lastName: string };
   token: { id: string; tokenNumber: number } | null;
 };
@@ -37,6 +55,10 @@ function serialize(order: LabOrderWithRelations) {
     tokenNumber: order.token?.tokenNumber ?? null,
     patientName: `${order.patient.firstName} ${order.patient.lastName}`,
     orderedByName: `${order.orderedBy.firstName} ${order.orderedBy.lastName}`,
+    patientMrNumber: order.patient.mrNumber,
+    patientDob: order.patient.dateOfBirth,
+    patientPhone: order.patient.phone,
+    patientBloodGroup: order.patient.bloodGroup,
   };
 }
 

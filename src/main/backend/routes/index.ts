@@ -10,7 +10,6 @@ import { createInvoicesRouter } from './invoices.routes';
 import { createPatientsRouter } from './patients.routes';
 import { createReportsRouter } from './reports.routes';
 import { createScheduleRouter } from './schedule.routes';
-import { createInventoryRouter } from './inventory.routes';
 import { createSearchRouter } from './search.routes';
 import { createMedicinesRouter } from './medicines.routes';
 
@@ -25,7 +24,6 @@ export function registerRoutes(app: Express, io: SocketIOServer): void {
   app.use('/api/reports', createReportsRouter());
   app.use('/api/doctors', createDoctorsRouter(io));
   app.use('/api/schedule', createScheduleRouter());
-  app.use('/api/inventory', createInventoryRouter(io));
   app.use('/api/search', createSearchRouter());
   app.use('/api/medicines', createMedicinesRouter());
 }

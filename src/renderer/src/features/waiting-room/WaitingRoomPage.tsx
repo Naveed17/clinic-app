@@ -28,6 +28,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { PatientHistoryDialog } from '@/features/patients/PatientHistoryDialog';
 import { PrescriptionPadDialog } from '@/features/tokens/PrescriptionPadDialog';
+import { OrderLabDialog } from '@/features/lab/OrderLabDialog';
 import { appointmentsService } from '@/services/appointments.service';
 import type { Appointment } from '@/types/appointment';
 import type { Patient } from '@/types/patient';
@@ -103,12 +104,14 @@ export function WaitingRoomPage(): React.JSX.Element {
   const { user } = useAuth();
   const { can } = useLicense();
   const canViewPatientHistory = can('managePatients');
+  const canOrderLab = can('labDashboard');
   const qc = useQueryClient();
   const theme = useTheme();
   const date = todayStr();
 
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [prescriptionToken, setPrescriptionToken] = useState<Token | null>(null);
+  const [labOrderToken, setLabOrderToken] = useState<Token | null>(null);
   const [historyPatient, setHistoryPatient] = useState<Patient | undefined>();
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
   const [offDayOpen, setOffDayOpen] = useState(false);
@@ -430,6 +433,15 @@ export function WaitingRoomPage(): React.JSX.Element {
                     >
                       Write Rx
                     </Button>
+                    {canOrderLab && visitStarted && (
+                      <Button
+                        variant="outlined"
+                        onClick={() => setLabOrderToken(currentToken)}
+                        sx={heroOutlineSx}
+                      >
+                        Order lab
+                      </Button>
+                    )}
                     <Button
                       variant="outlined"
                       loading={skipMutation.isPending}
@@ -737,6 +749,16 @@ export function WaitingRoomPage(): React.JSX.Element {
 
       {prescriptionToken && (
         <PrescriptionPadDialog token={prescriptionToken} onClose={() => setPrescriptionToken(null)} />
+      )}
+      {labOrderToken && user && (
+        <OrderLabDialog
+          open
+          patientId={labOrderToken.patientId}
+          patientName={`${labOrderToken.patient.firstName} ${labOrderToken.patient.lastName}`}
+          orderedById={user.id}
+          tokenId={labOrderToken.id}
+          onClose={() => setLabOrderToken(null)}
+        />
       )}
       {historyPatient && (
         <PatientHistoryDialog patient={historyPatient} onClose={() => setHistoryPatient(undefined)} />

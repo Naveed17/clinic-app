@@ -241,7 +241,6 @@ export function InvoiceDialog({
       } as InvoiceInput),
     onSuccess: async (invoice) => {
       await client.invalidateQueries({ queryKey: ['invoices'] });
-      await client.invalidateQueries({ queryKey: ['pharmacy-queue'] });
       onClose();
       onCreated?.(invoice as Invoice);
     },
@@ -423,7 +422,7 @@ export function InvoicesPage(): React.JSX.Element {
                       <Box>
                         <Typography fontSize={13.5} fontWeight={600}>{personLabel(invoice.patient)}</Typography>
                         <Typography fontSize={11.5} color="text.secondary">
-                          {invoice.invoiceNumber} · {new Date(invoice.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {invoice.patient.phone?.trim() || '—'}
                         </Typography>
                       </Box>
                     </Box>

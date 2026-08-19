@@ -16,7 +16,6 @@ import { LoginPage } from '@/features/auth/LoginPage';
 import { TokensPage } from '@/features/tokens/TokensPage';
 import { WaitingRoomPage } from '@/features/waiting-room/WaitingRoomPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
-import { PharmacyPage } from '@/features/pharmacy/PharmacyPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { RouteAccessGate } from '@/components/RouteAccessGate';
 import { LicensePage } from '@/features/auth/LicensePage';
@@ -147,14 +146,6 @@ const router = createHashRouter([
               </RouteAccessGate>
             ),
           },
-          {
-            path: '/pharmacy',
-            element: (
-              <RouteAccessGate route="/pharmacy">
-                <PharmacyPage />
-              </RouteAccessGate>
-            ),
-          },
         ],
       },
     ],
@@ -190,10 +181,11 @@ export function AppRouter(): React.JSX.Element {
   }, [refreshGate]);
 
   useEffect(() => {
-    if (gate?.state !== 'blocked') return;
+    if (gate?.state !== 'blocked' && gate?.state !== 'ok') return;
+    const ms = gate.state === 'blocked' ? 12_000 : 30_000;
     const id = window.setInterval(() => {
       void refreshGate({ silent: true });
-    }, 12_000);
+    }, ms);
     return () => window.clearInterval(id);
   }, [gate?.state, refreshGate]);
 

@@ -35,7 +35,7 @@ import { alpha, darken, useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useEffect, useState, useRef } from 'react';
 import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
-import careflowLogo from '@/assets/careflow-logo.png';
+import { DEFAULT_CLINIC_LOGO, useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 import type { Token, TokenInput, TokenPerson, TokenStatus, PrescriptionInput, PrescriptionMedicine } from '@/types/token';
 import { useAuth } from '@/features/auth/AuthContext';
 import { FetchingBar, ListCardsSkeleton, StatCardsSkeleton } from '@/components/LoadingUI';
@@ -229,15 +229,15 @@ const ts = StyleSheet.create({
   brand: { fontSize: 8, color: '#000', textAlign: 'center', marginTop: 8, fontWeight: 'bold', letterSpacing: 0.5 },
 });
 
-export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone }: {
-  token: Token; clinicName: string; clinicAddress: string; clinicPhone: string;
+export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone, logoSrc = DEFAULT_CLINIC_LOGO }: {
+  token: Token; clinicName: string; clinicAddress: string; clinicPhone: string; logoSrc?: string;
 }) {
   const date = new Date(token.createdAt).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
   const time = new Date(token.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return (
     <Document>
       <Page size={[POS_PAPER.pdfPageWidth, POS_PAPER.pdfPageHeightToken]} style={ts.page} wrap={false}>
-        <Image src={careflowLogo} style={ts.logo} />
+        <Image src={logoSrc} style={ts.logo} />
         <Text style={ts.shopName}>{clinicName || POS_RECEIPT.clinicFallback}</Text>
         {clinicAddress ? <Text style={ts.shopSub}>{clinicAddress}</Text> : null}
         {clinicPhone ? <Text style={ts.shopSub}>Tel: {clinicPhone}</Text> : null}
@@ -417,6 +417,7 @@ export function TokenPrintPreview({
   /** Walk-in: open preview and silently print to the POS printer */
   autoPrint?: boolean;
 }) {
+  const brandLogo = useClinicBrandLogo();
   const [clinic, setClinic] = useState<{ clinicName: string; clinicAddress: string; clinicPhone: string } | null>(null);
   const [freshToken, setFreshToken] = useState<Token>(token);
   const [printing, setPrinting] = useState(false);
@@ -441,12 +442,13 @@ export function TokenPrintPreview({
     clinic?.clinicName ?? '',
     clinic?.clinicAddress ?? '',
     clinic?.clinicPhone ?? '',
+    brandLogo,
   ].join('|');
 
   const pdfDocument = useMemo(() => {
     if (!clinic) return null;
-    return <TokenSlipDocument token={freshToken} {...clinic} />;
-  }, [clinic, freshToken]);
+    return <TokenSlipDocument token={freshToken} logoSrc={brandLogo} {...clinic} />;
+  }, [clinic, freshToken, brandLogo]);
 
   async function handlePrint(): Promise<void> {
     setPrinting(true);

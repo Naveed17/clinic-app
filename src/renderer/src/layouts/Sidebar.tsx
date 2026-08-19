@@ -11,7 +11,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getNavItems } from './navigation';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
-import careflowLogo from '@/assets/careflow-logo.png';
+import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 
 export const drawerWidth = 60;
 
@@ -26,6 +26,7 @@ function SidebarContents(): React.JSX.Element {
   const theme = useTheme();
   const { user, logout } = useAuth();
   const modules = useLicenseModules();
+  const brandLogo = useClinicBrandLogo();
   const navItems = user ? getNavItems(user.role, modules) : [];
 
   const navBtnSx = (active: boolean) => ({
@@ -73,8 +74,8 @@ function SidebarContents(): React.JSX.Element {
       >
         <Box
           component="img"
-          src={careflowLogo}
-          alt="CareFlow"
+          src={brandLogo}
+          alt="Clinic"
           sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
         />
       </Box>

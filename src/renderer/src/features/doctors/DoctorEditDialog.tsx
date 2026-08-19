@@ -11,6 +11,7 @@ import {
   dialogFormSx, dialogPaperProps,
 } from '@/components/DialogUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
+import { DoctorAvatarPicker } from '@/components/DoctorAvatar';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -57,6 +58,7 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
     queryFn: () => window.clinic.doctors.getOne(doctorId),
     enabled: open && Boolean(doctorId),
   });
+  const [avatar, setAvatar] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(editSchema) as import('react-hook-form').Resolver<FormValues>,
@@ -64,7 +66,7 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
   });
 
   useEffect(() => {
-    if (open && doctor) { form.reset(toFormValues(doctor)); setShowPw(false); }
+    if (open && doctor) { form.reset(toFormValues(doctor)); setShowPw(false); setAvatar(doctor.doctorProfile?.avatar ?? null); }
   }, [open, doctor, form]);
 
   const mutation = useMutation({
@@ -77,6 +79,7 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
         experienceYears: values.experienceYears,
         phone: values.phone || undefined,
         bio: values.bio || undefined,
+        avatar,
         ...(values.password ? { password: values.password } : {}),
       };
       return doctorsService.update(doctorId, input);
@@ -132,6 +135,7 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
             </Box>
             <Divider />
             <Typography variant="subtitle2" color="text.secondary">Doctor Profile</Typography>
+            <DoctorAvatarPicker value={avatar} onChange={setAvatar} />
             <TextField fullWidth label="Specialization" error={Boolean(errors.specialization)} helperText={errors.specialization?.message} {...form.register('specialization')} />
             <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
               <TextField fullWidth label="Qualification (e.g. MBBS, MD)" {...form.register('qualification')} />

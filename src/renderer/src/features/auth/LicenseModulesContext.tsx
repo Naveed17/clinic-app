@@ -68,6 +68,9 @@ export function normalizeLicenseModules(
   for (const key of MODULE_KEYS) {
     next[key] = data[key] === true;
   }
+  next.pharmacy = false;
+  next.billing = true;
+  next.manageMedicines = true;
   return next;
 }
 

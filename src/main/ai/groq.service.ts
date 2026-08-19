@@ -9,6 +9,19 @@ export type SuggestPrescriptionInput = {
   patientName?: string;
 };
 
+export type InterpretLabInput = {
+  testName: string;
+  specimen?: string;
+  patientAge?: string;
+  rows: Array<{
+    name: string;
+    value: string;
+    unit: string;
+    range: string;
+    flag: string;
+  }>;
+};
+
 export type SummarizePatientInput = {
   patientName?: string;
   visits: Array<{ date?: string; diagnosis?: string; advice?: string }>;
@@ -216,4 +229,40 @@ Mark uncertainty; do not invent labs or diagnoses not in the data.`;
   });
   if (!result.ok) return result;
   return { ok: true, summary: stripCodeFences(result.text) };
+}
+
+export async function interpretLabReport(
+  input: InterpretLabInput,
+  onDelta?: (chunk: string) => void,
+): Promise<{ ok: true; html: string } | { ok: false; error: string }> {
+  const system = `You are a clinical pathologist assistant drafting a laboratory report impression for a clinician in Pakistan.
+Return ONLY simple HTML using <p>, <ul>, <ol>, <li>, <strong> — no markdown fences, no scripts, no tables, no headings.
+Write a professional Pathologist Impression / Summary:
+- Lead with a one-sentence overall impression.
+- Name which values are high or low versus the supplied reference range; do not invent numbers.
+- Suggest clinical correlation (e.g. repeat, clinical context) without prescribing treatment as a final order.
+- If most values are within range, say so clearly.
+- This is a DRAFT for the pathologist to edit and sign — never claim it is a signed report.
+- Do not include patient name, MR number, or demographics.
+- Keep it 80–160 words. Prefer English medical terms.`;
+
+  const lines = (input.rows ?? []).slice(0, 40).map((row) => {
+    const unit = row.unit ? ` ${row.unit}` : '';
+    const range = row.range ? `; ref ${row.range}` : '';
+    return `- ${row.name}: ${row.value}${unit}${range} [${row.flag || 'unflagged'}]`;
+  });
+
+  const user = [
+    `Test: ${input.testName || '(unspecified)'}`,
+    input.specimen ? `Specimen: ${input.specimen}` : '',
+    input.patientAge ? `Age context for interpretation only (do not print): ${input.patientAge}` : '',
+    'Results:',
+    lines.length ? lines.join('\n') : '(no numeric/text values provided)',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const result = await hostedChat(system, user, onDelta);
+  if (!result.ok) return result;
+  return { ok: true, html: sanitizeAiHtml(result.text) };
 }

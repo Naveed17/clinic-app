@@ -6,89 +6,6 @@ import type { ReportSummary } from './report';
 import type { LabOrder } from './lab';
 import type { GlobalSearchResult } from './search';
 
-// ── Inventory Module Types ───────────────────────────────────────────────────
-export interface InventoryCategory {
-  id: string;
-  name: string;
-  description?: string | null;
-  _count?: { medicines: number };
-}
-
-export interface InventoryMedicine {
-  id: string;
-  name: string;
-  genericName?: string | null;
-  categoryId?: string | null;
-  barcode?: string | null;
-  unit: string;
-  rackNumber?: string | null;
-  minStockAlert: number;
-  createdAt: string;
-  updatedAt: string;
-  category?: InventoryCategory | null;
-  batches?: InventoryBatch[];
-  stock?: number;
-}
-
-export interface InventoryBatch {
-  id: string;
-  medicineId: string;
-  batchNumber: string;
-  expiryDate: string;
-  purchasePrice: number;
-  salePrice: number;
-  quantity: number;
-  createdAt: string;
-  updatedAt: string;
-  medicine?: InventoryMedicine;
-}
-
-export interface InventorySupplier {
-  id: string;
-  name: string;
-  companyName?: string | null;
-  phone?: string | null;
-  email?: string | null;
-  address?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  _count?: { purchases: number };
-}
-
-export interface InventoryPurchaseOrderItem {
-  id: string;
-  purchaseId: string;
-  batchId: string;
-  quantity: number;
-  unitPrice: number;
-  lineTotal: number;
-  batch?: InventoryBatch;
-}
-
-export interface InventoryPurchaseOrder {
-  id: string;
-  invoiceNumber: string;
-  supplierId: string;
-  totalAmount: number;
-  purchaseDate: string;
-  notes?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  supplier?: InventorySupplier;
-  items?: InventoryPurchaseOrderItem[];
-}
-
-export interface InventoryStockMovement {
-  id: string;
-  batchId: string;
-  type: 'PURCHASE' | 'RETURN' | 'ADJUSTMENT' | 'EXPIRED' | 'DAMAGE' | 'DISPENSE';
-  quantity: number;
-  reference?: string | null;
-  createdAt: string;
-  batch?: InventoryBatch;
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
 declare global {
   interface Window {
     clinic: {
@@ -118,11 +35,6 @@ declare global {
         upsertPrescription: any;
         list: (date: string) => Promise<Token[]>;
         listPrescriptions: (date: string) => Promise<import('./token').PrescriptionFeedItem[]>;
-        pharmacyQueue: (date: string) => Promise<import('./token').PharmacyQueueItem[]>;
-        pharmacyDispense: (
-          tokenId: string,
-          options?: { invoiceId?: string | null },
-        ) => Promise<import('./token').PharmacyQueueItem | null>;
         doctors: () => Promise<TokenPerson[]>;
         patients: () => Promise<TokenPerson[]>;
         create: (input: TokenInput) => Promise<Token>;
@@ -206,6 +118,15 @@ declare global {
           },
           onDelta?: (delta: string) => void,
         ) => Promise<{ ok: boolean; summary?: string; error?: string }>;
+        interpretLabReport: (
+          input: {
+            testName: string;
+            specimen?: string;
+            patientAge?: string;
+            rows: Array<{ name: string; value: string; unit: string; range: string; flag: string }>;
+          },
+          onDelta?: (delta: string) => void,
+        ) => Promise<{ ok: boolean; html?: string; error?: string }>;
       };
       whatsapp: {
         status: () => Promise<{ enabled: boolean; configured: boolean; displayNumber: string }>;
@@ -233,8 +154,8 @@ declare global {
         sendMessage: (input: { phone?: string; text: string }) => Promise<{ success: boolean; error?: string }>;
       };
       settings: {
-        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string; aiEnabled?: boolean; groqApiKey?: string; groqModel?: string; whatsappEnabled?: boolean; whatsappToken?: string; whatsappPhoneNumberId?: string; whatsappDisplayNumber?: string }>;
-        save: (patch: unknown) => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string; aiEnabled?: boolean; groqApiKey?: string; groqModel?: string; whatsappEnabled?: boolean; whatsappToken?: string; whatsappPhoneNumberId?: string; whatsappDisplayNumber?: string }>;
+        get: () => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; clinicLogo?: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string; aiEnabled?: boolean; groqApiKey?: string; groqModel?: string; whatsappEnabled?: boolean; whatsappToken?: string; whatsappPhoneNumberId?: string; whatsappDisplayNumber?: string }>;
+        save: (patch: unknown) => Promise<{ serverMode: 'local' | 'lan-server' | 'lan-client'; clientApiUrl: string; lanPort: number; clinicName: string; clinicAddress: string; clinicPhone: string; clinicLogo?: string; setupDone: boolean; databaseMode?: 'local' | 'online'; clinicalApiUrl?: string; schemaId?: string; aiEnabled?: boolean; groqApiKey?: string; groqModel?: string; whatsappEnabled?: boolean; whatsappToken?: string; whatsappPhoneNumberId?: string; whatsappDisplayNumber?: string }>;
         relaunch: () => Promise<void>;
         lanIp: () => Promise<string>;
         testConnection: (url: string) => Promise<boolean>;
@@ -268,99 +189,6 @@ declare global {
         create: (input: { patientId: string; orderedById: string; test: string; tokenId?: string; notes?: string }) => Promise<LabOrder>;
         updateStatus: (id: string, status: string) => Promise<LabOrder>;
         saveResult: (id: string, result: string) => Promise<LabOrder>;
-      };
-      // ── New Inventory API Bridge Definitions ──────────────────────────────
-      inventory: {
-        categories: {
-          list: () => Promise<InventoryCategory[]>;
-          create: (input: { name: string; description?: string }) => Promise<InventoryCategory>;
-        };
-        medicines: {
-          list: () => Promise<InventoryMedicine[]>;
-          create: (input: {
-            name: string;
-            genericName?: string;
-            categoryId?: string;
-            barcode?: string;
-            unit?: string;
-            rackNumber?: string;
-            minStockAlert?: number;
-          }) => Promise<InventoryMedicine>;
-          update: (
-            id: string,
-            input: Partial<{
-              name: string;
-              genericName?: string;
-              categoryId?: string;
-              barcode?: string;
-              unit?: string;
-              rackNumber?: string;
-              minStockAlert?: number;
-            }>
-          ) => Promise<InventoryMedicine>;
-          delete: (id: string) => Promise<void>;
-          lowStock: () => Promise<InventoryMedicine[]>;
-          upsertWithStock: (input: {
-            id?: string;
-            name: string;
-            unit?: string;
-            category?: string;
-            minStockAlert?: number;
-            salePrice?: number;
-            stock?: number;
-            genericName?: string;
-            rackNumber?: string;
-          }) => Promise<InventoryMedicine>;
-        };
-        batches: {
-          list: () => Promise<InventoryBatch[]>;
-          create: (input: {
-            medicineId: string;
-            batchNumber: string;
-            expiryDate: string | Date;
-            purchasePrice: number;
-            salePrice: number;
-            quantity: number;
-          }) => Promise<InventoryBatch>;
-          expiringSoon: (daysAhead?: number) => Promise<InventoryBatch[]>;
-        };
-        suppliers: {
-          list: () => Promise<InventorySupplier[]>;
-          create: (input: {
-            name: string;
-            companyName?: string;
-            phone?: string;
-            email?: string;
-            address?: string;
-          }) => Promise<InventorySupplier>;
-        };
-        purchases: {
-          list: () => Promise<InventoryPurchaseOrder[]>;
-          create: (input: {
-            invoiceNumber: string;
-            supplierId: string;
-            notes?: string;
-            items: Array<{
-              batchId?: string;
-              medicineId?: string;
-              batchNumber?: string;
-              expiryDate?: string | Date;
-              purchasePrice?: number;
-              salePrice?: number;
-              quantity: number;
-              unitPrice: number;
-            }>;
-          }) => Promise<InventoryPurchaseOrder>;
-        };
-        movements: {
-          list: () => Promise<InventoryStockMovement[]>;
-          record: (input: {
-            batchId: string;
-            type: 'PURCHASE' | 'RETURN' | 'ADJUSTMENT' | 'EXPIRED' | 'DAMAGE' | 'DISPENSE';
-            quantity: number;
-            reference?: string;
-          }) => Promise<InventoryStockMovement>;
-        };
       };
       update: {
         check: () => Promise<'available' | 'latest' | 'error' | { error?: string }>;

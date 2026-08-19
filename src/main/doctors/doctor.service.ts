@@ -18,6 +18,7 @@ export interface DoctorInput {
   experienceYears?: number;
   phone?: string;
   bio?: string;
+  avatar?: string | null;
 }
 
 export interface DoctorUpdateInput {
@@ -31,6 +32,7 @@ export interface DoctorUpdateInput {
   experienceYears?: number;
   phone?: string;
   bio?: string;
+  avatar?: string | null;
 }
 
 const doctorSelect = {
@@ -106,6 +108,7 @@ export async function createDoctor(input: DoctorInput) {
           experienceYears: input.experienceYears ?? 0,
           phone: input.phone?.trim() || null,
           bio: input.bio?.trim() || null,
+          avatar: input.avatar?.trim() || null,
         },
       },
     },
@@ -134,6 +137,7 @@ export async function updateDoctor(id: string, input: DoctorUpdateInput) {
               experienceYears: input.experienceYears ?? 0,
               phone: input.phone?.trim() || null,
               bio: input.bio?.trim() || null,
+              avatar: input.avatar?.trim() || null,
             },
             update: {
               specialization: input.specialization!.trim(),
@@ -141,6 +145,7 @@ export async function updateDoctor(id: string, input: DoctorUpdateInput) {
               experienceYears: input.experienceYears ?? 0,
               phone: input.phone?.trim() || null,
               bio: input.bio?.trim() || null,
+              ...(input.avatar !== undefined ? { avatar: input.avatar?.trim() || null } : {}),
             },
           },
         },

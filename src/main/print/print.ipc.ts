@@ -42,8 +42,11 @@ function scorePrinter(name: string, paper?: PrintPaperId): number {
   const n = name.toLowerCase();
   if (isVirtualPrinter(n)) return -100;
   let score = 10;
-  if (paper !== 'A4') {
-    if (/pos|thermal|receipt|xprinter|rongta|tsp|tm-|star micronics|citizen/i.test(n)) score += 50;
+  const thermal = /pos|thermal|receipt|xprinter|rongta|tsp|tm-|star micronics|citizen/i.test(n);
+  if (paper === 'A4') {
+    if (thermal) score -= 80;
+  } else if (thermal) {
+    score += 50;
   }
   if (/usb/i.test(n)) score += 8;
   if (/epson|hp |canon|brother|lexmark/i.test(n)) score += 6;
@@ -105,9 +108,18 @@ async function printWindow(
         printBackground: true,
         landscape: false,
         pageSize: resolvePageSize(paper),
-        // `none` + CSS `size: auto` printed blank rolls on thermal POS.
-        margins: { marginType: 'printableArea' },
         scaleFactor: 100,
+        ...(paper === 'A4'
+          ? {
+              // Lab/Rx HTML: CSS `@page` owns size + margins. Avoid POS printableArea
+              // which shrinks A4 and can clip the report.
+              preferCSSPageSize: true,
+              margins: { marginType: 'none' as const },
+            }
+          : {
+              // `none` + CSS `size: auto` printed blank rolls on thermal POS.
+              margins: { marginType: 'printableArea' as const },
+            }),
         ...(deviceName ? { deviceName } : {}),
       },
       (success, failureReason) => {

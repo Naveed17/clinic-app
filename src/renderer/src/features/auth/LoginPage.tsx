@@ -24,7 +24,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
-import careflowLogo from '@/assets/careflow-logo.png';
+import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 
 /* ── Animated galaxy canvas ── */
 function GalaxyCanvas(): React.JSX.Element {
@@ -101,6 +101,7 @@ function GalaxyCanvas(): React.JSX.Element {
 export function LoginPage(): React.JSX.Element {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const brandLogo = useClinicBrandLogo();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -281,8 +282,8 @@ export function LoginPage(): React.JSX.Element {
           >
             <Box
               component="img"
-              src={careflowLogo}
-              alt="CareFlow"
+              src={brandLogo}
+              alt="Clinic"
               sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
             />
           </Box>

@@ -41,6 +41,7 @@ import {
   dialogFormSx, dialogPaperProps,
 } from '@/components/DialogUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
+import { DoctorAvatar, DoctorAvatarPicker } from '@/components/DoctorAvatar';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 
 const roleLabels: Record<string, string> = {
@@ -127,6 +128,7 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
   });
 
   const [showPw, setShowPw] = useState(false);
+  const [avatar, setAvatar] = useState<string | null>(null);
   const role = form.watch('role');
   const isDoctor = role === 'DOCTOR';
 
@@ -139,6 +141,7 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
           experienceYears: values.doctorProfile.experienceYears,
           phone: values.doctorProfile.phone || undefined,
           bio: values.doctorProfile.bio || undefined,
+          avatar,
         }
         : undefined;
 
@@ -167,7 +170,7 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
   });
 
   useEffect(() => {
-    if (open) { form.reset(toFormValues(user)); setShowPw(false); }
+    if (open) { form.reset(toFormValues(user)); setShowPw(false); setAvatar(user?.doctorProfile?.avatar ?? null); }
   }, [form, open, user]);
 
   const { errors } = form.formState;
@@ -203,7 +206,6 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
                       {can('doctorDashboard') && <MenuItem value="DOCTOR">Doctor</MenuItem>}
                       <MenuItem value="RECEPTIONIST">Receptionist</MenuItem>
                       {can('labDashboard') && <MenuItem value="LAB_TECHNICIAN">Lab Technician</MenuItem>}
-                      {can('pharmacy') && <MenuItem value="PHARMACIST">Pharmacist</MenuItem>}
                     </Select>
                     {errors.role && <FormHelperText>{errors.role.message}</FormHelperText>}
                   </FormControl>
@@ -222,6 +224,7 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
               <>
                 <Divider />
                 <Typography variant="subtitle2" color="text.secondary">Doctor Profile</Typography>
+                <DoctorAvatarPicker value={avatar} onChange={setAvatar} />
                 <TextField
                   fullWidth
                   label="Specialization"
@@ -317,9 +320,13 @@ export function UsersPage(): React.JSX.Element {
               <TableRow key={user.id} sx={tableSx.row}>
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                    <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'primary.main' }}>
-                      {user.firstName[0]}{user.lastName[0]}
-                    </Avatar>
+                    {user.role === 'DOCTOR' ? (
+                      <DoctorAvatar src={user.doctorProfile?.avatar} name={`Dr. ${user.firstName} ${user.lastName}`} size={34} />
+                    ) : (
+                      <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'primary.main' }}>
+                        {user.firstName[0]}{user.lastName[0]}
+                      </Avatar>
+                    )}
                     <Box>
                       <Typography fontSize={13.5} fontWeight={600}>{user.firstName} {user.lastName}</Typography>
                       <Typography fontSize={11.5} color="text.secondary">{roleLabels[user.role] ?? user.role}</Typography>

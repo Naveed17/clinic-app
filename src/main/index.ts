@@ -44,7 +44,6 @@ import { registerMedicineIpc } from './medicines/medicine.ipc';
 import { registerScheduleIpc } from './doctors/schedule.ipc';
 import { seedDefaultAdmin } from './auth/seed';
 import { initAutoUpdater } from './updater';
-import { registerInventoryIPCHandlers } from './inventory/inventory.ipc';
 import { registerWhatsAppIpc } from './whatsapp/whatsapp.ipc';
 
 let backendServer: BackendServer | undefined;
@@ -238,7 +237,7 @@ app.whenReady().then(async () => {
   registerBackupIpc();
   registerDocumentsIpc();
   registerTokenIpc(backendServer?.io);
-  registerLabIpc();
+  registerLabIpc(backendServer?.io);
   registerAuthIpc();
   registerScheduleIpc();
   registerPatientIpc(backendServer?.io);
@@ -253,7 +252,6 @@ app.whenReady().then(async () => {
   registerWhatsAppIpc();
   registerSearchIpc();
   registerMedicineIpc();
-  registerInventoryIPCHandlers();
   // LAN discovery only when not on cloud Postgres
   if (!isOnlineDatabaseMode()) {
     startDiscoveryListener();

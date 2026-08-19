@@ -15,4 +15,8 @@ export interface LabOrder {
   updatedAt: string;
   patientName: string;
   orderedByName: string;
+  patientMrNumber?: string | null;
+  patientDob?: string | Date | null;
+  patientPhone?: string | null;
+  patientBloodGroup?: string | null;
 }

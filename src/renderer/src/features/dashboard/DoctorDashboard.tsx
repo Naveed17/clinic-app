@@ -9,6 +9,7 @@ import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined
 import FormatListBulletedOutlinedIcon from '@mui/icons-material/FormatListBulletedOutlined';
 import TodayOutlinedIcon from '@mui/icons-material/TodayOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
+import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
 import {
   alpha, Avatar, Box, Button, Chip, Dialog, DialogActions, DialogContent,
   Divider, IconButton, ListItemIcon, ListItemText,
@@ -29,6 +30,7 @@ import { AppointmentCalendar } from '@/components/AppointmentCalendar';
 import { TokenPrintPreview, IssueTokenDialog } from '@/features/tokens/TokensPage';
 import { PrescriptionPadDialog } from '@/features/tokens/PrescriptionPadDialog';
 import { PatientHistoryDialog } from '@/features/patients/PatientHistoryDialog';
+import { OrderLabDialog } from '@/features/lab/OrderLabDialog';
 import type { Token } from '@/types/token';
 import type { Appointment } from '@/types/appointment';
 import type { Patient } from '@/types/patient';
@@ -50,7 +52,8 @@ export function DoctorDashboard(): React.JSX.Element {
   const { user } = useAuth();
   const { can } = useLicense();
   const canViewPatientHistory = can('managePatients');
-  const showWaitingRoom = can('tokens');
+  const canOrderLab = can('labDashboard');
+  const showWaitingRoom = true;
   const navigate = useNavigate();
   const qc = useQueryClient();
   const theme = useTheme();
@@ -69,6 +72,7 @@ export function DoctorDashboard(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState(0);
   const [historyPatient, setHistoryPatient] = useState<Patient | undefined>();
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
+  const [labOrder, setLabOrder] = useState<{ patientId: string; patientName: string; tokenId?: string } | null>(null);
 
   const { data: raw = [], isLoading: apptsLoading, isFetching: apptsFetching } = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const appointments = (raw as Appointment[]).filter((a) => a.providerId === user?.id);
@@ -89,6 +93,22 @@ export function DoctorDashboard(): React.JSX.Element {
       return;
     }
     setPrescriptionToken(token);
+  }
+
+  async function openLabOrder(appt: Appointment): Promise<void> {
+    const apptDate = new Date(appt.startsAt).toLocaleDateString('en-CA');
+    let tokenId: string | undefined;
+    try {
+      const token = await window.clinic.tokens.getForPatient(appt.patientId, apptDate);
+      tokenId = token?.id;
+    } catch {
+      /* token is optional for lab orders */
+    }
+    setLabOrder({
+      patientId: appt.patientId,
+      patientName: `${appt.patient.firstName} ${appt.patient.lastName}`,
+      tokenId,
+    });
   }
 
   async function openPatientHistory(appt: Appointment): Promise<void> {
@@ -291,6 +311,13 @@ export function DoctorDashboard(): React.JSX.Element {
                         </span>
                       </Tooltip>
                     )}
+                    {canOrderLab && appt.status !== 'CANCELLED' && appt.status !== 'NO_SHOW' && (
+                      <Tooltip title="Order lab">
+                        <IconButton size="small" sx={{ p: 0.4 }} onClick={() => void openLabOrder(appt)}>
+                          <BiotechOutlinedIcon sx={{ fontSize: 15 }} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                     {isCompleted && (
                       <Tooltip title="Write Prescription">
                         <IconButton size="small" sx={{ p: 0.4 }} onClick={() => void openPrescription(appt)}>
@@ -465,6 +492,7 @@ export function DoctorDashboard(): React.JSX.Element {
             onAppointmentClick={(appt) => { setEditAppt(appt); setApptDialogOpen(true); }}
             onPrescriptionClick={(appt) => openPrescription(appt)}
             onPatientHistoryClick={canViewPatientHistory ? (appt) => openPatientHistory(appt) : undefined}
+            onLabOrderClick={canOrderLab ? (appt) => openLabOrder(appt) : undefined}
           />
         </Box>
 
@@ -540,6 +568,18 @@ export function DoctorDashboard(): React.JSX.Element {
           <ListItemIcon><EditOutlinedIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Edit Appointment</ListItemText>
         </MenuItem>
+        {canOrderLab && apptCtxMenu?.appointment.status !== 'CANCELLED' && apptCtxMenu?.appointment.status !== 'NO_SHOW' && (
+          <MenuItem
+            onClick={() => {
+              const a = apptCtxMenu!.appointment;
+              setApptCtxMenu(null);
+              void openLabOrder(a);
+            }}
+          >
+            <ListItemIcon><BiotechOutlinedIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Order lab</ListItemText>
+          </MenuItem>
+        )}
         {apptCtxMenu?.appointment.status === 'COMPLETED' && (
           <MenuItem onClick={() => { const a = apptCtxMenu!.appointment; setApptCtxMenu(null); openPrescription(a); }}>
             <ListItemIcon><MedicalServicesOutlinedIcon fontSize="small" /></ListItemIcon>
@@ -550,6 +590,17 @@ export function DoctorDashboard(): React.JSX.Element {
 
       {canViewPatientHistory && historyPatient && (
         <PatientHistoryDialog patient={historyPatient} onClose={() => setHistoryPatient(undefined)} />
+      )}
+
+      {user && (
+        <OrderLabDialog
+          open={Boolean(labOrder)}
+          patientId={labOrder?.patientId ?? ''}
+          patientName={labOrder?.patientName ?? ''}
+          orderedById={user.id}
+          tokenId={labOrder?.tokenId}
+          onClose={() => setLabOrder(null)}
+        />
       )}
 
       {/* Day right-click menu */}

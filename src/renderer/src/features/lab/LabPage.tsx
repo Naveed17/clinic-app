@@ -1,9 +1,7 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
 import {
   Alert,
   Avatar,
@@ -13,13 +11,9 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  Divider,
   FormControl,
   IconButton,
   InputLabel,
-  List,
-  ListItem,
-  ListItemText,
   MenuItem,
   Select,
   Stack,
@@ -31,20 +25,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
 import type { LabOrder, LabOrderStatus } from '@/types/lab';
-import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
-  ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
+  FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogPaperProps,
 } from '@/components/DialogUI';
 import { LabReportPrint } from './LabReportPrint';
-
-const LAB_TESTS = [
-  'CBC', 'Blood Sugar (FBS)', 'Blood Sugar (RBS)', 'HbA1c', 'Lipid Profile',
-  'LFTs', 'KFTs', 'Urine R/E', 'Urine C/S', 'Thyroid Profile (TSH)',
-  'Thyroid Profile (T3/T4)', 'ECG', 'X-Ray', 'Ultrasound', 'COVID-19 PCR',
-  'Hepatitis B', 'Hepatitis C', 'Blood Group', 'ESR', 'CRP',
-];
+import { LabReportBuilderDialog } from './LabReportBuilderDialog';
+import { LAB_TEST_OPTIONS } from './labTestCatalog';
+import { labReportNumber } from './labReportNumber';
+import { DoctorAvatar } from '@/components/DoctorAvatar';
 
 const statusColor: Record<LabOrderStatus, 'warning' | 'primary' | 'success' | 'error'> = {
   PENDING: 'warning',
@@ -62,14 +53,11 @@ export function LabPage(): React.JSX.Element {
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
-  const [tokenSearch, setTokenSearch] = useState('');
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [resultDialog, setResultDialog] = useState<LabOrder | null>(null);
+  const [builderOrder, setBuilderOrder] = useState<LabOrder | null>(null);
   const [printOrder, setPrintOrder] = useState<LabOrder | null>(null);
-  const [resultText, setResultText] = useState('');
-  const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
   const [form, setForm] = useState({ patientId: '', test: '', notes: '' });
 
   const { data: orders = [], isLoading, isFetching, isError } = useQuery<LabOrder[]>({
@@ -109,43 +97,17 @@ export function LabPage(): React.JSX.Element {
     meta: { toast: 'Lab status updated' },
   });
 
-  const resultMutation = useMutation({
-    mutationFn: ({ id, result }: { id: string; result: string }) =>
-      window.clinic.lab.saveResult(id, result),
-    onSuccess: () => {
-      invalidate();
-      setResultDialog(null);
-      setResultText('');
-    },
-    meta: { toast: 'Lab result saved', errorToast: 'Unable to save result.' },
-  });
-
-  const { data: labReports = [], refetch: refetchReports } = useQuery<{ id: string; name: string; filePath: string; uploadedAt: string }[]>({
-    queryKey: ['lab-reports', resultDialog?.id],
-    queryFn: () => window.clinic.docs.lab.list(resultDialog!.id),
-    enabled: Boolean(resultDialog),
-  });
-  const uploadReportMutation = useMutation({
-    mutationFn: () => window.clinic.docs.lab.upload(resultDialog!.id),
-    onSuccess: () => refetchReports(),
-    meta: { toast: 'Report uploaded', errorToast: 'Unable to upload report.' },
-  });
-  const deleteReportMutation = useMutation({
-    mutationFn: (id: string) => window.clinic.docs.lab.delete(id),
-    onSuccess: () => {
-      refetchReports();
-      setDeleteReportId(null);
-    },
-    meta: { toast: 'Report deleted', errorToast: 'Unable to delete report.' },
-  });
-
   const filtered = orders.filter((order) => {
+    const q = search.trim().toLowerCase();
+    const reportNo = labReportNumber(order.id).toLowerCase();
+    const needle = q.replace(/[^a-z0-9]/g, '');
     const matchSearch =
-      order.patientName.toLowerCase().includes(search.toLowerCase()) ||
-      order.test.toLowerCase().includes(search.toLowerCase());
+      !q ||
+      order.patientName.toLowerCase().includes(q) ||
+      reportNo.includes(needle) ||
+      reportNo.replace(/^lab/, '').includes(needle.replace(/^lab/, ''));
     const matchStatus = filterStatus === 'ALL' || order.status === filterStatus;
-    const matchToken = !tokenSearch.trim() || String(order.tokenNumber ?? '').includes(tokenSearch.trim());
-    return matchSearch && matchStatus && matchToken;
+    return matchSearch && matchStatus;
   });
   const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
@@ -165,14 +127,7 @@ export function LabPage(): React.JSX.Element {
         }
         toolbar={
           <>
-            <SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Search by patient or test" sx={{ flex: 1, maxWidth: 260 }} />
-            <TextField
-              size="small"
-              placeholder="Token #"
-              value={tokenSearch}
-              onChange={(e) => setTokenSearch(e.target.value)}
-              sx={{ width: 100 }}
-            />
+            <SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Search by patient or report no." sx={{ flex: 1, maxWidth: 280 }} />
             <FormControl size="small" sx={{ minWidth: 150 }}>
               <InputLabel>Status</InputLabel>
               <Select label="Status" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} sx={{ borderRadius: 2, fontSize: 13.5 }}>
@@ -206,19 +161,18 @@ export function LabPage(): React.JSX.Element {
           <TableRow>
             <TableCell>Patient</TableCell>
             <TableCell>Test</TableCell>
-            <TableCell>Token</TableCell>
+            <TableCell>Report no.</TableCell>
             <TableCell>Ordered by</TableCell>
             <TableCell>Date & time</TableCell>
-            <TableCell>Result</TableCell>
             <TableCell>Status</TableCell>
             <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {isLoading ? (
-            <TableRowsSkeleton cols={8} />
+            <TableRowsSkeleton cols={7} />
           ) : filtered.length === 0 ? (
-            <TableRow><TableCell colSpan={8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No lab orders found.</TableCell></TableRow>
+            <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No lab orders found.</TableCell></TableRow>
           ) : (
             paginated.map((order) => (
               <TableRow key={order.id} sx={tableSx.row}>
@@ -229,7 +183,9 @@ export function LabPage(): React.JSX.Element {
                     </Avatar>
                     <Box>
                       <Typography fontSize={13.5} fontWeight={600}>{order.patientName}</Typography>
-                      <Typography fontSize={11.5} color="text.secondary">{order.test}</Typography>
+                      <Typography fontSize={11.5} color="text.secondary">
+                        {order.patientPhone?.trim() || '—'}
+                      </Typography>
                     </Box>
                   </Box>
                 </TableCell>
@@ -240,16 +196,13 @@ export function LabPage(): React.JSX.Element {
                   </Stack>
                 </TableCell>
                 <TableCell>
-                  {order.tokenNumber != null
-                    ? <Chip label={`#${String(order.tokenNumber).padStart(3, '0')}`} size="small" color="primary" variant="outlined" sx={{ fontWeight: 700, borderRadius: 1 }} />
-                    : <Typography fontSize={12} color="text.disabled">—</Typography>
-                  }
+                  <Typography fontSize={12.5} fontWeight={700} sx={{ fontFamily: 'ui-monospace, Consolas, monospace', letterSpacing: '0.02em' }}>
+                    {labReportNumber(order.id)}
+                  </Typography>
                 </TableCell>
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                    <Avatar sx={{ width: 28, height: 28, fontSize: 11, fontWeight: 700, bgcolor: 'secondary.main' }}>
-                      {order.orderedByName[0]}
-                    </Avatar>
+                    <DoctorAvatar name={order.orderedByName} size={28} />
                     <Box>
                       <Typography fontSize={13}>{order.orderedByName}</Typography>
                       <Typography fontSize={11} color="text.secondary">Doctor</Typography>
@@ -257,9 +210,6 @@ export function LabPage(): React.JSX.Element {
                   </Box>
                 </TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(order.orderedAt).toLocaleString()}</TableCell>
-                <TableCell sx={{ color: order.result ? 'text.primary' : 'text.disabled', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {order.result || '—'}
-                </TableCell>
                 <TableCell>
                   <Chip color={statusColor[order.status]} label={order.status.replace('_', ' ')} size="small" sx={chipSx} />
                 </TableCell>
@@ -268,11 +218,22 @@ export function LabPage(): React.JSX.Element {
                     {order.status === 'COMPLETED' && (
                       <Tooltip title="Print report"><IconButton sx={actionBtnSx} onClick={() => setPrintOrder(order)}><PrintOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                     )}
+                    {(isLabTech || isDoctor || isAdmin) && (order.status === 'IN_PROGRESS' || order.status === 'COMPLETED') && (
+                      <Tooltip title={order.status === 'COMPLETED' ? 'Open report' : 'Build report'}>
+                        <Button
+                          size="small"
+                          color={order.status === 'IN_PROGRESS' ? 'success' : 'primary'}
+                          variant={order.status === 'IN_PROGRESS' ? 'contained' : 'outlined'}
+                          startIcon={<ScienceOutlinedIcon sx={{ fontSize: 16 }} />}
+                          sx={{ borderRadius: 1.5, fontSize: 12, py: 0.25, px: 1.25 }}
+                          onClick={() => setBuilderOrder(order)}
+                        >
+                          {order.status === 'IN_PROGRESS' ? 'Build report' : 'Open report'}
+                        </Button>
+                      </Tooltip>
+                    )}
                     {isLabTech && order.status === 'PENDING' && (
                       <Button size="small" variant="outlined" loading={statusMutation.isPending} sx={{ borderRadius: 1.5, fontSize: 12, py: 0.25, px: 1.25 }} onClick={() => statusMutation.mutate({ id: order.id, status: 'IN_PROGRESS' })}>Start</Button>
-                    )}
-                    {isLabTech && order.status === 'IN_PROGRESS' && (
-                      <Button size="small" color="success" variant="contained" sx={{ borderRadius: 1.5, fontSize: 12, py: 0.25, px: 1.25 }} onClick={() => { setResultDialog(order); setResultText(order.result ?? ''); }}>Add result</Button>
                     )}
 
                   </Stack>
@@ -309,7 +270,7 @@ export function LabPage(): React.JSX.Element {
                 onChange={(e) => setForm((f) => ({ ...f, test: e.target.value }))}
                 value={form.test}
               >
-                {LAB_TESTS.map((test) => (
+                {LAB_TEST_OPTIONS.map((test) => (
                   <MenuItem key={test} value={test}>{test}</MenuItem>
                 ))}
               </Select>
@@ -336,85 +297,16 @@ export function LabPage(): React.JSX.Element {
         </DialogActions>
       </Dialog>
 
-      {Boolean(resultDialog) && <Dialog fullWidth maxWidth="sm" onClose={() => setResultDialog(null)} open={Boolean(resultDialog)} PaperProps={dialogPaperProps}>
-        <FormDialogTitle title={`Add Result — ${resultDialog?.test}`} subtitle={`Patient: ${resultDialog?.patientName}`} />
-        <DialogContent sx={dialogContentSx}>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Patient: <strong>{resultDialog?.patientName}</strong>
-            </Typography>
-            <TextField
-              fullWidth
-              label="Result"
-              multiline
-              onChange={(e) => setResultText(e.target.value)}
-              placeholder="Enter test result"
-              rows={3}
-              value={resultText}
-            />
-            <Divider />
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Typography variant="subtitle2">Attachments</Typography>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<AttachFileOutlinedIcon />}
-                loading={uploadReportMutation.isPending}
-                onClick={() => uploadReportMutation.mutate()}
-              >
-                Attach file
-              </Button>
-            </Box>
-            {labReports.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">No attachments.</Typography>
-            ) : (
-              <List dense disablePadding>
-                {labReports.map((r) => (
-                  <ListItem
-                    key={r.id}
-                    secondaryAction={
-                      <Stack direction="row" gap={0.5}>
-                        <Tooltip title="Open">
-                          <IconButton size="small" onClick={() => window.clinic.docs.lab.open(r.id)}>
-                            <FolderOpenOutlinedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton size="small" color="error" onClick={() => setDeleteReportId(r.id)}>
-                            <DeleteOutlineIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    }
-                  >
-                    <ListItemText primary={r.name} secondary={new Date(r.uploadedAt).toLocaleDateString()} />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={dialogActionsSx}>
-          <Button onClick={() => setResultDialog(null)} disabled={resultMutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
-          <SubmitButton
-            color="success"
-            disabled={!resultText}
-            loading={resultMutation.isPending}
-            onClick={() => resultMutation.mutate({ id: resultDialog!.id, result: resultText })}
-          >
-            Save and complete
-          </SubmitButton>
-        </DialogActions>
-      </Dialog>}
-
-      <ConfirmDialog
-        open={Boolean(deleteReportId)}
-        title="Delete attachment?"
-        message="Remove this lab report file?"
-        loading={deleteReportMutation.isPending}
-        onClose={() => setDeleteReportId(null)}
-        onConfirm={() => deleteReportId && deleteReportMutation.mutate(deleteReportId)}
-      />
+      {builderOrder && (
+        <LabReportBuilderDialog
+          order={builderOrder}
+          onClose={() => setBuilderOrder(null)}
+          onSaved={() => {
+            invalidate();
+            setBuilderOrder(null);
+          }}
+        />
+      )}
 
       {printOrder && <LabReportPrint order={printOrder} onClose={() => setPrintOrder(null)} />}
     </>

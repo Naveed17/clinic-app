@@ -9,8 +9,8 @@ import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import DevicesOutlinedIcon from '@mui/icons-material/DevicesOutlined';
 import WifiTetheringOutlinedIcon from '@mui/icons-material/WifiTetheringOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import careflowLogo from '@/assets/careflow-logo.png';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
+import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 
 type Mode = 'local' | 'lan-server' | 'lan-client';
 
@@ -26,6 +26,7 @@ function normalizeServerUrl(raw: string): string {
 
 export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Element {
   const theme = useTheme();
+  const brandLogo = useClinicBrandLogo();
 
   const [step, setStep] = useState(0);
   const [clinicName, setClinicName] = useState('');
@@ -154,7 +155,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
               p: 0.4,
             }}
           >
-            <Box component="img" src={careflowLogo} alt="CareFlow" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            <Box component="img" src={brandLogo} alt="Clinic" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </Box>
           <Typography fontWeight={800} fontSize={20}>CareFlow Setup</Typography>
         </Stack>

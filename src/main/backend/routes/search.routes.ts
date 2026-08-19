@@ -15,7 +15,6 @@ export function createSearchRouter(): Router {
       const q = typeof req.query.q === 'string' ? req.query.q : '';
       const scope = getSearchScope(req.user?.role, {
         billing: isLicenseModuleEnabled('billing'),
-        pharmacy: isLicenseModuleEnabled('pharmacy'),
         labDashboard: isLicenseModuleEnabled('labDashboard'),
       });
       res.json(await globalSearch(q, scope));

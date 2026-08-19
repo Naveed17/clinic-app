@@ -2,9 +2,7 @@ import type { TokenStatus } from '@prisma/client';
 import { getPrisma, ensurePrescriptionPharmacyColumns } from '../database/client';
 import { randomUUID } from 'node:crypto';
 import { markCheckIn, markCheckOut } from '../doctors/attendance.service';
-import { adjustStockByMedicineName } from '../inventory/inventory.service';
 import { assertDoctorAvailableOnDate } from '../doctors/schedule.service';
-import { isLicenseModuleEnabled } from '../license/license.ipc';
 
 export interface TokenInput {
   patientId: string;
@@ -76,22 +74,6 @@ function mapPrescription(tokenId: unknown, r: Record<string, unknown>) {
     invoiceId: (r.invoiceId as string | null | undefined) ?? null,
     createdAt: r.prescriptionCreatedAt ?? r.createdAt,
   };
-}
-
-function pharmacyModuleOn(): boolean {
-  return isLicenseModuleEnabled('pharmacy');
-}
-
-async function applyPrescriptionStockDelta(
-  medicines: { name?: string }[],
-  delta: number,
-  reference: string,
-): Promise<void> {
-  for (const med of medicines) {
-    if (med.name?.trim()) {
-      await adjustStockByMedicineName(med.name, delta, reference);
-    }
-  }
 }
 
 export async function listTokens(date: string) {
@@ -347,19 +329,11 @@ export async function upsertPrescription(tokenId: string, input: PrescriptionInp
     input.thumbName === undefined ? undefined : input.thumbName?.trim() || null;
   const thumbnail =
     input.thumbnail === undefined ? undefined : input.thumbnail?.trim() || null;
-  const deferStock = pharmacyModuleOn();
 
   if (existing.length > 0) {
     const medsChanged = (existing[0].medicines || '[]') !== medicines;
     const nextStatus =
       existing[0].pharmacyStatus === 'DISPENSED' && !medsChanged ? 'DISPENSED' : 'PENDING';
-
-    if (!deferStock) {
-      try {
-        const oldMeds: { name: string }[] = JSON.parse(existing[0].medicines || '[]');
-        await applyPrescriptionStockDelta(oldMeds, 1, `Prescription restore:${tokenId}`);
-      } catch { /* ignore parse errors from old data */ }
-    }
 
     if (thumbName !== undefined || thumbnail !== undefined) {
       await db.$executeRawUnsafe(
@@ -402,10 +376,6 @@ export async function upsertPrescription(tokenId: string, input: PrescriptionInp
       );
     }
 
-    if (!deferStock) {
-      await applyPrescriptionStockDelta(input.medicines, -1, `Prescription:${tokenId}`);
-    }
-
     return existing[0].id;
   }
 
@@ -425,10 +395,6 @@ export async function upsertPrescription(tokenId: string, input: PrescriptionInp
     now,
     now,
   );
-
-  if (!deferStock) {
-    await applyPrescriptionStockDelta(input.medicines, -1, `Prescription:${tokenId}`);
-  }
 
   return id;
 }
@@ -451,7 +417,6 @@ export async function dispensePharmacyPrescription(
   );
   if (!rows[0]) throw new Error('Prescription not found.');
 
-  const alreadyDispensed = rows[0].pharmacyStatus === 'DISPENSED';
   const now = new Date().toISOString();
   const invoiceId = options?.invoiceId?.trim() || null;
 
@@ -467,13 +432,6 @@ export async function dispensePharmacyPrescription(
     now,
     tokenId,
   );
-
-  if (!alreadyDispensed && pharmacyModuleOn() && !options?.skipStock) {
-    try {
-      const meds: { name: string }[] = JSON.parse(rows[0].medicines || '[]');
-      await applyPrescriptionStockDelta(meds, -1, `Pharmacy dispense:${tokenId}`);
-    } catch { /* ignore */ }
-  }
 
   const token = await getTokenById(tokenId);
   if (!token) return null;

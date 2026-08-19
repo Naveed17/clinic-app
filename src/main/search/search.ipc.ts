@@ -6,7 +6,6 @@ import { globalSearch } from './search.service';
 function licenseModulesForSearch(): Record<string, boolean> {
   return {
     billing: isLicenseModuleEnabled('billing'),
-    pharmacy: isLicenseModuleEnabled('pharmacy'),
     labDashboard: isLicenseModuleEnabled('labDashboard'),
   };
 }

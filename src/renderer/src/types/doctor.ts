@@ -6,6 +6,7 @@ export interface DoctorProfile {
   experienceYears: number;
   phone: string | null;
   bio: string | null;
+  avatar: string | null;
 }
 
 export interface Doctor {
@@ -31,6 +32,7 @@ export interface DoctorInput {
   experienceYears?: number;
   phone?: string;
   bio?: string;
+  avatar?: string | null;
 }
 
 export interface DoctorUpdateInput {
@@ -44,6 +46,7 @@ export interface DoctorUpdateInput {
   experienceYears?: number;
   phone?: string;
   bio?: string;
+  avatar?: string | null;
 }
 
 export interface DoctorListInput {

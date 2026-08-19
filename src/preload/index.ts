@@ -524,22 +524,6 @@ const api = {
         () => request(`/api/tokens/prescriptions?date=${date}`),
         'tokens:list-prescriptions', date,
       ),
-    pharmacyQueue: (date: string) =>
-      call(
-        () => request(`/api/tokens/pharmacy-queue?date=${date}`),
-        'tokens:pharmacy-queue', date,
-      ),
-    pharmacyDispense: (tokenId: string, options?: { invoiceId?: string | null }) =>
-      call(
-        () =>
-          request(`/api/tokens/${tokenId}/pharmacy-dispense`, {
-            method: 'POST',
-            body: JSON.stringify(options ?? {}),
-          }),
-        'tokens:pharmacy-dispense',
-        tokenId,
-        options,
-      ),
     getById: (tokenId: string) =>
       call(
         () => request(`/api/tokens/${tokenId}`),
@@ -701,6 +685,27 @@ const api = {
         if (onDelta) ipcRenderer.removeListener('ai:summarizePatient:delta', listener);
       });
     },
+    interpretLabReport: (
+      input: {
+        testName: string;
+        specimen?: string;
+        patientAge?: string;
+        rows: Array<{ name: string; value: string; unit: string; range: string; flag: string }>;
+      },
+      onDelta?: (delta: string) => void,
+    ) => {
+      const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const listener = (_e: unknown, msg: { requestId?: string; delta?: string }) => {
+        if (msg?.requestId === requestId && msg.delta) onDelta?.(msg.delta);
+      };
+      if (onDelta) ipcRenderer.on('ai:interpretLabReport:delta', listener);
+      return ipc<{ ok: boolean; html?: string; error?: string }>('ai:interpretLabReport', {
+        ...input,
+        requestId,
+      }).finally(() => {
+        if (onDelta) ipcRenderer.removeListener('ai:interpretLabReport:delta', listener);
+      });
+    },
   },
   whatsapp: {
     status: () =>
@@ -745,12 +750,14 @@ const api = {
           clinicName?: string;
           clinicAddress?: string;
           clinicPhone?: string;
+          clinicLogo?: string;
         }>('/api/clinic/meta');
         return {
           ...local,
           clinicName: meta.clinicName || local.clinicName || '',
           clinicAddress: meta.clinicAddress || local.clinicAddress || '',
           clinicPhone: meta.clinicPhone || local.clinicPhone || '',
+          clinicLogo: typeof meta.clinicLogo === 'string' ? meta.clinicLogo : String(local.clinicLogo || ''),
         };
       } catch {
         return local;
@@ -767,6 +774,7 @@ const api = {
               clinicName: p.clinicName ?? saved.clinicName ?? '',
               clinicAddress: p.clinicAddress ?? saved.clinicAddress ?? '',
               clinicPhone: p.clinicPhone ?? saved.clinicPhone ?? '',
+              clinicLogo: p.clinicLogo ?? saved.clinicLogo ?? '',
             }),
           });
         } catch {
@@ -823,84 +831,6 @@ const api = {
         () => request(`/api/medicines/${id}/price`, { method: 'PUT', body: JSON.stringify({ price }) }),
         'medicines:update-price', id, price,
       ),
-  },
-  // ==========================================
-  // COMPLETE INVENTORY MODULE API (LAN & IPC)
-  // ==========================================
-  inventory: {
-    categories: {
-      list: () => call(() => request('/api/inventory/categories'), 'inventory:categories:list'),
-      create: (input: unknown) =>
-        call(
-          () => request('/api/inventory/categories', { method: 'POST', body: JSON.stringify(input) }),
-          'inventory:categories:create', input,
-        ),
-    },
-    medicines: {
-      list: () => call(() => request('/api/inventory/medicines'), 'inventory:medicines:list'),
-      create: (input: unknown) =>
-        call(
-          () => request('/api/inventory/medicines', { method: 'POST', body: JSON.stringify(input) }),
-          'inventory:medicines:create', input,
-        ),
-      update: (id: string, input: unknown) =>
-        call(
-          () => request(`/api/inventory/medicines/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
-          'inventory:medicines:update', { id, data: input },
-        ),
-      delete: (id: string) =>
-        call(
-          () => request(`/api/inventory/medicines/${id}`, { method: 'DELETE' }),
-          'inventory:medicines:delete', id,
-        ),
-      lowStock: () =>
-        call(
-          () => request('/api/inventory/medicines/low-stock'),
-          'inventory:medicines:low-stock',
-        ),
-      upsertWithStock: (input: unknown) =>
-        call(
-          () => request('/api/inventory/medicines/upsert-with-stock', { method: 'POST', body: JSON.stringify(input) }),
-          'inventory:medicines:upsert-with-stock', input,
-        ),
-    },
-    batches: {
-      list: () => call(() => request('/api/inventory/batches'), 'inventory:batches:list'),
-      create: (input: unknown) =>
-        call(
-          () => request('/api/inventory/batches', { method: 'POST', body: JSON.stringify(input) }),
-          'inventory:batches:create', input,
-        ),
-      expiringSoon: (daysAhead = 60) =>
-        call(
-          () => request(`/api/inventory/batches/expiring-soon?days=${daysAhead}`),
-          'inventory:batches:expiring-soon', daysAhead,
-        ),
-    },
-    suppliers: {
-      list: () => call(() => request('/api/inventory/suppliers'), 'inventory:suppliers:list'),
-      create: (input: unknown) =>
-        call(
-          () => request('/api/inventory/suppliers', { method: 'POST', body: JSON.stringify(input) }),
-          'inventory:suppliers:create', input,
-        ),
-    },
-    purchases: {
-      list: () => call(() => request('/api/inventory/purchases'), 'inventory:purchases:list'),
-      create: (input: unknown) =>
-        call(
-          () => request('/api/inventory/purchases', { method: 'POST', body: JSON.stringify(input) }),
-          'inventory:purchases:create', input,
-        ),
-    },
-    movements: {
-      list: () => call(() => request('/api/inventory/movements'), 'inventory:movements:list'),
-      record: (input: unknown) =>
-        call(
-          () => request('/api/inventory/movements', { method: 'POST', body: JSON.stringify(input) }),
-          'inventory:movements:record', input,
-        ),
-    },
   },
   search: {
     global: (query: string, role?: string) =>

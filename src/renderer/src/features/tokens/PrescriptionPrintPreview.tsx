@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { PrescriptionPadDocument, parsePadMeta, stripAdviceHtml, doctorPadLines } from './PrescriptionPadPdf';
 import { printReactPdfDocument } from '@/utils/printPdf';
 import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
+import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 
 const styles = StyleSheet.create({
   page: {
@@ -350,6 +351,7 @@ export function PrescriptionPrintPreview({
   doctor: doctorProp,
   onClose,
 }: PrescriptionPrintPreviewProps): React.JSX.Element {
+  const brandLogo = useClinicBrandLogo();
   const [clinic, setClinic] = useState({ clinicName: '', clinicAddress: '', clinicPhone: '' });
   const [qualification, setQualification] = useState('');
   const [specialization, setSpecialization] = useState('');
@@ -432,6 +434,7 @@ export function PrescriptionPrintPreview({
     padSex,
     padAddress,
     padDiagnosis,
+    brandLogo,
   ].join('|');
 
   const pdfDocument = useMemo(() => {
@@ -450,6 +453,7 @@ export function PrescriptionPrintPreview({
           dateStr={dateStr}
           diagnosis={padDiagnosis}
           bodyText={padBody}
+          logoSrc={brandLogo}
         />
       );
     }
@@ -484,6 +488,7 @@ export function PrescriptionPrintPreview({
     patientPhone,
     qualification,
     specialization,
+    brandLogo,
   ]);
 
   async function handlePrint(): Promise<void> {

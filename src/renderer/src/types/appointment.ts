@@ -4,6 +4,7 @@ export interface AppointmentPerson {
   firstName: string;
   lastName: string;
   phone?: string | null;
+  avatar?: string | null;
 }
 
 export interface Appointment {

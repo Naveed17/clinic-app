@@ -35,12 +35,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
+import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { AppointmentCalendar } from '@/components/AppointmentCalendar';
 import { appointmentsService } from '@/services/appointments.service';
 import { patientsService } from '@/services/patients.service';
 import type { Appointment, AppointmentInput, AppointmentPerson } from '@/types/appointment';
 import type { Token } from '@/types/token';
-import { nextFreeSlot, doctorOfflineReason, type SlotAdjustReason } from '@/utils/appointmentSlot';
+import { nextFreeSlot, doctorOfflineReason, slotSearchFrom, type SlotAdjustReason } from '@/utils/appointmentSlot';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
@@ -307,7 +308,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
       appointments: doctorAppts,
       providerId,
       durationMin: duration || 30,
-      from: defaultDate ? new Date(`${defaultDate}T00:00:00`) : new Date(),
+      from: slotSearchFrom(defaultDate),
     });
     if (!next) return;
     form.setValue('date', next.date);
@@ -433,13 +434,13 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
                           field.onChange(value.toLocaleDateString('en-CA'));
                           return;
                         }
-                        const from = new Date(value.getFullYear(), value.getMonth(), value.getDate(), 0, 0, 0, 0);
+                        const dateStr = value.toLocaleDateString('en-CA');
                         const next = nextFreeSlot({
                           schedule,
                           appointments: doctorAppts,
                           providerId,
                           durationMin: duration || 30,
-                          from,
+                          from: slotSearchFrom(dateStr),
                           excludeId: appointment?.id,
                         });
                         if (next) {
@@ -760,9 +761,11 @@ export function AppointmentsPage(): React.JSX.Element {
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                      <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'secondary.main' }}>
-                        {a.provider.firstName[0]}{a.provider.lastName[0]}
-                      </Avatar>
+                      <DoctorAvatar
+                        src={a.provider.avatar}
+                        name={`Dr. ${a.provider.firstName} ${a.provider.lastName}`}
+                        size={34}
+                      />
                       <Box>
                         <Typography fontSize={13.5} fontWeight={600}>{personLabel(a.provider)}</Typography>
                         <Typography fontSize={11.5} color="text.secondary">{a.provider.role ?? 'Doctor'}</Typography>

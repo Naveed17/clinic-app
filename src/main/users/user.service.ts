@@ -14,6 +14,7 @@ export interface DoctorProfileInput {
   experienceYears?: number;
   phone?: string;
   bio?: string;
+  avatar?: string | null;
 }
 
 export interface UserInput {
@@ -92,6 +93,7 @@ export async function createUser(input: UserInput) {
                 experienceYears: input.doctorProfile.experienceYears ?? 0,
                 phone: input.doctorProfile.phone?.trim() || null,
                 bio: input.doctorProfile.bio?.trim() || null,
+                avatar: input.doctorProfile.avatar?.trim() || null,
               },
             },
           }
@@ -130,6 +132,7 @@ export async function updateUser(id: string, input: UserUpdateInput) {
                 experienceYears: input.doctorProfile.experienceYears ?? 0,
                 phone: input.doctorProfile.phone?.trim() || null,
                 bio: input.doctorProfile.bio?.trim() || null,
+                avatar: input.doctorProfile.avatar?.trim() || null,
               },
               update: {
                 specialization: input.doctorProfile.specialization.trim(),
@@ -137,6 +140,9 @@ export async function updateUser(id: string, input: UserUpdateInput) {
                 experienceYears: input.doctorProfile.experienceYears ?? 0,
                 phone: input.doctorProfile.phone?.trim() || null,
                 bio: input.doctorProfile.bio?.trim() || null,
+                ...(input.doctorProfile.avatar !== undefined
+                  ? { avatar: input.doctorProfile.avatar?.trim() || null }
+                  : {}),
               },
             },
           },

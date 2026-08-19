@@ -28,6 +28,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { StatCardsSkeleton } from '@/components/LoadingUI';
+import { DoctorAvatar } from '@/components/DoctorAvatar';
 import type { Doctor } from '@/types/doctor';
 import { DoctorEditDialog } from './DoctorEditDialog';
 
@@ -138,7 +139,6 @@ export function DoctorDetailPage(): React.JSX.Element {
     );
   }
 
-  const initials = `${doctor.firstName[0]}${doctor.lastName[0]}`.toUpperCase();
   const green = theme.palette.primary.main;
   const success = theme.palette.success.main;
   const warning = theme.palette.warning.main;
@@ -611,18 +611,12 @@ export function DoctorDetailPage(): React.JSX.Element {
                 }}
               >
                 <Stack direction="row" spacing={1.75} alignItems="center">
-                  <Avatar
-                    sx={{
-                      width: 64,
-                      height: 64,
-                      fontSize: 22,
-                      fontWeight: 800,
-                      bgcolor: green,
-                      boxShadow: `0 8px 20px ${alpha(green, 0.35)}`,
-                    }}
-                  >
-                    {initials}
-                  </Avatar>
+                  <DoctorAvatar
+                    src={doctor.doctorProfile?.avatar}
+                    name={`Dr. ${doctor.firstName} ${doctor.lastName}`}
+                    size={64}
+                    sx={{ boxShadow: `0 8px 20px ${alpha(green, 0.35)}` }}
+                  />
                   <Box sx={{ minWidth: 0 }}>
                     <Typography fontWeight={800} fontSize={16} noWrap letterSpacing="-0.01em">
                       Dr. {doctor.firstName} {doctor.lastName}

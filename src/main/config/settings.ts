@@ -14,6 +14,7 @@ export interface AppSettings {
   clinicName: string;
   clinicAddress: string;
   clinicPhone: string;
+  clinicLogo: string;
   setupDone: boolean;
   /** From license API — not user-toggled freely */
   databaseMode: DatabaseMode;
@@ -39,6 +40,7 @@ const DEFAULTS: AppSettings = {
   clinicName: 'CLINIC MANAGEMENT',
   clinicAddress: '',
   clinicPhone: '',
+  clinicLogo: '',
   setupDone: false,
   databaseMode: 'local',
   clinicalApiUrl: '',

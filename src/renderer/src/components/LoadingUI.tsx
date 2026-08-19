@@ -64,28 +64,22 @@ export function ListCardsSkeleton({ count = 5 }: { count?: number }): React.JSX.
 
 export function CalendarSkeleton(): React.JSX.Element {
   return (
-    <Box sx={{ display: 'flex', flex: 1, minHeight: 0, p: 3, gap: 3 }}>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2.5 }}>
-          <Skeleton variant="rounded" width={168} height={28} />
-          <Box sx={{ flex: 1 }} />
-          <Skeleton variant="circular" width={32} height={32} />
-          <Skeleton variant="circular" width={32} height={32} />
-        </Stack>
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5, mb: 1 }}>
-          {Array.from({ length: 7 }, (_, i) => (
-            <Skeleton key={i} variant="text" height={18} />
-          ))}
-        </Box>
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5 }}>
-          {Array.from({ length: 35 }, (_, i) => (
-            <Skeleton key={i} variant="rounded" height={72} />
-          ))}
-        </Box>
+    <Box sx={{ flex: 1, minHeight: 0, p: 3, width: '100%' }}>
+      <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2.5 }}>
+        <Skeleton variant="rounded" width={168} height={28} />
+        <Box sx={{ flex: 1 }} />
+        <Skeleton variant="circular" width={32} height={32} />
+        <Skeleton variant="circular" width={32} height={32} />
+      </Stack>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5, mb: 1 }}>
+        {Array.from({ length: 7 }, (_, i) => (
+          <Skeleton key={i} variant="text" height={18} />
+        ))}
       </Box>
-      <Box sx={{ width: 300, flexShrink: 0, display: { xs: 'none', md: 'block' } }}>
-        <Skeleton variant="rounded" width={180} height={24} sx={{ mb: 2 }} />
-        <ListCardsSkeleton count={4} />
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5 }}>
+        {Array.from({ length: 35 }, (_, i) => (
+          <Skeleton key={i} variant="rounded" height={72} />
+        ))}
       </Box>
     </Box>
   );

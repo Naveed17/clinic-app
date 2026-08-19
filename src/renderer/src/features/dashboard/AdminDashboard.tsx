@@ -15,6 +15,7 @@ import { useLicense } from '@/features/auth/LicenseModulesContext';
 import type { Token, TokenStatus } from '@/types/token';
 import type { Appointment } from '@/types/appointment';
 import doctorImg from '@/assets/doctor_banner.png';
+import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { ListCardsSkeleton, StatCardsSkeleton } from '@/components/LoadingUI';
 
 const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
@@ -40,14 +41,14 @@ export function AdminDashboard(): React.JSX.Element {
   const totalAppts = appointments.data?.length ?? 0;
 
   // Doctor load calculation
-  const doctorMap = new Map<string, { name: string; initials: string; count: number }>();
+  const doctorMap = new Map<string, { name: string; avatar: string | null; count: number }>();
   (appointments.data ?? []).forEach((a) => {
     if (a.status === 'CANCELLED') return;
     const key = a.provider.id;
     if (!doctorMap.has(key)) {
       doctorMap.set(key, {
         name: `Dr. ${a.provider.firstName} ${a.provider.lastName}`,
-        initials: `${a.provider.firstName[0]}${a.provider.lastName[0]}`.toUpperCase(),
+        avatar: a.provider.avatar ?? null,
         count: 0,
       });
     }
@@ -440,17 +441,7 @@ export function AdminDashboard(): React.JSX.Element {
                       borderRadius: '8px'
                     }}
                   />
-                  <Avatar
-                    sx={{
-                      width: 38,
-                      height: 38,
-                      bgcolor: 'primary.main',
-                      fontSize: 13,
-                      fontWeight: 800
-                    }}
-                  >
-                    {doc.initials}
-                  </Avatar>
+                  <DoctorAvatar src={doc.avatar} name={doc.name} size={38} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="body2" fontWeight={800} noWrap fontSize="0.9rem">
                       {doc.name}

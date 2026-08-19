@@ -117,7 +117,8 @@ export function PatientsPage(): React.JSX.Element {
         <TableHead sx={tableSx.head}>
           <TableRow>
             <TableCell>Patient</TableCell>
-            <TableCell>Contact</TableCell>
+            <TableCell>Allergies</TableCell>
+            <TableCell>Chronic conditions</TableCell>
             <TableCell>Date of Birth</TableCell>
             <TableCell>Blood Group</TableCell>
             <TableCell>Address</TableCell>
@@ -127,15 +128,15 @@ export function PatientsPage(): React.JSX.Element {
         </TableHead>
         <TableBody>
           {patientsQuery.isLoading ? (
-            <TableRowsSkeleton cols={7} />
+            <TableRowsSkeleton cols={8} />
           ) : patients.length === 0 ? (
-            <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No patients found.</TableCell></TableRow>
+            <TableRow><TableCell colSpan={8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No patients found.</TableCell></TableRow>
           ) : (
             patients.map((patient) => {
               const color = getAvatarColor(patient.firstName);
               return (
                 <TableRow key={patient.id} sx={tableSx.row}>
-                  {/* Avatar + Name + extra info */}
+                  {/* Avatar + Name + phone */}
                   <TableCell>
                     <Stack direction="row" alignItems="center" gap={1.5}>
                       <Avatar
@@ -150,34 +151,36 @@ export function PatientsPage(): React.JSX.Element {
                         <Typography fontSize={13.5} fontWeight={600} lineHeight={1.3}>
                           {patient.firstName} {patient.lastName}
                         </Typography>
-                        <Stack direction="row" gap={0.6} flexWrap="wrap" sx={{ mt: 0.4 }}>
-                          {patient.allergies && (
-                            <Chip
-                              label={`⚠ ${patient.allergies}`}
-                              size="small"
-                              sx={{ fontSize: 10, height: 18, bgcolor: alpha(theme.palette.error.main, 0.1), color: 'error.main', fontWeight: 600 }}
-                            />
-                          )}
-                          {patient.chronicConditions && (
-                            <Chip
-                              label={patient.chronicConditions}
-                              size="small"
-                              sx={{ fontSize: 10, height: 18, bgcolor: alpha(theme.palette.secondary.main, 0.1), color: 'secondary.main', fontWeight: 600 }}
-                            />
-                          )}
-                          {!patient.allergies && !patient.chronicConditions && (
-                            <Typography fontSize={11} color="text.secondary">No conditions noted</Typography>
-                          )}
-                        </Stack>
+                        <Typography fontSize={11.5} color="text.secondary">
+                          {patient.phone?.trim() || '—'}
+                        </Typography>
                       </Box>
                     </Stack>
                   </TableCell>
 
-                  {/* Phone + Email */}
-                  <TableCell>
-                    <Typography fontSize={13}>{patient.phone ?? '—'}</Typography>
-                    {patient.email && (
-                      <Typography fontSize={11} color="text.secondary" sx={{ mt: 0.3 }}>{patient.email}</Typography>
+                  {/* Allergies */}
+                  <TableCell sx={{ maxWidth: 180 }}>
+                    {patient.allergies ? (
+                      <Chip
+                        label={`⚠ ${patient.allergies}`}
+                        size="small"
+                        sx={{ fontSize: 10, height: 18, bgcolor: alpha(theme.palette.error.main, 0.1), color: 'error.main', fontWeight: 600 }}
+                      />
+                    ) : (
+                      <Typography fontSize={13} color="text.secondary">—</Typography>
+                    )}
+                  </TableCell>
+
+                  {/* Chronic conditions */}
+                  <TableCell sx={{ maxWidth: 180 }}>
+                    {patient.chronicConditions ? (
+                      <Chip
+                        label={patient.chronicConditions}
+                        size="small"
+                        sx={{ fontSize: 10, height: 18, bgcolor: alpha(theme.palette.secondary.main, 0.1), color: 'secondary.main', fontWeight: 600 }}
+                      />
+                    ) : (
+                      <Typography fontSize={13} color="text.secondary">—</Typography>
                     )}
                   </TableCell>
 

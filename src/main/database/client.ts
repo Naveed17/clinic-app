@@ -189,6 +189,10 @@ export async function initializeDatabase(): Promise<void> {
       FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE
     )
   `);
+  const doctorProfileCols = (await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(DoctorProfile)')).map((r) => r.name);
+  if (!doctorProfileCols.includes('avatar')) {
+    await database.$executeRawUnsafe('ALTER TABLE "DoctorProfile" ADD COLUMN "avatar" TEXT');
+  }
 
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "LabOrder" (
@@ -379,32 +383,8 @@ export async function initializeDatabase(): Promise<void> {
   await ensurePrescriptionPharmacyColumns(database);
 
   // ==========================================
-  // PHARMACY & INVENTORY TABLES
+  // MEDICINE CATALOG (invoice / Rx picker)
   // ==========================================
-
-  await database.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "Supplier" (
-      "id" TEXT NOT NULL PRIMARY KEY,
-      "name" TEXT NOT NULL,
-      "companyName" TEXT,
-      "phone" TEXT,
-      "email" TEXT,
-      "address" TEXT,
-      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" DATETIME NOT NULL
-    )
-  `);
-  await database.$executeRawUnsafe(
-    'CREATE INDEX IF NOT EXISTS "Supplier_name_idx" ON "Supplier"("name")',
-  );
-
-  await database.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "MedicineCategory" (
-      "id" TEXT NOT NULL PRIMARY KEY,
-      "name" TEXT NOT NULL UNIQUE,
-      "description" TEXT
-    )
-  `);
 
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Medicine" (
@@ -417,8 +397,7 @@ export async function initializeDatabase(): Promise<void> {
       "rackNumber" TEXT,
       "minStockAlert" INTEGER NOT NULL DEFAULT 10,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" DATETIME NOT NULL,
-      FOREIGN KEY ("categoryId") REFERENCES "MedicineCategory"("id") ON DELETE SET NULL
+      "updatedAt" DATETIME NOT NULL
     )
   `);
   await database.$executeRawUnsafe(
@@ -498,59 +477,13 @@ export async function initializeDatabase(): Promise<void> {
     }
   }
 
-  await database.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "PurchaseOrder" (
-      "id" TEXT NOT NULL PRIMARY KEY,
-      "invoiceNumber" TEXT NOT NULL UNIQUE,
-      "supplierId" TEXT NOT NULL,
-      "totalAmount" DECIMAL NOT NULL DEFAULT 0,
-      "purchaseDate" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "notes" TEXT,
-      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      "updatedAt" DATETIME NOT NULL,
-      FOREIGN KEY ("supplierId") REFERENCES "Supplier"("id") ON DELETE RESTRICT
-    )
-  `);
-  await database.$executeRawUnsafe(
-    'CREATE INDEX IF NOT EXISTS "PurchaseOrder_supplierId_idx" ON "PurchaseOrder"("supplierId")',
-  );
-
-  await database.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "PurchaseOrderItem" (
-      "id" TEXT NOT NULL PRIMARY KEY,
-      "purchaseId" TEXT NOT NULL,
-      "batchId" TEXT NOT NULL,
-      "quantity" INTEGER NOT NULL,
-      "unitPrice" DECIMAL NOT NULL DEFAULT 0,
-      "lineTotal" DECIMAL NOT NULL DEFAULT 0,
-      FOREIGN KEY ("purchaseId") REFERENCES "PurchaseOrder"("id") ON DELETE CASCADE,
-      FOREIGN KEY ("batchId") REFERENCES "MedicineBatch"("id") ON DELETE RESTRICT
-    )
-  `);
-  await database.$executeRawUnsafe(
-    'CREATE INDEX IF NOT EXISTS "PurchaseOrderItem_purchaseId_idx" ON "PurchaseOrderItem"("purchaseId")',
-  );
-  await database.$executeRawUnsafe(
-    'CREATE INDEX IF NOT EXISTS "PurchaseOrderItem_batchId_idx" ON "PurchaseOrderItem"("batchId")',
-  );
-
-  await database.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "StockMovement" (
-      "id" TEXT NOT NULL PRIMARY KEY,
-      "batchId" TEXT NOT NULL,
-      "type" TEXT NOT NULL,
-      "quantity" INTEGER NOT NULL,
-      "reference" TEXT,
-      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY ("batchId") REFERENCES "MedicineBatch"("id") ON DELETE CASCADE
-    )
-  `);
-  await database.$executeRawUnsafe(
-    'CREATE INDEX IF NOT EXISTS "StockMovement_batchId_idx" ON "StockMovement"("batchId")',
-  );
-  await database.$executeRawUnsafe(
-    'CREATE INDEX IF NOT EXISTS "StockMovement_type_idx" ON "StockMovement"("type")',
-  );
+  await database.$executeRawUnsafe('PRAGMA foreign_keys = OFF');
+  await database.$executeRawUnsafe('DROP TABLE IF EXISTS "StockMovement"');
+  await database.$executeRawUnsafe('DROP TABLE IF EXISTS "PurchaseOrderItem"');
+  await database.$executeRawUnsafe('DROP TABLE IF EXISTS "PurchaseOrder"');
+  await database.$executeRawUnsafe('DROP TABLE IF EXISTS "Supplier"');
+  await database.$executeRawUnsafe('DROP TABLE IF EXISTS "MedicineCategory"');
+  await database.$executeRawUnsafe('PRAGMA foreign_keys = ON');
 }
 
 export async function disconnectPrisma(): Promise<void> {

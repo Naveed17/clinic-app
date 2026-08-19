@@ -40,15 +40,12 @@ export function getSearchScope(
   if (!r) return EMPTY_SCOPE;
 
   const billingOn = licensed(modules, 'billing');
-  const pharmacyOn = licensed(modules, 'pharmacy');
   const labOn = licensed(modules, 'labDashboard');
 
   return {
     patients: r !== 'pharmacist',
     appointments: r === 'admin' || r === 'doctor' || r === 'receptionist',
-    invoices:
-      ((r === 'admin' || r === 'receptionist') && billingOn) ||
-      (r === 'pharmacist' && (pharmacyOn || billingOn)),
+    invoices: (r === 'admin' || r === 'receptionist') && billingOn,
     labOrders: (r === 'admin' || r === 'lab_technician') && labOn,
   };
 }

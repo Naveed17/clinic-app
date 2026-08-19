@@ -22,6 +22,7 @@ export interface InvoicePerson {
   id: string;
   firstName: string;
   lastName: string;
+  phone?: string | null;
 }
 export interface InvoiceItem {
   id: string;

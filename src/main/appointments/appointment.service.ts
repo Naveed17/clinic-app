@@ -49,6 +49,7 @@ export async function listAppointments() {
       a.reason, a.notes, a.recurrenceRule, a.parentId,
       pat.id as patId, pat.firstName as patFirst, pat.lastName as patLast, pat.phone as patPhone,
       prov.id as provId, prov.firstName as provFirst, prov.lastName as provLast, prov.role as provRole,
+      dp.avatar as provAvatar,
       (
         SELECT t.tokenNumber FROM "Token" t
         WHERE t.patientId = a.patientId AND t.doctorId = a.providerId
@@ -58,6 +59,7 @@ export async function listAppointments() {
     FROM "Appointment" a
     JOIN "Patient" pat ON pat.id = a.patientId
     JOIN "User" prov ON prov.id = a.providerId
+    LEFT JOIN "DoctorProfile" dp ON dp.userId = prov.id
     ORDER BY a.createdAt DESC
   `);
   return rows.map((r) => ({
@@ -66,7 +68,7 @@ export async function listAppointments() {
     reason: r.reason, notes: r.notes, recurrenceRule: r.recurrenceRule, parentId: r.parentId,
     tokenNumber: r.tokenNumber != null ? Number(r.tokenNumber) : null,
     patient: { id: r.patId, firstName: r.patFirst, lastName: r.patLast, role: '', phone: r.patPhone ?? null },
-    provider: { id: r.provId, firstName: r.provFirst, lastName: r.provLast, role: r.provRole },
+    provider: { id: r.provId, firstName: r.provFirst, lastName: r.provLast, role: r.provRole, avatar: r.provAvatar ?? null },
   }));
 }
 
@@ -78,11 +80,17 @@ export async function listAppointmentPatients() {
 }
 
 export async function listDoctors() {
-  return getPrisma().user.findMany({
+  const rows = await getPrisma().user.findMany({
     where: { role: 'DOCTOR', isActive: true },
-    select: { id: true, firstName: true, lastName: true },
+    select: { id: true, firstName: true, lastName: true, doctorProfile: { select: { avatar: true } } },
     orderBy: { createdAt: 'desc' },
   });
+  return rows.map((d) => ({
+    id: d.id,
+    firstName: d.firstName,
+    lastName: d.lastName,
+    avatar: d.doctorProfile?.avatar ?? null,
+  }));
 }
 
 async function getAppointmentById(id: string) {
@@ -92,6 +100,7 @@ async function getAppointmentById(id: string) {
       a.reason, a.notes, a.recurrenceRule, a.parentId,
       pat.id as patId, pat.firstName as patFirst, pat.lastName as patLast, pat.phone as patPhone,
       prov.id as provId, prov.firstName as provFirst, prov.lastName as provLast, prov.role as provRole,
+      dp.avatar as provAvatar,
       (
         SELECT t.tokenNumber FROM "Token" t
         WHERE t.patientId = a.patientId AND t.doctorId = a.providerId
@@ -101,6 +110,7 @@ async function getAppointmentById(id: string) {
     FROM "Appointment" a
     JOIN "Patient" pat ON pat.id = a.patientId
     JOIN "User" prov ON prov.id = a.providerId
+    LEFT JOIN "DoctorProfile" dp ON dp.userId = prov.id
     WHERE a.id = ?
     LIMIT 1
   `, id);
@@ -112,7 +122,7 @@ async function getAppointmentById(id: string) {
     reason: r.reason, notes: r.notes, recurrenceRule: r.recurrenceRule, parentId: r.parentId,
     tokenNumber: r.tokenNumber != null ? Number(r.tokenNumber) : null,
     patient: { id: r.patId, firstName: r.patFirst, lastName: r.patLast, role: '', phone: r.patPhone ?? null },
-    provider: { id: r.provId, firstName: r.provFirst, lastName: r.provLast, role: r.provRole },
+    provider: { id: r.provId, firstName: r.provFirst, lastName: r.provLast, role: r.provRole, avatar: r.provAvatar ?? null },
   };
 }
 

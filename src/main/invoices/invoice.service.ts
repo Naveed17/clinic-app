@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { getPrisma } from '../database/client';
-import { dispensePharmacyPrescription } from '../tokens/token.service';
 
 export interface InvoiceItemInput {
   description: string;
@@ -133,11 +132,6 @@ export async function createInvoice(input: InvoiceInput) {
       await transaction.invoice.findUniqueOrThrow({ where: { id: invoice.id }, include }),
     );
   });
-
-  const tokenId = input.tokenId?.trim();
-  if (tokenId) {
-    await dispensePharmacyPrescription(tokenId, { invoiceId: result.id });
-  }
 
   return result;
 }

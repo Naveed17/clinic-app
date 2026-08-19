@@ -37,7 +37,8 @@ import { useNavigate } from 'react-router-dom';
 import type { TokenPerson, Token, PrescriptionFeedItem } from '@/types/token';
 import type { PatientInput } from '@/types/patient';
 import type { Appointment, AppointmentPerson } from '@/types/appointment';
-import { nextFreeSlot, doctorOfflineReason, type SlotAdjustReason } from '@/utils/appointmentSlot';
+import { DoctorAvatar } from '@/components/DoctorAvatar';
+import { nextFreeSlot, doctorOfflineReason, slotSearchFrom, type SlotAdjustReason } from '@/utils/appointmentSlot';
 import imgMask from '@/assets/dashboard/clinic-mask.svg';
 import imgCapsule from '@/assets/dashboard/clinic-capsule.svg';
 import imgVirus from '@/assets/dashboard/clinic-virus.svg';
@@ -542,13 +543,13 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
                       setDate(v ? v.toLocaleDateString('en-CA') : '');
                       return;
                     }
-                    const from = new Date(v.getFullYear(), v.getMonth(), v.getDate(), 0, 0, 0, 0);
+                    const dateStr = v.toLocaleDateString('en-CA');
                     const next = nextFreeSlot({
                       schedule,
                       appointments: doctorAppts,
                       providerId,
                       durationMin: duration,
-                      from,
+                      from: slotSearchFrom(dateStr),
                     });
                     if (next) {
                       setDate(next.date);
@@ -1346,20 +1347,12 @@ export function ReceptionistDashboard(): React.JSX.Element {
                       bgcolor: alpha(theme.palette.primary.main, 0.03),
                     }}
                   >
-                    <Avatar
-                      sx={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 1,
-                        bgcolor: alpha(theme.palette.primary.main, 0.14),
-                        color: 'primary.main',
-                        fontWeight: 800,
-                        fontSize: 13,
-                      }}
-                    >
-                      {doc.firstName[0]}
-                      {doc.lastName[0]}
-                    </Avatar>
+                    <DoctorAvatar
+                      src={doc.avatar}
+                      name={`Dr. ${doc.firstName} ${doc.lastName}`}
+                      size={36}
+                      sx={{ borderRadius: 1 }}
+                    />
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography fontWeight={700} fontSize={13} noWrap>
                         Dr. {doc.firstName} {doc.lastName}
