@@ -3,6 +3,7 @@ import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined
 import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import ReceiptOutlinedIcon from '@mui/icons-material/ReceiptOutlined';
 import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
+import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import {
@@ -23,6 +24,8 @@ import { formatAdvicePreview } from '@/features/tokens/PrescriptionPadPdf';
 import { PatientDocumentsPanel } from './PatientDocumentsPanel';
 import { PatientWhatsAppButton } from './PatientWhatsAppButton';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
+import { LabOrderHistoryCard } from '@/features/lab/LabOrderResultView';
+import type { LabOrder } from '@/types/lab';
 
 const apptStatusColor: Record<string, 'default' | 'primary' | 'warning' | 'success' | 'error'> = {
   SCHEDULED: 'primary', CHECKED_IN: 'warning', COMPLETED: 'success', CANCELLED: 'default', NO_SHOW: 'error',
@@ -266,16 +269,26 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
   const { can } = useLicense();
   const [tab, setTab] = useState(0);
   const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
+  const showLab = can('labDashboard');
 
   const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list, enabled: can('managePatients') });
   const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list, enabled: can('managePatients') });
+  const labOrders = useQuery<LabOrder[]>({
+    queryKey: ['lab-orders'],
+    queryFn: () => window.clinic.lab.list() as Promise<LabOrder[]>,
+    enabled: can('managePatients') && showLab,
+  });
   if (!can('managePatients')) return null;
   const patientAppointments = (appointments.data ?? []).filter((a) => a.patientId === patient.id);
   const patientInvoices = (invoices.data ?? []).filter((i) => i.patient.id === patient.id);
+  const patientLab = (labOrders.data ?? []).filter((o) => o.patientId === patient.id);
   const initials = `${patient.firstName[0]}${patient.lastName[0]}`.toUpperCase();
   const totalPaid = patientInvoices.reduce((sum, inv) => sum + Number(inv.amountPaid ?? 0), 0);
   const totalBilled = patientInvoices.reduce((sum, inv) => sum + Number(inv.total ?? 0), 0);
   const completedAppointments = patientAppointments.filter((a) => a.status === 'COMPLETED').length;
+  const medicalTab = showLab ? 3 : 2;
+  const documentsTab = showLab ? 4 : 3;
+  const prescriptionsTab = showLab ? 5 : 4;
   const softCard = {
     borderRadius: '20px',
     border: '1px solid',
@@ -335,10 +348,13 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
             </Stack>
           </Paper>
 
-          <Box sx={{ display: 'grid', gap: 1.75, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
+          <Box sx={{ display: 'grid', gap: 1.75, gridTemplateColumns: { xs: '1fr 1fr', md: showLab ? 'repeat(5, 1fr)' : 'repeat(4, 1fr)' } }}>
             {[
               { label: 'Appointments', value: patientAppointments.length, icon: <CalendarMonthOutlinedIcon />, bg: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main },
               { label: 'Completed', value: completedAppointments, icon: <MonitorHeartOutlinedIcon />, bg: alpha(theme.palette.success.main, 0.12), color: theme.palette.success.dark },
+              ...(showLab
+                ? [{ label: 'Lab Orders', value: patientLab.length, icon: <BiotechOutlinedIcon />, bg: alpha(theme.palette.info.main, 0.12), color: theme.palette.info.dark }]
+                : []),
               { label: 'Total Billed', value: money(totalBilled), icon: <ReceiptOutlinedIcon />, bg: alpha(theme.palette.warning.main, 0.12), color: theme.palette.warning.dark },
               { label: 'Paid', value: money(totalPaid), icon: <ReceiptOutlinedIcon />, bg: alpha(theme.palette.info.main, 0.12), color: theme.palette.info.dark },
             ].map((card) => (
@@ -372,6 +388,9 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
       >
         <Tab icon={<CalendarMonthOutlinedIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Appointments" />
         <Tab icon={<ReceiptOutlinedIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Billing" />
+        {showLab && (
+          <Tab icon={<BiotechOutlinedIcon sx={{ fontSize: 16 }} />} iconPosition="start" label={`Lab (${patientLab.length})`} />
+        )}
         <Tab icon={<MonitorHeartOutlinedIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Medical Info" />
         <Tab icon={<InsertDriveFileOutlinedIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Documents" />
         <Tab icon={<MedicalServicesOutlinedIcon sx={{ fontSize: 16 }} />} iconPosition="start" label="Prescriptions" />
@@ -488,7 +507,17 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
               </Stack>
         )}
 
-        {tab === 2 && (
+        {showLab && tab === 2 && (
+          patientLab.length === 0
+            ? <EmptyState icon={<BiotechOutlinedIcon sx={{ fontSize: 40 }} />} text="Lab test orders for this patient will show here." />
+            : <Stack spacing={1} sx={{ p: 2 }}>
+                {[...patientLab]
+                  .sort((a, b) => new Date(b.orderedAt).getTime() - new Date(a.orderedAt).getTime())
+                  .map((o) => <LabOrderHistoryCard key={o.id} order={o} />)}
+              </Stack>
+        )}
+
+        {tab === medicalTab && (
           <Box sx={{ p: 2 }}>
             <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' } }}>
               {[
@@ -507,8 +536,8 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
           </Box>
         )}
 
-        {tab === 3 && <PatientDocumentsPanel patient={patient} />}
-        {tab === 4 && <PrescriptionsTab patientId={patient.id} patient={patient} />}
+        {tab === documentsTab && <PatientDocumentsPanel patient={patient} />}
+        {tab === prescriptionsTab && <PrescriptionsTab patientId={patient.id} patient={patient} />}
       </DialogContent>
 
       <DialogActions sx={{ px: 2.5, py: 1.75, borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.default', flexShrink: 0, gap: 1 }}>

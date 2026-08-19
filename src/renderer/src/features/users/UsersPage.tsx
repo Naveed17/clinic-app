@@ -38,7 +38,7 @@ import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, 
 import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogFormSx, dialogPaperProps,
+  dialogFormSx, dialogPaperProps, telInputDialogProps,
 } from '@/components/DialogUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { DoctorAvatar, DoctorAvatarPicker } from '@/components/DoctorAvatar';
@@ -176,7 +176,7 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
   const { errors } = form.formState;
 
   return (
-    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
+    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps} {...telInputDialogProps}>
       <FormDialogTitle
         title={isEditing ? 'Edit user' : 'Add user'}
         subtitle={isEditing ? 'Update account role and access.' : 'Create a new staff account.'}
@@ -240,7 +240,7 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
                   control={form.control}
                   name="doctorProfile.phone"
                   render={({ field }) => (
-                    <PhoneInputField label="Contact phone" value={field.value} onChange={field.onChange} />
+                    <PhoneInputField label="Contact phone" value={field.value ?? ''} onChange={field.onChange} />
                   )}
                 />
                 <TextField fullWidth label="Bio" multiline minRows={2} {...form.register('doctorProfile.bio')} />

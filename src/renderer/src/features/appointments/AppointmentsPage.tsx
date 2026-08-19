@@ -49,6 +49,7 @@ import {
   dialogFormSx, dialogPaperProps,
 } from '@/components/DialogUI';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
 
@@ -114,8 +115,8 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
   onIssued: (token: Token) => void;
 }) {
   const qc = useQueryClient();
-  const { user } = useAuth();
-  const showLabReason = user?.role !== 'receptionist';
+  const { can } = useLicense();
+  const showLabReason = can('labDashboard');
   const [reason, setReason] = useState('');
   const mutation = useMutation({
     mutationFn: () =>
@@ -173,7 +174,8 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const showLabReason = user?.role !== 'receptionist';
+  const { can } = useLicense();
+  const showLabReason = can('labDashboard');
   const [slotNotice, setSlotNotice] = useState<SlotAdjustReason | null>(null);
   const isEdit = !!appointment;
   const schema = z.object({

@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import {
   FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogFormSx, dialogPaperProps,
+  dialogFormSx, dialogPaperProps, telInputDialogProps,
 } from '@/components/DialogUI';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
@@ -115,7 +115,7 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
   const { errors } = form.formState;
 
   return (
-    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
+    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps} {...telInputDialogProps}>
       <FormDialogTitle
         title={isEditing ? 'Edit patient' : 'Add patient'}
         subtitle={isEditing ? 'Update patient details and medical info.' : 'Register a new patient in the clinic.'}
@@ -128,8 +128,8 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
               <TextField autoFocus fullWidth label="First name" error={Boolean(errors.firstName)} helperText={errors.firstName?.message} {...form.register('firstName')} />
               <TextField fullWidth label="Last name" error={Boolean(errors.lastName)} helperText={errors.lastName?.message} {...form.register('lastName')} />
             </Box>
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
                 <Controller
                   name="dateOfBirth"
                   control={form.control}
@@ -142,19 +142,19 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
                     />
                   )}
                 />
-                <Controller
-                  name="phone"
-                  control={form.control}
-                  render={({ field }) => (
-                    <PhoneInputField
-                      label="Phone"
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
-                  )}
-                />
-              </Box>
-            </LocalizationProvider>
+              </LocalizationProvider>
+              <Controller
+                name="phone"
+                control={form.control}
+                render={({ field }) => (
+                  <PhoneInputField
+                    label="Phone"
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            </Box>
             <TextField fullWidth label="Email" type="email" error={Boolean(errors.email)} helperText={errors.email?.message} {...form.register('email')} />
             <TextField fullWidth label="Address" minRows={2} multiline {...form.register('address')} />
             <Typography color="text.secondary" variant="subtitle2">Emergency contact</Typography>
@@ -166,7 +166,7 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
                 render={({ field }) => (
                   <PhoneInputField
                     label="Phone"
-                    value={field.value}
+                    value={field.value ?? ''}
                     onChange={field.onChange}
                   />
                 )}

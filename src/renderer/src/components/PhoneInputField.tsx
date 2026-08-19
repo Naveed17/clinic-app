@@ -1,7 +1,8 @@
 import type { JSX } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getCountryCallingCode, parsePhoneNumberFromString } from 'libphonenumber-js';
 import { MuiTelInput, type MuiTelInputCountry, type MuiTelInputInfo, type MuiTelInputProps } from 'mui-tel-input';
-import { toWhatsAppNumber } from '@shared/whatsappPhone';
+import { toPhoneDigits } from '@shared/whatsappPhone';
 
 export type PhoneInputFieldProps = Omit<
   MuiTelInputProps,
@@ -13,13 +14,17 @@ export type PhoneInputFieldProps = Omit<
   defaultCountry?: MuiTelInputCountry;
 };
 
-/** Stored 92300… / 97150… → +92300… / +97150… for the input. */
+function digitsOf(raw: string | null | undefined): string {
+  return String(raw || '').replace(/\D/g, '');
+}
+
+/** Stored 92300… / 97150… → +92300… / +97150… when hydrating from outside the input. */
 function toTelValue(raw: string | null | undefined, defaultCountry: MuiTelInputCountry): string {
-  const n = String(raw || '').replace(/\D/g, '');
+  const n = digitsOf(raw);
   if (!n) return '';
   const parsed =
     parsePhoneNumberFromString(`+${n}`) || parsePhoneNumberFromString(n, defaultCountry);
-  if (parsed?.countryCallingCode) return parsed.number;
+  if (parsed?.number && digitsOf(parsed.number) === n) return parsed.number;
   if (n.startsWith('0')) {
     try {
       return `+${getCountryCallingCode(defaultCountry)}${n.replace(/^0+/, '')}`;
@@ -39,22 +44,38 @@ export function PhoneInputField({
   onChange,
   defaultCountry = 'PK',
   fullWidth = true,
+  MenuProps,
   ...rest
 }: PhoneInputFieldProps): JSX.Element {
+  const incoming = digitsOf(value);
+  const [display, setDisplay] = useState(() => toTelValue(value, defaultCountry));
+  const lastEmitted = useRef(incoming);
+
+  useEffect(() => {
+    if (incoming === lastEmitted.current) return;
+    lastEmitted.current = incoming;
+    setDisplay(toTelValue(value, defaultCountry));
+  }, [incoming, value, defaultCountry]);
+
   return (
     <MuiTelInput
       {...rest}
       fullWidth={fullWidth}
       defaultCountry={defaultCountry}
       forceCallingCode
+      disableFormatting
+      focusOnSelectCountry
       preferredCountries={['PK', 'US', 'GB', 'AE', 'SA']}
-      value={toTelValue(value, defaultCountry)}
+      MenuProps={{ disableAutoFocusItem: true, sx: { zIndex: 2000 }, ...MenuProps }}
+      value={display}
       onChange={(next, info: MuiTelInputInfo) => {
-        const e164 = info.numberValue || next;
+        setDisplay(next);
         const cc = info.countryCallingCode || '';
-        const out = toWhatsAppNumber(e164, cc) || '';
-        // Clearing the field leaves the forced calling code behind — treat that as empty.
-        onChange(out === cc ? '' : out);
+        // Use the typed string, not info.numberValue — that is often just +92
+        // until the national number is complete, which wipes digits as you type.
+        const out = toPhoneDigits(next, cc);
+        lastEmitted.current = out;
+        onChange(out);
       }}
     />
   );

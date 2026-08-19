@@ -34,6 +34,8 @@ import { PatientDialog } from './PatientDialog';
 import { PatientDocumentsPanel } from './PatientDocumentsPanel';
 import { PatientWhatsAppButton } from './PatientWhatsAppButton';
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
+import { LabOrderHistoryCard } from '@/features/lab/LabOrderResultView';
+import type { LabOrder } from '@/types/lab';
 
 const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
 
@@ -50,9 +52,6 @@ const invoiceLeftBorder: Record<string, string> = {
   PAID: 'success.main', PARTIALLY_PAID: 'warning.main', DRAFT: 'info.main', VOID: 'error.main',
 };
 
-const labLeftBorder: Record<string, string> = {
-  COMPLETED: 'success.main', IN_PROGRESS: 'primary.main', PENDING: 'warning.main', CANCELLED: 'error.main',
-};
 
 function EmptyState({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
   const theme = useTheme();
@@ -221,9 +220,7 @@ export function PatientProfilePage(): React.JSX.Element {
   const { user } = useAuth();
   const { can } = useLicense();
   const isAdmin = user?.role === 'admin';
-  const showLab =
-    can('labDashboard') &&
-    (user?.role === 'admin' || user?.role === 'doctor' || user?.role === 'lab_technician');
+  const showLab = can('labDashboard');
   const showBilling = can('billing');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -238,9 +235,9 @@ export function PatientProfilePage(): React.JSX.Element {
 
   const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list, enabled: showBilling });
-  const labOrders = useQuery<{ id: string; test: string; status: string; result: string | null; orderedAt: string; patientId: string }[]>({
+  const labOrders = useQuery<LabOrder[]>({
     queryKey: ['lab-orders'],
-    queryFn: () => window.clinic.lab.list() as Promise<{ id: string; test: string; status: string; result: string | null; orderedAt: string; patientId: string }[]>,
+    queryFn: () => window.clinic.lab.list() as Promise<LabOrder[]>,
     enabled: showLab,
   });
 
@@ -503,40 +500,7 @@ export function PatientProfilePage(): React.JSX.Element {
                     <Stack spacing={1} sx={{ p: 2, maxHeight: 480, overflowY: 'auto' }}>
                       {[...patientLab]
                         .sort((a, b) => new Date(b.orderedAt).getTime() - new Date(a.orderedAt).getTime())
-                        .map((o) => (
-                          <Box
-                            key={o.id}
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 1,
-                              bgcolor: alpha(theme.palette.info.main, 0.03),
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              borderLeft: '4px solid',
-                              borderLeftColor: labLeftBorder[o.status] ?? 'divider',
-                            }}
-                          >
-                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1}>
-                              <Box sx={{ flex: 1, minWidth: 0 }}>
-                                <Typography fontWeight={700} fontSize={14}>{o.test}</Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  Ordered {new Date(o.orderedAt).toLocaleDateString()}
-                                </Typography>
-                                {o.result && (
-                                  <Typography variant="body2" sx={{ mt: 0.75, fontSize: 13, color: 'text.primary' }}>
-                                    Result: {o.result}
-                                  </Typography>
-                                )}
-                              </Box>
-                              <Chip
-                                label={o.status.replace('_', ' ')}
-                                size="small"
-                                color={o.status === 'COMPLETED' ? 'success' : o.status === 'IN_PROGRESS' ? 'primary' : o.status === 'CANCELLED' ? 'error' : 'warning'}
-                                sx={{ ...chipSx, fontWeight: 700, borderRadius: 1, flexShrink: 0 }}
-                              />
-                            </Stack>
-                          </Box>
-                        ))}
+                        .map((o) => <LabOrderHistoryCard key={o.id} order={o} />)}
                     </Stack>
                   )
                 )}

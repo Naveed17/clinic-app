@@ -31,7 +31,11 @@ export function normalizeSearchRole(role: string | undefined | null): SearchRole
   return null;
 }
 
-/** What global search may return — role access AND purchased license modules. */
+/**
+ * What global search may return.
+ * Lab *records* follow the labDashboard license (same as patient history).
+ * Lab *page* access stays role-gated separately (`/lab` = admin + lab technician).
+ */
 export function getSearchScope(
   role: string | undefined | null,
   modules: Record<string, boolean> | undefined,
@@ -46,7 +50,7 @@ export function getSearchScope(
     patients: r !== 'pharmacist',
     appointments: r === 'admin' || r === 'doctor' || r === 'receptionist',
     invoices: (r === 'admin' || r === 'receptionist') && billingOn,
-    labOrders: (r === 'admin' || r === 'lab_technician') && labOn,
+    labOrders: r !== 'pharmacist' && labOn,
   };
 }
 

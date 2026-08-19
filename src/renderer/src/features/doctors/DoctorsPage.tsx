@@ -35,7 +35,7 @@ import { tableSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, T
 import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogFormSx, dialogPaperProps,
+  dialogFormSx, dialogPaperProps, telInputDialogProps,
 } from '@/components/DialogUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { DoctorAvatar, DoctorAvatarPicker } from '@/components/DoctorAvatar';
@@ -149,7 +149,7 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
   const { errors } = form.formState;
 
   return (
-    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
+    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps} {...telInputDialogProps}>
       <FormDialogTitle
         title={isEditing ? 'Edit doctor' : 'Add doctor'}
         subtitle={isEditing ? 'Update doctor profile and account.' : 'Register a new doctor account.'}
@@ -203,7 +203,7 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
               control={form.control}
               name="phone"
               render={({ field }) => (
-                <PhoneInputField label="Contact phone" value={field.value} onChange={field.onChange} />
+                <PhoneInputField label="Contact phone" value={field.value ?? ''} onChange={field.onChange} />
               )}
             />
             <TextField fullWidth label="Bio" multiline minRows={2} {...form.register('bio')} />

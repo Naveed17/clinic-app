@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import {
   FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps,
+  dialogPaperProps, telInputDialogProps,
 } from '@/components/DialogUI';
 import { ListCardsSkeleton } from '@/components/LoadingUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
@@ -73,6 +73,8 @@ const STEPS = ['Register Patient', 'Issue Token', 'Print Token'];
 
 function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
+  const { can } = useLicense();
+  const showLabReason = can('labDashboard');
   const [step, setStep] = useState(0);
   const [createdToken, setCreatedToken] = useState<Token | null>(null);
   const [patientId, setPatientId] = useState('');
@@ -165,7 +167,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   }
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
+    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps} {...telInputDialogProps}>
       <FormDialogTitle title="Walk-in Registration" subtitle="Register a patient and issue a token." />
       <DialogContent sx={dialogContentSx}>
         <Stepper activeStep={step} sx={{ mb: 3 }}>
@@ -200,7 +202,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
                     name="phone"
                     control={form.control}
                     render={({ field }) => (
-                      <PhoneInputField label="Phone (optional)" value={field.value} onChange={field.onChange} />
+                      <PhoneInputField label="Phone (optional)" value={field.value ?? ''} onChange={field.onChange} />
                     )}
                   />
                   <TextField label="Address (optional)" {...form.register('address')} />
@@ -240,7 +242,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
               <InputLabel>Reason (optional)</InputLabel>
               <Select label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)}>
                 <MenuItem value="">— None —</MenuItem>
-                {['Checkup', 'Follow-up', 'Urgent', 'Consultation', 'Vaccination'].map((r) => (
+                {['Checkup', 'Follow-up', 'Urgent', 'Consultation', ...(showLabReason ? ['Lab Results'] : []), 'Vaccination'].map((r) => (
                   <MenuItem key={r} value={r}>{r}</MenuItem>
                 ))}
               </Select>
@@ -326,6 +328,8 @@ const APPT_STEPS = ['Add Patient', 'Create Appointment'];
 
 function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
+  const { can } = useLicense();
+  const showLabReason = can('labDashboard');
   const [step, setStep] = useState(0);
   const [patientId, setPatientId] = useState('');
   const [patientName, setPatientName] = useState('');
@@ -442,7 +446,7 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
   const canSubmitAppt = !!patientId && !!providerId && !!date && !!time && !offlineReason;
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
+    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps} {...telInputDialogProps}>
       <FormDialogTitle title="Book Appointment" subtitle="Add a patient and schedule an appointment." />
       <DialogContent sx={dialogContentSx}>
         <Stepper activeStep={done ? 2 : step} sx={{ mb: 3 }}>
@@ -480,7 +484,7 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
                     name="phone"
                     control={form.control}
                     render={({ field }) => (
-                      <PhoneInputField label="Phone (optional)" value={field.value} onChange={field.onChange} />
+                      <PhoneInputField label="Phone (optional)" value={field.value ?? ''} onChange={field.onChange} />
                     )}
                   />
                   <TextField label="Address (optional)" {...form.register('address')} />
@@ -604,7 +608,7 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
               <InputLabel>Reason (optional)</InputLabel>
               <Select label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)}>
                 <MenuItem value="">— None —</MenuItem>
-                {['Checkup', 'Follow-up', 'Urgent', 'Consultation', 'Vaccination'].map((r) => (
+                {['Checkup', 'Follow-up', 'Urgent', 'Consultation', ...(showLabReason ? ['Lab Results'] : []), 'Vaccination'].map((r) => (
                   <MenuItem key={r} value={r}>{r}</MenuItem>
                 ))}
               </Select>

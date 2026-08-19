@@ -50,6 +50,7 @@ import {
 import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
 import { printTokenSlip } from '@/utils/printTokenSlip';
 import { POS_PAPER, POS_RECEIPT } from '@shared/invoicePaper';
+import { labResultPreview } from '@/features/lab/labReportPayload';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
   WAITING: { label: 'Waiting', color: 'warning' },
@@ -70,8 +71,8 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   onSuccess?: (token: Token) => void;
 }) {
   const qc = useQueryClient();
-  const { user } = useAuth();
-  const showLabReason = user?.role !== 'receptionist';
+  const { can } = useLicense();
+  const showLabReason = can('labDashboard');
   const [patientId, setPatientId] = useState(defaultPatientId ?? '');
   const [doctorId, setDoctorId] = useState(defaultDoctorId ?? '');
   const [notes, setNotes] = useState('');
@@ -268,7 +269,8 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
   const qc = useQueryClient();
   const { user } = useAuth();
   const { can } = useLicense();
-  const showLab = can('labDashboard') && user?.role !== 'receptionist';
+  const showLab = can('labDashboard');
+  const canOrderLab = showLab && user?.role !== 'receptionist';
   const emptyMed = (): PrescriptionMedicine => ({ name: '', dosage: '', duration: '', instructions: '' });
   const [diagnosis, setDiagnosis] = useState(token.prescription?.diagnosis ?? '');
   const [medicines, setMedicines] = useState<PrescriptionMedicine[]>(
@@ -341,6 +343,7 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
             {showLab && (
             <Box>
               <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Lab Orders</Typography>
+              {canOrderLab && (
               <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
                 <TextField
                   size="small"
@@ -360,6 +363,7 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
                   Order
                 </Button>
               </Stack>
+              )}
               {labOrders.length > 0 && (
                 <Stack spacing={0.5}>
                   {labOrders.map((o) => (
@@ -371,7 +375,11 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
                         variant="outlined"
                       />
                       <Typography variant="caption" color="text.secondary">{o.status.replace('_', ' ')}</Typography>
-                      {o.result && <Typography variant="caption" color="text.secondary">— {o.result}</Typography>}
+                      {o.result && (
+                        <Typography variant="caption" color="text.secondary">
+                          — {labResultPreview(o.result)}
+                        </Typography>
+                      )}
                     </Box>
                   ))}
                 </Stack>

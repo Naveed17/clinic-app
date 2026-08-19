@@ -13,10 +13,14 @@ import {
 
 export function createLabRouter(io: SocketIOServer): Router {
   const router = Router();
+  /** Lab page work: status, results, patient picker for new orders. */
   const labStaff = requireRole(['admin', 'lab_technician']);
-  const labReaders = requireRole(['admin', 'doctor', 'lab_technician']);
+  /** Read lab records (history / search / token) — not the Lab page. */
+  const labRecordReaders = requireRole(['admin', 'doctor', 'receptionist', 'lab_technician']);
+  /** Create orders from doctor/lab workflows. */
+  const labOrderers = requireRole(['admin', 'doctor', 'lab_technician']);
 
-  router.get('/', labReaders, async (_req, res) => {
+  router.get('/', labRecordReaders, async (_req, res) => {
     res.json(await listLabOrders());
   });
 
@@ -24,11 +28,11 @@ export function createLabRouter(io: SocketIOServer): Router {
     res.json(await labPatients());
   });
 
-  router.get('/by-token/:tokenId', labReaders, async (req, res) => {
+  router.get('/by-token/:tokenId', labRecordReaders, async (req, res) => {
     res.json(await listLabOrdersByToken(String(req.params.tokenId)));
   });
 
-  router.post('/', labReaders, async (req, res) => {
+  router.post('/', labOrderers, async (req, res) => {
     const order = await createLabOrder(req.body);
     emitDataChange(io, 'lab', 'created');
     emitNotification(io, {

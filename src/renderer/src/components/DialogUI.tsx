@@ -54,6 +54,12 @@ export const dialogFormSx = {
   overflow: 'hidden',
 } as const;
 
+/** MuiTelInput / country menu inside Dialog — without this, digits often cannot be typed. */
+export const telInputDialogProps: Pick<DialogProps, 'disableEnforceFocus' | 'disableRestoreFocus'> = {
+  disableEnforceFocus: true,
+  disableRestoreFocus: true,
+};
+
 export const dialogCancelBtnSx = {
   borderRadius: 2,
   fontWeight: 700,

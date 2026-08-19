@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import {
   FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogFormSx, dialogPaperProps,
+  dialogFormSx, dialogPaperProps, telInputDialogProps,
 } from '@/components/DialogUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { DoctorAvatarPicker } from '@/components/DoctorAvatar';
@@ -109,7 +109,7 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
   }
 
   return (
-    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
+    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps} {...telInputDialogProps}>
       <FormDialogTitle title="Edit Doctor" subtitle="Update account details and doctor profile." />
       <Box
         component="form"
@@ -146,7 +146,7 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
               control={form.control}
               name="phone"
               render={({ field }) => (
-                <PhoneInputField label="Contact phone" value={field.value} onChange={field.onChange} />
+                <PhoneInputField label="Contact phone" value={field.value ?? ''} onChange={field.onChange} />
               )}
             />
             <TextField fullWidth label="Bio" multiline minRows={2} {...form.register('bio')} />
