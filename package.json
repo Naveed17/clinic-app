@@ -1,6 +1,6 @@
 {
   "name": "care-flow",
-  "version": "1.0.45",
+  "version": "1.0.46",
   "repository": {
     "type": "git",
     "url": "https://github.com/Naveed17/clinic-app.git"
@@ -34,10 +34,6 @@
       "package.json"
     ],
     "extraResources": [
-      {
-        "from": "prisma",
-        "to": "prisma"
-      },
       {
         "from": "node_modules/@prisma/client",
         "to": "node_modules/@prisma/client"
