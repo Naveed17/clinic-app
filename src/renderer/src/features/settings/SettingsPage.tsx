@@ -24,6 +24,8 @@ import LaptopOutlinedIcon from '@mui/icons-material/LaptopOutlined';
 import DevicesOutlinedIcon from '@mui/icons-material/DevicesOutlined';
 import BackupOutlinedIcon from '@mui/icons-material/BackupOutlined';
 import RestoreOutlinedIcon from '@mui/icons-material/RestoreOutlined';
+import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
+import CloudDownloadOutlinedIcon from '@mui/icons-material/CloudDownloadOutlined';
 import SystemUpdateAltOutlinedIcon from '@mui/icons-material/SystemUpdateAltOutlined';
 import WifiTetheringOutlinedIcon from '@mui/icons-material/WifiTetheringOutlined';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
@@ -96,6 +98,11 @@ export function SettingsPage(): React.JSX.Element {
   const [lanIp, setLanIp] = useState<string>('...');
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
+  const [migrateLoading, setMigrateLoading] = useState(false);
+  const [migrateProgress, setMigrateProgress] = useState<{ percent: number; label: string }>({
+    percent: 0,
+    label: 'Starting…',
+  });
   const [saving, setSaving] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [logoError, setLogoError] = useState('');
@@ -109,6 +116,18 @@ export function SettingsPage(): React.JSX.Element {
     void window.clinic?.update?.getVersion?.().then((ver: string) => {
       if (ver) setCurrentVersion(ver);
     });
+  }, []);
+
+  useEffect(() => {
+    const unsub = window.clinic?.backup?.onMigrateProgress?.((progress) => {
+      setMigrateProgress({
+        percent: Math.min(100, Math.max(0, Math.round(progress.percent))),
+        label: progress.label || 'Transferring…',
+      });
+    });
+    return () => {
+      unsub?.();
+    };
   }, []);
 
   // Listen to Context downloading & error state changes dynamically
@@ -166,6 +185,73 @@ export function SettingsPage(): React.JSX.Element {
       showAppToast({ type: 'success', message: 'Restore successful. Please restart the app.' });
     } else {
       showAppToast({ type: 'error', message: result?.error ?? 'Restore failed.' });
+    }
+  }
+
+  async function handleMigrateToCloud() {
+    if (!isAdmin) {
+      showAppToast({ type: 'error', message: 'Only an admin can migrate local data.' });
+      return;
+    }
+    const confirmed = window.confirm(
+      'Copy this PC’s offline clinic (patients, visits, invoices, lab, documents and images) into Online DB?\n\nCloud clinic must be empty. Local SQLite stays on this PC as a backup.',
+    );
+    if (!confirmed) return;
+    setMigrateProgress({ percent: 0, label: 'Starting…' });
+    setMigrateLoading(true);
+    try {
+      const result = await window.clinic?.backup.migrateToCloud();
+      if (result?.ok) {
+        const files = result.files;
+        const extra = files
+          ? ` Documents: ${files.uploaded} uploaded, ${files.skipped} skipped, ${files.failed} failed.`
+          : '';
+        showAppToast({ type: 'success', message: `Local clinic copied to Online DB.${extra}` });
+      } else {
+        showAppToast({ type: 'error', message: result?.error ?? 'Migration failed.' });
+      }
+    } catch (err) {
+      showAppToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Migration failed.',
+      });
+    } finally {
+      setMigrateLoading(false);
+    }
+  }
+
+  async function handleMigrateFromCloud() {
+    if (!isAdmin) {
+      showAppToast({ type: 'error', message: 'Only an admin can copy Online data to this PC.' });
+      return;
+    }
+    const confirmed = window.confirm(
+      'Replace this PC’s local clinic.db with the current Online DB (patients, visits, invoices, lab, documents and images)?\n\nThis overwrites local data. After it finishes, switch the license to Local mode and this copy will open.',
+    );
+    if (!confirmed) return;
+    setMigrateProgress({ percent: 0, label: 'Starting…' });
+    setMigrateLoading(true);
+    try {
+      const result = await window.clinic?.backup.migrateFromCloud();
+      if (result?.ok) {
+        const files = result.files;
+        const extra = files
+          ? ` Documents: ${files.uploaded} downloaded, ${files.skipped} skipped, ${files.failed} failed.`
+          : '';
+        showAppToast({
+          type: 'success',
+          message: `Online clinic copied to this PC.${extra} Switch the license to Local to use it.`,
+        });
+      } else {
+        showAppToast({ type: 'error', message: result?.error ?? 'Download from Online DB failed.' });
+      }
+    } catch (err) {
+      showAppToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Download from Online DB failed.',
+      });
+    } finally {
+      setMigrateLoading(false);
     }
   }
 
@@ -929,11 +1015,57 @@ export function SettingsPage(): React.JSX.Element {
                 Full backup (.zip) includes the database plus patient/lab documents so images and PDFs work after restore on another PC. Legacy .db-only backups are still supported.
               </Typography>
               {isOnline ? (
-                <Alert severity="info">
-                  Online database mode — clinic data lives in the cloud (Neon). Local Backup & Restore is disabled because it only copies the offline SQLite file.
-                </Alert>
+                <Stack spacing={2}>
+                  <Alert severity="info">
+                    Online database is on. Local ZIP backup is disabled. Copy local → Online (empty cloud only), or copy Online → this PC so you can switch the license back to Local with the latest cloud data.
+                  </Alert>
+                  {isAdmin && (
+                    migrateLoading ? (
+                      <Box sx={{ width: '100%', pt: 0.5 }}>
+                        <Stack
+                          direction="row"
+                          justifyContent="space-between"
+                          alignItems="center"
+                          sx={{ mb: 0.75 }}
+                        >
+                          <Typography variant="body2" color="text.secondary" fontWeight={600} noWrap>
+                            {migrateProgress.label}
+                          </Typography>
+                          <Typography variant="body2" color="primary.main" fontWeight={800} sx={{ ml: 2 }}>
+                            {migrateProgress.percent}%
+                          </Typography>
+                        </Stack>
+                        <LinearProgress
+                          variant="determinate"
+                          value={migrateProgress.percent}
+                          sx={{ height: 10, borderRadius: 5 }}
+                        />
+                      </Box>
+                    ) : (
+                      <Stack direction="row" gap={1.5} flexWrap="wrap">
+                        <Button
+                          variant="contained"
+                          startIcon={<CloudUploadOutlinedIcon />}
+                          onClick={() => void handleMigrateToCloud()}
+                        >
+                          Migrate local data to Online DB
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          startIcon={<CloudDownloadOutlinedIcon />}
+                          onClick={() => void handleMigrateFromCloud()}
+                        >
+                          Copy Online DB to this PC
+                        </Button>
+                      </Stack>
+                    )
+                  )}
+                </Stack>
               ) : (
                 <Stack spacing={2}>
+                  <Alert severity="info">
+                    Local mode uses this PC’s clinic.db. To bring the latest Online data here, turn Online Database on, click Copy Online DB to this PC, then switch the license back to Local.
+                  </Alert>
                   <Stack direction="row" gap={1.5} flexWrap="wrap">
                     <Button
                       variant="outlined"

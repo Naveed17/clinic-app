@@ -37,6 +37,7 @@ import { registerBackupIpc } from './backup/backup.ipc';
 import { registerDocumentsIpc } from './backup/documents.ipc';
 import { registerTokenIpc } from './tokens/token.ipc';
 import { registerLabIpc } from './lab/lab.ipc';
+import { registerChatIpc } from './chat/chat.ipc';
 import { registerLicenseIpc, isLicenseActivated, getLicenseRuntimeMeta } from './license/license.ipc';
 import { registerAuthIpc } from './auth/auth.ipc';
 import { registerSearchIpc } from './search/search.ipc';
@@ -238,6 +239,7 @@ app.whenReady().then(async () => {
   registerDocumentsIpc();
   registerTokenIpc(backendServer?.io);
   registerLabIpc(backendServer?.io);
+  registerChatIpc(backendServer?.io);
   registerAuthIpc();
   registerScheduleIpc();
   registerPatientIpc(backendServer?.io);

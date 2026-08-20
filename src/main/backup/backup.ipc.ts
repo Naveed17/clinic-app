@@ -15,6 +15,8 @@ import AdmZip from 'adm-zip';
 import { disconnectPrisma, getPrisma } from '../database/client';
 import { getDocumentsRoot, resolveDocPath, toStoredDocPath } from './docs-paths';
 import { isOnlineDatabaseMode } from '../config/settings';
+import { registerMigrateToCloudIpc } from './migrate-to-cloud.ipc';
+import { registerMigrateFromCloudIpc } from './migrate-from-cloud.ipc';
 
 function getDbPath(): string {
   return join(app.getPath('userData'), 'clinic.db');
@@ -172,4 +174,6 @@ export function registerBackupIpc(): void {
       }
     }
   });
+  registerMigrateToCloudIpc();
+  registerMigrateFromCloudIpc();
 }

@@ -9,6 +9,7 @@ import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
 import LocalHospitalOutlinedIcon from '@mui/icons-material/LocalHospitalOutlined';
 import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined';
+import ChatOutlinedIcon from '@mui/icons-material/ChatOutlined';
 import type { ReactNode } from 'react';
 import type { UserRole } from '@/features/auth/AuthContext';
 import type { AppRoute } from '@/app/access';
@@ -33,6 +34,7 @@ const ALL_NAV_ITEMS: NavigationItem[] = [
   { label: 'Doctors',      path: '/doctors',      icon: <LocalHospitalOutlinedIcon /> },
   { label: 'Schedule',     path: '/schedule',     icon: <EventAvailableOutlinedIcon /> },
   { label: 'Users',        path: '/users',        icon: <ManageAccountsOutlinedIcon /> },
+  { label: 'Chat',         path: '/chat',         icon: <ChatOutlinedIcon /> },
 ];
 
 export function getNavItems(role: UserRole, modules: LicenseModules | undefined): NavigationItem[] {

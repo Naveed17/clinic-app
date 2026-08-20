@@ -65,16 +65,32 @@ function stripApiSuffix(url: string): string {
     .replace(/\/api$/i, '');
 }
 
-function isLocalhostOrigin(url: string): boolean {
-  return !url || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(url);
+export function isUnusableOnlineOrigin(url: string): boolean {
+  if (!url) return true;
+  try {
+    const host = new URL(url.includes('://') ? url : `http://${url}`).hostname
+      .replace(/^\[|\]$/g, '')
+      .toLowerCase();
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0') return true;
+    const parts = host.split('.').map(Number);
+    if (parts.length === 4 && parts.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
+      if (parts[0] === 10) return true;
+      if (parts[0] === 192 && parts[1] === 168) return true;
+      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+      if (parts[0] === 169 && parts[1] === 254) return true;
+    }
+    return false;
+  } catch {
+    return true;
+  }
 }
 
 /** Resolve live API origin for online mode (env → hardcoded Vercel → saved). */
 export function resolveOnlineApiOrigin(savedClinicalApiUrl = ''): string {
   const fromEnv = stripApiSuffix(process.env.API_BASE_URL || '');
-  if (fromEnv && !isLocalhostOrigin(fromEnv)) return fromEnv;
+  if (fromEnv && !isUnusableOnlineOrigin(fromEnv)) return fromEnv;
   const saved = stripApiSuffix(savedClinicalApiUrl);
-  if (saved && !isLocalhostOrigin(saved)) return saved;
+  if (saved && !isUnusableOnlineOrigin(saved)) return saved;
   return ONLINE_API_ORIGIN;
 }
 

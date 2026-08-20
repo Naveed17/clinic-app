@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { ChatWidget } from '@/features/chat/ChatWidget';
 
 export function AppShell(): React.JSX.Element {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -36,6 +37,7 @@ export function AppShell(): React.JSX.Element {
           </Box>
         </Box>
       </Box>
+      <ChatWidget />
     </Box>
   );
 }

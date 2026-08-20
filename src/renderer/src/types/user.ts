@@ -18,6 +18,7 @@ export interface User {
   email: string;
   role: UserRole;
   isActive: boolean;
+  avatar?: string | null;
   createdAt: string;
   updatedAt: string;
   doctorProfile: DoctorProfile | null;
@@ -39,6 +40,7 @@ export interface UserInput {
   password: string;
   role: UserRole;
   isActive: boolean;
+  avatar?: string | null;
   doctorProfile?: DoctorProfileInput;
 }
 
@@ -49,6 +51,7 @@ export interface UserUpdateInput {
   role: UserRole;
   isActive: boolean;
   password?: string;
+  avatar?: string | null;
   doctorProfile?: DoctorProfileInput;
 }
 

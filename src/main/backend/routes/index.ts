@@ -11,6 +11,7 @@ import { createPatientsRouter } from './patients.routes';
 import { createReportsRouter } from './reports.routes';
 import { createScheduleRouter } from './schedule.routes';
 import { createSearchRouter } from './search.routes';
+import { createChatRouter } from './chat.routes';
 import { createMedicinesRouter } from './medicines.routes';
 
 export function registerRoutes(app: Express, io: SocketIOServer): void {
@@ -25,5 +26,6 @@ export function registerRoutes(app: Express, io: SocketIOServer): void {
   app.use('/api/doctors', createDoctorsRouter(io));
   app.use('/api/schedule', createScheduleRouter());
   app.use('/api/search', createSearchRouter());
+  app.use('/api/chat', createChatRouter(io));
   app.use('/api/medicines', createMedicinesRouter());
 }

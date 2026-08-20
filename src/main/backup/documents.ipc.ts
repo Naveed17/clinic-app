@@ -71,7 +71,7 @@ function r2ErrorMessage(status: number, body: string): string {
 }
 
 /** PUT to R2 with only the headers the presigned URL actually signed. */
-function putPresignedObject(
+export function putPresignedObject(
   uploadUrl: string,
   body: Buffer,
   contentType: string,

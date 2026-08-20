@@ -24,6 +24,7 @@ export interface LicenseModules {
   pharmacy: boolean;
   whatsapp: boolean;
   ai: boolean;
+  chat: boolean;
   [key: string]: boolean;
 }
 
@@ -41,6 +42,7 @@ const MODULE_KEYS = [
   'pharmacy',
   'whatsapp',
   'ai',
+  'chat',
 ] as const satisfies ReadonlyArray<keyof LicenseModules>;
 
 const NO_MODULES_ENABLED: LicenseModules = {
@@ -57,6 +59,7 @@ const NO_MODULES_ENABLED: LicenseModules = {
   pharmacy: false,
   whatsapp: false,
   ai: false,
+  chat: false,
 };
 
 /** Only known keys; missing/invalid → false (opt-in). */

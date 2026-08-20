@@ -81,6 +81,23 @@ function toQueryString(input: unknown): string {
   return params.toString();
 }
 
+function isOnlineDbSuspendedResponse(status: number, raw: string): boolean {
+  if (status !== 403) return false;
+  const text = String(raw || '');
+  if (/online database service suspended/i.test(text)) return true;
+  try {
+    const json = JSON.parse(text) as { message?: unknown; error?: unknown };
+    const parts = [json.message, json.error]
+      .flatMap((v) => (Array.isArray(v) ? v : [v]))
+      .map(String);
+    return parts.some((p) => /online database service suspended/i.test(p));
+  } catch {
+    return false;
+  }
+}
+
+let cloudSuspendSwitching = false;
+
 function onlineErrorMessage(raw: string, status: number): string {
   const text = String(raw || '').trim();
   if (text) {
@@ -127,6 +144,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (!response.ok) {
     const raw = await response.text();
+    if (isOnlineClient && isOnlineDbSuspendedResponse(response.status, raw) && !cloudSuspendSwitching) {
+      cloudSuspendSwitching = true;
+      try {
+        await ipcRenderer.invoke('license:cloud-suspended');
+      } catch {
+        /* main relaunch may abort this call */
+      }
+    }
     throw new Error(onlineErrorMessage(raw, response.status));
   }
   if (response.status === 204) return undefined as T;
@@ -389,10 +414,19 @@ const api = {
         'doctors:delete', id,
       ),
   },
-  backup: {
-    create: () => ipc('backup:create'),
-    restore: () => ipc('backup:restore'),
-  },
+      backup: {
+        create: () => ipc('backup:create'),
+        restore: () => ipc('backup:restore'),
+        migrateToCloud: () => ipc('backup:migrate-to-cloud'),
+        migrateFromCloud: () => ipc('backup:migrate-from-cloud'),
+        onMigrateProgress: (handler: (progress: { percent: number; label: string }) => void) => {
+          const listener = (_: unknown, progress: { percent: number; label: string }) => handler(progress);
+          ipcRenderer.on('backup:migrate-progress', listener);
+          return () => {
+            ipcRenderer.removeListener('backup:migrate-progress', listener);
+          };
+        },
+      },
   docs: {
     patient: {
       list: (patientId: string) =>
@@ -576,6 +610,28 @@ const api = {
         'lab:save-result', id, result,
       ),
   },
+  chat: {
+    list: (roomId?: string) =>
+      call(
+        () => request(`/api/chat/messages?roomId=${encodeURIComponent(roomId || 'staff')}`),
+        'chat:list', roomId,
+      ),
+    staff: () =>
+      call(
+        () => request('/api/chat/staff'),
+        'chat:staff',
+      ),
+    inbox: (userId?: string) =>
+      call(
+        () => request(`/api/chat/inbox?userId=${encodeURIComponent(userId || '')}`),
+        'chat:inbox', userId,
+      ),
+    send: (input: unknown) =>
+      call(
+        () => request('/api/chat/messages', { method: 'POST', body: JSON.stringify(input) }),
+        'chat:send', input,
+      ),
+  },
   realtime: {
     connect: async () => {
       await settingsReady;
@@ -587,6 +643,14 @@ const api = {
         ...(isOnlineClient && onlineLicenseKey ? { licenseKey: onlineLicenseKey } : {}),
       };
       if (!activeSocket.connected) activeSocket.connect();
+    },
+    identify: async (userId: string) => {
+      const activeSocket = await ensureSocket();
+      const id = String(userId || '').trim();
+      if (!id) return;
+      activeSocket.auth = { ...(activeSocket.auth as object), userId: id };
+      if (!activeSocket.connected) activeSocket.connect();
+      activeSocket.emit('presence:join', { userId: id });
     },
     disconnect: () => {
       socket?.disconnect();
@@ -615,6 +679,32 @@ const api = {
       return () => {
         cancelled = true;
         active?.off('notification:new', handler);
+      };
+    },
+    onChatMessage: (handler: (message: unknown) => void) => {
+      let active: Socket | undefined;
+      let cancelled = false;
+      void ensureSocket().then((s) => {
+        if (cancelled) return;
+        active = s;
+        s.on('chat:message', handler);
+      });
+      return () => {
+        cancelled = true;
+        active?.off('chat:message', handler);
+      };
+    },
+    onPresence: (handler: (payload: { userIds: string[] }) => void) => {
+      let active: Socket | undefined;
+      let cancelled = false;
+      void ensureSocket().then((s) => {
+        if (cancelled) return;
+        active = s;
+        s.on('presence:update', handler);
+      });
+      return () => {
+        cancelled = true;
+        active?.off('presence:update', handler);
       };
     },
   },

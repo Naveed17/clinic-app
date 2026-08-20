@@ -24,6 +24,7 @@ export interface UserInput {
   password: string;
   role: 'ADMIN' | 'DOCTOR' | 'RECEPTIONIST' | 'LAB_TECHNICIAN' | 'PHARMACIST';
   isActive: boolean;
+  avatar?: string | null;
   doctorProfile?: DoctorProfileInput;
 }
 
@@ -34,6 +35,7 @@ export interface UserUpdateInput {
   role: 'ADMIN' | 'DOCTOR' | 'RECEPTIONIST' | 'LAB_TECHNICIAN' | 'PHARMACIST';
   isActive: boolean;
   password?: string;
+  avatar?: string | null;
   doctorProfile?: DoctorProfileInput;
 }
 
@@ -48,6 +50,32 @@ const userSelect = {
   updatedAt: true,
   doctorProfile: true,
 } satisfies Prisma.UserSelect;
+
+function staffAvatar(input: { avatar?: string | null; doctorProfile?: DoctorProfileInput }): string | null {
+  const fromUser = input.avatar?.trim();
+  if (fromUser) return fromUser;
+  const fromDoctor = input.doctorProfile?.avatar?.trim();
+  return fromDoctor || null;
+}
+
+async function saveUserAvatar(id: string, avatar: string | null): Promise<void> {
+  await getPrisma().$executeRawUnsafe('UPDATE "User" SET "avatar" = ? WHERE id = ?', avatar, id);
+}
+
+async function withAvatars<T extends { id: string; doctorProfile?: { avatar?: string | null } | null }>(
+  users: T[],
+): Promise<Array<T & { avatar: string | null }>> {
+  if (!users.length) return [];
+  const rows = await getPrisma().$queryRawUnsafe<Array<{ id: string; avatar: string | null }>>(
+    `SELECT id, avatar FROM "User" WHERE id IN (${users.map(() => '?').join(',')})`,
+    ...users.map((user) => user.id),
+  );
+  const map = new Map(rows.map((row) => [row.id, row.avatar]));
+  return users.map((user) => ({
+    ...user,
+    avatar: map.get(user.id) || user.doctorProfile?.avatar || null,
+  }));
+}
 
 export async function listUsers({ page, pageSize, search }: UserListInput) {
   const prisma = getPrisma();
@@ -70,13 +98,14 @@ export async function listUsers({ page, pageSize, search }: UserListInput) {
     }),
     prisma.user.count({ where }),
   ]);
-  return { data, total };
+  return { data: await withAvatars(data), total };
 }
 
 export async function createUser(input: UserInput) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const bcrypt = require('bcryptjs') as typeof import('bcryptjs');
-  return getPrisma().user.create({
+  const avatar = staffAvatar(input);
+  const created = await getPrisma().user.create({
     data: {
       firstName: input.firstName.trim(),
       lastName: input.lastName.trim(),
@@ -93,7 +122,7 @@ export async function createUser(input: UserInput) {
                 experienceYears: input.doctorProfile.experienceYears ?? 0,
                 phone: input.doctorProfile.phone?.trim() || null,
                 bio: input.doctorProfile.bio?.trim() || null,
-                avatar: input.doctorProfile.avatar?.trim() || null,
+                avatar,
               },
             },
           }
@@ -101,12 +130,18 @@ export async function createUser(input: UserInput) {
     },
     select: userSelect,
   });
+  await saveUserAvatar(created.id, avatar);
+  const [withPhoto] = await withAvatars([created]);
+  return withPhoto;
 }
 
 export async function updateUser(id: string, input: UserUpdateInput) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const bcrypt = require('bcryptjs') as typeof import('bcryptjs');
   const prisma = getPrisma();
+  const avatar = input.avatar !== undefined || input.doctorProfile?.avatar !== undefined
+    ? staffAvatar(input)
+    : undefined;
 
   if (input.role !== 'DOCTOR') {
     const existing = await prisma.user.findUnique({ where: { id }, select: { doctorProfile: { select: { id: true } } } });
@@ -132,7 +167,7 @@ export async function updateUser(id: string, input: UserUpdateInput) {
                 experienceYears: input.doctorProfile.experienceYears ?? 0,
                 phone: input.doctorProfile.phone?.trim() || null,
                 bio: input.doctorProfile.bio?.trim() || null,
-                avatar: input.doctorProfile.avatar?.trim() || null,
+                avatar: avatar ?? null,
               },
               update: {
                 specialization: input.doctorProfile.specialization.trim(),
@@ -140,16 +175,17 @@ export async function updateUser(id: string, input: UserUpdateInput) {
                 experienceYears: input.doctorProfile.experienceYears ?? 0,
                 phone: input.doctorProfile.phone?.trim() || null,
                 bio: input.doctorProfile.bio?.trim() || null,
-                ...(input.doctorProfile.avatar !== undefined
-                  ? { avatar: input.doctorProfile.avatar?.trim() || null }
-                  : {}),
+                ...(avatar !== undefined ? { avatar } : {}),
               },
             },
           },
         }
       : {}),
   };
-  return prisma.user.update({ where: { id }, data, select: userSelect });
+  const updated = await prisma.user.update({ where: { id }, data, select: userSelect });
+  if (avatar !== undefined) await saveUserAvatar(id, avatar);
+  const [withPhoto] = await withAvatars([updated]);
+  return withPhoto;
 }
 
 export async function deleteUser(id: string): Promise<void> {

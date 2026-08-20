@@ -93,7 +93,7 @@ export async function listDoctors({ page, pageSize, search }: DoctorListInput) {
 export async function createDoctor(input: DoctorInput) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const bcrypt = require('bcryptjs') as typeof import('bcryptjs');
-  return getPrisma().user.create({
+  const created = await getPrisma().user.create({
     data: {
       firstName: input.firstName.trim(),
       lastName: input.lastName.trim(),
@@ -114,13 +114,19 @@ export async function createDoctor(input: DoctorInput) {
     },
     select: doctorSelect,
   });
+  await getPrisma().$executeRawUnsafe(
+    'UPDATE "User" SET "avatar" = ? WHERE id = ?',
+    input.avatar?.trim() || null,
+    created.id,
+  );
+  return created;
 }
 
 export async function updateDoctor(id: string, input: DoctorUpdateInput) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const bcrypt = require('bcryptjs') as typeof import('bcryptjs');
   const hasProfile = input.specialization !== undefined;
-  return getPrisma().user.update({
+  const updated = await getPrisma().user.update({
     where: { id },
     data: {
       ...(input.firstName !== undefined ? { firstName: input.firstName.trim() } : {}),
@@ -153,6 +159,14 @@ export async function updateDoctor(id: string, input: DoctorUpdateInput) {
     },
     select: doctorSelect,
   });
+  if (input.avatar !== undefined) {
+    await getPrisma().$executeRawUnsafe(
+      'UPDATE "User" SET "avatar" = ? WHERE id = ?',
+      input.avatar?.trim() || null,
+      id,
+    );
+  }
+  return updated;
 }
 
 export async function deleteDoctor(id: string): Promise<void> {

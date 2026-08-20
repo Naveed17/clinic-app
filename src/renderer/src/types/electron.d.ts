@@ -5,6 +5,7 @@ import type { Invoice, InvoiceInput, InvoicePerson } from './invoice';
 import type { ReportSummary } from './report';
 import type { LabOrder } from './lab';
 import type { GlobalSearchResult } from './search';
+import type { ChatMessage, ChatMessageInput } from './chat';
 
 declare global {
   interface Window {
@@ -62,10 +63,20 @@ declare global {
       reports: {
         summary: () => Promise<ReportSummary>;
       };
+      chat: {
+        list: (roomId?: string) => Promise<ChatMessage[]>;
+        staff: () => Promise<import('./chat').ChatStaff[]>;
+        inbox: (userId?: string) => Promise<import('./chat').ChatInboxItem[]>;
+        send: (input: ChatMessageInput) => Promise<ChatMessage>;
+      };
       realtime: {
         connect: () => Promise<void>;
+        identify: (userId: string) => Promise<void>;
         disconnect: () => void;
         onNotification: (handler: (notification: unknown) => void) => () => void;
+        onDataChanged: (handler: (e: { entity: string; action: string }) => void) => () => void;
+        onChatMessage: (handler: (message: unknown) => void) => () => void;
+        onPresence: (handler: (payload: { userIds: string[] }) => void) => () => void;
       };
       users: {
         list: (input: unknown) => Promise<unknown>;
@@ -166,6 +177,19 @@ declare global {
       backup: {
         create: () => Promise<{ ok: boolean; canceled?: boolean; path?: string; error?: string }>;
         restore: () => Promise<{ ok: boolean; canceled?: boolean; error?: string }>;
+        migrateToCloud: () => Promise<{
+          ok: boolean;
+          error?: string;
+          imported?: Record<string, number>;
+          files?: { uploaded: number; skipped: number; failed: number };
+        }>;
+        migrateFromCloud: () => Promise<{
+          ok: boolean;
+          error?: string;
+          imported?: Record<string, number>;
+          files?: { uploaded: number; skipped: number; failed: number };
+        }>;
+        onMigrateProgress: (handler: (progress: { percent: number; label: string }) => void) => () => void;
       };
       docs: {
         patient: {

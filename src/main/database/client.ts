@@ -49,10 +49,15 @@ export async function initializeDatabase(): Promise<void> {
       "passwordHash" TEXT NOT NULL,
       "role" TEXT NOT NULL DEFAULT 'RECEPTIONIST',
       "isActive" BOOLEAN NOT NULL DEFAULT true,
+      "avatar" TEXT,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" DATETIME NOT NULL
     )
   `);
+  const userCols = (await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(User)')).map((r) => r.name);
+  if (!userCols.includes('avatar')) {
+    await database.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN "avatar" TEXT');
+  }
 
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Patient" (
@@ -193,6 +198,18 @@ export async function initializeDatabase(): Promise<void> {
   if (!doctorProfileCols.includes('avatar')) {
     await database.$executeRawUnsafe('ALTER TABLE "DoctorProfile" ADD COLUMN "avatar" TEXT');
   }
+  await database.$executeRawUnsafe(`
+    UPDATE "User" SET "avatar" = (
+      SELECT dp.avatar FROM "DoctorProfile" dp
+       WHERE dp."userId" = "User".id AND dp.avatar IS NOT NULL AND TRIM(dp.avatar) <> ''
+       LIMIT 1
+    )
+    WHERE ("avatar" IS NULL OR TRIM("avatar") = '')
+      AND EXISTS (
+        SELECT 1 FROM "DoctorProfile" dp
+         WHERE dp."userId" = "User".id AND dp.avatar IS NOT NULL AND TRIM(dp.avatar) <> ''
+      )
+  `);
 
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "LabOrder" (
@@ -441,6 +458,21 @@ export async function initializeDatabase(): Promise<void> {
   );
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "MedicineBatch_quantity_idx" ON "MedicineBatch"("quantity")',
+  );
+
+  await database.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "ChatMessage" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "roomId" TEXT NOT NULL DEFAULT 'staff',
+      "senderId" TEXT NOT NULL,
+      "senderName" TEXT NOT NULL,
+      "role" TEXT NOT NULL DEFAULT '',
+      "message" TEXT NOT NULL,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "ChatMessage_roomId_createdAt_idx" ON "ChatMessage"("roomId", "createdAt")',
   );
 
   // Migrate legacy flat stock/price into MedicineBatch (one-time, when old columns still exist)

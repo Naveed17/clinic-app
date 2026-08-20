@@ -16,6 +16,7 @@ import { LoginPage } from '@/features/auth/LoginPage';
 import { TokensPage } from '@/features/tokens/TokensPage';
 import { WaitingRoomPage } from '@/features/waiting-room/WaitingRoomPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
+import { ChatPage } from '@/features/chat/ChatPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { RouteAccessGate } from '@/components/RouteAccessGate';
 import { LicensePage } from '@/features/auth/LicensePage';
@@ -135,6 +136,14 @@ const router = createHashRouter([
             element: (
               <RouteAccessGate route="/waiting-room">
                 <WaitingRoomPage />
+              </RouteAccessGate>
+            ),
+          },
+          {
+            path: '/chat',
+            element: (
+              <RouteAccessGate route="/chat">
+                <ChatPage />
               </RouteAccessGate>
             ),
           },

@@ -11,6 +11,7 @@ const ENTITY_QUERY_MAP: Record<string, string[]> = {
   prescription: ['prescription-feed', 'tokens'],
   lab: ['lab-orders', 'lab-patients', 'lab-orders-token'],
   medicine: ['medicines'],
+  chat: ['chat'],
 };
 
 export function useRealtimeInvalidation(): void {

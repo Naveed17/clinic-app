@@ -3,7 +3,7 @@ import { machineIdSync } from 'node-machine-id';
 import { join } from 'node:path';
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import os from 'node:os';
-import { saveSettings, saveDatabaseModeSettings, type DatabaseMode, resolveOnlineApiOrigin } from '../config/settings';
+import { saveSettings, saveDatabaseModeSettings, type DatabaseMode, resolveOnlineApiOrigin, isUnusableOnlineOrigin } from '../config/settings';
 
 const API_BASE_URL = process.env.API_BASE_URL || 'https://clinic-license-six.vercel.app/api';
 
@@ -17,9 +17,7 @@ function normalizeClinicalApiUrl(raw: string): string {
 }
 
 function isUsableClinicalApiUrl(url: string): boolean {
-  if (!url) return false;
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(url)) return false;
-  return true;
+  return Boolean(url) && !isUnusableOnlineOrigin(url);
 }
 function getLicenseFilePath(): string {
   return join(app.getPath('userData'), 'license.dat');
@@ -64,6 +62,7 @@ type ModulesCache = { key: string; modules: Record<string, boolean>; updatedAt: 
 type LicenseCache = {
   key: string;
   expiresAt: string | null;
+  licenseType?: 'monthly' | 'lifetime';
   activatedAt: string;
   updatedAt: string;
   databaseMode?: DatabaseMode;
@@ -80,6 +79,7 @@ export type LicenseGate =
 
 const DISABLED_FALLBACK =
   'This license has been disabled. Contact CareFlow customer support.';
+const EXPIRED_REASON = 'License has expired. Contact CareFlow customer support.';
 
 function getHWID(): string {
   try { return machineIdSync(); } catch { return 'UNKNOWN_HWID'; }
@@ -132,6 +132,7 @@ function rememberGate(key: string, lastGate: 'ok' | 'blocked', lastReason?: stri
     const cache: LicenseCache = {
       key,
       expiresAt: existing?.expiresAt ?? null,
+      licenseType: existing?.licenseType,
       activatedAt: existing?.activatedAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       databaseMode: existing?.databaseMode ?? 'local',
@@ -144,6 +145,17 @@ function rememberGate(key: string, lastGate: 'ok' | 'blocked', lastReason?: stri
   } catch { /* ignore */ }
 }
 
+function toIsoExpiry(value: unknown): string | null {
+  if (value == null || value === '') return null;
+  const date = new Date(value as string);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
+function asLicenseType(value: unknown): 'monthly' | 'lifetime' | undefined {
+  return value === 'monthly' || value === 'lifetime' ? value : undefined;
+}
+
 function saveLicenseCache(
   key: string,
   expiresAt: string | null,
@@ -151,6 +163,7 @@ function saveLicenseCache(
     databaseMode?: DatabaseMode;
     clinicalApiUrl?: string | null;
     schemaId?: string | null;
+    licenseType?: 'monthly' | 'lifetime';
     lastGate?: 'ok' | 'blocked';
     lastReason?: string;
   },
@@ -160,6 +173,7 @@ function saveLicenseCache(
     const cache: LicenseCache = {
       key,
       expiresAt,
+      licenseType: extra?.licenseType ?? existing?.licenseType,
       activatedAt: existing?.activatedAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       databaseMode: extra?.databaseMode ?? existing?.databaseMode ?? 'local',
@@ -186,6 +200,7 @@ function getCachedModules(key: string): Record<string, boolean> | null {
 export function isLicenseModuleEnabled(moduleKey: string): boolean {
   const savedKey = getSavedKey();
   if (!savedKey) return false;
+  if (isLocallyExpired(savedKey)) return false;
   const modules = getCachedModules(savedKey);
   return modules?.[moduleKey] === true;
 }
@@ -196,8 +211,12 @@ function saveModulesCache(key: string, modules: Record<string, boolean>): void {
 }
 function isLocallyExpired(key: string): boolean {
   const cache = getLicenseCache(key);
-  if (!cache || !cache.expiresAt) return false;
-  return new Date() > new Date(cache.expiresAt);
+  if (!cache) return false;
+  if (cache.licenseType === 'monthly' && !cache.expiresAt) return true;
+  if (!cache.expiresAt) return false;
+  const end = new Date(cache.expiresAt);
+  if (Number.isNaN(end.getTime())) return cache.licenseType === 'monthly';
+  return Date.now() > end.getTime();
 }
 
 function clearLocalLicense(): void {
@@ -233,20 +252,25 @@ type LicenseApiExtras = {
   schemaId?: string | null;
   onlineDatabase?: boolean;
   localDatabase?: boolean;
+  licenseType?: string;
 };
 
-function applyDatabaseModeFromApi(key: string, data: LicenseApiExtras & { expiresAt?: string | null }): void {
+function applyDatabaseModeFromApi(key: string, data: LicenseApiExtras & { expiresAt?: string | Date | null }): void {
   const databaseMode: DatabaseMode =
     data.databaseMode === 'online' || data.onlineDatabase === true ? 'online' : 'local';
   const fromApi = normalizeClinicalApiUrl(data.clinicalApiUrl || '');
   // Prefer env/live origin when API returns empty or localhost (common on Vercel without PUBLIC_API_BASE_URL)
   const clinicalApiUrl = isUsableClinicalApiUrl(fromApi) ? fromApi : apiOriginFromEnv();
   const schemaId = (data.schemaId || '').trim();
+  const existing = getLicenseCache(key);
+  const expiresAt =
+    data.expiresAt !== undefined ? toIsoExpiry(data.expiresAt) : (existing?.expiresAt ?? null);
 
-  saveLicenseCache(key, data.expiresAt ?? null, {
+  saveLicenseCache(key, expiresAt, {
     databaseMode,
     clinicalApiUrl: databaseMode === 'online' ? clinicalApiUrl || null : null,
     schemaId: schemaId || null,
+    licenseType: asLicenseType(data.licenseType),
     lastGate: 'ok',
   });
 
@@ -273,6 +297,7 @@ const KNOWN_MODULE_KEYS = [
   'pharmacy',
   'whatsapp',
   'ai',
+  'chat',
 ] as const;
 
 function normalizeModulesPayload(modules?: Record<string, boolean> | null): Record<string, boolean> {
@@ -289,6 +314,7 @@ function normalizeModulesPayload(modules?: Record<string, boolean> | null): Reco
 export async function getLicenseModules(): Promise<Record<string, boolean> | null> {
   const savedKey = getSavedKey();
   if (!savedKey) return null;
+  if (isLocallyExpired(savedKey)) return null;
   try {
     const response = await fetch(`${API_BASE_URL}/license/modules`, {
       method: 'POST',
@@ -297,19 +323,31 @@ export async function getLicenseModules(): Promise<Record<string, boolean> | nul
     });
     const data = (await response.json()) as {
       ok: boolean;
+      error?: string;
       modules?: Record<string, boolean>;
       expiresAt?: string | null;
     } & LicenseApiExtras;
     if (!data.ok || !data.modules) {
+      const expired = /expir/i.test(String(data.error || ''));
+      if (expired) {
+        const nextExpiry = toIsoExpiry(data.expiresAt) ?? getLicenseCache(savedKey)?.expiresAt ?? null;
+        saveLicenseCache(savedKey, nextExpiry, { lastGate: 'blocked', lastReason: EXPIRED_REASON });
+        return null;
+      }
       const cached = getCachedModules(savedKey);
       return cached ? normalizeModulesPayload(cached) : null;
     }
 
     applyDatabaseModeFromApi(savedKey, data);
+    if (isLocallyExpired(savedKey)) {
+      rememberGate(savedKey, 'blocked', EXPIRED_REASON);
+      return null;
+    }
     const normalized = normalizeModulesPayload(data.modules);
     saveModulesCache(savedKey, normalized);
     return normalized;
   } catch {
+    if (isLocallyExpired(savedKey)) return null;
     const cached = getCachedModules(savedKey);
     return cached ? normalizeModulesPayload(cached) : null;
   }
@@ -344,15 +382,18 @@ export async function getLicenseGate(): Promise<LicenseGate> {
       return { state: 'blocked', reason };
     }
     applyDatabaseModeFromApi(savedKey, data);
+    if (isLocallyExpired(savedKey)) {
+      rememberGate(savedKey, 'blocked', EXPIRED_REASON);
+      return { state: 'blocked', reason: EXPIRED_REASON };
+    }
     return { state: 'ok' };
   } catch {
     const cache = getLicenseCache(savedKey);
+    if (isLocallyExpired(savedKey)) {
+      return { state: 'blocked', reason: EXPIRED_REASON };
+    }
     if (cache?.lastGate === 'blocked') {
       return { state: 'blocked', reason: cache.lastReason || DISABLED_FALLBACK };
-    }
-    if (isLocallyExpired(savedKey)) {
-      console.warn('[License] Offline — license expiry date has passed.');
-      return { state: 'blocked', reason: 'License has expired. Contact CareFlow customer support.' };
     }
     return { state: 'ok' };
   }
@@ -395,6 +436,24 @@ export function registerLicenseIpc(): void {
       schemaId: meta.schemaId,
     };
   });
+
+    ipcMain.handle('license:cloud-suspended', () => {
+      const key = getSavedKey();
+      if (key) {
+        applyDatabaseModeFromApi(key, { databaseMode: 'local', onlineDatabase: false });
+      } else {
+        saveDatabaseModeSettings({
+          databaseMode: 'local',
+          clinicalApiUrl: '',
+          schemaId: '',
+        });
+      }
+      setTimeout(() => {
+        app.relaunch();
+        app.exit(0);
+      }, 50);
+      return { ok: true };
+    });
 
   ipcMain.handle('license:activate', async (_e, key: string) => {
     const formattedKey = key.trim().toUpperCase();
