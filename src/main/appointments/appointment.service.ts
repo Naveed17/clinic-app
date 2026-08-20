@@ -82,14 +82,21 @@ export async function listAppointmentPatients() {
 export async function listDoctors() {
   const rows = await getPrisma().user.findMany({
     where: { role: 'DOCTOR', isActive: true },
-    select: { id: true, firstName: true, lastName: true, doctorProfile: { select: { avatar: true } } },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      avatar: true,
+      doctorProfile: { select: { avatar: true, consultationFee: true } },
+    },
     orderBy: { createdAt: 'desc' },
   });
   return rows.map((d) => ({
     id: d.id,
     firstName: d.firstName,
     lastName: d.lastName,
-    avatar: d.doctorProfile?.avatar ?? null,
+    avatar: d.avatar || d.doctorProfile?.avatar || null,
+    consultationFee: Number(d.doctorProfile?.consultationFee ?? 0),
   }));
 }
 
@@ -170,8 +177,12 @@ async function assertSlotFree(
   }
 }
 
-/** Walk-in / token: if this start is taken, jump +30 min or to the overlapping visit end. */
-async function resolveFreeSlot(
+/**
+ * Walk-in / token: prefer the next free 30-min slot inside doctor hours.
+ * If the day is packed or hours have ended, keep the requested time so the queue
+ * still works (overbook / after-hours walk-in). Never throws for a full calendar.
+ */
+async function resolveWalkInSlot(
   providerId: string,
   startsAt: Date,
   endsAt: Date,
@@ -199,16 +210,14 @@ async function resolveFreeSlot(
 
   for (let i = 0; i < 48; i++) {
     const candidateEnd = new Date(cursor.getTime() + durationMs);
-    if (candidateEnd.getTime() > windowEnd.getTime()) {
-      throw new Error('No free slot left in doctor hours today. Pick another time or doctor.');
-    }
+    if (candidateEnd.getTime() > windowEnd.getTime()) break;
     const clash = await findClash(providerId, cursor, candidateEnd, excludeId);
     if (!clash) return { startsAt: cursor, endsAt: candidateEnd };
     const afterHit = asDate(clash.endsAt).getTime();
     const plusStep = cursor.getTime() + SLOT_STEP_MS;
     cursor = new Date(Math.max(afterHit, plusStep));
   }
-  throw new Error('This time slot is busy. No free slot found today.');
+  return { startsAt, endsAt };
 }
 
 export async function createAppointment(input: AppointmentInput) {
@@ -262,7 +271,8 @@ export async function createAppointment(input: AppointmentInput) {
 /**
  * Token / walk-in: same patient + doctor + day → update existing appointment
  * instead of inserting a duplicate card (same token #).
- * New walk-ins auto-shift to the next free 30-min slot (or after the overlapping visit).
+ * New walk-ins prefer the next free 30-min slot; if none remain, still create
+ * the visit so issuing a token never fails on a full calendar.
  */
 export async function ensureSameDayAppointment(input: AppointmentInput) {
   await assertProviderActive(input.providerId);
@@ -308,13 +318,16 @@ export async function ensureSameDayAppointment(input: AppointmentInput) {
     return getAppointmentById(target.id);
   }
 
-  const resolved = await resolveFreeSlot(input.providerId, startsAt, endsAt);
-  return createAppointment({
-    ...input,
-    startsAt: resolved.startsAt.toISOString(),
-    endsAt: resolved.endsAt.toISOString(),
-    recurrenceRule: null,
+  const resolved = await resolveWalkInSlot(input.providerId, startsAt, endsAt);
+  const created = await getPrisma().appointment.create({
+    data: toData({
+      ...input,
+      startsAt: resolved.startsAt.toISOString(),
+      endsAt: resolved.endsAt.toISOString(),
+      recurrenceRule: null,
+    }),
   });
+  return getAppointmentById(created.id);
 }
 
 export async function updateAppointment(id: string, input: AppointmentInput) {

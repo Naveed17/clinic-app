@@ -15,6 +15,7 @@ export interface LicenseModules {
   labDashboard: boolean;
   billing: boolean;
   reports: boolean;
+  opdReports: boolean;
   statistics: boolean;
   tokens: boolean;
   manageDoctors: boolean;
@@ -33,6 +34,7 @@ const MODULE_KEYS = [
   'labDashboard',
   'billing',
   'reports',
+  'opdReports',
   'statistics',
   'tokens',
   'manageDoctors',
@@ -50,6 +52,7 @@ const NO_MODULES_ENABLED: LicenseModules = {
   labDashboard: false,
   billing: false,
   reports: false,
+  opdReports: false,
   statistics: false,
   tokens: false,
   manageDoctors: false,
@@ -74,6 +77,7 @@ export function normalizeLicenseModules(
   next.pharmacy = false;
   next.billing = true;
   next.manageMedicines = true;
+  next.reports = true;
   return next;
 }
 

@@ -49,7 +49,7 @@ const apptLeftBorder: Record<string, string> = {
 };
 
 const invoiceLeftBorder: Record<string, string> = {
-  PAID: 'success.main', PARTIALLY_PAID: 'warning.main', DRAFT: 'info.main', VOID: 'error.main',
+  PAID: 'success.main', PARTIALLY_PAID: 'warning.main', DRAFT: 'info.main', VOID: 'error.main', REFUNDED: 'error.main',
 };
 
 

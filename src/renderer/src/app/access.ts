@@ -10,6 +10,8 @@ export type AppRoute =
   | '/tokens'
   | '/waiting-room'
   | '/billing'
+  | '/opd-reports'
+  | '/medicines'
   | '/lab'
   | '/statistics'
   | '/users'
@@ -21,12 +23,14 @@ export type AppRoute =
 /** Which roles can access each route */
 export const ROUTE_ACCESS: Record<AppRoute, UserRole[]> = {
   '/dashboard':    ['admin', 'doctor', 'receptionist', 'lab_technician', 'pharmacist'],
-  '/patients':     ['admin', 'doctor', 'receptionist', 'lab_technician'],
-  '/patients/:id': ['admin', 'doctor', 'receptionist', 'lab_technician'],
-  '/appointments': ['admin', 'doctor', 'receptionist'],
-  '/tokens':       ['admin', 'receptionist'],
+  '/patients':     ['doctor', 'receptionist', 'lab_technician'],
+  '/patients/:id': ['doctor', 'receptionist', 'lab_technician'],
+  '/appointments': ['doctor', 'receptionist'],
+  '/tokens':       ['receptionist'],
   '/waiting-room': ['doctor'],
-  '/billing':      ['admin', 'receptionist'],
+  '/billing':      ['receptionist'],
+  '/opd-reports':  ['admin', 'receptionist'],
+  '/medicines':    ['admin', 'receptionist'],
   '/lab':          ['admin', 'lab_technician'],
   '/statistics':   ['admin'],
   '/users':        ['admin'],
@@ -44,6 +48,7 @@ export const ROUTE_ACCESS: Record<AppRoute, UserRole[]> = {
  */
 export const ROUTE_MODULE: Partial<Record<AppRoute, keyof LicenseModules>> = {
   '/billing':    'billing',
+  '/medicines':  'manageMedicines',
   '/lab':        'labDashboard',
   '/statistics': 'statistics',
   '/tokens':     'tokens',
@@ -51,6 +56,7 @@ export const ROUTE_MODULE: Partial<Record<AppRoute, keyof LicenseModules>> = {
   '/schedule':   'manageDoctors',
   '/patients/:id': 'managePatients',
   '/chat':       'chat',
+  '/opd-reports': 'opdReports',
 };
 
 /** First route a role lands on after login */

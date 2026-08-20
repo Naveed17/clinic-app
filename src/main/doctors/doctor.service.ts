@@ -19,6 +19,7 @@ export interface DoctorInput {
   phone?: string;
   bio?: string;
   avatar?: string | null;
+  consultationFee?: number;
 }
 
 export interface DoctorUpdateInput {
@@ -33,6 +34,21 @@ export interface DoctorUpdateInput {
   phone?: string;
   bio?: string;
   avatar?: string | null;
+  consultationFee?: number;
+}
+
+function parseFee(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.round(n * 100) / 100;
+}
+
+function withConsultationFee<T extends { doctorProfile?: { consultationFee?: unknown } | null }>(row: T): T {
+  if (!row.doctorProfile) return row;
+  return {
+    ...row,
+    doctorProfile: { ...row.doctorProfile, consultationFee: parseFee(row.doctorProfile.consultationFee) },
+  };
 }
 
 const doctorSelect = {
@@ -59,7 +75,7 @@ export async function getDoctor(id: string) {
     prisma.appointment.count({ where: { providerId: id } }),
     prisma.token.count({ where: { doctorId: id, date: today } }),
   ]);
-  return { ...doctor, totalAppointments, todayTokens };
+  return { ...withConsultationFee(doctor), totalAppointments, todayTokens };
 }
 
 export async function listDoctors({ page, pageSize, search }: DoctorListInput) {
@@ -87,7 +103,7 @@ export async function listDoctors({ page, pageSize, search }: DoctorListInput) {
     }),
     prisma.user.count({ where }),
   ]);
-  return { data, total };
+  return { data: data.map(withConsultationFee), total };
 }
 
 export async function createDoctor(input: DoctorInput) {
@@ -109,6 +125,7 @@ export async function createDoctor(input: DoctorInput) {
           phone: input.phone?.trim() || null,
           bio: input.bio?.trim() || null,
           avatar: input.avatar?.trim() || null,
+          consultationFee: parseFee(input.consultationFee),
         },
       },
     },
@@ -119,7 +136,7 @@ export async function createDoctor(input: DoctorInput) {
     input.avatar?.trim() || null,
     created.id,
   );
-  return created;
+  return withConsultationFee(created);
 }
 
 export async function updateDoctor(id: string, input: DoctorUpdateInput) {
@@ -144,6 +161,7 @@ export async function updateDoctor(id: string, input: DoctorUpdateInput) {
               phone: input.phone?.trim() || null,
               bio: input.bio?.trim() || null,
               avatar: input.avatar?.trim() || null,
+              consultationFee: parseFee(input.consultationFee),
             },
             update: {
               specialization: input.specialization!.trim(),
@@ -151,6 +169,7 @@ export async function updateDoctor(id: string, input: DoctorUpdateInput) {
               experienceYears: input.experienceYears ?? 0,
               phone: input.phone?.trim() || null,
               bio: input.bio?.trim() || null,
+              consultationFee: parseFee(input.consultationFee),
               ...(input.avatar !== undefined ? { avatar: input.avatar?.trim() || null } : {}),
             },
           },
@@ -166,7 +185,7 @@ export async function updateDoctor(id: string, input: DoctorUpdateInput) {
       id,
     );
   }
-  return updated;
+  return withConsultationFee(updated);
 }
 
 export async function deleteDoctor(id: string): Promise<void> {

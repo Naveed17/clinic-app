@@ -1,7 +1,16 @@
 import { Router } from 'express';
-import { getReportSummary } from '../../reports/report.service';
+import { isOpdReportsLicensed } from '../../license/license.ipc';
+import { getOpdDailyReport, getReportSummary } from '../../reports/report.service';
 import { asyncHandler } from '../utils/async-handler';
 import { requireRole } from '../middleware/auth';
+
+function assertOpdReportsAddon(): void {
+  if (!isOpdReportsLicensed()) {
+    const err = new Error('OPD Reports add-on is not enabled for this license.');
+    (err as Error & { status?: number }).status = 403;
+    throw err;
+  }
+}
 
 export function createReportsRouter(): Router {
   const router = Router();
@@ -11,6 +20,20 @@ export function createReportsRouter(): Router {
     requireRole(['admin', 'doctor', 'receptionist', 'lab_technician']),
     asyncHandler(async (_req, res) => {
       res.json(await getReportSummary());
+    }),
+  );
+
+  router.get(
+    '/opd',
+    requireRole(['admin', 'receptionist']),
+    asyncHandler(async (req, res) => {
+      assertOpdReportsAddon();
+      res.json(
+        await getOpdDailyReport({
+          date: String(req.query.date ?? ''),
+          doctorId: String(req.query.doctorId ?? '').trim() || null,
+        }),
+      );
     }),
   );
 

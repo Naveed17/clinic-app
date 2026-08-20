@@ -52,7 +52,9 @@ export function MedicineAutocomplete({ value, onChange, label = 'Medicine', size
           <Box component="li" {...props} key={m.id}>
             <Box sx={{ flex: 1 }}>
               <Typography fontSize={13.5}>{m.name}</Typography>
-              <Typography fontSize={11.5} color="text.secondary">Rs. {Number(m.price).toLocaleString('en-PK')}</Typography>
+              <Typography fontSize={11.5} color="text.secondary">
+                Rs. {Number(m.price).toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              </Typography>
             </Box>
           </Box>
         )}

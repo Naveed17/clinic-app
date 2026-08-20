@@ -14,6 +14,7 @@ import {
   listTokens,
   updateTokenStatus,
   upsertPrescription,
+  refundTokenFee,
 } from '../../tokens/token.service';
 import type { TokenStatus } from '@prisma/client';
 
@@ -69,6 +70,18 @@ export function createTokensRouter(io: SocketIOServer): Router {
     await deleteToken(String(req.params.id));
     emitDataChange(io, 'token', 'deleted');
     res.status(204).end();
+  }));
+  router.post('/:id/refund-fee', asyncHandler(async (req, res) => {
+    const amount = req.body?.amount;
+    const token = await refundTokenFee(String(req.params.id), amount === undefined ? undefined : Number(amount));
+    emitNotification(io, {
+      kind: 'warning',
+      title: 'Fee refunded',
+      message: `Consultation fee refund recorded for token #${String(token?.tokenNumber).padStart(3, '0')}.`,
+      payload: { entity: 'token', id: token?.id },
+    });
+    emitDataChange(io, 'token', 'updated');
+    res.json(token);
   }));
   router.put('/:id/prescription', asyncHandler(async (req, res) => {
     const tokenId = String(req.params.id);

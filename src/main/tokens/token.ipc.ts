@@ -13,6 +13,7 @@ import {
   listTokens,
   updateTokenStatus,
   upsertPrescription,
+  refundTokenFee,
 } from './token.service';
 import { emitNotification } from '../backend/realtime';
 
@@ -52,6 +53,7 @@ export function registerTokenIpc(io?: SocketIOServer): void {
     updateTokenStatus(id, status)
   );
   ipcMain.handle('tokens:delete', (_, id: string) => deleteToken(id));
+  ipcMain.handle('tokens:refund-fee', (_, id: string, amount?: number) => refundTokenFee(id, amount));
   ipcMain.handle('tokens:upsert-prescription', async (_, tokenId: string, input) => {
     const result = await upsertPrescription(tokenId, input);
     if (io) {

@@ -39,6 +39,7 @@ const STATUS_COLORS: Record<string, 'default' | 'success' | 'warning' | 'error' 
   ISSUED: 'info',
   PARTIALLY_PAID: 'warning',
   PAID: 'success',
+  REFUNDED: 'error',
   VOID: 'error',
   PENDING: 'info',
   IN_PROGRESS: 'warning',
@@ -242,7 +243,7 @@ export function GlobalSearchModal({ open, onClose }: Props) {
               <SectionHeader icon={<BiotechOutlinedIcon fontSize="small" />} label="Lab Orders" count={results!.labOrders.length} />
               <List dense disablePadding>
                 {results!.labOrders.map((l) => (
-                  <ListItemButton key={l.id} onClick={() => go(`/patients/${l.patientId}`)} sx={{ px: 2, py: 0.75 }}>
+                  <ListItemButton key={l.id} onClick={() => go(user?.role === 'admin' ? '/lab' : `/patients/${l.patientId}`)} sx={{ px: 2, py: 0.75 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
                       <Chip label={l.patientMrNumber} size="small" sx={{ fontWeight: 700, fontSize: 11, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', flexShrink: 0 }} />
                       <ListItemText

@@ -5,6 +5,8 @@ export interface TokenPerson {
   mrNumber?: string;
   firstName: string;
   lastName: string;
+  consultationFee?: number;
+  avatar?: string | null;
 }
 
 export interface Token {
@@ -16,6 +18,8 @@ export interface Token {
   status: TokenStatus;
   notes: string | null;
   reason: string | null;
+  consultationFee?: number;
+  feeRefunded?: number;
   createdAt: string;
   updatedAt?: string;
   patient: TokenPerson;
@@ -29,6 +33,7 @@ export interface TokenInput {
   date: string;
   notes?: string | null;
   reason?: string | null;
+  consultationFee?: number;
 }
 
 export interface PrescriptionMedicine {

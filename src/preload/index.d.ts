@@ -26,12 +26,14 @@ declare global {
         patients: () => Promise<unknown>;
         create: (input: unknown) => Promise<unknown>;
         addPayment: (invoiceId: string, amount: number, method: string, reference?: string) => Promise<unknown>;
+        refund: (invoiceId: string, amount: number, method: string, reason?: string) => Promise<unknown>;
         void: (id: string) => Promise<unknown>;
         delete: (id: string) => Promise<unknown>;
         payments: (invoiceId: string) => Promise<unknown>;
       };
       reports: {
         summary: () => Promise<unknown>;
+        opd: (input: unknown) => Promise<unknown>;
       };
       users: {
         list: (input: unknown) => Promise<unknown>;
@@ -56,6 +58,7 @@ declare global {
         patients: () => Promise<unknown>;
         create: (input: unknown) => Promise<unknown>;
         updateStatus: (id: string, status: string) => Promise<unknown>;
+        refundFee: (id: string, amount?: number) => Promise<unknown>;
         delete: (id: string) => Promise<unknown>;
         upsertPrescription: (tokenId: string, input: unknown) => Promise<unknown>;
       };
@@ -240,6 +243,8 @@ declare global {
         list: () => Promise<unknown>;
         create: (name: string, price: number) => Promise<unknown>;
         updatePrice: (id: string, price: number) => Promise<unknown>;
+        update: (id: string, name: string, price: number) => Promise<unknown>;
+        delete: (id: string) => Promise<unknown>;
       };
       search: {
         global: (query: string, role?: string) => Promise<unknown>;

@@ -18,8 +18,10 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  FormControl,
   FormControlLabel,
   IconButton,
+  InputLabel,
   MenuItem,
   Paper,
   Stack,
@@ -29,7 +31,8 @@ import {
   ToggleButtonGroup,
   Tooltip,
   Typography,
-  Autocomplete
+  Autocomplete,
+  Select,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
@@ -60,6 +63,14 @@ const statusConfig: Record<string, { label: string; color: 'default' | 'primary'
   CANCELLED: { label: 'Cancelled', color: 'default', hex: '#9e9e9e' },
   NO_SHOW: { label: 'No Show', color: 'error', hex: '#d32f2f' },
 };
+
+const filterSelectSx = {
+  borderRadius: 0.5,
+  fontSize: 13.5,
+  fontWeight: 500,
+  bgcolor: 'background.paper',
+  '& .MuiOutlinedInput-notchedOutline': { borderRadius: 0.5 },
+} as const;
 
 type FormValues = {
   patientId: string;
@@ -202,6 +213,9 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   const doctors = useQuery({ queryKey: ['doctors'], queryFn: appointmentsService.doctors, staleTime: 5 * 60 * 1000, retry: 3 });
   function personLabel(person: AppointmentPerson): string {
     return `${person.firstName} ${person.lastName}`;
+  }
+  function feeLabel(fee?: number): string {
+    return `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(fee) || 0)}`;
   }
 
   function asArray<T>(value: unknown): T[] {
@@ -378,14 +392,27 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
             <Controller
               name="providerId"
               control={form.control}
-              render={({ field }) => (
+              render={({ field }) => {
+                const selected = doctorOptions.find((p) => p.id === field.value) ?? null;
+                return (
                 <Autocomplete
                   options={doctorOptions}
                   loading={doctors.isLoading}
-                  value={doctorOptions.find((p) => p.id === field.value) ?? null}
+                  value={selected}
                   isOptionEqualToValue={(option, value) => option.id === value.id}
                   getOptionLabel={(option) => personLabel(option)}
                   onChange={(_, value) => field.onChange(value?.id ?? '')}
+                  renderOption={(props, option) => (
+                    <Box component="li" {...props} key={option.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                      <DoctorAvatar src={option.avatar} name={`Dr. ${personLabel(option)}`} size={32} />
+                      <Typography fontSize={13.5} fontWeight={600} sx={{ flex: 1 }} noWrap>
+                        {personLabel(option)}
+                      </Typography>
+                      <Typography fontSize={13} fontWeight={700} color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                        {feeLabel(option.consultationFee)}
+                      </Typography>
+                    </Box>
+                  )}
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -394,10 +421,25 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
                       error={Boolean(errors.providerId)}
                       helperText={errors.providerId?.message}
                       onBlur={field.onBlur}
+                      InputProps={{
+                        ...params.InputProps,
+                        startAdornment: selected ? (
+                          <>
+                            <DoctorAvatar
+                              src={selected.avatar}
+                              name={`Dr. ${personLabel(selected)}`}
+                              size={24}
+                              sx={{ ml: 0.5, mr: 0.5 }}
+                            />
+                            {params.InputProps.startAdornment}
+                          </>
+                        ) : params.InputProps.startAdornment,
+                      }}
                     />
                   )}
                 />
-              )}
+                );
+              }}
             />
 
             {!appointment && (
@@ -571,6 +613,8 @@ export function AppointmentsPage(): React.JSX.Element {
   const [defaultDate, setDefaultDate] = useState<string | undefined>();
   const [view, setView] = useState<'table' | 'calendar'>('table');
   const [search, setSearch] = useState('');
+  const [doctorFilter, setDoctorFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
   const { user } = useAuth();
@@ -639,7 +683,18 @@ export function AppointmentsPage(): React.JSX.Element {
   const allData = user?.role === 'doctor'
     ? (appointments.data ?? []).filter((a) => a.providerId === user.id)
     : (appointments.data ?? []);
+  const doctorOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of allData) {
+      if (!map.has(a.providerId)) {
+        map.set(a.providerId, `${a.provider.firstName} ${a.provider.lastName}`);
+      }
+    }
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [allData]);
   const filtered = allData.filter((a) => {
+    if (doctorFilter !== 'ALL' && a.providerId !== doctorFilter) return false;
+    if (statusFilter !== 'ALL' && a.status !== statusFilter) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -649,6 +704,48 @@ export function AppointmentsPage(): React.JSX.Element {
     );
   });
   const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  const showDoctorFilter = user?.role !== 'doctor';
+  const appointmentFilters = (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
+      <SearchField
+        value={search}
+        onChange={(v) => { setSearch(v); setPage(0); }}
+        placeholder="Search patient, doctor, reason..."
+        sx={{ flex: 1, maxWidth: 360, '& .MuiOutlinedInput-root': { borderRadius: 0.5 } }}
+      />
+      {showDoctorFilter && (
+        <FormControl size="small" sx={{ minWidth: 170, flexShrink: 0 }}>
+          <InputLabel>Doctor</InputLabel>
+          <Select
+            label="Doctor"
+            value={doctorFilter}
+            onChange={(e) => { setDoctorFilter(e.target.value); setPage(0); }}
+            sx={filterSelectSx}
+          >
+            <MenuItem value="ALL">All doctors</MenuItem>
+            {doctorOptions.map(([id, name]) => (
+              <MenuItem key={id} value={id}>{name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      )}
+      <FormControl size="small" sx={{ minWidth: 160, flexShrink: 0 }}>
+        <InputLabel>Status</InputLabel>
+        <Select
+          label="Status"
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
+          sx={filterSelectSx}
+        >
+          <MenuItem value="ALL">All statuses</MenuItem>
+          {Object.entries(statusConfig).map(([value, cfg]) => (
+            <MenuItem key={value} value={value}>{cfg.label}</MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    </Box>
+  );
 
 
   const viewToggle = (
@@ -695,9 +792,10 @@ export function AppointmentsPage(): React.JSX.Element {
               {!isAdmin && <Button startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }} onClick={() => { setActive(undefined); setDefaultDate(undefined); setOpen(true); }}>Create appointment</Button>}
             </Stack>
           </Box>
+          {appointmentFilters}
           <Paper variant="outlined" sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
             <AppointmentCalendar
-              appointments={allData}
+              appointments={filtered}
               loading={appointments.isLoading}
               fetching={appointments.isFetching && !appointments.isLoading}
               onStatusChange={(id, status) => statusMutation.mutate({ id, status })}
@@ -719,7 +817,7 @@ export function AppointmentsPage(): React.JSX.Element {
               {!isAdmin && <Button startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }} onClick={() => { setActive(undefined); setDefaultDate(undefined); setOpen(true); }}>Create appointment</Button>}
             </Stack>
           }
-          toolbar={<SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Search patient, doctor, reason..." sx={{ flex: 1, maxWidth: 360 }} />}
+          toolbar={appointmentFilters}
           pager={
             filtered.length > rowsPerPage ? (
               <TablePager page={page} rowsPerPage={rowsPerPage} total={filtered.length} onPageChange={setPage} />

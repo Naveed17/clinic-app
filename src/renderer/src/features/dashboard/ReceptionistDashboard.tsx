@@ -135,17 +135,26 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       const schedule = await window.clinic.schedule.get(doctorId);
       const offline = doctorOfflineReason(schedule, todayStr);
       if (offline) throw new Error(offline);
-      return window.clinic.tokens.create({
+      const startsAt = slotSearchFrom(todayStr);
+      const endsAt = new Date(startsAt.getTime() + 30 * 60000);
+      await appointmentsService.ensureSameDay({
+        patientId,
+        providerId: doctorId,
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        reason: reason || null,
+        notes: null,
+        recurrenceRule: null,
+      });
+      const token = await window.clinic.tokens.create({
         patientId, doctorId,
         date: todayStr,
         reason: reason || null,
-      }) as Promise<Token>;
+      }) as Token;
+      if (token.status === 'WAITING') return token;
+      return window.clinic.tokens.updateStatus(token.id, 'WAITING') as Promise<Token>;
     },
     onSuccess: async (token: Token) => {
-      await window.clinic.tokens.updateStatus(token.id, 'WAITING');
-      const startsAt = new Date(token.createdAt).toISOString();
-      const endsAt = new Date(new Date(token.createdAt).getTime() + 30 * 60000).toISOString();
-      await appointmentsService.ensureSameDay({ patientId, providerId: doctorId, startsAt, endsAt, reason: reason || null, notes: null, recurrenceRule: null });
       await qc.invalidateQueries({ queryKey: ['tokens'] });
       await qc.invalidateQueries({ queryKey: ['appointments'] });
       setCreatedToken(token);
@@ -232,12 +241,48 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             {walkOfflineReason && (
               <Alert severity="error">{walkOfflineReason}</Alert>
             )}
-            <FormControl fullWidth>
-              <InputLabel>Doctor</InputLabel>
-              <Select label="Doctor" value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
-                {doctors.map((d) => <MenuItem key={d.id} value={d.id}>Dr. {d.firstName} {d.lastName}</MenuItem>)}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              options={doctors}
+              getOptionLabel={(d) => `Dr. ${d.firstName} ${d.lastName}`}
+              value={doctors.find((d) => d.id === doctorId) ?? null}
+              onChange={(_, v) => setDoctorId(v?.id ?? '')}
+              isOptionEqualToValue={(o, v) => o.id === v.id}
+              renderOption={(props, option) => (
+                <Box component="li" {...props} key={option.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                  <DoctorAvatar src={option.avatar} name={`Dr. ${option.firstName} ${option.lastName}`} size={32} />
+                  <Typography fontSize={13.5} fontWeight={600} sx={{ flex: 1 }} noWrap>
+                    Dr. {option.firstName} {option.lastName}
+                  </Typography>
+                  <Typography fontSize={13} fontWeight={700} color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                    Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(option.consultationFee) || 0)}
+                  </Typography>
+                </Box>
+              )}
+              renderInput={(params) => {
+                const selected = doctors.find((d) => d.id === doctorId);
+                return (
+                  <TextField
+                    {...params}
+                    label="Doctor"
+                    fullWidth
+                    InputProps={{
+                      ...params.InputProps,
+                      startAdornment: selected ? (
+                        <>
+                          <DoctorAvatar
+                            src={selected.avatar}
+                            name={`Dr. ${selected.firstName} ${selected.lastName}`}
+                            size={24}
+                            sx={{ ml: 0.5, mr: 0.5 }}
+                          />
+                          {params.InputProps.startAdornment}
+                        </>
+                      ) : params.InputProps.startAdornment,
+                    }}
+                  />
+                );
+              }}
+            />
             <FormControl fullWidth>
               <InputLabel>Reason (optional)</InputLabel>
               <Select label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)}>
@@ -533,8 +578,36 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
             )}
             <FormControl fullWidth>
               <InputLabel>Doctor</InputLabel>
-              <Select label="Doctor" value={providerId} onChange={(e) => setProviderId(e.target.value)}>
-                {doctors.map((d) => <MenuItem key={d.id} value={d.id}>Dr. {d.firstName} {d.lastName}</MenuItem>)}
+              <Select
+                label="Doctor"
+                value={providerId}
+                onChange={(e) => setProviderId(e.target.value)}
+                renderValue={(value) => {
+                  const d = doctors.find((doc) => doc.id === value);
+                  if (!d) return '';
+                  return (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <DoctorAvatar src={d.avatar} name={`Dr. ${d.firstName} ${d.lastName}`} size={22} />
+                      <Typography component="span" fontSize={13.5} fontWeight={600}>
+                        Dr. {d.firstName} {d.lastName}
+                      </Typography>
+                    </Box>
+                  );
+                }}
+              >
+                {doctors.map((d) => (
+                  <MenuItem key={d.id} value={d.id}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, width: '100%' }}>
+                      <DoctorAvatar src={d.avatar} name={`Dr. ${d.firstName} ${d.lastName}`} size={28} />
+                      <Typography fontSize={13.5} fontWeight={600} sx={{ flex: 1 }}>
+                        Dr. {d.firstName} {d.lastName}
+                      </Typography>
+                      <Typography fontSize={13} fontWeight={700} color="text.secondary">
+                        Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(d.consultationFee) || 0)}
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
             <LocalizationProvider dateAdapter={AdapterDateFns}>

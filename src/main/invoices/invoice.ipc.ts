@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { createInvoice, invoicePatients, listInvoices, addPayment, voidInvoice, deleteInvoice, getPayments } from './invoice.service';
+import { createInvoice, invoicePatients, listInvoices, addPayment, refundPayment, voidInvoice, deleteInvoice, getPayments } from './invoice.service';
 
 export function registerInvoiceIpc(): void {
   ipcMain.handle('invoices:list', () => listInvoices());
@@ -11,7 +11,12 @@ export function registerInvoiceIpc(): void {
   ipcMain.handle('invoices:add-payment', async (_, invoiceId, amount, method, reference) =>
     addPayment(invoiceId, amount, method, reference),
   );
+  ipcMain.handle('invoices:refund', async (_, invoiceId, amount, method, reason) =>
+    refundPayment(invoiceId, amount, method, reason),
+  );
   ipcMain.handle('invoices:void', (_, id: string) => voidInvoice(id));
   ipcMain.handle('invoices:delete', (_, id: string) => deleteInvoice(id));
-  ipcMain.handle('invoices:payments', (_, invoiceId: string) => getPayments(invoiceId));
+  ipcMain.handle('invoices:payments', async (_, invoiceId: string) =>
+    JSON.parse(JSON.stringify(await getPayments(invoiceId))),
+  );
 }

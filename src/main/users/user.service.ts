@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { getPrisma } from '../database/client';
 import { seedDefaultAdmin } from '../auth/seed';
+import { isLicenseModuleEnabled } from '../license/license.ipc';
 
 export interface UserListInput {
   page: number;
@@ -15,6 +16,7 @@ export interface DoctorProfileInput {
   phone?: string;
   bio?: string;
   avatar?: string | null;
+  consultationFee?: number;
 }
 
 export interface UserInput {
@@ -62,7 +64,7 @@ async function saveUserAvatar(id: string, avatar: string | null): Promise<void> 
   await getPrisma().$executeRawUnsafe('UPDATE "User" SET "avatar" = ? WHERE id = ?', avatar, id);
 }
 
-async function withAvatars<T extends { id: string; doctorProfile?: { avatar?: string | null } | null }>(
+async function withAvatars<T extends { id: string; doctorProfile?: { avatar?: string | null; consultationFee?: unknown } | null }>(
   users: T[],
 ): Promise<Array<T & { avatar: string | null }>> {
   if (!users.length) return [];
@@ -74,6 +76,9 @@ async function withAvatars<T extends { id: string; doctorProfile?: { avatar?: st
   return users.map((user) => ({
     ...user,
     avatar: map.get(user.id) || user.doctorProfile?.avatar || null,
+    doctorProfile: user.doctorProfile
+      ? { ...user.doctorProfile, consultationFee: Number(user.doctorProfile.consultationFee ?? 0) || 0 }
+      : user.doctorProfile,
   }));
 }
 
@@ -101,7 +106,23 @@ export async function listUsers({ page, pageSize, search }: UserListInput) {
   return { data: await withAvatars(data), total };
 }
 
+async function adminCount(excludeId?: string): Promise<number> {
+  return getPrisma().user.count({
+    where: { role: 'ADMIN', ...(excludeId ? { id: { not: excludeId } } : {}) },
+  });
+}
+
+async function assertExtraAdminAllowed(role: string, existingRole?: string): Promise<void> {
+  if (String(role).toUpperCase() !== 'ADMIN') return;
+  if (existingRole === 'ADMIN') return;
+  if (isLicenseModuleEnabled('manageUsers')) return;
+  if ((await adminCount()) >= 1) {
+    throw new Error('Extra admin accounts require the Manage Users add-on.');
+  }
+}
+
 export async function createUser(input: UserInput) {
+  await assertExtraAdminAllowed(input.role);
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const bcrypt = require('bcryptjs') as typeof import('bcryptjs');
   const avatar = staffAvatar(input);
@@ -123,6 +144,7 @@ export async function createUser(input: UserInput) {
                 phone: input.doctorProfile.phone?.trim() || null,
                 bio: input.doctorProfile.bio?.trim() || null,
                 avatar,
+                consultationFee: Number(input.doctorProfile.consultationFee ?? 0) || 0,
               },
             },
           }
@@ -139,6 +161,8 @@ export async function updateUser(id: string, input: UserUpdateInput) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const bcrypt = require('bcryptjs') as typeof import('bcryptjs');
   const prisma = getPrisma();
+  const current = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+  await assertExtraAdminAllowed(input.role, current?.role);
   const avatar = input.avatar !== undefined || input.doctorProfile?.avatar !== undefined
     ? staffAvatar(input)
     : undefined;
@@ -168,6 +192,7 @@ export async function updateUser(id: string, input: UserUpdateInput) {
                 phone: input.doctorProfile.phone?.trim() || null,
                 bio: input.doctorProfile.bio?.trim() || null,
                 avatar: avatar ?? null,
+                consultationFee: Number(input.doctorProfile.consultationFee ?? 0) || 0,
               },
               update: {
                 specialization: input.doctorProfile.specialization.trim(),
@@ -175,6 +200,7 @@ export async function updateUser(id: string, input: UserUpdateInput) {
                 experienceYears: input.doctorProfile.experienceYears ?? 0,
                 phone: input.doctorProfile.phone?.trim() || null,
                 bio: input.doctorProfile.bio?.trim() || null,
+                consultationFee: Number(input.doctorProfile.consultationFee ?? 0) || 0,
                 ...(avatar !== undefined ? { avatar } : {}),
               },
             },
@@ -189,6 +215,11 @@ export async function updateUser(id: string, input: UserUpdateInput) {
 }
 
 export async function deleteUser(id: string): Promise<void> {
-  await getPrisma().user.delete({ where: { id } });
+  const prisma = getPrisma();
+  const target = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+  if (target?.role === 'ADMIN' && !isLicenseModuleEnabled('manageUsers')) {
+    throw new Error('Deleting admin accounts requires the Manage Users add-on.');
+  }
+  await prisma.user.delete({ where: { id } });
   await seedDefaultAdmin();
 }

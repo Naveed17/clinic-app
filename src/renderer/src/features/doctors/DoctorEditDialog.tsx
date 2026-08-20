@@ -27,6 +27,7 @@ const editSchema = z.object({
   specialization: z.string().trim().min(1, 'Specialization is required.'),
   qualification: z.string().trim(),
   experienceYears: z.coerce.number().int().min(0).max(60),
+  consultationFee: z.coerce.number().min(0),
   phone: z.string().trim(),
   bio: z.string().trim(),
   password: z.string().refine((v) => !v || v.length >= 6, 'Password must be at least 6 characters.'),
@@ -44,6 +45,7 @@ function toFormValues(doctor: Doctor): FormValues {
     specialization: doctor.doctorProfile?.specialization ?? '',
     qualification: doctor.doctorProfile?.qualification ?? '',
     experienceYears: doctor.doctorProfile?.experienceYears ?? 0,
+    consultationFee: Number(doctor.doctorProfile?.consultationFee ?? 0),
     phone: doctor.doctorProfile?.phone ?? '',
     bio: doctor.doctorProfile?.bio ?? '',
   };
@@ -62,7 +64,7 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
 
   const form = useForm<FormValues>({
     resolver: zodResolver(editSchema) as import('react-hook-form').Resolver<FormValues>,
-    defaultValues: { firstName: '', lastName: '', email: '', password: '', isActive: true, specialization: '', qualification: '', experienceYears: 0, phone: '', bio: '' },
+    defaultValues: { firstName: '', lastName: '', email: '', password: '', isActive: true, specialization: '', qualification: '', experienceYears: 0, consultationFee: 0, phone: '', bio: '' },
   });
 
   useEffect(() => {
@@ -77,6 +79,7 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
         specialization: values.specialization,
         qualification: values.qualification || undefined,
         experienceYears: values.experienceYears,
+        consultationFee: values.consultationFee,
         phone: values.phone || undefined,
         bio: values.bio || undefined,
         avatar,
@@ -142,6 +145,16 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
               <TextField fullWidth label="Experience (years)" type="number" slotProps={{ htmlInput: { min: 0, max: 60, step: 1 } }}
                 {...form.register('experienceYears', { setValueAs: (v) => (v === '' ? 0 : Number(v)) })} />
             </Box>
+            <TextField
+              fullWidth
+              label="Consultation fee"
+              type="number"
+              slotProps={{
+                htmlInput: { min: 0, step: 'any' },
+                input: { startAdornment: <InputAdornment position="start">Rs.</InputAdornment> },
+              }}
+              {...form.register('consultationFee', { setValueAs: (v) => (v === '' ? 0 : Number(v)) })}
+            />
             <Controller
               control={form.control}
               name="phone"

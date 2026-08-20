@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Server as SocketIOServer } from 'socket.io';
-import { createInvoice, invoicePatients, listInvoices, addPayment, voidInvoice, deleteInvoice, getPayments } from '../../invoices/invoice.service';
+import { createInvoice, invoicePatients, listInvoices, addPayment, refundPayment, voidInvoice, deleteInvoice, getPayments } from '../../invoices/invoice.service';
 import type { InvoiceInput } from '../../invoices/invoice.service';
 import { asyncHandler } from '../utils/async-handler';
 import { requireRole } from '../middleware/auth';
@@ -48,6 +48,23 @@ export function createInvoicesRouter(io: SocketIOServer): Router {
       const { amount, method, reference } = req.body as { amount: number; method: string; reference?: string };
       const invoice = await addPayment(req.params['id'] as string, amount, method, reference);
       emitNotification(io, { kind: 'success', title: 'Payment recorded', message: `Payment of ${amount} recorded.`, payload: { entity: 'invoice', id: invoice.id } });
+      emitDataChange(io, 'invoice', 'updated');
+      res.json(invoice);
+    }),
+  );
+
+  router.post(
+    '/:id/refund',
+    requireRole(['admin', 'receptionist', 'pharmacist']),
+    asyncHandler(async (req, res) => {
+      const { amount, method, reason } = req.body as { amount: number; method: string; reason?: string };
+      const invoice = await refundPayment(req.params['id'] as string, amount, method, reason);
+      emitNotification(io, {
+        kind: 'warning',
+        title: 'Refund recorded',
+        message: `Refund of ${amount} recorded.`,
+        payload: { entity: 'invoice', id: invoice.id },
+      });
       emitDataChange(io, 'invoice', 'updated');
       res.json(invoice);
     }),

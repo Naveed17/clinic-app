@@ -27,5 +27,5 @@ export function registerRoutes(app: Express, io: SocketIOServer): void {
   app.use('/api/schedule', createScheduleRouter());
   app.use('/api/search', createSearchRouter());
   app.use('/api/chat', createChatRouter(io));
-  app.use('/api/medicines', createMedicinesRouter());
+  app.use('/api/medicines', createMedicinesRouter(io));
 }

@@ -7,6 +7,7 @@ export interface DoctorProfile {
   phone: string | null;
   bio: string | null;
   avatar: string | null;
+  consultationFee?: number;
 }
 
 export interface Doctor {
@@ -33,6 +34,7 @@ export interface DoctorInput {
   phone?: string;
   bio?: string;
   avatar?: string | null;
+  consultationFee?: number;
 }
 
 export interface DoctorUpdateInput {
@@ -47,6 +49,7 @@ export interface DoctorUpdateInput {
   phone?: string;
   bio?: string;
   avatar?: string | null;
+  consultationFee?: number;
 }
 
 export interface DoctorListInput {

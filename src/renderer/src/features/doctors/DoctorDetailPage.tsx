@@ -5,6 +5,7 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined';
 import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
+import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
 import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
 import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
 import WorkOutlineOutlinedIcon from '@mui/icons-material/WorkOutlineOutlined';
@@ -194,6 +195,11 @@ export function DoctorDetailPage(): React.JSX.Element {
         doctor.doctorProfile?.experienceYears != null
           ? `${doctor.doctorProfile.experienceYears} year${doctor.doctorProfile.experienceYears !== 1 ? 's' : ''}`
           : '—',
+    },
+    {
+      icon: <PaymentsOutlinedIcon sx={{ fontSize: 18 }} />,
+      label: 'Consultation fee',
+      value: `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(doctor.doctorProfile?.consultationFee ?? 0))}`,
     },
     {
       icon: <LocalPhoneOutlinedIcon sx={{ fontSize: 18 }} />,

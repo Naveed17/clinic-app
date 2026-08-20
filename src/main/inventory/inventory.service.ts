@@ -41,6 +41,23 @@ async function ensurePriceBatch(medicineId: string, price: number) {
   });
 }
 
+function toCatalog(m: any) {
+  const priced = (m.batches ?? []).find((b: any) => Number(b.salePrice) > 0) ?? m.batches?.[0];
+  return {
+    id: m.id,
+    name: m.name,
+    price: Number(priced?.salePrice ?? 0),
+    createdAt: m.createdAt,
+    updatedAt: m.updatedAt,
+  };
+}
+
+const catalogInclude = {
+  batches: {
+    orderBy: [{ quantity: 'desc' }, { expiryDate: 'asc' }],
+  },
+} as const;
+
 /** Catalog search for prescription / billing pickers — price from FEFO batch. */
 export async function searchCatalogMedicines(query: string) {
   const q = query.trim();
@@ -48,25 +65,16 @@ export async function searchCatalogMedicines(query: string) {
     where: q
       ? { OR: [{ name: { contains: q } }, { genericName: { contains: q } }] }
       : undefined,
-    include: {
-      batches: {
-        orderBy: [{ quantity: 'desc' }, { expiryDate: 'asc' }],
-      },
-    },
-    orderBy: q ? { name: 'asc' } : { createdAt: 'desc' },
-    take: 50,
+    include: catalogInclude,
+    orderBy: { name: 'asc' },
+    ...(q ? { take: 50 } : {}),
   });
 
-  return medicines.map((m: any) => {
-    const priced = (m.batches ?? []).find((b: any) => Number(b.salePrice) > 0) ?? m.batches?.[0];
-    return {
-      id: m.id,
-      name: m.name,
-      price: Number(priced?.salePrice ?? 0),
-      createdAt: m.createdAt,
-      updatedAt: m.updatedAt,
-    };
-  });
+  return medicines.map(toCatalog);
+}
+
+export async function listCatalogMedicines() {
+  return searchCatalogMedicines('');
 }
 
 export async function createCatalogMedicine(name: string, price: number) {
@@ -103,6 +111,7 @@ export async function createCatalogMedicine(name: string, price: number) {
 export async function updateCatalogMedicinePrice(id: string, price: number) {
   await ensurePriceBatch(id, price);
   const medicine = await db().medicine.findUnique({ where: { id } });
+  if (!medicine) throw new Error('Medicine not found.');
   return {
     id: medicine.id,
     name: medicine.name,
@@ -110,4 +119,39 @@ export async function updateCatalogMedicinePrice(id: string, price: number) {
     createdAt: medicine.createdAt,
     updatedAt: medicine.updatedAt,
   };
+}
+
+export async function updateCatalogMedicine(id: string, name: string, price: number) {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('name is required');
+
+  const medicine = await db().medicine.findUnique({ where: { id } });
+  if (!medicine) throw new Error('Medicine not found.');
+
+  const clash = await db().medicine.findFirst({
+    where: { name: trimmed, NOT: { id } },
+  });
+  if (clash) throw new Error('A medicine with this name already exists.');
+
+  await db().medicine.update({
+    where: { id },
+    data: { name: trimmed },
+  });
+  await ensurePriceBatch(id, price);
+
+  const updated = await db().medicine.findUnique({ where: { id } });
+  return {
+    id: updated.id,
+    name: updated.name,
+    price,
+    createdAt: updated.createdAt,
+    updatedAt: updated.updatedAt,
+  };
+}
+
+export async function deleteCatalogMedicine(id: string) {
+  const medicine = await db().medicine.findUnique({ where: { id } });
+  if (!medicine) throw new Error('Medicine not found.');
+  await db().medicine.delete({ where: { id } });
+  return { ok: true, id };
 }

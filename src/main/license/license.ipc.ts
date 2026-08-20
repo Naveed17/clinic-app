@@ -204,6 +204,11 @@ export function isLicenseModuleEnabled(moduleKey: string): boolean {
   const modules = getCachedModules(savedKey);
   return modules?.[moduleKey] === true;
 }
+
+/** OPD daily reports page. */
+export function isOpdReportsLicensed(): boolean {
+  return isLicenseModuleEnabled('opdReports');
+}
 function saveModulesCache(key: string, modules: Record<string, boolean>): void {
   try {
     writeFileSync(getModulesCacheFilePath(), JSON.stringify({ key, modules, updatedAt: new Date().toISOString() }), 'utf-8');
@@ -288,6 +293,7 @@ const KNOWN_MODULE_KEYS = [
   'labDashboard',
   'billing',
   'reports',
+  'opdReports',
   'statistics',
   'tokens',
   'manageDoctors',
@@ -308,6 +314,7 @@ function normalizeModulesPayload(modules?: Record<string, boolean> | null): Reco
   out.pharmacy = false;
   out.billing = true;
   out.manageMedicines = true;
+  out.reports = true;
   return out;
 }
 

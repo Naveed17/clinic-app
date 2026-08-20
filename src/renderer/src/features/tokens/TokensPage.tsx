@@ -1,5 +1,6 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined';
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
@@ -20,6 +21,7 @@ import {
   DialogContent,
   FormControl,
   IconButton,
+  InputAdornment,
   InputLabel,
   MenuItem,
   Paper,
@@ -41,7 +43,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { FetchingBar, ListCardsSkeleton, StatCardsSkeleton } from '@/components/LoadingUI';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { appointmentsService } from '@/services/appointments.service';
-import { doctorOfflineReason } from '@/utils/appointmentSlot';
+import { doctorOfflineReason, slotSearchFrom } from '@/utils/appointmentSlot';
 import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
@@ -51,6 +53,7 @@ import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
 import { printTokenSlip } from '@/utils/printTokenSlip';
 import { POS_PAPER, POS_RECEIPT } from '@shared/invoicePaper';
 import { labResultPreview } from '@/features/lab/labReportPayload';
+import { DoctorAvatar } from '@/components/DoctorAvatar';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
   WAITING: { label: 'Waiting', color: 'warning' },
@@ -77,6 +80,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   const [doctorId, setDoctorId] = useState(defaultDoctorId ?? '');
   const [notes, setNotes] = useState('');
   const [reason, setReason] = useState('');
+  const [consultationFee, setConsultationFee] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -84,6 +88,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
       setDoctorId(defaultDoctorId ?? '');
       setNotes('');
       setReason('');
+      setConsultationFee('');
     }
   }, [open, defaultPatientId, defaultDoctorId]);
 
@@ -98,8 +103,17 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
 
   const selectedPatient = useMemo(
     () => patients.find((p) => p.id === patientId) ?? null,
-    [patients, patientId]
+    [patients, patientId],
   );
+  const selectedDoctor = useMemo(
+    () => doctors.find((d) => d.id === doctorId) ?? null,
+    [doctors, doctorId],
+  );
+
+  useEffect(() => {
+    if (!open || !selectedDoctor) return;
+    setConsultationFee(String(Number(selectedDoctor.consultationFee ?? 0)));
+  }, [open, selectedDoctor]);
   const { data: tokenSchedule = [], isFetched: tokenScheduleFetched } = useQuery({
     queryKey: ['schedule', doctorId],
     queryFn: () => window.clinic.schedule.get(doctorId),
@@ -110,24 +124,31 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
     : null;
 
   const mutation = useMutation({
-    mutationFn: () => window.clinic.tokens.create({ patientId, doctorId, date, notes, reason }),
-    onSuccess: async (token: Token) => {
-      // Auto-create appointment linked to this token
-      const tokenTime = new Date(token.createdAt);
-      const startsAt = tokenTime.toISOString();
-      const endsAt = new Date(tokenTime.getTime() + 30 * 60000).toISOString();
+    mutationFn: async () => {
+      const startsAt = slotSearchFrom(date);
+      const endsAt = new Date(startsAt.getTime() + 30 * 60000);
       await appointmentsService.ensureSameDay({
         patientId,
         providerId: doctorId,
-        startsAt,
-        endsAt,
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
         reason: reason || null,
         notes: notes || null,
         recurrenceRule: null,
       });
+      return window.clinic.tokens.create({
+        patientId,
+        doctorId,
+        date,
+        notes,
+        reason,
+        consultationFee: parseFloat(consultationFee) || 0,
+      }) as Promise<Token>;
+    },
+    onSuccess: async (token: Token) => {
       await qc.invalidateQueries({ queryKey: ['tokens'] });
       await qc.invalidateQueries({ queryKey: ['appointments'] });
-      setPatientId(''); setDoctorId(''); setNotes(''); setReason('');
+      setPatientId(''); setDoctorId(''); setNotes(''); setReason(''); setConsultationFee('');
       onClose();
       onSuccess?.(token);
     },
@@ -155,14 +176,56 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
             isOptionEqualToValue={(o, v) => o.id === v.id}
             renderInput={(params) => <TextField {...params} label="Patient" fullWidth />}
           />
-          <FormControl fullWidth>
-            <InputLabel>Doctor</InputLabel>
-            <Select label="Doctor" value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
-              {doctors.map((d) => (
-                <MenuItem key={d.id} value={d.id}>Dr. {d.firstName} {d.lastName}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            options={doctors}
+            getOptionLabel={(d) => `Dr. ${d.firstName} ${d.lastName}`}
+            value={selectedDoctor}
+            onChange={(_, v) => setDoctorId(v?.id ?? '')}
+            isOptionEqualToValue={(o, v) => o.id === v.id}
+            renderOption={(props, option) => (
+              <Box component="li" {...props} key={option.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                <DoctorAvatar src={option.avatar} name={`Dr. ${option.firstName} ${option.lastName}`} size={32} />
+                <Typography fontSize={13.5} fontWeight={600} sx={{ flex: 1 }} noWrap>
+                  Dr. {option.firstName} {option.lastName}
+                </Typography>
+                <Typography fontSize={13} fontWeight={700} color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                  Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(option.consultationFee) || 0)}
+                </Typography>
+              </Box>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Doctor"
+                fullWidth
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: selectedDoctor ? (
+                    <>
+                      <DoctorAvatar
+                        src={selectedDoctor.avatar}
+                        name={`Dr. ${selectedDoctor.firstName} ${selectedDoctor.lastName}`}
+                        size={24}
+                        sx={{ ml: 0.5, mr: 0.5 }}
+                      />
+                      {params.InputProps.startAdornment}
+                    </>
+                  ) : params.InputProps.startAdornment,
+                }}
+              />
+            )}
+          />
+          <TextField
+            label="Consultation fee"
+            type="number"
+            fullWidth
+            value={consultationFee}
+            onChange={(e) => setConsultationFee(e.target.value)}
+            slotProps={{
+              htmlInput: { min: 0, step: 'any' },
+              input: { startAdornment: <InputAdornment position="start">Rs.</InputAdornment> },
+            }}
+          />
           <FormControl fullWidth>
             <InputLabel>Reason (optional)</InputLabel>
             <Select label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)}>
@@ -191,6 +254,65 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
           onClick={() => mutation.mutate()}
         >
           Issue Token
+        </SubmitButton>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function FeeRefundDialog({ token, onClose }: { token: Token; onClose: () => void }): React.JSX.Element {
+  const qc = useQueryClient();
+  const remaining = Math.max(0, Number(token.consultationFee ?? 0) - Number(token.feeRefunded ?? 0));
+  const [amount, setAmount] = useState(String(remaining));
+  const mutation = useMutation({
+    mutationFn: () => {
+      const n = parseFloat(amount);
+      return window.clinic.tokens.refundFee(token.id, Number.isFinite(n) ? n : remaining);
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['tokens'] });
+      onClose();
+    },
+    meta: { toast: 'Consultation fee refunded', errorToast: 'Failed to refund fee.' },
+  });
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
+      <FormDialogTitle
+        title={`Refund fee — Token #${String(token.tokenNumber).padStart(3, '0')}`}
+        subtitle={`Return consultation fee for ${token.patient.firstName} ${token.patient.lastName}.`}
+      />
+      <DialogContent sx={dialogContentSx}>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {mutation.isError && (
+            <Alert severity="error">{(mutation.error as Error)?.message || 'Failed to refund fee.'}</Alert>
+          )}
+          <Typography variant="body2" color="text.secondary">
+            Collected: <strong>Rs. {new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(Number(token.consultationFee ?? 0))}</strong>
+            {Number(token.feeRefunded ?? 0) > 0
+              ? ` · Already refunded: Rs. ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(Number(token.feeRefunded))}`
+              : ''}
+          </Typography>
+          <TextField
+            label="Refund amount"
+            type="number"
+            fullWidth
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            slotProps={{
+              htmlInput: { min: 0, max: remaining, step: 'any' },
+              input: { startAdornment: <InputAdornment position="start">Rs.</InputAdornment> },
+            }}
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={dialogActionsSx}>
+        <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+        <SubmitButton
+          loading={mutation.isPending}
+          disabled={remaining <= 0}
+          onClick={() => mutation.mutate()}
+        >
+          Refund Fee
         </SubmitButton>
       </DialogActions>
     </Dialog>
@@ -253,6 +375,15 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
         <View style={ts.row}><Text style={ts.lbl}>Patient</Text><Text style={ts.val}>{token.patient.firstName} {token.patient.lastName}</Text></View>
         {token.patient.mrNumber ? <View style={ts.row}><Text style={ts.lbl}>MR #</Text><Text style={ts.val}>{token.patient.mrNumber}</Text></View> : null}
         <View style={ts.row}><Text style={ts.lbl}>Doctor</Text><Text style={ts.val}>Dr. {token.doctor.firstName} {token.doctor.lastName}</Text></View>
+        {Number(token.consultationFee ?? 0) > 0 ? (
+          <View style={ts.row}>
+            <Text style={ts.lbl}>Fee</Text>
+            <Text style={ts.val}>
+              Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(token.consultationFee))}
+              {Number(token.feeRefunded ?? 0) > 0 ? ' (refunded)' : ''}
+            </Text>
+          </View>
+        ) : null}
         <View style={ts.row}><Text style={ts.lbl}>Date</Text><Text style={ts.val}>{date}</Text></View>
         <View style={ts.row}><Text style={ts.lbl}>Time</Text><Text style={ts.val}>{time}</Text></View>
         {token.notes ? <View style={ts.row}><Text style={ts.lbl}>Note</Text><Text style={ts.val}>{token.notes}</Text></View> : null}
@@ -561,6 +692,7 @@ export function TokensPage(): React.JSX.Element {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [printToken, setPrintToken] = useState<Token | null>(null);
   const [deleteToken, setDeleteToken] = useState<Token | null>(null);
+  const [refundToken, setRefundToken] = useState<Token | null>(null);
 
   const { data: tokens = [], isLoading, isFetching, isError } = useQuery<Token[]>({
     queryKey: ['tokens', date],
@@ -582,8 +714,8 @@ export function TokensPage(): React.JSX.Element {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => window.clinic.tokens.delete(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tokens'] });
+    onSettled: async () => {
+      await qc.invalidateQueries({ queryKey: ['tokens'] });
       setDeleteToken(null);
     },
     meta: { silent: true },
@@ -880,6 +1012,9 @@ export function TokensPage(): React.JSX.Element {
                           </Stack>
                           <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
                             Dr. {token.doctor.firstName} {token.doctor.lastName}
+                            {Number(token.consultationFee ?? 0) > 0
+                              ? ` · Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(token.consultationFee))}${Number(token.feeRefunded ?? 0) > 0 ? ' refunded' : ''}`
+                              : ''}
                             {token.reason ? ` · ${token.reason}` : ''}
                             {token.notes ? ` · ${token.notes}` : ''}
                           </Typography>
@@ -898,6 +1033,13 @@ export function TokensPage(): React.JSX.Element {
                               <PrintOutlinedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          {!isAdmin && Number(token.consultationFee ?? 0) - Number(token.feeRefunded ?? 0) > 0 && (
+                            <Tooltip title="Refund consultation fee">
+                              <IconButton size="small" onClick={() => setRefundToken(token)} sx={{ borderRadius: 1 }}>
+                                <UndoOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                           {!isAdmin && token.status === 'WAITING' && (
                             <Tooltip title="Mark Done">
                               <IconButton
@@ -1063,6 +1205,7 @@ export function TokensPage(): React.JSX.Element {
 
       <IssueTokenDialog open={dialogOpen} onClose={() => setDialogOpen(false)} date={date} />
       {printToken && <TokenPrintPreview token={printToken} onClose={() => setPrintToken(null)} />}
+      {refundToken && <FeeRefundDialog token={refundToken} onClose={() => setRefundToken(null)} />}
       <ConfirmDialog
         open={Boolean(deleteToken)}
         title="Delete token?"

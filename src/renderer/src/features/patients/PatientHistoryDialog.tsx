@@ -479,7 +479,7 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
                             ? 'success.main'
                             : inv.status === 'PARTIALLY_PAID'
                               ? 'warning.main'
-                              : inv.status === 'VOID'
+                              : inv.status === 'VOID' || inv.status === 'REFUNDED'
                                 ? 'error.main'
                                 : 'info.main',
                       }}

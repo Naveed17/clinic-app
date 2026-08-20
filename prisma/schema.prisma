@@ -32,6 +32,7 @@ enum InvoiceStatus {
   ISSUED
   PARTIALLY_PAID
   PAID
+  REFUNDED
   VOID
 }
 
@@ -93,6 +94,7 @@ model DoctorProfile {
   phone           String?
   bio             String?
   avatar          String?
+  consultationFee Decimal @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -218,6 +220,8 @@ model Token {
   status      TokenStatus @default(WAITING)
   notes       String?
   reason      String?
+  consultationFee Decimal    @default(0)
+  feeRefunded     Decimal    @default(0)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 

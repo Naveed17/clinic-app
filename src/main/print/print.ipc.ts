@@ -258,23 +258,28 @@ async function setPrinting(win: BrowserWindow, printing: boolean): Promise<void>
   `);
 }
 
-async function openHtmlPreview(html: string): Promise<{ ok: true } | { ok: false; error: string }> {
+async function openHtmlPreview(
+  html: string,
+  paper: PrintPaperId = 'pos80',
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const file = join(app.getPath('temp'), `careflow-print-${randomUUID()}.html`);
   let win: BrowserWindow | null = null;
   let printing = false;
+  const size = previewSize(paper);
+  const isA4 = paper === 'A4';
 
   try {
     writeFileSync(file, withPreviewChrome(html), 'utf8');
 
     win = new BrowserWindow({
       show: true,
-      width: POS_PAPER.previewWidth,
-      height: POS_PAPER.previewHeight,
-      minWidth: 280,
-      minHeight: 420,
+      width: size.width,
+      height: size.height,
+      minWidth: isA4 ? 560 : 280,
+      minHeight: isA4 ? 640 : 420,
       autoHideMenuBar: true,
-      title: 'Print',
-      backgroundColor: '#ffffff',
+      title: isA4 ? 'OPD Report · A4' : 'Print',
+      backgroundColor: isA4 ? '#e8eaed' : '#ffffff',
       webPreferences: {
         sandbox: false,
         contextIsolation: true,
@@ -297,11 +302,11 @@ async function openHtmlPreview(html: string): Promise<{ ok: true } | { ok: false
         void (async () => {
           try {
             await setPrinting(target, true);
-            const result = await printWindow(target, true, 'pos80');
+            const result = await printWindow(target, true, paper);
             if (!result.ok) {
               await showPrintError(
                 target,
-                `${result.error}. Set your POS printer as Windows default (not "Microsoft Print to PDF"), then try again.`,
+                `${result.error}. ${isA4 ? 'Choose your A4 printer as Windows default (not "Microsoft Print to PDF")' : 'Set your POS printer as Windows default (not "Microsoft Print to PDF")'}, then try again.`,
               );
               return;
             }
@@ -723,7 +728,7 @@ export function registerPrintIpc(): void {
     if (options?.printDialog === false) {
       return silentPrintHtml(html, options.paper ?? 'pos80');
     }
-    return openHtmlPreview(html);
+    return openHtmlPreview(html, options?.paper ?? 'pos80');
   });
 
   ipcMain.handle('print:pdf', async (_event, base64: string, options?: PrintOptions) => {

@@ -69,6 +69,7 @@ export function MedicinePickerDialog({ open, onClose, onAdded }: Props) {
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">Rs.</InputAdornment> }}
+            slotProps={{ htmlInput: { min: 0, step: 'any' } }}
           />
         </Stack>
       </DialogContent>
@@ -114,6 +115,7 @@ export function MedicineUpdatePriceDialog({ medicine, onClose }: { medicine: Med
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">Rs.</InputAdornment> }}
+            slotProps={{ htmlInput: { min: 0, step: 'any' } }}
           />
         </Box>
       </DialogContent>

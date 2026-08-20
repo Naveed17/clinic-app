@@ -6,11 +6,19 @@ import type { ReportSummary } from './report';
 import type { LabOrder } from './lab';
 import type { GlobalSearchResult } from './search';
 import type { ChatMessage, ChatMessageInput } from './chat';
+import type { Medicine } from './medicine';
 
 declare global {
   interface Window {
     clinic: {
-      medicines: any;
+      medicines: {
+        search: (query: string) => Promise<Medicine[]>;
+        list: () => Promise<Medicine[]>;
+        create: (name: string, price: number) => Promise<Medicine>;
+        updatePrice: (id: string, price: number) => Promise<Medicine>;
+        update: (id: string, name: string, price: number) => Promise<Medicine>;
+        delete: (id: string) => Promise<{ ok: boolean; id: string } | void>;
+      };
       license: {
         status: () => Promise<boolean>;
         gate: () => Promise<{ state: 'ok' | 'none' | 'blocked'; reason?: string }>;
@@ -40,6 +48,7 @@ declare global {
         patients: () => Promise<TokenPerson[]>;
         create: (input: TokenInput) => Promise<Token>;
         updateStatus: (id: string, status: string) => Promise<Token>;
+        refundFee: (id: string, amount?: number) => Promise<Token>;
         delete: (id: string) => Promise<void>;
       };
       appointments: {
@@ -56,12 +65,14 @@ declare global {
         patients: () => Promise<InvoicePerson[]>;
         create: (input: InvoiceInput) => Promise<Invoice>;
         addPayment: (invoiceId: string, amount: number, method: string, reference?: string) => Promise<Invoice>;
+        refund: (invoiceId: string, amount: number, method: string, reason?: string) => Promise<Invoice>;
         void: (id: string) => Promise<Invoice>;
         delete: (id: string) => Promise<void>;
         payments: (invoiceId: string) => Promise<import('./invoice').Payment[]>;
       };
       reports: {
         summary: () => Promise<ReportSummary>;
+        opd: (input: import('./report').OpdReportInput) => Promise<import('./report').OpdDailyReport>;
       };
       chat: {
         list: (roomId?: string) => Promise<ChatMessage[]>;

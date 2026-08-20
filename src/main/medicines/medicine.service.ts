@@ -1,7 +1,10 @@
 import {
   searchCatalogMedicines,
+  listCatalogMedicines,
   createCatalogMedicine,
   updateCatalogMedicinePrice,
+  updateCatalogMedicine,
+  deleteCatalogMedicine,
 } from '../inventory/inventory.service';
 
 export async function searchMedicines(query: string) {
@@ -16,6 +19,14 @@ export async function updateMedicinePrice(id: string, price: number) {
   return updateCatalogMedicinePrice(id, price);
 }
 
+export async function updateMedicine(id: string, name: string, price: number) {
+  return updateCatalogMedicine(id, name, price);
+}
+
+export async function deleteMedicine(id: string) {
+  return deleteCatalogMedicine(id);
+}
+
 export async function listMedicines() {
-  return searchCatalogMedicines('');
+  return listCatalogMedicines();
 }

@@ -44,6 +44,9 @@ export function buildTokenSlipHtml(
   const note = token.notes
     ? `<div class="row"><div class="lbl">Note</div><div class="val">${escapeHtml(token.notes)}</div></div>`
     : '';
+  const fee = Number(token.consultationFee ?? 0) > 0
+    ? `<div class="row"><div class="lbl">Fee</div><div class="val">${escapeHtml(`Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(token.consultationFee))}${Number(token.feeRefunded ?? 0) > 0 ? ' (refunded)' : ''}`)}</div></div>`
+    : '';
   const reason = token.reason
     ? `<div class="row"><div class="lbl">Reason</div><div class="val">${escapeHtml(token.reason)}</div></div>`
     : '';
@@ -135,6 +138,7 @@ export function buildTokenSlipHtml(
   <div class="row"><div class="lbl">Patient</div><div class="val">${escapeHtml(`${token.patient.firstName} ${token.patient.lastName}`.trim())}</div></div>
   ${mr}
   <div class="row"><div class="lbl">Doctor</div><div class="val">${escapeHtml(`Dr. ${token.doctor.firstName} ${token.doctor.lastName}`.trim())}</div></div>
+  ${fee}
   <div class="row"><div class="lbl">Date</div><div class="val">${escapeHtml(date)}</div></div>
   <div class="row"><div class="lbl">Time</div><div class="val">${escapeHtml(time)}</div></div>
   ${note}

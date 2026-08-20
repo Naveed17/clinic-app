@@ -48,6 +48,7 @@ const baseSchema = z.object({
   specialization: z.string().trim().min(1, 'Specialization is required.'),
   qualification: z.string().trim(),
   experienceYears: z.coerce.number().int().min(0).max(60),
+  consultationFee: z.coerce.number().min(0),
   phone: z.string().trim(),
   bio: z.string().trim(),
 });
@@ -71,6 +72,7 @@ const emptyValues: FormValues = {
   specialization: '',
   qualification: '',
   experienceYears: 0,
+  consultationFee: 0,
   phone: '',
   bio: '',
 };
@@ -86,6 +88,7 @@ function toFormValues(doctor?: Doctor): FormValues {
     specialization: doctor.doctorProfile?.specialization ?? '',
     qualification: doctor.doctorProfile?.qualification ?? '',
     experienceYears: doctor.doctorProfile?.experienceYears ?? 0,
+    consultationFee: Number(doctor.doctorProfile?.consultationFee ?? 0),
     phone: doctor.doctorProfile?.phone ?? '',
     bio: doctor.doctorProfile?.bio ?? '',
   };
@@ -110,6 +113,7 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
         specialization: values.specialization,
         qualification: values.qualification || undefined,
         experienceYears: values.experienceYears,
+        consultationFee: values.consultationFee,
         phone: values.phone || undefined,
         bio: values.bio || undefined,
         avatar,
@@ -199,6 +203,18 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
                 })}
               />
             </Box>
+            <TextField
+              fullWidth
+              label="Consultation fee"
+              type="number"
+              slotProps={{
+                htmlInput: { min: 0, step: 'any' },
+                input: { startAdornment: <InputAdornment position="start">Rs.</InputAdornment> },
+              }}
+              {...form.register('consultationFee', {
+                setValueAs: (value) => (value === '' ? 0 : Number(value)),
+              })}
+            />
             <Controller
               control={form.control}
               name="phone"
@@ -267,15 +283,16 @@ export function DoctorsPage(): React.JSX.Element {
             <TableCell>Specialization</TableCell>
             <TableCell>Qualification</TableCell>
             <TableCell>Experience</TableCell>
+            <TableCell>Fee</TableCell>
             <TableCell>Status</TableCell>
             <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {doctorsQuery.isLoading ? (
-            <TableRowsSkeleton cols={6} />
+            <TableRowsSkeleton cols={7} />
           ) : doctors.length === 0 ? (
-            <TableRow><TableCell colSpan={6} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No doctors found.</TableCell></TableRow>
+            <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No doctors found.</TableCell></TableRow>
           ) : (
             doctors.map((doc: Doctor) => {
               return (
@@ -292,6 +309,9 @@ export function DoctorsPage(): React.JSX.Element {
                   <TableCell>{doc.doctorProfile?.specialization ?? '—'}</TableCell>
                   <TableCell>{doc.doctorProfile?.qualification ?? '—'}</TableCell>
                   <TableCell>{doc.doctorProfile ? `${doc.doctorProfile.experienceYears} yr${doc.doctorProfile.experienceYears !== 1 ? 's' : ''}` : '—'}</TableCell>
+                  <TableCell>
+                    {`Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(doc.doctorProfile?.consultationFee ?? 0))}`}
+                  </TableCell>
                   <TableCell>
                     <Box sx={{
                       display: 'inline-flex',

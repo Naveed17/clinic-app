@@ -13,7 +13,7 @@ function escapeHtml(value: string): string {
 }
 
 function money(v: number): string {
-  return `Rs. ${new Intl.NumberFormat('en-PK').format(Number(v) || 0)}`;
+  return `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(v) || 0)}`;
 }
 
 function barcodeDataUrl(text: string): string | null {

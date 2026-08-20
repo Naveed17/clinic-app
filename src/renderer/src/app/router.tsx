@@ -6,6 +6,8 @@ import { PatientsPage } from '@/features/patients/PatientsPage';
 import { PatientProfilePage } from '@/features/patients/PatientProfilePage';
 import { AppointmentsPage } from '@/features/appointments/AppointmentsPage';
 import { InvoicesPage } from '@/features/billing/InvoicesPage';
+import { OpdReportsPage } from '@/features/reports/OpdReportsPage';
+import { MedicinesPage } from '@/features/medicines/MedicinesPage';
 import { StatisticsPage } from '@/features/statistics/StatisticsPage';
 import { LabPage } from '@/features/lab/LabPage';
 import { UsersPage } from '@/features/users/UsersPage';
@@ -72,6 +74,22 @@ const router = createHashRouter([
             element: (
               <RouteAccessGate route="/billing">
                 <InvoicesPage />
+              </RouteAccessGate>
+            ),
+          },
+          {
+            path: '/opd-reports',
+            element: (
+              <RouteAccessGate route="/opd-reports">
+                <OpdReportsPage />
+              </RouteAccessGate>
+            ),
+          },
+          {
+            path: '/medicines',
+            element: (
+              <RouteAccessGate route="/medicines">
+                <MedicinesPage />
               </RouteAccessGate>
             ),
           },

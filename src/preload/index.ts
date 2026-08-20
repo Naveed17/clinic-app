@@ -341,6 +341,11 @@ const api = {
         () => request(`/api/invoices/${invoiceId}/payment`, { method: 'POST', body: JSON.stringify({ amount, method, reference }) }),
         'invoices:add-payment', invoiceId, amount, method, reference,
       ),
+    refund: (invoiceId: string, amount: number, method: string, reason?: string) =>
+      call(
+        () => request(`/api/invoices/${invoiceId}/refund`, { method: 'POST', body: JSON.stringify({ amount, method, reason }) }),
+        'invoices:refund', invoiceId, amount, method, reason,
+      ),
     void: (id: string) =>
       call(
         () => request(`/api/invoices/${id}/void`, { method: 'POST' }),
@@ -359,6 +364,11 @@ const api = {
   },
   reports: {
     summary: () => call(() => request('/api/reports/summary'), 'reports:summary'),
+    opd: (input: unknown) =>
+      call(
+        () => request(`/api/reports/opd?${toQueryString(input)}`),
+        'reports:opd', input,
+      ),
   },
   users: {
     list: (input: unknown) =>
@@ -579,6 +589,11 @@ const api = {
       call(
         () => request(`/api/tokens/${id}`, { method: 'DELETE' }),
         'tokens:delete', id,
+      ),
+    refundFee: (id: string, amount?: number) =>
+      call(
+        () => request(`/api/tokens/${id}/refund-fee`, { method: 'POST', body: JSON.stringify({ amount }) }),
+        'tokens:refund-fee', id, amount,
       ),
     upsertPrescription: (tokenId: string, input: unknown) =>
       call(
@@ -920,6 +935,16 @@ const api = {
       call(
         () => request(`/api/medicines/${id}/price`, { method: 'PUT', body: JSON.stringify({ price }) }),
         'medicines:update-price', id, price,
+      ),
+    update: (id: string, name: string, price: number) =>
+      call(
+        () => request(`/api/medicines/${id}`, { method: 'PUT', body: JSON.stringify({ name, price }) }),
+        'medicines:update', id, name, price,
+      ),
+    delete: (id: string) =>
+      call(
+        () => request(`/api/medicines/${id}`, { method: 'DELETE' }),
+        'medicines:delete', id,
       ),
   },
   search: {

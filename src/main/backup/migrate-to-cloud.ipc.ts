@@ -166,7 +166,6 @@ async function loadTable(name: (typeof TABLES)[number]): Promise<JsonRow[]> {
   const db = getPrisma();
   try {
     switch (name) {
-      case 'User':
       case 'User': {
         const rows = await db.$queryRawUnsafe<JsonRow[]>('SELECT * FROM "User"');
         return rows.map(plain).map((row) => embedImageFields(row, ['avatar']));

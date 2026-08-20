@@ -9,7 +9,7 @@ export interface InvoiceItemInput {
 }
 export interface InvoiceInput {
   patientId: string;
-  drFee: number;
+  drFee?: number;
   discount: number;
   notes?: string | null;
   items: InvoiceItemInput[];
@@ -17,16 +17,28 @@ export interface InvoiceInput {
   tokenId?: string | null;
 }
 
-const include = { patient: true, items: true } satisfies Prisma.InvoiceInclude;
+const include = {
+  patient: true,
+  items: true,
+  payments: { select: { amount: true } },
+} satisfies Prisma.InvoiceInclude;
 
 function serializeInvoice(invoice: Prisma.InvoiceGetPayload<{ include: typeof include }>) {
+  const amountPaid = Number(invoice.amountPaid);
+  const hasRefund = invoice.payments.some((p) => Number(p.amount) < 0);
+  const status =
+    invoice.status !== 'VOID' && invoice.status !== 'DRAFT' && hasRefund && amountPaid <= 0
+      ? 'REFUNDED'
+      : invoice.status;
+  const { payments: _payments, ...rest } = invoice;
   return {
-    ...invoice,
+    ...rest,
+    status,
     subtotal: Number(invoice.subtotal),
     discount: Number(invoice.discount),
     tax: Number(invoice.tax),
     total: Number(invoice.total),
-    amountPaid: Number(invoice.amountPaid),
+    amountPaid,
     items: invoice.items.map((item) => ({
       ...item,
       unitPrice: Number(item.unitPrice),
@@ -37,9 +49,8 @@ function serializeInvoice(invoice: Prisma.InvoiceGetPayload<{ include: typeof in
 
 function toInvoiceData(input: InvoiceInput): Omit<Prisma.InvoiceUncheckedCreateInput, 'id'> {
   const subtotal = input.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-  const drFee = Math.max(0, input.drFee || 0);
-  const discount = Math.max(0, Math.min(input.discount, subtotal + drFee));
-  const total = subtotal + drFee - discount;
+  const discount = Math.max(0, Math.min(input.discount, subtotal));
+  const total = Math.max(0, subtotal - discount);
   return {
     patientId: input.patientId,
     invoiceNumber: `INV-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${randomUUID().slice(0, 6).toUpperCase()}`,
@@ -62,25 +73,75 @@ export async function invoicePatients() {
   });
 }
 
+function roundMoney(n: number) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+function statusAfterBalance(total: number, paid: number): 'PAID' | 'PARTIALLY_PAID' | 'ISSUED' {
+  if (paid >= total && total > 0) return 'PAID';
+  if (paid > 0) return 'PARTIALLY_PAID';
+  return 'ISSUED';
+}
+
 export async function addPayment(invoiceId: string, amount: number, method: string, reference?: string) {
+  const pay = roundMoney(amount);
+  if (!Number.isFinite(pay) || pay <= 0) throw new Error('Payment amount must be greater than 0.');
   const database = getPrisma();
   return database.$transaction(async (tx) => {
+    const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include });
+    if (invoice.status === 'VOID') throw new Error('Cannot record payment on a voided invoice.');
     await tx.payment.create({
       data: {
         invoiceId,
-        amount,
+        amount: pay,
         method: method as import('@prisma/client').PaymentMethod,
         reference: reference?.trim() || null,
         paidAt: new Date(),
       },
     });
-    const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include });
-    const totalPaid = Number(invoice.amountPaid) + amount;
-    const total = Number(invoice.total);
-    const status = totalPaid >= total ? 'PAID' : totalPaid > 0 ? 'PARTIALLY_PAID' : 'ISSUED';
+    const totalPaid = roundMoney(Number(invoice.amountPaid) + pay);
+    const status = statusAfterBalance(Number(invoice.total), totalPaid);
     const updated = await tx.invoice.update({
       where: { id: invoiceId },
       data: { amountPaid: totalPaid, status, issuedAt: invoice.issuedAt ?? new Date() },
+      include,
+    });
+    return serializeInvoice(updated);
+  });
+}
+
+export async function refundPayment(
+  invoiceId: string,
+  amount: number,
+  method: string,
+  reason?: string,
+) {
+  const refund = roundMoney(amount);
+  if (!Number.isFinite(refund) || refund <= 0) throw new Error('Refund amount must be greater than 0.');
+  const database = getPrisma();
+  return database.$transaction(async (tx) => {
+    const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include });
+    if (invoice.status === 'VOID') throw new Error('Cannot refund a voided invoice.');
+    const paid = roundMoney(Number(invoice.amountPaid));
+    if (paid <= 0) throw new Error('Nothing to refund on this invoice.');
+    if (refund > paid) throw new Error('Refund cannot exceed the amount paid.');
+
+    const note = reason?.trim() ? `Refund: ${reason.trim()}` : 'Refund';
+    await tx.payment.create({
+      data: {
+        invoiceId,
+        amount: -refund,
+        method: method as import('@prisma/client').PaymentMethod,
+        reference: reason?.trim() || null,
+        notes: note,
+        paidAt: new Date(),
+      },
+    });
+    const totalPaid = roundMoney(paid - refund);
+    const status = statusAfterBalance(Number(invoice.total), totalPaid);
+    const updated = await tx.invoice.update({
+      where: { id: invoiceId },
+      data: { amountPaid: totalPaid, status },
       include,
     });
     return serializeInvoice(updated);
@@ -106,10 +167,19 @@ export async function deleteInvoice(id: string): Promise<void> {
 }
 
 export async function getPayments(invoiceId: string) {
-  return getPrisma().payment.findMany({
+  const payments = await getPrisma().payment.findMany({
     where: { invoiceId },
-    orderBy: { paidAt: 'desc' }, 
+    orderBy: { paidAt: 'desc' },
   });
+  return payments.map((p) => ({
+    id: p.id,
+    invoiceId: p.invoiceId,
+    amount: Number(p.amount),
+    method: p.method,
+    paidAt: p.paidAt.toISOString(),
+    reference: p.reference,
+    notes: p.notes,
+  }));
 }
 
 export async function createInvoice(input: InvoiceInput) {

@@ -8,16 +8,6 @@ export interface Payment {
   notes: string | null;
 }
 
-export interface Payment {
-  id: string;
-  invoiceId: string;
-  amount: number;
-  method: string;
-  paidAt: string;
-  reference: string | null;
-  notes: string | null;
-}
-
 export interface InvoicePerson {
   id: string;
   firstName: string;
@@ -34,7 +24,7 @@ export interface InvoiceItem {
 export interface Invoice {
   id: string;
   invoiceNumber: string;
-  status: 'DRAFT' | 'ISSUED' | 'PARTIALLY_PAID' | 'PAID' | 'VOID';
+  status: 'DRAFT' | 'ISSUED' | 'PARTIALLY_PAID' | 'PAID' | 'REFUNDED' | 'VOID';
   patient: InvoicePerson;
   subtotal: number;
   discount: number;
@@ -46,7 +36,6 @@ export interface Invoice {
 }
 export interface InvoiceInput {
   patientId: string;
-  drFee: number;
   discount: number;
   notes?: string | null;
   items: Array<{ description: string; quantity: number; unitPrice: number }>;

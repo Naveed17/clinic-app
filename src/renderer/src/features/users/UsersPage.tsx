@@ -41,6 +41,7 @@ import {
 } from '@/components/DialogUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { DoctorAvatar, DoctorAvatarPicker, avatarFallbackFromRole } from '@/components/DoctorAvatar';
+import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 
 const roleLabels: Record<string, string> = {
@@ -63,6 +64,7 @@ const doctorProfileSchema = z.object({
   specialization: z.string().trim(),
   qualification: z.string().trim(),
   experienceYears: z.number().min(0).max(60),
+  consultationFee: z.number().min(0),
   phone: z.string().trim(),
   bio: z.string().trim(),
 });
@@ -94,7 +96,7 @@ const emptyFormValues: FormValues = {
   password: '',
   role: 'RECEPTIONIST',
   isActive: true,
-  doctorProfile: { specialization: '', qualification: '', experienceYears: 0, phone: '', bio: '' },
+  doctorProfile: { specialization: '', qualification: '', experienceYears: 0, consultationFee: 0, phone: '', bio: '' },
 };
 
 function toFormValues(user?: User): FormValues {
@@ -110,6 +112,7 @@ function toFormValues(user?: User): FormValues {
       specialization: user.doctorProfile?.specialization ?? '',
       qualification: user.doctorProfile?.qualification ?? '',
       experienceYears: user.doctorProfile?.experienceYears ?? 0,
+      consultationFee: Number(user.doctorProfile?.consultationFee ?? 0),
       phone: user.doctorProfile?.phone ?? '',
       bio: user.doctorProfile?.bio ?? '',
     },
@@ -120,7 +123,7 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
   const queryClient = useQueryClient();
   const isEditing = Boolean(user);
   const { can } = useLicense();
-  const canManageStaff = can('manageUsers');
+  const extraAdmins = can('manageUsers');
   const form = useForm<FormValues>({
     resolver: zodResolver(isEditing ? editSchema : createSchema),
     defaultValues: emptyFormValues,
@@ -138,6 +141,7 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
           specialization: values.doctorProfile.specialization,
           qualification: values.doctorProfile.qualification || undefined,
           experienceYears: values.doctorProfile.experienceYears,
+          consultationFee: values.doctorProfile.consultationFee,
           phone: values.doctorProfile.phone || undefined,
           bio: values.doctorProfile.bio || undefined,
           avatar,
@@ -206,7 +210,7 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
                   <FormControl fullWidth error={Boolean(errors.role)}>
                     <InputLabel>Role</InputLabel>
                     <Select label="Role" {...field}>
-                      {(canManageStaff || user?.role === 'ADMIN') && <MenuItem value="ADMIN">Admin</MenuItem>}
+                      {(extraAdmins || user?.role === 'ADMIN') && <MenuItem value="ADMIN">Admin</MenuItem>}
                       {can('doctorDashboard') && <MenuItem value="DOCTOR">Doctor</MenuItem>}
                       <MenuItem value="RECEPTIONIST">Receptionist</MenuItem>
                       {can('labDashboard') && <MenuItem value="LAB_TECHNICIAN">Lab Technician</MenuItem>}
@@ -246,6 +250,16 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
                   <TextField fullWidth label="Qualification (e.g. MBBS, MD)" {...form.register('doctorProfile.qualification')} />
                   <TextField fullWidth label="Experience (years)" type="number" slotProps={{ htmlInput: { min: 0, max: 60 } }} {...form.register('doctorProfile.experienceYears', { valueAsNumber: true })} />
                 </Box>
+                <TextField
+                  fullWidth
+                  label="Consultation fee"
+                  type="number"
+                  slotProps={{
+                    htmlInput: { min: 0, step: 'any' },
+                    input: { startAdornment: <InputAdornment position="start">Rs.</InputAdornment> },
+                  }}
+                  {...form.register('doctorProfile.consultationFee', { valueAsNumber: true })}
+                />
                 <Controller
                   control={form.control}
                   name="doctorProfile.phone"
@@ -271,8 +285,9 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
 
 export function UsersPage(): React.JSX.Element {
   const queryClient = useQueryClient();
+  const { user: me } = useAuth();
   const { can } = useLicense();
-  const canManageStaff = can('manageUsers');
+  const extraAdmins = can('manageUsers');
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(0);
@@ -373,7 +388,7 @@ export function UsersPage(): React.JSX.Element {
                 <TableCell align="right">
                   <Stack direction="row" gap={0.5} justifyContent="flex-end">
                     <Tooltip title="Edit"><IconButton sx={actionBtnSx} onClick={() => { setDialogUser(user); setDialogOpen(true); }}><EditOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                    {canManageStaff && (
+                    {(user.id !== me?.id && (user.role !== 'ADMIN' || extraAdmins)) && (
                       <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => setDeleteUser(user)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                     )}
                   </Stack>

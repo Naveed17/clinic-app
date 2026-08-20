@@ -85,7 +85,8 @@ const styles = StyleSheet.create({
   brand: { fontSize: 8, color: '#000', textAlign: 'center', marginTop: 8, fontWeight: 'bold', letterSpacing: 0.5 },
 });
 
-const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(Number(v))}`;
+const money = (v: number) =>
+  `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(v) || 0)}`;
 
 function ReceiptDocument({
   invoice,

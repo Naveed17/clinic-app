@@ -47,9 +47,9 @@ export function getSearchScope(
   const labOn = licensed(modules, 'labDashboard');
 
   return {
-    patients: r !== 'pharmacist',
-    appointments: r === 'admin' || r === 'doctor' || r === 'receptionist',
-    invoices: (r === 'admin' || r === 'receptionist') && billingOn,
+    patients: r === 'doctor' || r === 'receptionist' || r === 'lab_technician',
+    appointments: r === 'doctor' || r === 'receptionist',
+    invoices: r === 'receptionist' && billingOn,
     labOrders: r !== 'pharmacist' && labOn,
   };
 }

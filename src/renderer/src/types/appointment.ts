@@ -1,10 +1,11 @@
 export interface AppointmentPerson {
-  role: string;
+  role?: string;
   id: string;
   firstName: string;
   lastName: string;
   phone?: string | null;
   avatar?: string | null;
+  consultationFee?: number;
 }
 
 export interface Appointment {

@@ -5,6 +5,8 @@ import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
+import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
+import MedicationOutlinedIcon from '@mui/icons-material/MedicationOutlined';
 import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
 import LocalHospitalOutlinedIcon from '@mui/icons-material/LocalHospitalOutlined';
@@ -29,6 +31,8 @@ const ALL_NAV_ITEMS: NavigationItem[] = [
   { label: 'Appointments', path: '/appointments', icon: <CalendarMonthOutlinedIcon /> },
   { label: 'Tokens',       path: '/tokens',       icon: <ConfirmationNumberOutlinedIcon /> },
   { label: 'Billing',      path: '/billing',      icon: <PaymentsOutlinedIcon /> },
+  { label: 'OPD Reports',  path: '/opd-reports',  icon: <AssessmentOutlinedIcon /> },
+  { label: 'Medicines',    path: '/medicines',    icon: <MedicationOutlinedIcon /> },
   { label: 'Lab',          path: '/lab',          icon: <BiotechOutlinedIcon /> },
   { label: 'Statistics',   path: '/statistics',   icon: <BarChartOutlinedIcon /> },
   { label: 'Doctors',      path: '/doctors',      icon: <LocalHospitalOutlinedIcon /> },

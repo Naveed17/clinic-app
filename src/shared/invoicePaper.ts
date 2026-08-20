@@ -57,8 +57,8 @@ export const RX_PAPER = {
   id: 'A4' as const,
   label: 'A4',
   electronPageSize: 'A4' as const,
-  previewWidth: 640,
-  previewHeight: 900,
+  previewWidth: 860,
+  previewHeight: 1100,
 };
 
 export type PrintPaperId = typeof POS_PAPER.id | typeof RX_PAPER.id;
