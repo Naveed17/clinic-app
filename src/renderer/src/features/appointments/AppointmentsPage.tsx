@@ -7,6 +7,7 @@ import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
 import PersonOffOutlinedIcon from '@mui/icons-material/PersonOffOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import TableRowsOutlinedIcon from '@mui/icons-material/TableRowsOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import RepeatOutlinedIcon from '@mui/icons-material/RepeatOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -36,6 +37,7 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
@@ -642,6 +644,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
 }
 
 export function AppointmentsPage(): React.JSX.Element {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [active, setActive] = useState<Appointment | undefined>();
   const [open, setOpen] = useState(false);
@@ -836,7 +839,7 @@ export function AppointmentsPage(): React.JSX.Element {
               onStatusChange={(id, status) => statusMutation.mutate({ id, status })}
               statusPendingId={statusMutation.isPending ? statusMutation.variables?.id : null}
               onDateClick={isAdmin ? undefined : (date) => { setActive(undefined); setDefaultDate(date); setOpen(true); }}
-              onAppointmentClick={isAdmin ? undefined : (appt) => { setActive(appt); setOpen(true); }}
+              onAppointmentClick={isAdmin ? undefined : (appt) => navigate(`/appointments/${appt.id}`)}
               readOnly={isAdmin}
               hideCheckIn={user?.role !== 'doctor'}
             />
@@ -880,7 +883,11 @@ export function AppointmentsPage(): React.JSX.Element {
               <TableRow><TableCell colSpan={isAdmin ? 7 : 8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No appointments scheduled.</TableCell></TableRow>
             ) : (
               paginated.map((a) => (
-                <TableRow key={a.id} sx={tableSx.row}>
+                <TableRow
+                  key={a.id}
+                  sx={{ ...tableSx.row, cursor: 'pointer' }}
+                  onClick={() => navigate(`/appointments/${a.id}`)}
+                >
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
                       <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'primary.main' }}>
@@ -923,8 +930,13 @@ export function AppointmentsPage(): React.JSX.Element {
                   </TableCell>
                   <TableCell>{a.reason || '—'}</TableCell>
                   {!isAdmin && (
-                    <TableCell align="right">
+                    <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                       <Stack direction="row" gap={0.5} justifyContent="flex-end">
+                        <Tooltip title="View details">
+                          <IconButton sx={actionBtnSx} onClick={() => navigate(`/appointments/${a.id}`)}>
+                            <VisibilityOutlinedIcon sx={{ fontSize: 17 }} />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Edit"><span>
                           <IconButton sx={actionBtnSx} disabled={['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status)} onClick={() => { setActive(a); setOpen(true); }}>
                             <EditOutlinedIcon sx={{ fontSize: 17 }} />

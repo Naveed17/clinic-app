@@ -290,6 +290,8 @@ const api = {
   },
   appointments: {
     list: () => call(() => request('/api/appointments'), 'appointments:list'),
+    get: (id: string) =>
+      call(() => request(`/api/appointments/${encodeURIComponent(id)}`), 'appointments:get', id),
     patients: () => call(() => request('/api/appointments/patients'), 'appointments:patients'),
     doctors: () => call(() => request('/api/appointments/doctors'), 'appointments:doctors'),
     create: (input: unknown) =>
@@ -330,6 +332,8 @@ const api = {
   },
   invoices: {
     list: () => call(() => request('/api/invoices'), 'invoices:list'),
+    get: (id: string) =>
+      call(() => request(`/api/invoices/${encodeURIComponent(id)}`), 'invoices:get', id),
     patients: () => call(() => request('/api/invoices/patients'), 'invoices:patients'),
     create: (input: unknown) =>
       call(
@@ -620,6 +624,8 @@ const api = {
   },
   lab: {
     list: () => call(() => request('/api/lab'), 'lab:list'),
+    get: (id: string) =>
+      call(() => request(`/api/lab/${encodeURIComponent(id)}`), 'lab:get', id),
     listByToken: (tokenId: string) =>
       call(
         () => request(`/api/lab/by-token/${encodeURIComponent(tokenId)}`),
@@ -1024,6 +1030,15 @@ const api = {
         ).catch(() => null);
       }
       return ipc('auth:login', email, password);
+    },
+    directory: async () => {
+      await settingsReady;
+      if (isLanClient) {
+        return request<Array<{ id: string; name: string; email: string; role: string; avatar: string | null }>>(
+          '/api/auth/directory',
+        ).catch(() => []);
+      }
+      return ipc('auth:directory');
     },
     changePassword: async (userId: string, current: string, next: string) => {
       await settingsReady;

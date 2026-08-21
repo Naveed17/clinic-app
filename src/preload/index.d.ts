@@ -12,6 +12,7 @@ declare global {
       };
       appointments: {
         list: () => Promise<unknown>;
+        get: (id: string) => Promise<unknown>;
         patients: () => Promise<unknown>;
         doctors: () => Promise<unknown>;
         create: (input: unknown) => Promise<unknown>;
@@ -23,6 +24,7 @@ declare global {
       };
       invoices: {
         list: () => Promise<unknown>;
+        get: (id: string) => Promise<unknown>;
         patients: () => Promise<unknown>;
         create: (input: unknown) => Promise<unknown>;
         addPayment: (invoiceId: string, amount: number, method: string, reference?: string) => Promise<unknown>;
@@ -65,6 +67,7 @@ declare global {
       };
       lab: {
         list: () => Promise<unknown>;
+        get: (id: string) => Promise<unknown>;
         listByToken: (tokenId: string) => Promise<unknown>;
         patients: () => Promise<unknown>;
         create: (input: unknown) => Promise<unknown>;
@@ -249,6 +252,7 @@ declare global {
           email: string,
           password: string
         ) => Promise<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | { blocked: true; error?: string } | null>;
+        directory: () => Promise<Array<{ id: string; name: string; email: string; role: string; avatar: string | null }>>;
         changePassword: (userId: string, current: string, next: string) => Promise<{ ok: boolean; error?: string }>;
       };
       license: {

@@ -250,6 +250,7 @@ export function DoctorDashboard(): React.JSX.Element {
             <Box key={appt.id}>
               {idx > 0 && <Divider />}
               <Box
+                onClick={() => navigate(`/appointments/${appt.id}`)}
                 sx={{
                   px: 3, py: 2,
                   borderLeft: '4px solid',
@@ -257,6 +258,8 @@ export function DoctorDashboard(): React.JSX.Element {
                   bgcolor: isCheckedIn ? alpha(theme.palette.warning.main, 0.05) : 'transparent',
                   opacity: (isPast && appt.status === 'SCHEDULED') || isCompleted ? 0.7 : 1,
                   transition: 'background 0.15s',
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) },
                 }}
               >
                 <Stack direction="row" alignItems="center" spacing={2}>
@@ -285,7 +288,7 @@ export function DoctorDashboard(): React.JSX.Element {
                       )}
                     </Stack>
                   </Box>
-                  <Stack direction="row" alignItems="center" gap={0.75} flexShrink={0}>
+                  <Stack direction="row" alignItems="center" gap={0.75} flexShrink={0} onClick={(e) => e.stopPropagation()}>
                     <Chip
                       size="small"
                       label={appt.status.replace('_', ' ')}
@@ -489,7 +492,7 @@ export function DoctorDashboard(): React.JSX.Element {
             }}
             onDayContextMenu={(date, anchor) => { setContextDate(date); setCtxMenu(anchor); }}
             onAppointmentContextMenu={(appt, anchor) => setApptCtxMenu({ ...anchor, appointment: appt })}
-            onAppointmentClick={(appt) => { setEditAppt(appt); setApptDialogOpen(true); }}
+            onAppointmentClick={(appt) => navigate(`/appointments/${appt.id}`)}
             onPrescriptionClick={(appt) => openPrescription(appt)}
             onPatientHistoryClick={canViewPatientHistory ? (appt) => openPatientHistory(appt) : undefined}
             onLabOrderClick={canOrderLab ? (appt) => openLabOrder(appt) : undefined}

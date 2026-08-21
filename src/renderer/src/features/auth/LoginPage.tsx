@@ -7,6 +7,7 @@ import WifiTetheringIcon from '@mui/icons-material/WifiTethering';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Collapse,
@@ -25,6 +26,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
+import { DoctorAvatar, avatarFallbackFromRole } from '@/components/DoctorAvatar';
 
 /* ── Animated galaxy canvas ── */
 function GalaxyCanvas(): React.JSX.Element {
@@ -98,12 +100,30 @@ function GalaxyCanvas(): React.JSX.Element {
 }
 
 /* ── Login Page ── */
+type LoginDirectoryUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar: string | null;
+};
+
+const LAST_LOGIN_EMAIL_KEY = 'clinic-last-login-email';
+
+function roleLabel(role: string): string {
+  return String(role || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
 export function LoginPage(): React.JSX.Element {
   const { login } = useAuth();
   const navigate = useNavigate();
   const brandLogo = useClinicBrandLogo();
+  const passwordRef = useRef<HTMLInputElement>(null);
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => window.localStorage.getItem(LAST_LOGIN_EMAIL_KEY) || '');
+  const [users, setUsers] = useState<LoginDirectoryUser[]>([]);
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState(() => {
@@ -123,6 +143,16 @@ export function LoginPage(): React.JSX.Element {
   const [connected, setConnected] = useState(false);
   const [serverMode, setServerMode] = useState<string>('local');
   const { isOnline } = useDatabaseMode();
+
+  useEffect(() => {
+    void window.clinic?.auth.directory?.()
+      .then((list) => {
+        if (Array.isArray(list)) setUsers(list);
+      })
+      .catch(() => {
+        setUsers([]);
+      });
+  }, []);
 
   useEffect(() => {
     void window.clinic?.settings.get().then((s) => {
@@ -168,6 +198,7 @@ export function LoginPage(): React.JSX.Element {
     const result = await login(email, password);
     setLoading(false);
     if (result === true) {
+      window.localStorage.setItem(LAST_LOGIN_EMAIL_KEY, email.trim().toLowerCase());
       navigate('/dashboard', { replace: true });
     } else if (typeof result === 'string') {
       setError(result);
@@ -305,22 +336,123 @@ export function LoginPage(): React.JSX.Element {
             </Alert>
           )}
 
-          <TextField
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void handleLogin()}
-            fullWidth
-            sx={glassField}
-            slotProps={{
-              input: {
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <PersonOutlineOutlinedIcon sx={{ color: 'rgba(255,255,255,0.4)', fontSize: 20 }} />
-                  </InputAdornment>
-                ),
+          <Autocomplete
+            freeSolo
+            autoHighlight
+            openOnFocus
+            options={users}
+            inputValue={email}
+            onInputChange={(_, value) => setEmail(value)}
+            onChange={(_, value) => {
+              if (value && typeof value !== 'string') {
+                setEmail(value.email);
+                window.setTimeout(() => passwordRef.current?.focus(), 0);
+              }
+            }}
+            getOptionLabel={(option) => (typeof option === 'string' ? option : option.email)}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            filterOptions={(options, state) => {
+              const query = state.inputValue.trim().toLowerCase();
+              if (!query) return options;
+              return options.filter((user) =>
+                user.email.toLowerCase().includes(query)
+                || user.name.toLowerCase().includes(query)
+                || roleLabel(user.role).toLowerCase().includes(query),
+              );
+            }}
+            sx={{
+              '& .MuiAutocomplete-popupIndicator, & .MuiAutocomplete-clearIndicator': {
+                color: 'rgba(255,255,255,0.45)',
               },
+            }}
+            slotProps={{
+              paper: {
+                sx: {
+                  mt: 0.5,
+                  bgcolor: 'rgba(10,20,40,0.94)',
+                  backdropFilter: 'blur(18px)',
+                  border: '1px solid rgba(255,255,255,0.16)',
+                  color: '#fff',
+                  '& .MuiAutocomplete-noOptions': { color: 'rgba(255,255,255,0.45)' },
+                },
+              },
+              listbox: {
+                sx: {
+                  py: 0.5,
+                  '& .MuiAutocomplete-option': {
+                    px: 1.25,
+                    py: 1,
+                    gap: 1.25,
+                    minHeight: 56,
+                    '&[aria-selected="true"]': { bgcolor: 'rgba(15,118,110,0.28)' },
+                    '&.Mui-focused': { bgcolor: 'rgba(255,255,255,0.08)' },
+                  },
+                },
+              },
+            }}
+            renderOption={(props, option) => {
+              const { key, ...optionProps } = props as typeof props & { key: string };
+              return (
+                <Box component="li" key={key} {...optionProps}>
+                  <DoctorAvatar
+                    src={option.avatar}
+                    name={option.name}
+                    size={36}
+                    fallback={avatarFallbackFromRole(option.role)}
+                  />
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography fontSize={14} fontWeight={700} color="#fff" noWrap>
+                      {option.name}
+                    </Typography>
+                    <Typography fontSize={12} sx={{ color: 'rgba(255,255,255,0.55)' }} noWrap>
+                      {option.email}
+                    </Typography>
+                  </Box>
+                  <Typography fontSize={11} fontWeight={700} sx={{ color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>
+                    {roleLabel(option.role)}
+                  </Typography>
+                </Box>
+              );
+            }}
+            renderInput={(params) => {
+              const selected = users.find((user) => user.email.toLowerCase() === email.trim().toLowerCase());
+              return (
+                <TextField
+                  {...params}
+                  label="Email"
+                  type="email"
+                  autoComplete="username"
+                  fullWidth
+                  sx={glassField}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      passwordRef.current?.focus();
+                    }
+                  }}
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: (
+                      <>
+                        {selected ? (
+                          <DoctorAvatar
+                            src={selected.avatar}
+                            name={selected.name}
+                            size={28}
+                            fallback={avatarFallbackFromRole(selected.role)}
+                            sx={{ ml: 0.5, mr: 0.75 }}
+                          />
+                        ) : (
+                          <InputAdornment position="start">
+                            <PersonOutlineOutlinedIcon sx={{ color: 'rgba(255,255,255,0.4)', fontSize: 20 }} />
+                          </InputAdornment>
+                        )}
+                        {params.InputProps.startAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              );
             }}
           />
 
@@ -331,6 +463,8 @@ export function LoginPage(): React.JSX.Element {
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void handleLogin()}
             fullWidth
+            inputRef={passwordRef}
+            autoComplete="current-password"
             sx={glassField}
             slotProps={{
               input: {

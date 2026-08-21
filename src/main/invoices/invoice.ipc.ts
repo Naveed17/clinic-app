@@ -1,8 +1,9 @@
 import { ipcMain } from 'electron';
-import { createInvoice, invoicePatients, listInvoices, addPayment, refundPayment, voidInvoice, deleteInvoice, getPayments } from './invoice.service';
+import { createInvoice, invoicePatients, listInvoices, getInvoice, addPayment, refundPayment, voidInvoice, deleteInvoice, getPayments } from './invoice.service';
 
 export function registerInvoiceIpc(): void {
   ipcMain.handle('invoices:list', () => listInvoices());
+  ipcMain.handle('invoices:get', (_, id: string) => getInvoice(id));
   ipcMain.handle('invoices:patients', () => invoicePatients());
   ipcMain.handle('invoices:create', async (_, input) => {
     try { return await createInvoice(input); }

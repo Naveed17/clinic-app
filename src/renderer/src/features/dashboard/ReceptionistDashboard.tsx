@@ -1,3 +1,7 @@
+import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
+import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
+import EventOutlinedIcon from '@mui/icons-material/EventOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
 import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
@@ -6,7 +10,7 @@ import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
-  Alert, Autocomplete, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent,
+  Alert, Autocomplete, Box, Button, Dialog, DialogActions, DialogContent,
   Divider, FormControl, IconButton, InputLabel, MenuItem, Paper, Select, Skeleton,
   Step, StepLabel, Stepper, Stack, TextField, Typography, Chip, Avatar,
 } from '@mui/material';
@@ -18,9 +22,9 @@ import { ListCardsSkeleton } from '@/components/LoadingUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
-import { alpha, darken, useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, type ReactNode } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -39,6 +43,7 @@ import type { PatientInput } from '@/types/patient';
 import type { Appointment, AppointmentPerson } from '@/types/appointment';
 import { TokenFeeFields } from '@/features/tokens/TokenFeeFields';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
+import { LiveClock } from '@/components/LiveClock';
 import { nextFreeSlot, doctorOfflineReason, slotSearchFrom, type SlotAdjustReason } from '@/utils/appointmentSlot';
 import imgMask from '@/assets/dashboard/clinic-mask.svg';
 import imgCapsule from '@/assets/dashboard/clinic-capsule.svg';
@@ -848,35 +853,73 @@ function toDayKey(d: Date): string {
   return d.toLocaleDateString('en-CA');
 }
 
-function StatusRing({
+function AttentionStat({
   label,
+  hint,
   value,
-  total,
-  color,
+  tone,
+  icon,
+  onClick,
 }: {
   label: string;
+  hint?: string;
   value: number;
-  total: number;
-  color: string;
+  tone: 'warning' | 'error' | 'info';
+  icon: ReactNode;
+  onClick?: () => void;
 }): React.JSX.Element {
-  const pct = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0;
+  const theme = useTheme();
+  const active = value > 0;
+  const alertColor = theme.palette[tone].main;
+
   return (
-    <Stack alignItems="center" spacing={0.75} sx={{ flex: 1, minWidth: 0 }}>
-      <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-        <CircularProgress variant="determinate" value={100} size={64} thickness={3.5} sx={{ color: alpha(color, 0.15) }} />
-        <CircularProgress
-          variant="determinate"
-          value={pct}
-          size={64}
-          thickness={3.5}
-          sx={{ color, position: 'absolute', left: 0, '& .MuiCircularProgress-circle': { strokeLinecap: 'round' } }}
-        />
-        <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
-          <Typography variant="h6" sx={{ color: 'common.white' }}>{value}</Typography>
+    <Paper
+      elevation={0}
+      onClick={onClick}
+      sx={{
+        flex: 1,
+        minWidth: 0,
+        p: 2,
+        borderRadius: 2,
+        cursor: onClick ? 'pointer' : 'default',
+        bgcolor: active
+          ? alpha(alertColor, 0.12)
+          : theme.palette.mode === 'dark'
+            ? alpha(theme.palette.common.white, 0.06)
+            : 'grey.50',
+        border: '1px solid',
+        borderColor: active ? `${tone}.light` : 'divider',
+        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+        '&:hover': {
+          transform: 'translateY(-2px)',
+          boxShadow: 2,
+        },
+      }}
+    >
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+        <Typography
+          variant="h5"
+          sx={{
+            fontWeight: 800,
+            lineHeight: 1,
+            color: active ? `${tone}.main` : 'text.disabled',
+          }}
+        >
+          {value}
+        </Typography>
+        <Box sx={{ color: active ? `${tone}.main` : 'text.disabled', display: 'flex' }}>
+          {icon}
         </Box>
-      </Box>
-      <Typography variant="body2" sx={{ color: alpha('#fff', 0.85), fontWeight: 600 }}>{label}</Typography>
-    </Stack>
+      </Stack>
+      <Typography variant="subtitle2" fontWeight={600} color="text.primary">
+        {label}
+      </Typography>
+      {hint ? (
+        <Typography variant="caption" color={active ? 'text.secondary' : 'text.disabled'} sx={{ display: 'block' }}>
+          {hint}
+        </Typography>
+      ) : null}
+    </Paper>
   );
 }
 
@@ -1030,6 +1073,12 @@ export function ReceptionistDashboard(): React.JSX.Element {
     queryFn: () => appointmentsService.doctors(),
     refetchInterval: 60_000,
   });
+  const todayKey = toDayKey(new Date());
+  const { data: tokens = [] } = useQuery<Token[]>({
+    queryKey: ['tokens', todayKey],
+    queryFn: () => window.clinic.tokens.list(todayKey) as Promise<Token[]>,
+    refetchInterval: 15_000,
+  });
 
   const today = new Date();
   const todaysAppts = useMemo(
@@ -1050,7 +1099,15 @@ export function ReceptionistDashboard(): React.JSX.Element {
 
   const checkedIn = todaysAppts.filter((a) => a.status === 'CHECKED_IN').length;
   const completedToday = todaysAppts.filter((a) => a.status === 'COMPLETED').length;
-  const scheduledToday = todaysAppts.filter((a) => a.status === 'SCHEDULED').length;
+  const nowMs = Date.now();
+  const waitingNow = tokens.filter((token) => token.status === 'WAITING').length;
+  const lateArrivals = todaysAppts.filter(
+    (a) => a.status === 'SCHEDULED' && new Date(a.startsAt).getTime() <= nowMs,
+  ).length;
+  const unpaidBills = invoices.filter((i) => i.status === 'ISSUED' || i.status === 'PARTIALLY_PAID').length;
+  const upcomingToday = todaysAppts.filter(
+    (a) => a.status === 'SCHEDULED' && new Date(a.startsAt).getTime() > nowMs,
+  ).length;
   const pendingBilling = invoices.filter((i) => i.status === 'DRAFT').length;
   const paidToday = invoices.filter((i) => {
     if (i.status !== 'PAID') return false;
@@ -1081,14 +1138,17 @@ export function ReceptionistDashboard(): React.JSX.Element {
 
   return (
     <>
-      <Box sx={{ mb: 2.5 }}>
-        <Typography variant="body2" color="text.secondary" fontWeight={600}>
-          Hi {user?.name || 'Receptionist'},
-        </Typography>
-        <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
-          Welcome Back!
-        </Typography>
-      </Box>
+      <Stack direction="row" justifyContent="space-between" alignItems="flex-end" sx={{ mb: 2.5, gap: 2 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="body2" color="text.secondary" fontWeight={600}>
+            Hi {user?.name || 'Receptionist'},
+          </Typography>
+          <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
+            Welcome Back!
+          </Typography>
+        </Box>
+        <LiveClock />
+      </Stack>
 
       <Box
         sx={{
@@ -1171,31 +1231,55 @@ export function ReceptionistDashboard(): React.JSX.Element {
             </Box>
           </Paper>
 
-          {/* Status rings + metric grid */}
+          {/* Needs attention + metric grid */}
           <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1.1fr 1fr' } }}>
             <Paper
-              elevation={0}
+              variant="outlined"
               sx={{
-                p: 2.5,
-                borderRadius: '20px',
-                border: 'none',
-                background: theme.palette.mode === 'dark'
-                  ? `linear-gradient(160deg, ${theme.palette.grey[900]} 0%, #1a2e22 100%)`
-                  : `linear-gradient(160deg, ${theme.palette.primary.dark} 0%, ${darken(theme.palette.primary.main, 0.42)} 100%)`,
-                boxShadow: `0 8px 24px ${alpha(
-                  theme.palette.mode === 'dark' ? theme.palette.common.black : theme.palette.primary.main,
-                  theme.palette.mode === 'dark' ? 0.35 : 0.22,
-                )}`,
-                color: theme.palette.common.white,
+                p: 3,
+                borderRadius: 1,
+                bgcolor: 'background.paper',
               }}
             >
-              <Typography fontWeight={800} fontSize={16} sx={{ color: alpha(theme.palette.common.white, 0.7), mb: 2 }}>
-                Today&apos;s status
+              <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
+                Needs attention
               </Typography>
-              <Stack direction="row" spacing={1}>
-                <StatusRing label="Scheduled" value={scheduledToday} total={todaysAppts.length || 1} color={theme.palette.info.light} />
-                <StatusRing label="Checked in" value={checkedIn} total={todaysAppts.length || 1} color={theme.palette.warning.light} />
-                <StatusRing label="Completed" value={completedToday} total={todaysAppts.length || 1} color={theme.palette.primary.light} />
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <AttentionStat
+                  label="In queue"
+                  hint="waiting for doctor"
+                  value={waitingNow}
+                  tone="warning"
+                  icon={<GroupsOutlinedIcon fontSize="small" />}
+                  onClick={() => navigate('/tokens')}
+                />
+                <AttentionStat
+                  label="Late check-in"
+                  hint="appointment time passed"
+                  value={lateArrivals}
+                  tone="error"
+                  icon={<AccessTimeOutlinedIcon fontSize="small" />}
+                  onClick={() => navigate('/appointments')}
+                />
+                {showBilling ? (
+                  <AttentionStat
+                    label="Unpaid bills"
+                    hint="to collect"
+                    value={unpaidBills}
+                    tone="info"
+                    icon={<ReceiptLongOutlinedIcon fontSize="small" />}
+                    onClick={() => navigate('/billing')}
+                  />
+                ) : (
+                  <AttentionStat
+                    label="Upcoming"
+                    hint="appointments left"
+                    value={upcomingToday}
+                    tone="info"
+                    icon={<EventOutlinedIcon fontSize="small" />}
+                    onClick={() => navigate('/appointments')}
+                  />
+                )}
               </Stack>
             </Paper>
 
@@ -1278,12 +1362,14 @@ export function ReceptionistDashboard(): React.JSX.Element {
                 {selectedDayAppts.map((a) => (
                   <Box
                     key={a.id}
+                    onClick={() => navigate(`/appointments/${a.id}`)}
                     sx={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: 2,
                       p: 1.5,
                       borderRadius: 1,
+                      cursor: 'pointer',
                       bgcolor: alpha(theme.palette.primary.main, 0.03),
                       border: `1px solid ${theme.palette.divider}`,
                       borderLeft: '4px solid',
@@ -1291,6 +1377,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
                         statusColor[a.status] && statusColor[a.status] !== 'default'
                           ? `${statusColor[a.status]}.main`
                           : 'divider',
+                      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.07) },
                     }}
                   >
                     <Avatar

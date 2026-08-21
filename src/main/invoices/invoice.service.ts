@@ -66,6 +66,11 @@ export async function listInvoices() {
   return invoices.map(serializeInvoice);
 }
 
+export async function getInvoice(id: string) {
+  const invoice = await getPrisma().invoice.findUnique({ where: { id }, include });
+  return invoice ? serializeInvoice(invoice) : null;
+}
+
 export async function invoicePatients() {
   return getPrisma().patient.findMany({
     select: { id: true, firstName: true, lastName: true },

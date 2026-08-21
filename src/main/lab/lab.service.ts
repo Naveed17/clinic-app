@@ -70,6 +70,11 @@ export async function listLabOrders() {
   return orders.map(serialize);
 }
 
+export async function getLabOrder(id: string) {
+  const order = await getPrisma().labOrder.findUnique({ where: { id }, include });
+  return order ? serialize(order) : null;
+}
+
 export async function listLabOrdersByToken(tokenId: string) {
   const orders = await getPrisma().labOrder.findMany({
     where: { tokenId },

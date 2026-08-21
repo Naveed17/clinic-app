@@ -3,8 +3,9 @@ import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
 import { Box, Button, CircularProgress, Link, Paper, Stack, Typography } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useEffect, useState } from 'react';
-import { CAREFLOW_BRAND, supportTelHref, supportWhatsAppHref } from '@shared/careflowSupport';
+import { CAREFLOW_BRAND, supportWhatsAppHref } from '@shared/careflowSupport';
 import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
+import { copySupportPhone, openSupportEmail, openSupportWhatsApp } from '@/utils/careflowSupportActions';
 
 export function LicenseDisabledOverlay({
   reason,
@@ -30,7 +31,6 @@ export function LicenseDisabledOverlay({
     });
   }, []);
 
-  const tel = supportTelHref(phone);
   const whatsapp = supportWhatsAppHref(phone);
 
   return (
@@ -118,23 +118,30 @@ export function LicenseDisabledOverlay({
                   <Stack direction="row" spacing={1.25} alignItems="center">
                     <LocalPhoneOutlinedIcon sx={{ fontSize: 22, color: 'primary.main' }} />
                     <Link
-                      href={tel || undefined}
+                      component="button"
+                      type="button"
                       underline="hover"
                       color="text.primary"
-                      sx={{ fontSize: 16.5, fontWeight: 600 }}
+                      onClick={() => void copySupportPhone(phone)}
+                      sx={{ fontSize: 16.5, fontWeight: 600, cursor: 'pointer', border: 0, background: 'none', p: 0, font: 'inherit' }}
                     >
                       {phone}
                     </Link>
+                    <Typography variant="caption" color="text.secondary">
+                      Click to copy
+                    </Typography>
                   </Stack>
                 )}
                 {email && (
                   <Stack direction="row" spacing={1.25} alignItems="center">
                     <EmailOutlinedIcon sx={{ fontSize: 22, color: 'primary.main' }} />
                     <Link
-                      href={`mailto:${email}`}
+                      component="button"
+                      type="button"
                       underline="hover"
                       color="text.primary"
-                      sx={{ fontSize: 16.5, fontWeight: 600 }}
+                      onClick={() => openSupportEmail(email)}
+                      sx={{ fontSize: 16.5, fontWeight: 600, cursor: 'pointer', border: 0, background: 'none', p: 0, font: 'inherit' }}
                     >
                       {email}
                     </Link>
@@ -142,12 +149,12 @@ export function LicenseDisabledOverlay({
                 )}
                 {whatsapp && (
                   <Link
-                    href={whatsapp}
-                    target="_blank"
-                    rel="noreferrer"
+                    component="button"
+                    type="button"
                     underline="hover"
                     color="primary.main"
-                    sx={{ fontSize: 15.5, fontWeight: 600 }}
+                    onClick={() => openSupportWhatsApp(phone)}
+                    sx={{ fontSize: 15.5, fontWeight: 600, cursor: 'pointer', border: 0, background: 'none', font: 'inherit', textAlign: 'left' }}
                   >
                     WhatsApp CareFlow
                   </Link>

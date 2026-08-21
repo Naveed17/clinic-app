@@ -23,6 +23,7 @@ import {
   dialogSubmitBtnSx,
   FormDialogTitle,
 } from '@/components/DialogUI';
+import { LiveClock } from '@/components/LiveClock';
 import { FetchingBar, ListCardsSkeleton } from '@/components/LoadingUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
@@ -348,14 +349,17 @@ export function WaitingRoomPage(): React.JSX.Element {
 
   return (
     <>
-      <Box sx={{ mb: 2.5 }}>
-        <Typography variant="body2" color="text.secondary" fontWeight={600}>
-          Hi {user?.name || 'Doctor'},
-        </Typography>
-        <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
-          Waiting Room
-        </Typography>
-      </Box>
+      <Stack direction="row" justifyContent="space-between" alignItems="flex-end" sx={{ mb: 2.5, gap: 2 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="body2" color="text.secondary" fontWeight={600}>
+            Hi {user?.name || 'Doctor'},
+          </Typography>
+          <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
+            Waiting Room
+          </Typography>
+        </Box>
+        <LiveClock />
+      </Stack>
 
       {isError && <Alert severity="error" sx={{ mb: 2 }}>Failed to load waiting room.</Alert>}
 

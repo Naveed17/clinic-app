@@ -140,9 +140,8 @@ function createWindow(): void {
         },
       };
     }
-    // Only real http(s) links — about:blank / empty open must not hit Windows shell
-    // (that shows "Get an app to open this 'about' link").
-    if (/^https?:\/\//i.test(url)) {
+    // http(s) → browser; mailto → default mail app. Skip about:blank / tel: (no dialer on clinic PCs).
+    if (/^(https?:\/\/|mailto:)/i.test(url)) {
       void shell.openExternal(url);
     }
     return { action: 'deny' };

@@ -2,6 +2,7 @@ import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import {
   Alert,
   Avatar,
@@ -23,6 +24,7 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/AuthContext';
 import type { LabOrder, LabOrderStatus } from '@/types/lab';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
@@ -45,6 +47,7 @@ const statusColor: Record<LabOrderStatus, 'warning' | 'primary' | 'success' | 'e
 };
 
 export function LabPage(): React.JSX.Element {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const qc = useQueryClient();
   const isDoctor = user?.role === 'doctor';
@@ -175,7 +178,11 @@ export function LabPage(): React.JSX.Element {
             <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No lab orders found.</TableCell></TableRow>
           ) : (
             paginated.map((order) => (
-              <TableRow key={order.id} sx={tableSx.row}>
+              <TableRow
+                key={order.id}
+                sx={{ ...tableSx.row, cursor: 'pointer' }}
+                onClick={() => navigate(`/lab/${order.id}`)}
+              >
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
                     <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'primary.main' }}>
@@ -213,8 +220,13 @@ export function LabPage(): React.JSX.Element {
                 <TableCell>
                   <Chip color={statusColor[order.status]} label={order.status.replace('_', ' ')} size="small" sx={chipSx} />
                 </TableCell>
-                <TableCell align="right">
+                <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                   <Stack direction="row" gap={0.5} justifyContent="flex-end">
+                    <Tooltip title="View details">
+                      <IconButton sx={actionBtnSx} onClick={() => navigate(`/lab/${order.id}`)}>
+                        <VisibilityOutlinedIcon sx={{ fontSize: 17 }} />
+                      </IconButton>
+                    </Tooltip>
                     {order.status === 'COMPLETED' && (
                       <Tooltip title="Print report"><IconButton sx={actionBtnSx} onClick={() => setPrintOrder(order)}><PrintOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
                     )}

@@ -17,6 +17,7 @@ import type { Appointment } from '@/types/appointment';
 import doctorImg from '@/assets/doctor_banner.png';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { ListCardsSkeleton, StatCardsSkeleton } from '@/components/LoadingUI';
+import { LiveClock } from '@/components/LiveClock';
 
 const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
 
@@ -107,14 +108,17 @@ export function AdminDashboard(): React.JSX.Element {
   return (
     <Stack spacing={3} sx={{ pb: 3 }}>
       {/* Top Welcome Title */}
-      <Box>
-        <Typography variant="body2" color="text.secondary" fontWeight={600}>
-          Hi {user?.name || 'Admin'},
-        </Typography>
-        <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
-          Welcome Back!
-        </Typography>
-      </Box>
+      <Stack direction="row" justifyContent="space-between" alignItems="flex-end" sx={{ gap: 2 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="body2" color="text.secondary" fontWeight={600}>
+            Hi {user?.name || 'Admin'},
+          </Typography>
+          <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
+            Welcome Back!
+          </Typography>
+        </Box>
+        <LiveClock />
+      </Stack>
 
       {/* Top Section: Banner + Right Mini Calendar */}
       <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', lg: '1fr 340px' } }}>

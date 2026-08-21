@@ -54,15 +54,19 @@ declare global {
       };
       appointments: {
         list: () => Promise<Appointment[]>;
+        get: (id: string) => Promise<Appointment | null>;
         patients: () => Promise<AppointmentPerson[]>;
         doctors: () => Promise<AppointmentPerson[]>;
         create: (input: AppointmentInput) => Promise<Appointment>;
         ensureSameDay: (input: AppointmentInput) => Promise<Appointment>;
         update: (id: string, input: AppointmentInput) => Promise<Appointment>;
+        updateStatus: (id: string, status: Appointment['status']) => Promise<Appointment>;
         cancel: (id: string) => Promise<Appointment>;
+        delete: (id: string) => Promise<void>;
       };
       invoices: {
         list: () => Promise<Invoice[]>;
+        get: (id: string) => Promise<Invoice | null>;
         patients: () => Promise<InvoicePerson[]>;
         create: (input: InvoiceInput) => Promise<Invoice>;
         addPayment: (invoiceId: string, amount: number, method: string, reference?: string) => Promise<Invoice>;
@@ -244,8 +248,9 @@ declare global {
         };
       };
       lab: {
-        listByToken: any;
+        listByToken: (tokenId: string) => Promise<LabOrder[]>;
         list: () => Promise<LabOrder[]>;
+        get: (id: string) => Promise<LabOrder | null>;
         patients: () => Promise<{ id: string; firstName: string; lastName: string }[]>;
         create: (input: { patientId: string; orderedById: string; test: string; tokenId?: string; notes?: string }) => Promise<LabOrder>;
         updateStatus: (id: string, status: string) => Promise<LabOrder>;
@@ -269,6 +274,7 @@ declare global {
       };
       auth: {
         login: (email: string, password: string) => Promise<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | { blocked: true; error?: string } | null>;
+        directory: () => Promise<Array<{ id: string; name: string; email: string; role: string; avatar: string | null }>>;
         changePassword: (userId: string, current: string, next: string) => Promise<{ ok: boolean; error?: string }>;
       };
       search: {

@@ -108,7 +108,9 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
     navigate('/login', { replace: true });
   };
 
-  const activeIndex = navItems.findIndex((item) => item.path === location.pathname);
+  const activeIndex = navItems.findIndex(
+    (item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`),
+  );
 
   useEffect(() => {
     const unsubscribe = realtimeService.onNotification((n: RealtimeNotification) => {
@@ -135,7 +137,7 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
         boxShadow: '0 1px 8px rgba(0,0,0,0.06)',
       }}
     >
-      <Toolbar sx={{ minHeight: { xs: 48, md: 52 }, gap: 2, px: { xs: 3, md: 1 } }} >
+      <Toolbar sx={{ minHeight: { xs: 48, md: 52 }, gap: 2, pl: { xs: 3, md: 'calc(var(--mui-spacing) / 2)' }, pr: { xs: 3, md: 1 } }} >
         {/* Mobile menu */}
         < IconButton
           aria-label="Open navigation"
@@ -168,6 +170,7 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
                 boxShadow: theme.shadows[2],
                 zIndex: 0,
               },
+              '& .MuiTabs-flexContainer': { flexWrap: 'nowrap' },
               '& .MuiTabs-scrollButtons': { borderRadius: 99 },
             }}
           >
@@ -180,12 +183,15 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
                   position: 'relative',
                   zIndex: 1,
                   minHeight: 0,
+                  minWidth: 'max-content',
+                  flexShrink: 0,
                   px: 2.2,
                   py: 0.85,
                   borderRadius: 99,
                   fontSize: 14,
                   fontWeight: 500,
                   textTransform: 'none',
+                  whiteSpace: 'nowrap',
                   color: 'text.secondary',
                   '&.Mui-selected': { fontWeight: 700, color: 'text.primary' },
                 }}

@@ -5,6 +5,7 @@ import {
   createAppointment,
   deleteAppointment,
   ensureSameDayAppointment,
+  getAppointment,
   listAppointmentPatients,
   listAppointments,
   listDoctors,
@@ -40,6 +41,19 @@ export function createAppointmentsRouter(io: SocketIOServer): Router {
     requireRole(['admin', 'doctor', 'receptionist']),
     asyncHandler(async (_req, res) => {
       res.json(await listDoctors());
+    }),
+  );
+
+  router.get(
+    '/:id',
+    requireRole(['admin', 'doctor', 'receptionist']),
+    asyncHandler(async (req, res) => {
+      const appointment = await getAppointment(String(req.params.id));
+      if (!appointment) {
+        res.status(404).json({ error: 'Appointment not found' });
+        return;
+      }
+      res.json(appointment);
     }),
   );
 

@@ -5,6 +5,7 @@ import {
   Button,
   Chip,
   Divider,
+  Link,
   Paper,
   Skeleton,
   Stack,
@@ -33,6 +34,10 @@ import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
+import SupportAgentOutlinedIcon from '@mui/icons-material/SupportAgentOutlined';
+import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
+import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
+import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import { useUpdate } from '@/context/updateProvider';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -42,7 +47,8 @@ import { showAppToast } from '@/components/AppToast';
 import { WhatsAppCampaignDialog } from '@/features/settings/WhatsAppCampaignDialog';
 import { fileToClinicLogoDataUrl } from '@/utils/avatarImage';
 import { invalidateClinicLogoCache, notifyClinicBrandChanged, resolveClinicLogoSrc } from '@/utils/clinicBrandLogo';
-import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
+import { CAREFLOW_BRAND, supportWhatsAppHref } from '@shared/careflowSupport';
+import { copySupportPhone, openSupportEmail, openSupportWhatsApp } from '@/utils/careflowSupportActions';
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
 
@@ -161,7 +167,9 @@ export function SettingsPage(): React.JSX.Element {
     }
   }, [updateError]);
 
-  const [settingsTab, setSettingsTab] = useState<'general' | 'ai' | 'whatsapp' | 'backup'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'ai' | 'whatsapp' | 'backup' | 'support'>('general');
+  const [supportContact, setSupportContact] = useState<{ phone: string; email: string } | null>(null);
+  const [supportLoading, setSupportLoading] = useState(false);
   const [waTesting, setWaTesting] = useState(false);
   const [waTest, setWaTest] = useState<{ ok: boolean; name?: string; phone?: string; error?: string } | null>(null);
   const [waCampaignOpen, setWaCampaignOpen] = useState(false);
@@ -181,6 +189,23 @@ export function SettingsPage(): React.JSX.Element {
     if (settingsTab !== 'backup' || isOnline) return;
     void window.clinic?.backup.googleStatus().then(setDrive);
   }, [settingsTab, isOnline]);
+
+  useEffect(() => {
+    if (settingsTab !== 'support') return;
+    setSupportLoading(true);
+    void window.clinic?.license
+      .support()
+      .then((contact) => {
+        setSupportContact({
+          phone: String(contact?.phone || '').trim(),
+          email: String(contact?.email || '').trim(),
+        });
+      })
+      .catch(() => {
+        setSupportContact({ phone: '', email: '' });
+      })
+      .finally(() => setSupportLoading(false));
+  }, [settingsTab]);
 
   async function handleGoogleConnect(): Promise<void> {
     setDriveConnecting(true);
@@ -460,6 +485,11 @@ export function SettingsPage(): React.JSX.Element {
     if (settingsTab === 'whatsapp' && !can('whatsapp')) setSettingsTab('general');
   }, [can, settingsTab]);
 
+  const supportPhone = supportContact?.phone || '';
+  const supportEmail = supportContact?.email || '';
+  const supportWhatsApp = supportWhatsAppHref(supportPhone);
+  const hasSupportContact = Boolean(supportPhone || supportEmail);
+
   if (!isAdmin) {
     return (
       <Box
@@ -590,7 +620,7 @@ export function SettingsPage(): React.JSX.Element {
         <Stack spacing={0} sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <Tabs
             value={settingsTab}
-            onChange={(_, v: 'general' | 'ai' | 'whatsapp' | 'backup') => setSettingsTab(v)}
+            onChange={(_, v: 'general' | 'ai' | 'whatsapp' | 'backup' | 'support') => setSettingsTab(v)}
             sx={{
               mb: 3,
               minHeight: 44,
@@ -633,6 +663,12 @@ export function SettingsPage(): React.JSX.Element {
               icon={<BackupOutlinedIcon sx={{ fontSize: 18 }} />}
               iconPosition="start"
               label="Backup & Restore"
+            />
+            <Tab
+              value="support"
+              icon={<SupportAgentOutlinedIcon sx={{ fontSize: 18 }} />}
+              iconPosition="start"
+              label="Support"
             />
           </Tabs>
 
@@ -1217,15 +1253,101 @@ export function SettingsPage(): React.JSX.Element {
               )}
             </Box>
           )}
+
+          {settingsTab === 'support' && (
+            <Box sx={{ maxWidth: 520 }}>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                <SupportAgentOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                <Typography variant="h6" fontWeight={700}>Customer Support</Typography>
+              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+                Reach {CAREFLOW_BRAND} for license help, billing questions, or technical issues with this clinic.
+              </Typography>
+
+              {supportLoading ? (
+                <Stack spacing={1.5}>
+                  <Skeleton variant="rounded" height={22} width="55%" />
+                  <Skeleton variant="rounded" height={22} width="70%" />
+                  <Skeleton variant="rounded" height={22} width="40%" />
+                </Stack>
+              ) : hasSupportContact ? (
+                <Box
+                  sx={{
+                    px: 2.5,
+                    py: 2.25,
+                    borderRadius: 2.5,
+                    bgcolor: alpha(theme.palette.primary.main, 0.06),
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.16)}`,
+                  }}
+                >
+                  <Stack spacing={1.5}>
+                    {supportPhone && (
+                      <Stack direction="row" spacing={1.25} alignItems="center">
+                        <LocalPhoneOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                        <Link
+                          component="button"
+                          type="button"
+                          underline="hover"
+                          color="text.primary"
+                          onClick={() => void copySupportPhone(supportPhone)}
+                          sx={{ fontSize: 15.5, fontWeight: 600, cursor: 'pointer', border: 0, background: 'none', p: 0, font: 'inherit' }}
+                        >
+                          {supportPhone}
+                        </Link>
+                        <Typography variant="caption" color="text.secondary">
+                          Click to copy
+                        </Typography>
+                      </Stack>
+                    )}
+                    {supportEmail && (
+                      <Stack direction="row" spacing={1.25} alignItems="center">
+                        <EmailOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                        <Link
+                          component="button"
+                          type="button"
+                          underline="hover"
+                          color="text.primary"
+                          onClick={() => openSupportEmail(supportEmail)}
+                          sx={{ fontSize: 15.5, fontWeight: 600, cursor: 'pointer', border: 0, background: 'none', p: 0, font: 'inherit' }}
+                        >
+                          {supportEmail}
+                        </Link>
+                      </Stack>
+                    )}
+                    {supportWhatsApp && (
+                      <Link
+                        component="button"
+                        type="button"
+                        underline="hover"
+                        color="primary.main"
+                        onClick={() => openSupportWhatsApp(supportPhone)}
+                        sx={{ fontSize: 14.5, fontWeight: 600, pl: 0.25, cursor: 'pointer', border: 0, background: 'none', font: 'inherit', textAlign: 'left' }}
+                      >
+                        WhatsApp {CAREFLOW_BRAND}
+                      </Link>
+                    )}
+                  </Stack>
+                </Box>
+              ) : (
+                <Alert severity="info">
+                  Support contact details are unavailable right now. Check your internet connection and try again later.
+                </Alert>
+              )}
+            </Box>
+          )}
           </Box>
 
-          <Divider sx={{ my: 3, flexShrink: 0 }} />
+          {settingsTab !== 'support' && (
+            <>
+              <Divider sx={{ my: 3, flexShrink: 0 }} />
 
-          <Stack direction="row" alignItems="center" spacing={2} sx={{ flexShrink: 0 }}>
-            <Button variant="contained" loading={saving} onClick={() => void handleSave()}>
-              Save Settings
-            </Button>
-          </Stack>
+              <Stack direction="row" alignItems="center" spacing={2} sx={{ flexShrink: 0 }}>
+                <Button variant="contained" loading={saving} onClick={() => void handleSave()}>
+                  Save Settings
+                </Button>
+              </Stack>
+            </>
+          )}
         </Stack>
       )}
 

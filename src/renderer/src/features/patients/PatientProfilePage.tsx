@@ -406,17 +406,20 @@ export function PatientProfilePage(): React.JSX.Element {
                         .map((a) => (
                           <Box
                             key={a.id}
+                            onClick={() => navigate(`/appointments/${a.id}`)}
                             sx={{
                               p: 1.5,
                               borderRadius: 1,
                               display: 'flex',
                               alignItems: 'center',
                               gap: 1.5,
+                              cursor: 'pointer',
                               bgcolor: alpha(theme.palette.primary.main, 0.03),
                               border: '1px solid',
                               borderColor: 'divider',
                               borderLeft: '4px solid',
                               borderLeftColor: apptLeftBorder[a.status] ?? 'divider',
+                              '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.07) },
                             }}
                           >
                             <Avatar sx={{ width: 40, height: 40, borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, 0.12), color: 'primary.main', fontSize: 12, fontWeight: 800 }}>
@@ -452,17 +455,24 @@ export function PatientProfilePage(): React.JSX.Element {
                         .map((inv) => (
                           <Box
                             key={inv.id}
+                            onClick={() => {
+                              if (user?.role === 'receptionist') navigate(`/billing/${inv.id}`);
+                            }}
                             sx={{
                               p: 1.5,
                               borderRadius: 1,
                               display: 'flex',
                               alignItems: 'center',
                               gap: 1.5,
+                              cursor: user?.role === 'receptionist' ? 'pointer' : 'default',
                               bgcolor: alpha(theme.palette.warning.main, 0.03),
                               border: '1px solid',
                               borderColor: 'divider',
                               borderLeft: '4px solid',
                               borderLeftColor: invoiceLeftBorder[inv.status] ?? 'divider',
+                              '&:hover': user?.role === 'receptionist'
+                                ? { bgcolor: alpha(theme.palette.warning.main, 0.08) }
+                                : undefined,
                             }}
                           >
                             <Avatar sx={{ width: 40, height: 40, borderRadius: 1, bgcolor: alpha(theme.palette.warning.main, 0.12), color: 'warning.dark', fontSize: 11, fontWeight: 800 }}>
@@ -500,7 +510,23 @@ export function PatientProfilePage(): React.JSX.Element {
                     <Stack spacing={1} sx={{ p: 2, maxHeight: 480, overflowY: 'auto' }}>
                       {[...patientLab]
                         .sort((a, b) => new Date(b.orderedAt).getTime() - new Date(a.orderedAt).getTime())
-                        .map((o) => <LabOrderHistoryCard key={o.id} order={o} />)}
+                        .map((o) => (
+                          <Box
+                            key={o.id}
+                            onClick={() => {
+                              if (user?.role === 'lab_technician') navigate(`/lab/${o.id}`);
+                            }}
+                            sx={{
+                              cursor: user?.role === 'lab_technician' ? 'pointer' : 'default',
+                              borderRadius: 1,
+                              '&:hover': user?.role === 'lab_technician'
+                                ? { outline: `1px solid ${alpha(theme.palette.primary.main, 0.35)}` }
+                                : undefined,
+                            }}
+                          >
+                            <LabOrderHistoryCard order={o} />
+                          </Box>
+                        ))}
                     </Stack>
                   )
                 )}

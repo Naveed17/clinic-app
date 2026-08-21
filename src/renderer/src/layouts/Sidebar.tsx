@@ -83,7 +83,8 @@ function SidebarContents(): React.JSX.Element {
       {/* Nav icons */}
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, flex: 1 }}>
         {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          const isActive =
+            location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
           return (
             <Tooltip key={item.path} title={item.label} placement="right">
               <IconButton onClick={() => navigate(item.path)} sx={navBtnSx(isActive)}>
@@ -97,7 +98,12 @@ function SidebarContents(): React.JSX.Element {
       {/* Bottom icons */}
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75 }}>
         <Tooltip title="Settings" placement="right">
-          <IconButton onClick={() => navigate('/settings')} sx={navBtnSx(location.pathname === '/settings')}>
+          <IconButton
+            onClick={() => navigate('/settings')}
+            sx={navBtnSx(
+              location.pathname === '/settings' || location.pathname.startsWith('/settings/'),
+            )}
+          >
             <SettingsOutlinedIcon />
           </IconButton>
         </Tooltip>

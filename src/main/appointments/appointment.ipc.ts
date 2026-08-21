@@ -5,6 +5,7 @@ import {
   createAppointment,
   deleteAppointment,
   ensureSameDayAppointment,
+  getAppointment,
   listAppointmentPatients,
   listAppointments,
   listDoctors,
@@ -15,6 +16,7 @@ import { emitNotification, emitDataChange } from '../backend/realtime';
 
 export function registerAppointmentIpc(io?: SocketIOServer): void {
   ipcMain.handle('appointments:list', () => listAppointments());
+  ipcMain.handle('appointments:get', (_, id: string) => getAppointment(id));
   ipcMain.handle('appointments:patients', () => listAppointmentPatients());
   ipcMain.handle('appointments:doctors', () => listDoctors());
   ipcMain.handle('appointments:create', async (_, input) => {

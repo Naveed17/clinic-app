@@ -133,6 +133,10 @@ async function getAppointmentById(id: string) {
   };
 }
 
+export async function getAppointment(id: string) {
+  return getAppointmentById(id);
+}
+
 const SLOT_STEP_MS = 30 * 60 * 1000;
 
 /** Machine-local calendar day containing `date` (not UTC — avoids midnight PKT duplicates). */

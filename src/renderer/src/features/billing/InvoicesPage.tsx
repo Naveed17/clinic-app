@@ -5,6 +5,7 @@ import PaymentOutlinedIcon from '@mui/icons-material/PaymentOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
@@ -37,6 +38,7 @@ import { useFieldArray, useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { invoicesService } from '@/services/invoices.service';
 import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
 import type { Invoice, InvoiceInput, InvoicePerson, Payment } from '@/types/invoice';
@@ -122,11 +124,15 @@ function PaymentHistoryDialog({ invoice, onClose }: { invoice: Invoice; onClose:
 }
 
 /* ── Void Confirm Dialog ── */
-function VoidDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
+export function VoidDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
   const qc = useQueryClient();
   const mutation = useMutation({
-    mutationFn: () => window.clinic.invoices.void(invoice.id),
-    onSuccess: async () => { await qc.invalidateQueries({ queryKey: ['invoices'] }); onClose(); },
+    mutationFn: () => invoicesService.void(invoice.id),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['invoices'] });
+      await qc.invalidateQueries({ queryKey: ['invoice', invoice.id] });
+      onClose();
+    },
     meta: { toast: 'Invoice voided', errorToast: 'Failed to void invoice.' },
   });
   return (
@@ -144,11 +150,23 @@ function VoidDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => voi
 }
 
 /* ── Delete Confirm Dialog ── */
-function DeleteInvoiceDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
+export function DeleteInvoiceDialog({
+  invoice,
+  onClose,
+  onDeleted,
+}: {
+  invoice: Invoice;
+  onClose: () => void;
+  onDeleted?: () => void;
+}): React.JSX.Element {
   const qc = useQueryClient();
   const mutation = useMutation({
-    mutationFn: () => window.clinic.invoices.delete(invoice.id),
-    onSuccess: async () => { await qc.invalidateQueries({ queryKey: ['invoices'] }); onClose(); },
+    mutationFn: () => invoicesService.delete(invoice.id),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['invoices'] });
+      onClose();
+      onDeleted?.();
+    },
     meta: { toast: 'Invoice deleted', errorToast: 'Failed to delete invoice.' },
   });
   return (
@@ -171,7 +189,7 @@ function DeleteInvoiceDialog({ invoice, onClose }: { invoice: Invoice; onClose: 
 }
 
 /* ── Payment Dialog ── */
-function PaymentDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
+export function PaymentDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
   const queryClient = useQueryClient();
   const remaining = Number(invoice.total) - Number(invoice.amountPaid ?? 0);
   const form = useForm({ defaultValues: { amount: remaining, method: 'CASH', reference: '' } });
@@ -180,6 +198,8 @@ function PaymentDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => 
       invoicesService.addPayment(invoice.id, v.amount, v.method, v.reference || undefined),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      await queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
+      await queryClient.invalidateQueries({ queryKey: ['invoice-payments', invoice.id] });
       onClose();
     },
     meta: { toast: 'Payment recorded', errorToast: 'Failed to record payment.' },
@@ -220,7 +240,7 @@ function PaymentDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => 
 }
 
 /* ── Refund Dialog ── */
-function RefundDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
+export function RefundDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
   const queryClient = useQueryClient();
   const maxRefund = Math.max(0, Number(invoice.amountPaid ?? 0));
   const form = useForm({ defaultValues: { amount: maxRefund, method: 'CASH', reason: '' } });
@@ -229,6 +249,7 @@ function RefundDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => v
       invoicesService.refund(invoice.id, v.amount, v.method, v.reason || undefined),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      await queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
       await queryClient.invalidateQueries({ queryKey: ['invoice-payments', invoice.id] });
       onClose();
     },
@@ -389,6 +410,7 @@ export function InvoiceDialog({
 
 /* ── Invoices Page ── */
 export function InvoicesPage(): React.JSX.Element {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const [open, setOpen] = useState(false);
@@ -500,7 +522,11 @@ export function InvoicesPage(): React.JSX.Element {
               const canPay = !isAdmin && !isVoid && invoice.status !== 'PAID' && invoice.status !== 'REFUNDED';
               const canRefund = !isAdmin && !isVoid && Number(invoice.amountPaid ?? 0) > 0;
               return (
-                <TableRow key={invoice.id} sx={tableSx.row}>
+                <TableRow
+                  key={invoice.id}
+                  sx={{ ...tableSx.row, cursor: 'pointer' }}
+                  onClick={() => navigate(`/billing/${invoice.id}`)}
+                >
                   <TableCell><Typography fontSize={13.5} fontWeight={600}>{invoice.invoiceNumber}</Typography></TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
@@ -519,8 +545,13 @@ export function InvoicesPage(): React.JSX.Element {
                   <TableCell><Chip label={cfg.label} color={cfg.color} size="small" sx={chipSx} /></TableCell>
                   <TableCell align="right"><Typography fontSize={13.5} fontWeight={700}>{money(invoice.total)}</Typography></TableCell>
                   <TableCell align="right">{money(Number(invoice.amountPaid ?? 0))}</TableCell>
-                  <TableCell align="right">
+                  <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                     <Stack direction="row" gap={0.5} justifyContent="flex-end">
+                      <Tooltip title="View details">
+                        <IconButton sx={actionBtnSx} onClick={() => navigate(`/billing/${invoice.id}`)}>
+                          <VisibilityOutlinedIcon sx={{ fontSize: 17 }} />
+                        </IconButton>
+                      </Tooltip>
                       {!isAdmin && canPay && (
                         <Tooltip title="Record Payment">
                           <IconButton sx={actionBtnSx} onClick={() => setPaymentInvoice(invoice)}><PaymentOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>

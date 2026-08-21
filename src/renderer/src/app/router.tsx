@@ -5,11 +5,14 @@ import { NotFoundPage } from '@/pages/NotFoundPage';
 import { PatientsPage } from '@/features/patients/PatientsPage';
 import { PatientProfilePage } from '@/features/patients/PatientProfilePage';
 import { AppointmentsPage } from '@/features/appointments/AppointmentsPage';
+import { AppointmentDetailPage } from '@/features/appointments/AppointmentDetailPage';
 import { InvoicesPage } from '@/features/billing/InvoicesPage';
+import { InvoiceDetailPage } from '@/features/billing/InvoiceDetailPage';
 import { OpdReportsPage } from '@/features/reports/OpdReportsPage';
 import { MedicinesPage } from '@/features/medicines/MedicinesPage';
 import { StatisticsPage } from '@/features/statistics/StatisticsPage';
 import { LabPage } from '@/features/lab/LabPage';
+import { LabOrderDetailPage } from '@/features/lab/LabOrderDetailPage';
 import { UsersPage } from '@/features/users/UsersPage';
 import { DoctorsPage } from '@/features/doctors/DoctorsPage';
 import { DoctorDetailPage } from '@/features/doctors/DoctorDetailPage';
@@ -70,10 +73,26 @@ const router = createHashRouter([
             ),
           },
           {
+            path: '/appointments/:id',
+            element: (
+              <RouteAccessGate route="/appointments">
+                <AppointmentDetailPage />
+              </RouteAccessGate>
+            ),
+          },
+          {
             path: '/billing',
             element: (
               <RouteAccessGate route="/billing">
                 <InvoicesPage />
+              </RouteAccessGate>
+            ),
+          },
+          {
+            path: '/billing/:id',
+            element: (
+              <RouteAccessGate route="/billing">
+                <InvoiceDetailPage />
               </RouteAccessGate>
             ),
           },
@@ -98,6 +117,14 @@ const router = createHashRouter([
             element: (
               <RouteAccessGate route="/lab">
                 <LabPage />
+              </RouteAccessGate>
+            ),
+          },
+          {
+            path: '/lab/:id',
+            element: (
+              <RouteAccessGate route="/lab">
+                <LabOrderDetailPage />
               </RouteAccessGate>
             ),
           },

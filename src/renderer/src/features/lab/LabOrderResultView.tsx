@@ -22,7 +22,7 @@ const labLeftBorder: Record<string, string> = {
   CANCELLED: 'error.main',
 };
 
-function ResultBody({ result, notes }: { result: string | null; notes?: string | null }): React.JSX.Element | null {
+export function ResultBody({ result, notes }: { result: string | null; notes?: string | null }): React.JSX.Element | null {
   const theme = useTheme();
   const payload = parseLabResult(result);
   const noteText = notes?.trim() || '';

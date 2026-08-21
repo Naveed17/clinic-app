@@ -9,10 +9,15 @@ export function supportPhoneDigits(raw: string): string {
   return String(raw || '').replace(/\D/g, '');
 }
 
-export function supportTelHref(raw: string): string {
-  const digits = supportPhoneDigits(raw);
-  if (!digits) return '';
-  return `tel:+${digits.replace(/^0+/, '')}`;
+/** Display / clipboard value — desktop has no phone dialer, so we copy instead of tel:. */
+export function supportPhoneDisplay(raw: string): string {
+  return String(raw || '').trim();
+}
+
+export function supportMailtoHref(raw: string): string {
+  const email = String(raw || '').trim();
+  if (!email) return '';
+  return `mailto:${email}`;
 }
 
 export function supportWhatsAppHref(raw: string): string {

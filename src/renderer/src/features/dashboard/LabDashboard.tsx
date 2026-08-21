@@ -20,6 +20,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/AuthContext';
 import { ListCardsSkeleton, StatCardsSkeleton } from '@/components/LoadingUI';
+import { LiveClock } from '@/components/LiveClock';
 import { chipSx } from '@/components/TableUI';
 import type { LabOrder, LabOrderStatus } from '@/types/lab';
 import { LabReportBuilderDialog } from '@/features/lab/LabReportBuilderDialog';
@@ -170,14 +171,17 @@ export function LabDashboard(): React.JSX.Element {
 
   return (
     <>
-      <Box sx={{ mb: 2.5 }}>
-        <Typography variant="body2" color="text.secondary" fontWeight={600}>
-          Hi {user?.name || 'Lab Technician'},
-        </Typography>
-        <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
-          Welcome Back!
-        </Typography>
-      </Box>
+      <Stack direction="row" justifyContent="space-between" alignItems="flex-end" sx={{ mb: 2.5, gap: 2 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="body2" color="text.secondary" fontWeight={600}>
+            Hi {user?.name || 'Lab Technician'},
+          </Typography>
+          <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
+            Welcome Back!
+          </Typography>
+        </Box>
+        <LiveClock />
+      </Stack>
 
       <Box
         sx={{
@@ -219,7 +223,20 @@ export function LabDashboard(): React.JSX.Element {
                 </>
               ) : currentOrder ? (
                 <>
-                  <Typography variant="h3" fontWeight={800} sx={{ letterSpacing: '-0.02em', mt: 0.75, mb: 0.5, lineHeight: 1.2, textShadow: `0 2px 4px ${alpha(theme.palette.common.black, 0.1)}` }}>
+                  <Typography
+                    variant="h3"
+                    fontWeight={800}
+                    onClick={() => navigate(`/lab/${currentOrder.id}`)}
+                    sx={{
+                      letterSpacing: '-0.02em',
+                      mt: 0.75,
+                      mb: 0.5,
+                      lineHeight: 1.2,
+                      textShadow: `0 2px 4px ${alpha(theme.palette.common.black, 0.1)}`,
+                      cursor: 'pointer',
+                      '&:hover': { textDecoration: 'underline' },
+                    }}
+                  >
                     {currentOrder.tokenNumber != null ? `#${String(currentOrder.tokenNumber).padStart(3, '0')} ` : ''}
                     {currentOrder.patientName}
                   </Typography>
@@ -246,8 +263,8 @@ export function LabDashboard(): React.JSX.Element {
                     >
                       Build report
                     </Button>
-                    <Button variant="outlined" onClick={() => navigate('/lab')} sx={heroOutlineSx}>
-                      Open Lab
+                    <Button variant="outlined" onClick={() => navigate(`/lab/${currentOrder.id}`)} sx={heroOutlineSx}>
+                      Open details
                     </Button>
                   </Stack>
                 </>
@@ -346,7 +363,7 @@ export function LabDashboard(): React.JSX.Element {
                 {todaysOrders.map((order) => (
                   <Box
                     key={order.id}
-                    onClick={() => navigate('/lab')}
+                    onClick={() => navigate(`/lab/${order.id}`)}
                     sx={{
                       display: 'flex',
                       alignItems: 'center',

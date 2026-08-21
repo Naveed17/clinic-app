@@ -31,3 +31,17 @@ body,
   background: rgba(0, 0, 0, 0.15);
   border-radius: 99px;
 }
+
+.digital-clock {
+  font-family: 'Orbitron', 'Roboto Mono', monospace;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 2px;
+}
+
+.digital-clock .MuiTypography-root {
+  font-family: inherit;
+  font-feature-settings: inherit;
+  font-variant-numeric: inherit;
+  letter-spacing: inherit;
+}

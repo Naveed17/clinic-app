@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import { getPrisma } from '../database/client';
 import { signToken } from '../backend/middleware/auth';
 import { getLicenseModules } from '../license/license.ipc';
+import { listLoginDirectory } from './login-directory';
 
 const ROLE_MODULE: Record<string, string> = {
   doctor:         'doctorDashboard',
@@ -10,6 +11,8 @@ const ROLE_MODULE: Record<string, string> = {
 };
 
 export function registerAuthIpc(): void {
+  ipcMain.handle('auth:directory', () => listLoginDirectory());
+
   ipcMain.handle('auth:login', async (_e, email: string, password: string) => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const bcrypt = require('bcryptjs') as typeof import('bcryptjs');

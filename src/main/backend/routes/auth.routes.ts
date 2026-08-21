@@ -3,6 +3,7 @@ import { getPrisma } from '../../database/client';
 import { asyncHandler } from '../utils/async-handler';
 import { signToken } from '../middleware/auth';
 import { getLicenseModules } from '../../license/license.ipc';
+import { listLoginDirectory } from '../../auth/login-directory';
 
 const ROLE_MODULE: Record<string, string> = {
   doctor:         'doctorDashboard',
@@ -15,6 +16,10 @@ export function createAuthRouter(): Router {
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const bcrypt = require('bcryptjs') as typeof import('bcryptjs');
+
+  router.get('/directory', asyncHandler(async (_req, res) => {
+    res.json(await listLoginDirectory());
+  }));
 
   router.post('/login', asyncHandler(async (req, res) => {
     const { email, password } = req.body as { email: string; password: string };

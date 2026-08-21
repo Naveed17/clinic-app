@@ -4,6 +4,7 @@ import { emitDataChange, emitNotification } from '../realtime';
 import { requireRole } from '../middleware/auth';
 import {
   createLabOrder,
+  getLabOrder,
   labPatients,
   listLabOrders,
   listLabOrdersByToken,
@@ -30,6 +31,15 @@ export function createLabRouter(io: SocketIOServer): Router {
 
   router.get('/by-token/:tokenId', labRecordReaders, async (req, res) => {
     res.json(await listLabOrdersByToken(String(req.params.tokenId)));
+  });
+
+  router.get('/:id', labRecordReaders, async (req, res) => {
+    const order = await getLabOrder(String(req.params.id));
+    if (!order) {
+      res.status(404).json({ error: 'Lab order not found' });
+      return;
+    }
+    res.json(order);
   });
 
   router.post('/', labOrderers, async (req, res) => {

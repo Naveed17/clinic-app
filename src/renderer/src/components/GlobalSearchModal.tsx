@@ -197,7 +197,7 @@ export function GlobalSearchModal({ open, onClose }: Props) {
               <SectionHeader icon={<CalendarMonthOutlinedIcon fontSize="small" />} label="Appointments" count={results!.appointments.length} />
               <List dense disablePadding>
                 {results!.appointments.map((a) => (
-                  <ListItemButton key={a.id} onClick={() => go('/appointments')} sx={{ px: 2, py: 0.75 }}>
+                  <ListItemButton key={a.id} onClick={() => go(`/appointments/${a.id}`)} sx={{ px: 2, py: 0.75 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
                       <Chip label={a.patientMrNumber} size="small" sx={{ fontWeight: 700, fontSize: 11, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', flexShrink: 0 }} />
                       <ListItemText
@@ -220,7 +220,7 @@ export function GlobalSearchModal({ open, onClose }: Props) {
               <SectionHeader icon={<ReceiptOutlinedIcon fontSize="small" />} label="Invoices" count={results!.invoices.length} />
               <List dense disablePadding>
                 {results!.invoices.map((inv) => (
-                  <ListItemButton key={inv.id} onClick={() => go('/billing')} sx={{ px: 2, py: 0.75 }}>
+                  <ListItemButton key={inv.id} onClick={() => go(`/billing/${inv.id}`)} sx={{ px: 2, py: 0.75 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
                       <Chip label={inv.patientMrNumber} size="small" sx={{ fontWeight: 700, fontSize: 11, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', flexShrink: 0 }} />
                       <ListItemText
@@ -243,7 +243,13 @@ export function GlobalSearchModal({ open, onClose }: Props) {
               <SectionHeader icon={<BiotechOutlinedIcon fontSize="small" />} label="Lab Orders" count={results!.labOrders.length} />
               <List dense disablePadding>
                 {results!.labOrders.map((l) => (
-                  <ListItemButton key={l.id} onClick={() => go(user?.role === 'admin' ? '/lab' : `/patients/${l.patientId}`)} sx={{ px: 2, py: 0.75 }}>
+                  <ListItemButton
+                    key={l.id}
+                    onClick={() =>
+                      go(user?.role === 'lab_technician' ? `/lab/${l.id}` : `/patients/${l.patientId}`)
+                    }
+                    sx={{ px: 2, py: 0.75 }}
+                  >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
                       <Chip label={l.patientMrNumber} size="small" sx={{ fontWeight: 700, fontSize: 11, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', flexShrink: 0 }} />
                       <ListItemText
