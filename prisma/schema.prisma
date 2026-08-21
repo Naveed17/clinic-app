@@ -221,6 +221,7 @@ model Token {
   notes       String?
   reason      String?
   consultationFee Decimal    @default(0)
+  feeDiscount     Decimal    @default(0)
   feeRefunded     Decimal    @default(0)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

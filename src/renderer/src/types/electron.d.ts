@@ -46,6 +46,7 @@ declare global {
         listPrescriptions: (date: string) => Promise<import('./token').PrescriptionFeedItem[]>;
         doctors: () => Promise<TokenPerson[]>;
         patients: () => Promise<TokenPerson[]>;
+        weekVisits: (patientId: string, doctorId: string, date: string) => Promise<{ count: number }>;
         create: (input: TokenInput) => Promise<Token>;
         updateStatus: (id: string, status: string) => Promise<Token>;
         refundFee: (id: string, amount?: number) => Promise<Token>;
@@ -201,6 +202,31 @@ declare global {
           files?: { uploaded: number; skipped: number; failed: number };
         }>;
         onMigrateProgress: (handler: (progress: { percent: number; label: string }) => void) => () => void;
+        googleStatus: () => Promise<{
+          connected: boolean;
+          email: string;
+          schedule: 'off' | 'daily' | 'weekly' | 'monthly';
+          lastBackupAt: string | null;
+          configured: boolean;
+        }>;
+        googleConnect: () => Promise<{ ok: boolean; email?: string; error?: string; canceled?: boolean }>;
+        googleDisconnect: () => Promise<{
+          connected: boolean;
+          email: string;
+          schedule: 'off' | 'daily' | 'weekly' | 'monthly';
+          lastBackupAt: string | null;
+          configured: boolean;
+        }>;
+        googleSchedule: (
+          schedule: 'off' | 'daily' | 'weekly' | 'monthly',
+        ) => Promise<{
+          connected: boolean;
+          email: string;
+          schedule: 'off' | 'daily' | 'weekly' | 'monthly';
+          lastBackupAt: string | null;
+          configured: boolean;
+        }>;
+        googleBackupNow: () => Promise<{ ok: boolean; name?: string; error?: string }>;
       };
       docs: {
         patient: {

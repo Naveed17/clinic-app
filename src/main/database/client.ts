@@ -339,6 +339,11 @@ export async function initializeDatabase(): Promise<void> {
       'ALTER TABLE "Token" ADD COLUMN "feeRefunded" DECIMAL NOT NULL DEFAULT 0',
     );
   }
+  if (!tokenCols.includes('feeDiscount')) {
+    await database.$executeRawUnsafe(
+      'ALTER TABLE "Token" ADD COLUMN "feeDiscount" DECIMAL NOT NULL DEFAULT 0',
+    );
+  }
 
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "DoctorSchedule" (

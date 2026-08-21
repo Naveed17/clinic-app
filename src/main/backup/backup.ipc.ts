@@ -1,38 +1,30 @@
 import { ipcMain, dialog, app } from 'electron';
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-} from 'node:fs';
-import { join, basename, dirname } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { disconnectPrisma, getPrisma } from '../database/client';
 import { getDocumentsRoot, resolveDocPath, toStoredDocPath } from './docs-paths';
 import { isOnlineDatabaseMode } from '../config/settings';
+import { copyDirRecursive, getClinicDbPath, writeBackupZip } from './backup-zip';
+import {
+  backupToGoogleDriveNow,
+  connectGoogleDrive,
+  disconnectGoogleDrive,
+  getGoogleDriveStatus,
+  setGoogleDriveSchedule,
+  startGoogleDriveBackupScheduler,
+  type DriveSchedule,
+} from './google-drive';
 import { registerMigrateToCloudIpc } from './migrate-to-cloud.ipc';
 import { registerMigrateFromCloudIpc } from './migrate-from-cloud.ipc';
 
-function getDbPath(): string {
-  return join(app.getPath('userData'), 'clinic.db');
-}
-
-function copyDirRecursive(src: string, dest: string): void {
-  mkdirSync(dest, { recursive: true });
-  for (const name of readdirSync(src)) {
-    const from = join(src, name);
-    const to = join(dest, name);
-    if (statSync(from).isDirectory()) {
-      copyDirRecursive(from, to);
-    } else {
-      copyFileSync(from, to);
-    }
-  }
+function ensureZipPath(filePath: string): string {
+  const lower = filePath.toLowerCase();
+  if (lower.endsWith('.zip')) return filePath;
+  if (lower.endsWith('.db')) return `${filePath.slice(0, -3)}.zip`;
+  return `${filePath}.zip`;
 }
 
 /** After restore, rewrite absolute paths so files open on this machine. */
@@ -56,17 +48,14 @@ async function remapDocumentPaths(): Promise<void> {
   }
 }
 
-function ensureZipPath(filePath: string): string {
-  const lower = filePath.toLowerCase();
-  if (lower.endsWith('.zip')) return filePath;
-  // Strip accidental .db and force .zip
-  if (lower.endsWith('.db')) return `${filePath.slice(0, -3)}.zip`;
-  return `${filePath}.zip`;
-}
-
 export function registerBackupIpc(): void {
   ipcMain.removeHandler('backup:create');
   ipcMain.removeHandler('backup:restore');
+  ipcMain.removeHandler('backup:google-status');
+  ipcMain.removeHandler('backup:google-connect');
+  ipcMain.removeHandler('backup:google-disconnect');
+  ipcMain.removeHandler('backup:google-schedule');
+  ipcMain.removeHandler('backup:google-now');
 
   ipcMain.handle('backup:create', async () => {
     if (isOnlineDatabaseMode()) {
@@ -86,27 +75,9 @@ export function registerBackupIpc(): void {
     const zipPath = ensureZipPath(filePath);
 
     try {
-      await disconnectPrisma();
-
-      const zip = new AdmZip();
-      zip.addFile('clinic.db', readFileSync(getDbPath()));
-
-      const docsRoot = getDocumentsRoot();
-      if (existsSync(docsRoot) && readdirSync(docsRoot).length > 0) {
-        zip.addLocalFolder(docsRoot, 'documents');
-      }
-
-      mkdirSync(dirname(zipPath), { recursive: true });
-      zip.writeZip(zipPath);
-
-      getPrisma();
+      await writeBackupZip(zipPath);
       return { ok: true, path: zipPath, mode: 'full' };
     } catch (e) {
-      try {
-        getPrisma();
-      } catch {
-        /* ignore */
-      }
       return { ok: false, error: e instanceof Error ? e.message : 'Backup failed.' };
     }
   });
@@ -154,7 +125,7 @@ export function registerBackupIpc(): void {
         }
       }
 
-      copyFileSync(dbSource, getDbPath());
+      copyFileSync(dbSource, getClinicDbPath());
       getPrisma();
       await remapDocumentPaths();
 
@@ -174,6 +145,23 @@ export function registerBackupIpc(): void {
       }
     }
   });
+
+  ipcMain.handle('backup:google-status', () => getGoogleDriveStatus());
+  ipcMain.handle('backup:google-connect', () => connectGoogleDrive());
+  ipcMain.handle('backup:google-disconnect', async () => {
+    disconnectGoogleDrive();
+    return getGoogleDriveStatus();
+  });
+  ipcMain.handle('backup:google-schedule', async (_e, schedule: DriveSchedule) => {
+    if (schedule !== 'off' && schedule !== 'daily' && schedule !== 'weekly' && schedule !== 'monthly') {
+      return getGoogleDriveStatus();
+    }
+    setGoogleDriveSchedule(schedule);
+    return getGoogleDriveStatus();
+  });
+  ipcMain.handle('backup:google-now', () => backupToGoogleDriveNow());
+
+  startGoogleDriveBackupScheduler();
   registerMigrateToCloudIpc();
   registerMigrateFromCloudIpc();
 }

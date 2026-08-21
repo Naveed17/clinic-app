@@ -106,6 +106,7 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
     date: string;
     status: string;
     consultationFee: unknown;
+    feeDiscount: unknown;
     feeRefunded: unknown;
     patientId: string;
     doctorId: string;
@@ -120,7 +121,7 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
   const tokens = doctorId
     ? await database.$queryRawUnsafe<TokenReportRow[]>(
         `
-        SELECT t.id, t.tokenNumber, t.date, t.status, t.consultationFee, t.feeRefunded,
+        SELECT t.id, t.tokenNumber, t.date, t.status, t.consultationFee, t.feeDiscount, t.feeRefunded,
           t.patientId, t.doctorId, t.createdAt,
           p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
           u.firstName as doctorFirstName, u.lastName as doctorLastName
@@ -135,7 +136,7 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       )
     : await database.$queryRawUnsafe<TokenReportRow[]>(
         `
-        SELECT t.id, t.tokenNumber, t.date, t.status, t.consultationFee, t.feeRefunded,
+        SELECT t.id, t.tokenNumber, t.date, t.status, t.consultationFee, t.feeDiscount, t.feeRefunded,
           t.patientId, t.doctorId, t.createdAt,
           p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
           u.firstName as doctorFirstName, u.lastName as doctorLastName
@@ -213,8 +214,10 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
   const invoiceRefunded = roundMoney(countableInvoices.reduce((sum, row) => sum + row.refunded, 0));
 
   const feeRows = tokens.map((token) => {
-    const collected = roundMoney(Number(token.consultationFee));
+    const gross = roundMoney(Number(token.consultationFee));
+    const discounted = roundMoney(Number(token.feeDiscount));
     const refunded = roundMoney(Number(token.feeRefunded));
+    const collected = roundMoney(Math.max(0, gross - discounted));
     return {
       id: token.id,
       tokenNumber: Number(token.tokenNumber),
@@ -223,25 +226,28 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       doctorId: token.doctorId,
       doctorName: personName({ firstName: token.doctorFirstName, lastName: token.doctorLastName }),
       status: token.status,
-      consultationFee: collected,
+      consultationFee: gross,
+      feeDiscount: discounted,
       feeRefunded: refunded,
       net: roundMoney(Math.max(0, collected - refunded)),
       createdAt: token.createdAt instanceof Date ? token.createdAt.toISOString() : String(token.createdAt),
     };
   });
 
-  const byDoctorMap = new Map<string, { doctorId: string; doctorName: string; tokens: number; collected: number; refunded: number; net: number }>();
+  const byDoctorMap = new Map<string, { doctorId: string; doctorName: string; tokens: number; collected: number; discounted: number; refunded: number; net: number }>();
   for (const row of feeRows) {
     const current = byDoctorMap.get(row.doctorId) ?? {
       doctorId: row.doctorId,
       doctorName: row.doctorName,
       tokens: 0,
       collected: 0,
+      discounted: 0,
       refunded: 0,
       net: 0,
     };
     current.tokens += 1;
-    current.collected = roundMoney(current.collected + row.consultationFee);
+    current.collected = roundMoney(current.collected + (row.consultationFee - row.feeDiscount));
+    current.discounted = roundMoney(current.discounted + row.feeDiscount);
     current.refunded = roundMoney(current.refunded + row.feeRefunded);
     current.net = roundMoney(current.net + row.net);
     byDoctorMap.set(row.doctorId, current);
@@ -263,7 +269,8 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       rows: feeRows,
       byDoctor: [...byDoctorMap.values()],
       count: feeRows.length,
-      collected: roundMoney(feeRows.reduce((sum, row) => sum + row.consultationFee, 0)),
+      collected: roundMoney(feeRows.reduce((sum, row) => sum + (row.consultationFee - row.feeDiscount), 0)),
+      discounted: roundMoney(feeRows.reduce((sum, row) => sum + row.feeDiscount, 0)),
       refunded: roundMoney(feeRows.reduce((sum, row) => sum + row.feeRefunded, 0)),
       net: roundMoney(feeRows.reduce((sum, row) => sum + row.net, 0)),
     },

@@ -1,6 +1,7 @@
 import type { Token } from '@/types/token';
 import { POS_PAPER, POS_RECEIPT } from '@shared/invoicePaper';
 import { getCareflowLogoDataUrl } from '@/utils/careflowLogo';
+import { tokenNetFee } from '@shared/tokenFee';
 
 function escapeHtml(value: string): string {
   return value
@@ -44,9 +45,21 @@ export function buildTokenSlipHtml(
   const note = token.notes
     ? `<div class="row"><div class="lbl">Note</div><div class="val">${escapeHtml(token.notes)}</div></div>`
     : '';
-  const fee = Number(token.consultationFee ?? 0) > 0
-    ? `<div class="row"><div class="lbl">Fee</div><div class="val">${escapeHtml(`Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(token.consultationFee))}${Number(token.feeRefunded ?? 0) > 0 ? ' (refunded)' : ''}`)}</div></div>`
-    : '';
+  const feeAmount = Number(token.consultationFee ?? 0);
+  const discountAmount = Number(token.feeDiscount ?? 0);
+  const payable = tokenNetFee(token.consultationFee, token.feeDiscount, token.feeRefunded);
+  const rs = (v: number) =>
+    `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(v)}`;
+  let fee = '';
+  if (feeAmount > 0) {
+    fee = `<div class="row"><div class="lbl">Fee</div><div class="val">${escapeHtml(rs(feeAmount))}</div></div>`;
+    if (discountAmount > 0) {
+      fee += `<div class="row"><div class="lbl">Discount</div><div class="val">${escapeHtml(`- ${rs(discountAmount)}`)}</div></div>`;
+      fee += `<div class="row"><div class="lbl">Payable</div><div class="val">${escapeHtml(`${rs(payable)}${Number(token.feeRefunded ?? 0) > 0 ? ' (refunded)' : ''}`)}</div></div>`;
+    } else if (Number(token.feeRefunded ?? 0) > 0) {
+      fee = `<div class="row"><div class="lbl">Fee</div><div class="val">${escapeHtml(`${rs(feeAmount)} (refunded)`)}</div></div>`;
+    }
+  }
   const reason = token.reason
     ? `<div class="row"><div class="lbl">Reason</div><div class="val">${escapeHtml(token.reason)}</div></div>`
     : '';

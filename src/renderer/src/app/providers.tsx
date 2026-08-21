@@ -1,10 +1,8 @@
 import type { PropsWithChildren } from 'react';
 import React, { useMemo, useState, useEffect } from 'react';
-import { CssBaseline, ThemeProvider } from '@mui/material';
-import type { PaletteMode } from '@mui/material';
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ColorModeContext, type ColorMode } from './colorMode';
-import { createAppTheme } from './theme';
+import { ThemeRegistry } from '@/theme';
 import { AuthProvider } from '@/features/auth/AuthContext';
 import { LicenseModulesProvider } from '@/features/auth/LicenseModulesContext';
 import { useSocket, useRealtimeInvalidation } from '@/hooks';
@@ -70,13 +68,11 @@ export function AppProviders({ children }: PropsWithChildren): React.JSX.Element
     }),
     [mode],
   );
-  const theme = useMemo(() => createAppTheme(mode as PaletteMode), [mode]);
 
   return (
     <QueryClientProvider client={queryClient}>
       <ColorModeContext.Provider value={colorMode}>
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
+        <ThemeRegistry>
           <AuthProvider>
             <DatabaseModeProvider>
               <LicenseModulesProvider>
@@ -86,7 +82,7 @@ export function AppProviders({ children }: PropsWithChildren): React.JSX.Element
               </LicenseModulesProvider>
             </DatabaseModeProvider>
           </AuthProvider>
-        </ThemeProvider>
+        </ThemeRegistry>
       </ColorModeContext.Provider>
     </QueryClientProvider>
   );

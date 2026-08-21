@@ -14,6 +14,7 @@ import {
   updateTokenStatus,
   upsertPrescription,
   refundTokenFee,
+  countPriorVisitsThisWeek,
 } from './token.service';
 import { emitNotification } from '../backend/realtime';
 
@@ -26,6 +27,9 @@ export function registerTokenIpc(io?: SocketIOServer): void {
   ipcMain.handle('tokens:list-prescriptions', (_, date: string) => listPrescriptionFeed(date));
   ipcMain.handle('tokens:doctors', () => listTokenDoctors());
   ipcMain.handle('tokens:patients', () => listTokenPatients());
+  ipcMain.handle('tokens:week-visits', (_, patientId: string, doctorId: string, date: string) =>
+    countPriorVisitsThisWeek(patientId, doctorId, date),
+  );
   ipcMain.handle('tokens:create', async (_, input) => {
     const token = await createToken(input);
     if (io) {

@@ -54,6 +54,8 @@ import { printTokenSlip } from '@/utils/printTokenSlip';
 import { POS_PAPER, POS_RECEIPT } from '@shared/invoicePaper';
 import { labResultPreview } from '@/features/lab/labReportPayload';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
+import { TokenFeeFields } from '@/features/tokens/TokenFeeFields';
+import { tokenNetFee } from '@shared/tokenFee';
 
 const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
   WAITING: { label: 'Waiting', color: 'warning' },
@@ -81,6 +83,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   const [notes, setNotes] = useState('');
   const [reason, setReason] = useState('');
   const [consultationFee, setConsultationFee] = useState('');
+  const [feeDiscount, setFeeDiscount] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -89,6 +92,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
       setNotes('');
       setReason('');
       setConsultationFee('');
+      setFeeDiscount('');
     }
   }, [open, defaultPatientId, defaultDoctorId]);
 
@@ -113,7 +117,14 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   useEffect(() => {
     if (!open || !selectedDoctor) return;
     setConsultationFee(String(Number(selectedDoctor.consultationFee ?? 0)));
+    setFeeDiscount('');
   }, [open, selectedDoctor]);
+  const { data: weekVisits } = useQuery({
+    queryKey: ['token-week-visits', patientId, doctorId, date],
+    queryFn: () =>
+      window.clinic.tokens.weekVisits(patientId, doctorId, date).catch(() => ({ count: 0 })),
+    enabled: open && Boolean(patientId && doctorId && date),
+  });
   const { data: tokenSchedule = [], isFetched: tokenScheduleFetched } = useQuery({
     queryKey: ['schedule', doctorId],
     queryFn: () => window.clinic.schedule.get(doctorId),
@@ -143,12 +154,13 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
         notes,
         reason,
         consultationFee: parseFloat(consultationFee) || 0,
+        feeDiscount: parseFloat(feeDiscount) || 0,
       }) as Promise<Token>;
     },
     onSuccess: async (token: Token) => {
       await qc.invalidateQueries({ queryKey: ['tokens'] });
       await qc.invalidateQueries({ queryKey: ['appointments'] });
-      setPatientId(''); setDoctorId(''); setNotes(''); setReason(''); setConsultationFee('');
+      setPatientId(''); setDoctorId(''); setNotes(''); setReason(''); setConsultationFee(''); setFeeDiscount('');
       onClose();
       onSuccess?.(token);
     },
@@ -215,16 +227,12 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
               />
             )}
           />
-          <TextField
-            label="Consultation fee"
-            type="number"
-            fullWidth
-            value={consultationFee}
-            onChange={(e) => setConsultationFee(e.target.value)}
-            slotProps={{
-              htmlInput: { min: 0, step: 'any' },
-              input: { startAdornment: <InputAdornment position="start">Rs.</InputAdornment> },
-            }}
+          <TokenFeeFields
+            consultationFee={consultationFee}
+            feeDiscount={feeDiscount}
+            onFeeChange={setConsultationFee}
+            onDiscountChange={setFeeDiscount}
+            priorVisitsThisWeek={weekVisits?.count ?? 0}
           />
           <FormControl fullWidth>
             <InputLabel>Reason (optional)</InputLabel>
@@ -262,7 +270,8 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
 
 function FeeRefundDialog({ token, onClose }: { token: Token; onClose: () => void }): React.JSX.Element {
   const qc = useQueryClient();
-  const remaining = Math.max(0, Number(token.consultationFee ?? 0) - Number(token.feeRefunded ?? 0));
+  const remaining = tokenNetFee(token.consultationFee, token.feeDiscount, token.feeRefunded);
+  const charged = tokenNetFee(token.consultationFee, token.feeDiscount, 0);
   const [amount, setAmount] = useState(String(remaining));
   const mutation = useMutation({
     mutationFn: () => {
@@ -287,7 +296,10 @@ function FeeRefundDialog({ token, onClose }: { token: Token; onClose: () => void
             <Alert severity="error">{(mutation.error as Error)?.message || 'Failed to refund fee.'}</Alert>
           )}
           <Typography variant="body2" color="text.secondary">
-            Collected: <strong>Rs. {new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(Number(token.consultationFee ?? 0))}</strong>
+            Collected: <strong>Rs. {new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(charged)}</strong>
+            {Number(token.feeDiscount ?? 0) > 0
+              ? ` · Discount: Rs. ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(Number(token.feeDiscount))}`
+              : ''}
             {Number(token.feeRefunded ?? 0) > 0
               ? ` · Already refunded: Rs. ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(Number(token.feeRefunded))}`
               : ''}
@@ -376,13 +388,31 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
         {token.patient.mrNumber ? <View style={ts.row}><Text style={ts.lbl}>MR #</Text><Text style={ts.val}>{token.patient.mrNumber}</Text></View> : null}
         <View style={ts.row}><Text style={ts.lbl}>Doctor</Text><Text style={ts.val}>Dr. {token.doctor.firstName} {token.doctor.lastName}</Text></View>
         {Number(token.consultationFee ?? 0) > 0 ? (
-          <View style={ts.row}>
-            <Text style={ts.lbl}>Fee</Text>
-            <Text style={ts.val}>
-              Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(token.consultationFee))}
-              {Number(token.feeRefunded ?? 0) > 0 ? ' (refunded)' : ''}
-            </Text>
-          </View>
+          <>
+            <View style={ts.row}>
+              <Text style={ts.lbl}>Fee</Text>
+              <Text style={ts.val}>
+                Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(token.consultationFee))}
+              </Text>
+            </View>
+            {Number(token.feeDiscount ?? 0) > 0 ? (
+              <View style={ts.row}>
+                <Text style={ts.lbl}>Discount</Text>
+                <Text style={ts.val}>
+                  - Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(token.feeDiscount))}
+                </Text>
+              </View>
+            ) : null}
+            {Number(token.feeDiscount ?? 0) > 0 || Number(token.feeRefunded ?? 0) > 0 ? (
+              <View style={ts.row}>
+                <Text style={ts.lbl}>Payable</Text>
+                <Text style={ts.val}>
+                  Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(tokenNetFee(token.consultationFee, token.feeDiscount, token.feeRefunded))}
+                  {Number(token.feeRefunded ?? 0) > 0 ? ' (refunded)' : ''}
+                </Text>
+              </View>
+            ) : null}
+          </>
         ) : null}
         <View style={ts.row}><Text style={ts.lbl}>Date</Text><Text style={ts.val}>{date}</Text></View>
         <View style={ts.row}><Text style={ts.lbl}>Time</Text><Text style={ts.val}>{time}</Text></View>
@@ -792,12 +822,7 @@ export function TokensPage(): React.JSX.Element {
                 slotProps={{
                   textField: {
                     size: 'small',
-                    sx: {
-                      width: 168,
-                      bgcolor: 'background.paper',
-                      borderRadius: 2,
-                      '& .MuiOutlinedInput-root': { borderRadius: 2 },
-                    },
+                    sx: { width: 168 },
                   },
                 }}
               />
@@ -1013,7 +1038,7 @@ export function TokensPage(): React.JSX.Element {
                           <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
                             Dr. {token.doctor.firstName} {token.doctor.lastName}
                             {Number(token.consultationFee ?? 0) > 0
-                              ? ` · Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(token.consultationFee))}${Number(token.feeRefunded ?? 0) > 0 ? ' refunded' : ''}`
+                              ? ` · Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(tokenNetFee(token.consultationFee, token.feeDiscount, token.feeRefunded))}${Number(token.feeDiscount ?? 0) > 0 ? ' after discount' : ''}${Number(token.feeRefunded ?? 0) > 0 ? ' refunded' : ''}`
                               : ''}
                             {token.reason ? ` · ${token.reason}` : ''}
                             {token.notes ? ` · ${token.notes}` : ''}
@@ -1033,7 +1058,7 @@ export function TokensPage(): React.JSX.Element {
                               <PrintOutlinedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          {!isAdmin && Number(token.consultationFee ?? 0) - Number(token.feeRefunded ?? 0) > 0 && (
+                          {!isAdmin && tokenNetFee(token.consultationFee, token.feeDiscount, token.feeRefunded) > 0 && (
                             <Tooltip title="Refund consultation fee">
                               <IconButton size="small" onClick={() => setRefundToken(token)} sx={{ borderRadius: 1 }}>
                                 <UndoOutlinedIcon fontSize="small" />

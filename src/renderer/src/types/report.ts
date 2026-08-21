@@ -26,6 +26,7 @@ export interface OpdFeeRow {
   doctorName: string;
   status: string;
   consultationFee: number;
+  feeDiscount: number;
   feeRefunded: number;
   net: number;
   createdAt: string;
@@ -36,6 +37,7 @@ export interface OpdDoctorFeeSummary {
   doctorName: string;
   tokens: number;
   collected: number;
+  discounted: number;
   refunded: number;
   net: number;
 }
@@ -57,6 +59,7 @@ export interface OpdDailyReport {
     byDoctor: OpdDoctorFeeSummary[];
     count: number;
     collected: number;
+    discounted: number;
     refunded: number;
     net: number;
   };

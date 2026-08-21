@@ -19,6 +19,7 @@ export interface Token {
   notes: string | null;
   reason: string | null;
   consultationFee?: number;
+  feeDiscount?: number;
   feeRefunded?: number;
   createdAt: string;
   updatedAt?: string;
@@ -34,6 +35,7 @@ export interface TokenInput {
   notes?: string | null;
   reason?: string | null;
   consultationFee?: number;
+  feeDiscount?: number;
 }
 
 export interface PrescriptionMedicine {

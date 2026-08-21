@@ -15,6 +15,7 @@ import {
   updateTokenStatus,
   upsertPrescription,
   refundTokenFee,
+  countPriorVisitsThisWeek,
 } from '../../tokens/token.service';
 import type { TokenStatus } from '@prisma/client';
 
@@ -33,6 +34,10 @@ export function createTokensRouter(io: SocketIOServer): Router {
   router.get('/for-patient', asyncHandler(async (req, res) => {
     const { patientId, date } = req.query as { patientId: string; date: string };
     res.json(await getTokenForPatient(patientId, date));
+  }));
+  router.get('/week-visits', asyncHandler(async (req, res) => {
+    const { patientId, doctorId, date } = req.query as { patientId?: string; doctorId?: string; date?: string };
+    res.json(await countPriorVisitsThisWeek(String(patientId ?? ''), String(doctorId ?? ''), String(date ?? '')));
   }));
   router.get('/:id', asyncHandler(async (req, res) => {
     const token = await getTokenById(String(req.params.id));

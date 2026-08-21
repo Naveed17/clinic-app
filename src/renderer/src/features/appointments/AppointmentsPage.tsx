@@ -43,7 +43,8 @@ import { AppointmentCalendar } from '@/components/AppointmentCalendar';
 import { appointmentsService } from '@/services/appointments.service';
 import { patientsService } from '@/services/patients.service';
 import type { Appointment, AppointmentInput, AppointmentPerson } from '@/types/appointment';
-import type { Token } from '@/types/token';
+import type { Token, TokenPerson } from '@/types/token';
+import { TokenFeeFields } from '@/features/tokens/TokenFeeFields';
 import { nextFreeSlot, doctorOfflineReason, slotSearchFrom, type SlotAdjustReason } from '@/utils/appointmentSlot';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
@@ -129,9 +130,35 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
   const { can } = useLicense();
   const showLabReason = can('labDashboard');
   const [reason, setReason] = useState('');
+  const [consultationFee, setConsultationFee] = useState('');
+  const [feeDiscount, setFeeDiscount] = useState('');
+  const { data: doctors = [] } = useQuery<TokenPerson[]>({
+    queryKey: ['token-doctors'],
+    queryFn: () => window.clinic.tokens.doctors(),
+  });
+  useEffect(() => {
+    const doctor = doctors.find((d) => d.id === providerId);
+    if (doctor) {
+      setConsultationFee(String(Number(doctor.consultationFee ?? 0)));
+      setFeeDiscount('');
+    }
+  }, [providerId, doctors]);
+  const { data: weekVisits } = useQuery({
+    queryKey: ['token-week-visits', patientId, providerId, date],
+    queryFn: () =>
+      window.clinic.tokens.weekVisits(patientId, providerId, date).catch(() => ({ count: 0 })),
+    enabled: Boolean(patientId && providerId && date),
+  });
   const mutation = useMutation({
     mutationFn: () =>
-      window.clinic.tokens.create({ patientId, doctorId: providerId, date, reason: reason || null }) as Promise<Token>,
+      window.clinic.tokens.create({
+        patientId,
+        doctorId: providerId,
+        date,
+        reason: reason || null,
+        consultationFee: parseFloat(consultationFee) || 0,
+        feeDiscount: parseFloat(feeDiscount) || 0,
+      }) as Promise<Token>,
     onSuccess: (token) => {
       void qc.invalidateQueries({ queryKey: ['token-for-patient', patientId, date] });
       void qc.invalidateQueries({ queryKey: ['tokens'] });
@@ -144,6 +171,14 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
       <Typography variant="caption" color="warning.dark" fontWeight={600} sx={{ mb: 1, display: 'block' }}>
         No token found — issue one now
       </Typography>
+      <TokenFeeFields
+        consultationFee={consultationFee}
+        feeDiscount={feeDiscount}
+        onFeeChange={setConsultationFee}
+        onDiscountChange={setFeeDiscount}
+        priorVisitsThisWeek={weekVisits?.count ?? 0}
+        compact
+      />
       <Stack direction="row" spacing={1}>
         <TextField
           select size="small" label="Reason (optional)" value={reason}

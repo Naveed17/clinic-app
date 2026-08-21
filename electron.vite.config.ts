@@ -16,6 +16,7 @@ export default defineConfig({
       'process.env.META_APP_ID': JSON.stringify(env.META_APP_ID || ''),
       'process.env.META_APP_SECRET': JSON.stringify(env.META_APP_SECRET || ''),
       'process.env.META_EMBEDDED_CONFIG_ID': JSON.stringify(env.META_EMBEDDED_CONFIG_ID || ''),
+      'process.env.GOOGLE_DRIVE_CLIENT_ID': JSON.stringify(env.GOOGLE_DRIVE_CLIENT_ID || ''),
     },
     build: {
       rollupOptions: {},

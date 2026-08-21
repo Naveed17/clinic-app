@@ -37,6 +37,7 @@ import { useNavigate } from 'react-router-dom';
 import type { TokenPerson, Token, PrescriptionFeedItem } from '@/types/token';
 import type { PatientInput } from '@/types/patient';
 import type { Appointment, AppointmentPerson } from '@/types/appointment';
+import { TokenFeeFields } from '@/features/tokens/TokenFeeFields';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { nextFreeSlot, doctorOfflineReason, slotSearchFrom, type SlotAdjustReason } from '@/utils/appointmentSlot';
 import imgMask from '@/assets/dashboard/clinic-mask.svg';
@@ -80,6 +81,8 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   const [patientId, setPatientId] = useState('');
   const [doctorId, setDoctorId] = useState('');
   const [reason, setReason] = useState('');
+  const [consultationFee, setConsultationFee] = useState('');
+  const [feeDiscount, setFeeDiscount] = useState('');
   const [useExisting, setUseExisting] = useState(false);
   const [previewToken, setPreviewToken] = useState<Token | null>(null);
   const [previewAutoPrint, setPreviewAutoPrint] = useState(false);
@@ -98,6 +101,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   });
 
   const selectedPatient = useMemo(() => patients.find((p) => p.id === patientId) ?? null, [patients, patientId]);
+  const selectedDoctor = useMemo(() => doctors.find((d) => d.id === doctorId) ?? null, [doctors, doctorId]);
   const todayStr = new Date().toLocaleDateString('en-CA');
   const {
     data: walkSchedule = [],
@@ -112,6 +116,18 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
     ? doctorOfflineReason(walkSchedule, todayStr)
     : null;
   const walkScheduleReady = Boolean(doctorId) && walkScheduleFetched && !walkScheduleFetching;
+
+  useEffect(() => {
+    if (!open || !selectedDoctor) return;
+    setConsultationFee(String(Number(selectedDoctor.consultationFee ?? 0)));
+    setFeeDiscount('');
+  }, [open, selectedDoctor]);
+  const { data: weekVisits } = useQuery({
+    queryKey: ['token-week-visits', patientId, doctorId, todayStr],
+    queryFn: () =>
+      window.clinic.tokens.weekVisits(patientId, doctorId, todayStr).catch(() => ({ count: 0 })),
+    enabled: open && step === 1 && Boolean(patientId && doctorId),
+  });
 
   const createPatientMutation = useMutation({
     mutationFn: (values: PatientForm) => patientsService.create({
@@ -150,6 +166,8 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
         patientId, doctorId,
         date: todayStr,
         reason: reason || null,
+        consultationFee: parseFloat(consultationFee) || 0,
+        feeDiscount: parseFloat(feeDiscount) || 0,
       }) as Token;
       if (token.status === 'WAITING') return token;
       return window.clinic.tokens.updateStatus(token.id, 'WAITING') as Promise<Token>;
@@ -168,6 +186,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
 
   function handleClose() {
     setStep(0); setPatientId(''); setDoctorId(''); setReason('');
+    setConsultationFee(''); setFeeDiscount('');
     setCreatedToken(null); setUseExisting(false);
     setPreviewToken(null);
     setPreviewAutoPrint(false);
@@ -282,6 +301,13 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
                   />
                 );
               }}
+            />
+            <TokenFeeFields
+              consultationFee={consultationFee}
+              feeDiscount={feeDiscount}
+              onFeeChange={setConsultationFee}
+              onDiscountChange={setFeeDiscount}
+              priorVisitsThisWeek={weekVisits?.count ?? 0}
             />
             <FormControl fullWidth>
               <InputLabel>Reason (optional)</InputLabel>

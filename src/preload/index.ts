@@ -436,6 +436,12 @@ const api = {
             ipcRenderer.removeListener('backup:migrate-progress', listener);
           };
         },
+        googleStatus: () => ipc('backup:google-status'),
+        googleConnect: () => ipc('backup:google-connect'),
+        googleDisconnect: () => ipc('backup:google-disconnect'),
+        googleSchedule: (schedule: 'off' | 'daily' | 'weekly' | 'monthly') =>
+          ipc('backup:google-schedule', schedule),
+        googleBackupNow: () => ipc('backup:google-now'),
       },
   docs: {
     patient: {
@@ -575,6 +581,17 @@ const api = {
       ),
     doctors: () => call(() => request('/api/tokens/doctors'), 'tokens:doctors'),
     patients: () => call(() => request('/api/tokens/patients'), 'tokens:patients'),
+    weekVisits: (patientId: string, doctorId: string, date: string) =>
+      call(
+        () =>
+          request(
+            `/api/tokens/week-visits?patientId=${encodeURIComponent(patientId)}&doctorId=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(date)}`,
+          ),
+        'tokens:week-visits',
+        patientId,
+        doctorId,
+        date,
+      ),
     create: (input: unknown) =>
       call(
         () => request('/api/tokens', { method: 'POST', body: JSON.stringify(input) }),

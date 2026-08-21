@@ -60,7 +60,7 @@ const LOCAL_COLUMNS: Record<string, string[]> = {
     'id', 'patientId', 'providerId', 'startsAt', 'endsAt', 'status', 'reason', 'notes',
     'recurrenceRule', 'parentId', 'createdAt', 'updatedAt',
   ],
-  Token: ['id', 'tokenNumber', 'date', 'patientId', 'doctorId', 'status', 'notes', 'reason', 'consultationFee', 'feeRefunded', 'createdAt', 'updatedAt'],
+  Token: ['id', 'tokenNumber', 'date', 'patientId', 'doctorId', 'status', 'notes', 'reason', 'consultationFee', 'feeDiscount', 'feeRefunded', 'createdAt', 'updatedAt'],
   Prescription: [
     'id', 'tokenId', 'diagnosis', 'medicines', 'tests', 'advice', 'thumbName', 'thumbnail',
     'pharmacyStatus', 'dispensedAt', 'invoiceId', 'createdAt', 'updatedAt',

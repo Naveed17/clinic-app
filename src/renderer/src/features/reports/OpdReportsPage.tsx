@@ -42,6 +42,7 @@ import { reportsService } from '@/services/reports.service';
 import type { OpdDailyReport } from '@/types/report';
 import type { TokenPerson } from '@/types/token';
 import { OpdReportPrint } from '@/features/reports/OpdReportPrint';
+import type { OpdPrintSection } from '@/features/reports/OpdReportPdf';
 
 const invoiceStatusConfig: Record<string, { label: string; color: 'default' | 'warning' | 'info' | 'success' | 'error' }> = {
   DRAFT: { label: 'Draft', color: 'default' },
@@ -105,7 +106,7 @@ export function OpdReportsPage(): React.JSX.Element {
   const [doctorId, setDoctorId] = useState('');
   const [tab, setTab] = useState<'invoices' | 'fees'>('invoices');
   const [search, setSearch] = useState('');
-  const [preview, setPreview] = useState<OpdDailyReport | null>(null);
+  const [preview, setPreview] = useState<{ report: OpdDailyReport; section: OpdPrintSection } | null>(null);
 
   const doctors = useQuery<TokenPerson[]>({
     queryKey: ['token-doctors'],
@@ -155,13 +156,14 @@ export function OpdReportsPage(): React.JSX.Element {
     : [
         { label: 'Tokens', value: String(data?.fees.count ?? 0), icon: <ConfirmationNumberOutlinedIcon />, color: theme.palette.primary.main, bg: alpha(theme.palette.primary.main, 0.1) },
         { label: 'Fees collected', value: money(data?.fees.collected ?? 0), icon: <LocalHospitalOutlinedIcon />, color: theme.palette.info.dark, bg: alpha(theme.palette.info.main, 0.12) },
+        { label: 'Discount', value: money(data?.fees.discounted ?? 0), icon: <PaymentsOutlinedIcon />, color: theme.palette.warning.dark, bg: alpha(theme.palette.warning.main, 0.12) },
         { label: 'Refunded', value: money(data?.fees.refunded ?? 0), icon: <UndoOutlinedIcon />, color: theme.palette.error.dark, bg: alpha(theme.palette.error.main, 0.12) },
         { label: 'Net fees', value: money(data?.fees.net ?? 0), icon: <AccountBalanceWalletOutlinedIcon />, color: theme.palette.success.dark, bg: alpha(theme.palette.success.main, 0.12) },
       ];
 
-  function handlePrint(): void {
+  function handlePrint(section: OpdPrintSection): void {
     if (!data) return;
-    setPreview(data);
+    setPreview({ report: data, section });
   }
 
   return (
@@ -187,16 +189,12 @@ export function OpdReportsPage(): React.JSX.Element {
                 slotProps={{
                   textField: {
                     size: 'small',
-                    sx: {
-                      width: 168,
-                      bgcolor: 'background.paper',
-                      '& .MuiOutlinedInput-root': { borderRadius: 0.5 },
-                    },
+                    sx: { width: 168 },
                   },
                 }}
               />
             </LocalizationProvider>
-            <FormControl size="small" sx={{ minWidth: 220 }}>
+            <FormControl size="small" sx={{ minWidth: 220, height: 40 }}>
               <InputLabel>Doctor</InputLabel>
               <Select
                 label="Doctor"
@@ -207,19 +205,26 @@ export function OpdReportsPage(): React.JSX.Element {
                   const doctor = doctorById.get(String(value));
                   const name = doctor ? doctorLabel(doctor) : 'Doctor';
                   return (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-                      <DoctorAvatar src={doctor?.avatar} name={`Dr. ${name}`} size={22} />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, height: '100%' }}>
+                      <DoctorAvatar src={doctor?.avatar} name={`Dr. ${name}`} size={18} />
                       <Typography component="span" fontSize={13.5} fontWeight={600} noWrap>{name}</Typography>
                     </Box>
                   );
                 }}
                 sx={{
+                  height: 40,
                   borderRadius: 0.5,
                   fontSize: 13.5,
                   fontWeight: 500,
                   bgcolor: 'background.paper',
                   '& .MuiOutlinedInput-notchedOutline': { borderRadius: 0.5 },
-                  '& .MuiSelect-select': { display: 'flex', alignItems: 'center', py: 0.75 },
+                  '& .MuiSelect-select': {
+                    display: 'flex',
+                    alignItems: 'center',
+                    py: 0,
+                    height: 40,
+                    boxSizing: 'border-box',
+                  },
                 }}
               >
                 <MenuItem value="">All doctors</MenuItem>
@@ -237,18 +242,18 @@ export function OpdReportsPage(): React.JSX.Element {
               variant="contained"
               startIcon={<PrintOutlinedIcon />}
               disabled={!data}
-              onClick={() => handlePrint()}
-              sx={{ borderRadius: 2, fontWeight: 700, px: 2.25, py: 1 }}
+              onClick={() => handlePrint('all')}
+              sx={{ borderRadius: 2, fontWeight: 700, px: 2.25, height: 40 }}
             >
-              Print
+              Print all
             </Button>
           </Stack>
         </Box>
 
         {report.isLoading ? (
-          <StatCardsSkeleton count={4} />
+          <StatCardsSkeleton count={summaryCards.length} />
         ) : (
-          <Box sx={{ display: 'grid', gap: 1.75, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
+          <Box sx={{ display: 'grid', gap: 1.75, gridTemplateColumns: { xs: '1fr 1fr', md: `repeat(${summaryCards.length}, 1fr)` } }}>
             {summaryCards.map((card) => (
               <Paper
                 key={card.label}
@@ -310,7 +315,7 @@ export function OpdReportsPage(): React.JSX.Element {
 
         <Paper elevation={0} sx={{ ...softCardSx, overflow: 'hidden', position: 'relative' }}>
           <FetchingBar show={report.isFetching && !report.isLoading} />
-          <Box sx={{ px: 2, pt: 1, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+          <Box sx={{ px: 2, pt: 1.25, pb: 1.25, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             <Tabs
               value={tab}
               onChange={(_e, next: 'invoices' | 'fees') => { setTab(next); setSearch(''); }}
@@ -323,8 +328,17 @@ export function OpdReportsPage(): React.JSX.Element {
               value={search}
               onChange={setSearch}
               placeholder={tab === 'invoices' ? 'Search invoice or patient...' : 'Search token, patient or doctor...'}
-              sx={{ ml: 'auto', maxWidth: 320, '& .MuiOutlinedInput-root': { borderRadius: 0.5 } }}
+              sx={{ ml: 'auto', maxWidth: 280, '& .MuiOutlinedInput-root': { borderRadius: 0.5 } }}
             />
+            <Button
+              variant="contained"
+              disabled={!data}
+              startIcon={<PrintOutlinedIcon />}
+              onClick={() => handlePrint(tab === 'invoices' ? 'invoices' : 'fees')}
+              sx={{ borderRadius: 2, fontWeight: 700, px: 1.75, py: 1, flexShrink: 0 }}
+            >
+              {tab === 'invoices' ? 'Print invoices' : 'Print doctor fees'}
+            </Button>
           </Box>
           {report.isError ? <Alert severity="error" sx={{ m: 2 }}>Unable to load OPD report.</Alert> : null}
           <Box sx={{ px: 2, py: 1.5, maxHeight: 'calc(100vh - 420px)', overflowY: 'auto' }}>
@@ -387,16 +401,17 @@ export function OpdReportsPage(): React.JSX.Element {
                     <TableCell>Doctor</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell align="right">Fee</TableCell>
+                    <TableCell align="right">Discount</TableCell>
                     <TableCell align="right">Refunded</TableCell>
                     <TableCell align="right">Net</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {report.isLoading ? (
-                    <TableRowsSkeleton cols={7} />
+                    <TableRowsSkeleton cols={8} />
                   ) : feeRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>
+                      <TableCell colSpan={8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>
                         No doctor fees for this day.
                       </TableCell>
                     </TableRow>
@@ -412,6 +427,7 @@ export function OpdReportsPage(): React.JSX.Element {
                           </TableCell>
                           <TableCell><Chip size="small" label={cfg.label} color={cfg.color} sx={chipSx} /></TableCell>
                           <TableCell align="right">{money(row.consultationFee)}</TableCell>
+                          <TableCell align="right">{money(row.feeDiscount)}</TableCell>
                           <TableCell align="right">{money(row.feeRefunded)}</TableCell>
                           <TableCell align="right"><Typography fontWeight={700}>{money(row.net)}</Typography></TableCell>
                         </TableRow>
@@ -424,7 +440,13 @@ export function OpdReportsPage(): React.JSX.Element {
           </Box>
         </Paper>
       </Stack>
-      {preview ? <OpdReportPrint report={preview} onClose={() => setPreview(null)} /> : null}
+      {preview ? (
+        <OpdReportPrint
+          report={preview.report}
+          section={preview.section}
+          onClose={() => setPreview(null)}
+        />
+      ) : null}
     </>
   );
 }

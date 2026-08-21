@@ -26,6 +26,7 @@ import BackupOutlinedIcon from '@mui/icons-material/BackupOutlined';
 import RestoreOutlinedIcon from '@mui/icons-material/RestoreOutlined';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
 import CloudDownloadOutlinedIcon from '@mui/icons-material/CloudDownloadOutlined';
+import CloudOutlinedIcon from '@mui/icons-material/CloudOutlined';
 import SystemUpdateAltOutlinedIcon from '@mui/icons-material/SystemUpdateAltOutlined';
 import WifiTetheringOutlinedIcon from '@mui/icons-material/WifiTetheringOutlined';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
@@ -44,6 +45,16 @@ import { invalidateClinicLogoCache, notifyClinicBrandChanged, resolveClinicLogoS
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
+
+type DriveSchedule = 'off' | 'daily' | 'weekly' | 'monthly';
+
+type GoogleDriveStatus = {
+  connected: boolean;
+  email: string;
+  schedule: DriveSchedule;
+  lastBackupAt: string | null;
+  configured: boolean;
+};
 
 interface Settings {
   serverMode: ServerMode;
@@ -162,6 +173,52 @@ export function SettingsPage(): React.JSX.Element {
   const [discovered, setDiscovered] = useState<{ ip: string; port: number; name: string }[]>([]);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<boolean | null>(null);
+  const [drive, setDrive] = useState<GoogleDriveStatus | null>(null);
+  const [driveConnecting, setDriveConnecting] = useState(false);
+  const [driveUploading, setDriveUploading] = useState(false);
+
+  useEffect(() => {
+    if (settingsTab !== 'backup' || isOnline) return;
+    void window.clinic?.backup.googleStatus().then(setDrive);
+  }, [settingsTab, isOnline]);
+
+  async function handleGoogleConnect(): Promise<void> {
+    setDriveConnecting(true);
+    const result = await window.clinic?.backup.googleConnect();
+    setDriveConnecting(false);
+    if (result?.canceled) return;
+    if (result?.ok) {
+      const status = await window.clinic?.backup.googleStatus();
+      if (status) setDrive(status);
+      showAppToast({ type: 'success', message: `Connected ${result.email || 'Google Drive'}` });
+    } else {
+      showAppToast({ type: 'error', message: result?.error ?? 'Could not connect Google Drive.' });
+    }
+  }
+
+  async function handleGoogleDisconnect(): Promise<void> {
+    const status = await window.clinic?.backup.googleDisconnect();
+    if (status) setDrive(status);
+    showAppToast({ type: 'success', message: 'Google Drive disconnected.' });
+  }
+
+  async function handleGoogleSchedule(schedule: DriveSchedule): Promise<void> {
+    const status = await window.clinic?.backup.googleSchedule(schedule);
+    if (status) setDrive(status);
+  }
+
+  async function handleGoogleBackupNow(): Promise<void> {
+    setDriveUploading(true);
+    const result = await window.clinic?.backup.googleBackupNow();
+    setDriveUploading(false);
+    const status = await window.clinic?.backup.googleStatus();
+    if (status) setDrive(status);
+    if (result?.ok) {
+      showAppToast({ type: 'success', message: `Uploaded ${result.name || 'backup'} to Google Drive.` });
+    } else {
+      showAppToast({ type: 'error', message: result?.error ?? 'Google Drive backup failed.' });
+    }
+  }
 
   async function handleBackup() {
     setBackupLoading(true);
@@ -1085,6 +1142,77 @@ export function SettingsPage(): React.JSX.Element {
                       Restore Backup
                     </Button>
                   </Stack>
+
+                  <Divider />
+
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <CloudOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                    <Typography variant="subtitle1" fontWeight={800}>Google Drive</Typography>
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    Connect a Google account, then pick daily, weekly, or monthly. CareFlow uploads a ZIP into a
+                    CareFlow Backups folder while this PC is on.
+                  </Typography>
+                  {drive && !drive.configured && (
+                    <Alert severity="warning">
+                      Google Drive is not configured on the license server yet. Add GOOGLE_DRIVE_CLIENT_ID (Desktop OAuth client).
+                    </Alert>
+                  )}
+                  {drive?.connected ? (
+                    <Stack spacing={1.5}>
+                      <Alert severity="success">
+                        Connected as <strong>{drive.email}</strong>
+                      </Alert>
+                      <Typography variant="body2" fontWeight={700}>Backup schedule</Typography>
+                      <ToggleButtonGroup
+                        exclusive
+                        value={drive.schedule}
+                        onChange={(_e, val: DriveSchedule | null) => {
+                          if (val) void handleGoogleSchedule(val);
+                        }}
+                        sx={{ flexWrap: 'wrap', gap: 1 }}
+                      >
+                        {([
+                          { value: 'off', label: 'Off' },
+                          { value: 'daily', label: 'Daily' },
+                          { value: 'weekly', label: 'Weekly' },
+                          { value: 'monthly', label: 'Monthly' },
+                        ] as const).map((opt) => (
+                          <ToggleButton key={opt.value} value={opt.value} sx={{ px: 2, py: 0.75, textTransform: 'none', fontWeight: 700 }}>
+                            {opt.label}
+                          </ToggleButton>
+                        ))}
+                      </ToggleButtonGroup>
+                      {drive.lastBackupAt && (
+                        <Typography variant="caption" color="text.secondary">
+                          Last Drive backup: {new Date(drive.lastBackupAt).toLocaleString()}
+                        </Typography>
+                      )}
+                      <Stack direction="row" gap={1.5} flexWrap="wrap">
+                        <Button
+                          variant="contained"
+                          startIcon={<CloudUploadOutlinedIcon />}
+                          loading={driveUploading}
+                          onClick={() => void handleGoogleBackupNow()}
+                        >
+                          Backup now to Drive
+                        </Button>
+                        <Button color="warning" onClick={() => void handleGoogleDisconnect()}>
+                          Disconnect
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  ) : (
+                    <Button
+                      variant="contained"
+                      startIcon={<CloudOutlinedIcon />}
+                      loading={driveConnecting}
+                      disabled={drive?.configured === false}
+                      onClick={() => void handleGoogleConnect()}
+                    >
+                      Connect Google Drive
+                    </Button>
+                  )}
                 </Stack>
               )}
             </Box>

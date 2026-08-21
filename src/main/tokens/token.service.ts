@@ -3,6 +3,12 @@ import { getPrisma, ensurePrescriptionPharmacyColumns } from '../database/client
 import { randomUUID } from 'node:crypto';
 import { markCheckIn, markCheckOut } from '../doctors/attendance.service';
 import { assertDoctorAvailableOnDate } from '../doctors/schedule.service';
+import {
+  clampFeeDiscount,
+  mapTokenFee,
+  tokenNetFee,
+  weekVisitFromDate,
+} from '../../shared/tokenFee';
 
 export interface TokenInput {
   patientId: string;
@@ -11,6 +17,7 @@ export interface TokenInput {
   notes?: string | null;
   reason?: string | null;
   consultationFee?: number;
+  feeDiscount?: number;
 }
 
 export interface PrescriptionInput {
@@ -55,12 +62,6 @@ export interface PharmacyQueueItem {
   updatedAt: string;
 }
 
-function mapTokenFee(value: unknown): number {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < 0) return 0;
-  return Math.round(n * 100) / 100;
-}
-
 async function resolveConsultationFee(doctorId: string, override?: number): Promise<number> {
   if (override !== undefined && override !== null && String(override) !== '') {
     return mapTokenFee(override);
@@ -100,6 +101,7 @@ function mapJoinToken(r: Record<string, unknown>) {
     patientId: r.patientId, doctorId: r.doctorId,
     status: r.status, notes: r.notes, reason: r.reason,
     consultationFee: mapTokenFee(r.consultationFee),
+    feeDiscount: mapTokenFee(r.feeDiscount),
     feeRefunded: mapTokenFee(r.feeRefunded),
     createdAt: r.createdAt, updatedAt: r.updatedAt,
     patient: { id: r.patientObjId, firstName: r.patientFirstName, lastName: r.patientLastName, mrNumber: r.patientMrNumber },
@@ -271,6 +273,7 @@ export async function createToken(input: TokenInput) {
   }
 
   const consultationFee = await resolveConsultationFee(input.doctorId, input.consultationFee);
+  const feeDiscount = clampFeeDiscount(input.feeDiscount, consultationFee);
 
   const existing = await getPrisma().token.findFirst({
     where: { patientId: input.patientId, date: input.date, doctorId: input.doctorId },
@@ -285,7 +288,19 @@ export async function createToken(input: TokenInput) {
       data: { consultationFee },
       include: tokenInclude,
     });
-    return { ...updated, consultationFee: mapTokenFee(updated.consultationFee), feeRefunded: mapTokenFee((updated as { feeRefunded?: unknown }).feeRefunded), prescription: null };
+    await getPrisma().$executeRawUnsafe(
+      `UPDATE "Token" SET feeDiscount = ?, updatedAt = ? WHERE id = ?`,
+      feeDiscount,
+      new Date().toISOString(),
+      existing.id,
+    );
+    return {
+      ...updated,
+      consultationFee: mapTokenFee(updated.consultationFee),
+      feeDiscount,
+      feeRefunded: mapTokenFee((updated as { feeRefunded?: unknown }).feeRefunded),
+      prescription: null,
+    };
   }
   const last = await getPrisma().token.findFirst({
     where: { date: input.date, doctorId: input.doctorId },
@@ -305,7 +320,18 @@ export async function createToken(input: TokenInput) {
     },
     include: tokenInclude,
   });
-  return { ...token, consultationFee: mapTokenFee(token.consultationFee), feeRefunded: mapTokenFee((token as { feeRefunded?: unknown }).feeRefunded), prescription: null };
+  await getPrisma().$executeRawUnsafe(
+    `UPDATE "Token" SET feeDiscount = ? WHERE id = ?`,
+    feeDiscount,
+    token.id,
+  );
+  return {
+    ...token,
+    consultationFee: mapTokenFee(token.consultationFee),
+    feeDiscount,
+    feeRefunded: mapTokenFee((token as { feeRefunded?: unknown }).feeRefunded),
+    prescription: null,
+  };
 }
 
 export async function updateTokenStatus(id: string, status: TokenStatus) {
@@ -333,6 +359,7 @@ export async function updateTokenStatus(id: string, status: TokenStatus) {
   return {
     ...token,
     consultationFee: mapTokenFee((token as { consultationFee?: unknown }).consultationFee),
+    feeDiscount: mapTokenFee((token as { feeDiscount?: unknown }).feeDiscount),
     feeRefunded: mapTokenFee((token as { feeRefunded?: unknown }).feeRefunded),
     prescription: pr[0] ? mapPrescription(id, pr[0]) : null,
   };
@@ -538,23 +565,40 @@ export async function getTokenById(tokenId: string) {
   return mapJoinToken(rows[0]);
 }
 
+export async function countPriorVisitsThisWeek(
+  patientId: string,
+  doctorId: string,
+  date: string,
+): Promise<{ count: number }> {
+  if (!patientId || !doctorId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { count: 0 };
+  const from = weekVisitFromDate(date);
+  const count = await getPrisma().token.count({
+    where: {
+      patientId,
+      doctorId,
+      date: { gte: from, lt: date },
+      status: { not: 'SKIPPED' },
+    },
+  });
+  return { count };
+}
+
 export async function refundTokenFee(id: string, amount?: number) {
   const token = await getTokenById(id);
   if (!token) throw new Error('Token not found.');
-  const fee = mapTokenFee(token.consultationFee);
-  const already = mapTokenFee(token.feeRefunded);
-  const remaining = Math.round(Math.max(0, fee - already) * 100) / 100;
+  const remaining = tokenNetFee(token.consultationFee, token.feeDiscount, token.feeRefunded);
   if (remaining <= 0) throw new Error('No consultation fee left to refund.');
   const refund =
     amount === undefined || amount === null || Number.isNaN(Number(amount))
       ? remaining
-      : Math.round(Number(amount) * 100) / 100;
+      : mapTokenFee(amount);
   if (!Number.isFinite(refund) || refund <= 0) throw new Error('Refund amount must be greater than 0.');
   if (refund > remaining) throw new Error('Refund cannot exceed the collected consultation fee.');
+  const already = mapTokenFee(token.feeRefunded);
   const db = getPrisma();
   await db.$executeRawUnsafe(
     `UPDATE "Token" SET feeRefunded = ?, updatedAt = ? WHERE id = ?`,
-    Math.round((already + refund) * 100) / 100,
+    mapTokenFee(already + refund),
     new Date().toISOString(),
     id,
   );
