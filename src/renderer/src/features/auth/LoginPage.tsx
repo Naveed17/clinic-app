@@ -209,13 +209,22 @@ export function LoginPage(): React.JSX.Element {
 
   const glassField = {
     '& .MuiOutlinedInput-root': {
-      borderRadius: 1,
+      borderRadius: '8px',
       bgcolor: 'rgba(255,255,255,0.07)',
       backdropFilter: 'blur(8px)',
       color: '#fff',
-      '& fieldset': { borderColor: 'rgba(255,255,255,0.22)' },
+      overflow: 'hidden',
+      '& fieldset': { borderRadius: '8px', borderColor: 'rgba(255,255,255,0.22)' },
       '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.45)' },
-      '&.Mui-focused fieldset': { borderColor: 'rgba(255,255,255,0.7)' },
+      '&.Mui-focused fieldset': { borderRadius: '8px', borderColor: 'rgba(255,255,255,0.7)' },
+      '& input': { borderRadius: 0 },
+      '& input:-webkit-autofill': {
+        borderRadius: '0 !important',
+        WebkitBoxShadow: '0 0 0 1000px rgba(255,255,255,0.07) inset !important',
+        WebkitTextFillColor: '#fff !important',
+        caretColor: '#fff',
+        transition: 'background-color 5000s ease-in-out 0s !important',
+      },
     },
     '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.55)' },
     '& .MuiInputLabel-root.Mui-focused': { color: 'rgba(255,255,255,0.9)' },
@@ -339,7 +348,7 @@ export function LoginPage(): React.JSX.Element {
           <Autocomplete
             freeSolo
             autoHighlight
-            openOnFocus
+            openOnFocus={false}
             options={users}
             inputValue={email}
             onInputChange={(_, value) => setEmail(value)}
@@ -353,13 +362,14 @@ export function LoginPage(): React.JSX.Element {
             isOptionEqualToValue={(option, value) => option.id === value.id}
             filterOptions={(options, state) => {
               const query = state.inputValue.trim().toLowerCase();
-              if (!query) return options;
+              if (!query) return [];
               return options.filter((user) =>
                 user.email.toLowerCase().includes(query)
                 || user.name.toLowerCase().includes(query)
                 || roleLabel(user.role).toLowerCase().includes(query),
               );
             }}
+            noOptionsText={email.trim() ? 'No matching users' : 'Type to search users'}
             sx={{
               '& .MuiAutocomplete-popupIndicator, & .MuiAutocomplete-clearIndicator': {
                 color: 'rgba(255,255,255,0.45)',
