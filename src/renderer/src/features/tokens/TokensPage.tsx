@@ -8,6 +8,8 @@ import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import HourglassEmptyOutlinedIcon from '@mui/icons-material/HourglassEmptyOutlined';
 import DoneAllOutlinedIcon from '@mui/icons-material/DoneAllOutlined';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
   Alert,
   Autocomplete,
@@ -27,6 +29,8 @@ import {
   Paper,
   Select,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -35,7 +39,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { alpha, darken, useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useEffect, useState, useRef } from 'react';
+import { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
 import { DEFAULT_CLINIC_LOGO, useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 import type { Token, TokenInput, TokenPerson, TokenStatus, PrescriptionInput, PrescriptionMedicine } from '@/types/token';
@@ -711,6 +715,183 @@ export function TokenPrintPreview({
   );
 }
 
+const doctorTabSx = {
+  position: 'relative',
+  zIndex: 1,
+  minHeight: 0,
+  minWidth: 'max-content',
+  flexShrink: 0,
+  px: 2.2,
+  py: 0.85,
+  borderRadius: 999,
+  fontSize: 14,
+  fontWeight: 500,
+  textTransform: 'none',
+  whiteSpace: 'nowrap',
+  color: 'text.secondary',
+  '&.Mui-selected': { fontWeight: 700, color: 'text.primary' },
+} as const;
+
+function DoctorFilterTabs({
+  doctors,
+  value,
+  onChange,
+}: {
+  doctors: TokenPerson[];
+  value: string;
+  onChange: (id: string) => void;
+}): React.JSX.Element {
+  const theme = useTheme();
+  const tabsWrapRef = useRef<HTMLDivElement>(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(false);
+  const [hoverEdge, setHoverEdge] = useState<'left' | 'right' | null>(null);
+
+  const updateOverflow = useCallback(() => {
+    const scroller = tabsWrapRef.current?.querySelector('.MuiTabs-scroller') as HTMLElement | null;
+    if (!scroller) {
+      setCanLeft(false);
+      setCanRight(false);
+      return;
+    }
+    const { scrollLeft, clientWidth, scrollWidth } = scroller;
+    setCanLeft(scrollLeft > 2);
+    setCanRight(scrollLeft + clientWidth < scrollWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    updateOverflow();
+    const scroller = tabsWrapRef.current?.querySelector('.MuiTabs-scroller') as HTMLElement | null;
+    if (!scroller) return undefined;
+    scroller.addEventListener('scroll', updateOverflow, { passive: true });
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => updateOverflow()) : null;
+    ro?.observe(scroller);
+    window.addEventListener('resize', updateOverflow);
+    return () => {
+      scroller.removeEventListener('scroll', updateOverflow);
+      ro?.disconnect();
+      window.removeEventListener('resize', updateOverflow);
+    };
+  }, [doctors.length, updateOverflow]);
+
+  function scrollByDir(dir: -1 | 1): void {
+    const scroller = tabsWrapRef.current?.querySelector('.MuiTabs-scroller') as HTMLElement | null;
+    scroller?.scrollBy({ left: dir * 180, behavior: 'smooth' });
+  }
+
+  function handleMouseMove(e: React.MouseEvent<HTMLDivElement>): void {
+    if (!canLeft && !canRight) {
+      setHoverEdge(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const zone = 56;
+    if (canLeft && x <= zone) setHoverEdge('left');
+    else if (canRight && x >= rect.width - zone) setHoverEdge('right');
+    else setHoverEdge(null);
+  }
+
+  const showLeft = canLeft && hoverEdge === 'left';
+  const showRight = canRight && hoverEdge === 'right';
+
+  return (
+    <Box
+      ref={tabsWrapRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setHoverEdge(null)}
+      sx={{
+        position: 'relative',
+        flex: 1,
+        minWidth: 0,
+      }}
+    >
+      <Tabs
+        value={value}
+        onChange={(_e, next: string) => onChange(next)}
+        variant="scrollable"
+        scrollButtons={false}
+        sx={{
+          minHeight: 0,
+          bgcolor: alpha(theme.palette.text.primary, 0.05),
+          borderRadius: 999,
+          p: '4px',
+          '& .MuiTabs-scroller': {
+            borderRadius: 999,
+            scrollbarWidth: 'none',
+            '&::-webkit-scrollbar': { display: 'none' },
+          },
+          '& .MuiTabs-indicator': {
+            height: '100%',
+            borderRadius: 999,
+            bgcolor: 'background.paper',
+            boxShadow: theme.shadows[2],
+            zIndex: 0,
+          },
+          '& .MuiTabs-flexContainer': { flexWrap: 'nowrap' },
+        }}
+      >
+        <Tab disableRipple value="ALL" label="All Doctors" sx={doctorTabSx} />
+        {doctors.map((d) => (
+          <Tab
+            key={d.id}
+            disableRipple
+            value={d.id}
+            label={`Dr. ${d.firstName} ${d.lastName}`}
+            sx={doctorTabSx}
+          />
+        ))}
+      </Tabs>
+
+      <IconButton
+        size="small"
+        aria-label="Scroll doctors left"
+        onClick={() => scrollByDir(-1)}
+        sx={{
+          position: 'absolute',
+          left: 4,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          zIndex: 2,
+          width: 28,
+          height: 28,
+          bgcolor: 'background.paper',
+          boxShadow: theme.shadows[2],
+          opacity: showLeft ? 1 : 0,
+          pointerEvents: showLeft ? 'auto' : 'none',
+          transition: 'opacity 0.15s ease',
+          '&:hover': { bgcolor: 'background.paper' },
+        }}
+      >
+        <ChevronLeftIcon sx={{ fontSize: 18 }} />
+      </IconButton>
+
+      <IconButton
+        size="small"
+        aria-label="Scroll doctors right"
+        onClick={() => scrollByDir(1)}
+        sx={{
+          position: 'absolute',
+          right: 4,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          zIndex: 2,
+          width: 28,
+          height: 28,
+          bgcolor: 'background.paper',
+          boxShadow: theme.shadows[2],
+          opacity: showRight ? 1 : 0,
+          pointerEvents: showRight ? 'auto' : 'none',
+          transition: 'opacity 0.15s ease',
+          '&:hover': { bgcolor: 'background.paper' },
+        }}
+      >
+        <ChevronRightIcon sx={{ fontSize: 18 }} />
+      </IconButton>
+    </Box>
+  );
+}
+
 export function TokensPage(): React.JSX.Element {
   const theme = useTheme();
   const qc = useQueryClient();
@@ -886,31 +1067,34 @@ export function TokensPage(): React.JSX.Element {
         <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', lg: currentToken ? 'minmax(0, 1fr) 300px' : '1fr' }, alignItems: 'start' }}>
           <Stack spacing={2} sx={{ minWidth: 0 }}>
             {!isDoctor && (
-              <Paper elevation={0} sx={{ p: 1.5, ...softCard }}>
-                <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
-                  <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ mr: 0.5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: '4px',
+                  pl: '16px',
+                  borderRadius: 999,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: 'background.paper',
+                  boxShadow: `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,
+                  overflow: 'hidden',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    fontWeight={700}
+                    sx={{ flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}
+                  >
                     Doctor
                   </Typography>
-                  {[{ id: 'ALL', firstName: 'All', lastName: 'Doctors' }, ...doctors].map((d) => {
-                    const active = filterDoctor === d.id;
-                    return (
-                      <Chip
-                        key={d.id}
-                        label={d.id === 'ALL' ? 'All Doctors' : `Dr. ${d.firstName} ${d.lastName}`}
-                        onClick={() => setFilterDoctor(d.id)}
-                        color={active ? 'primary' : 'default'}
-                        variant={active ? 'filled' : 'outlined'}
-                        sx={{
-                          borderRadius: 2,
-                          fontWeight: 700,
-                          ...(active
-                            ? { boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.28)}` }
-                            : { borderColor: alpha(theme.palette.divider, 1) }),
-                        }}
-                      />
-                    );
-                  })}
-                </Stack>
+                  <DoctorFilterTabs
+                    doctors={doctors}
+                    value={filterDoctor}
+                    onChange={setFilterDoctor}
+                  />
+                </Box>
               </Paper>
             )}
 

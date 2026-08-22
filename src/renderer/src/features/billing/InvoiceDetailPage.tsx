@@ -22,7 +22,7 @@ import {
 import { alpha, useTheme } from '@mui/material/styles';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { StatCardsSkeleton, TableRowsSkeleton } from '@/components/LoadingUI';
 import { chipSx, tableSx, Table, TableBody, TableCell, TableHead, TableRow } from '@/components/TableUI';
 import {
@@ -51,6 +51,7 @@ export function InvoiceDetailPage(): React.JSX.Element {
   const theme = useTheme();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
@@ -64,6 +65,23 @@ export function InvoiceDetailPage(): React.JSX.Element {
     borderColor: 'divider',
     boxShadow: `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,
   } as const;
+
+  function goBack(): void {
+    const from = (location.state as { from?: string } | null)?.from;
+    if (from) {
+      navigate(from);
+      return;
+    }
+    if (location.pathname.startsWith('/opd-reports')) {
+      navigate('/opd-reports');
+      return;
+    }
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate('/billing');
+  }
 
   const query = useQuery({
     queryKey: ['invoice', id],
@@ -110,9 +128,9 @@ export function InvoiceDetailPage(): React.JSX.Element {
         <Button
           sx={{ mt: 2, borderRadius: 2, fontWeight: 700 }}
           startIcon={<ArrowBackOutlinedIcon />}
-          onClick={() => navigate('/billing')}
+          onClick={() => goBack()}
         >
-          Back to Invoices
+          Back
         </Button>
       </Box>
     );
@@ -172,9 +190,9 @@ export function InvoiceDetailPage(): React.JSX.Element {
           }}
         >
           <Stack direction="row" alignItems="flex-start" spacing={1.5}>
-            <Tooltip title="Back to invoices">
+            <Tooltip title="Back">
               <IconButton
-                onClick={() => navigate('/billing')}
+                onClick={() => goBack()}
                 size="small"
                 sx={{ mt: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
               >
@@ -437,7 +455,7 @@ export function InvoiceDetailPage(): React.JSX.Element {
         <DeleteInvoiceDialog
           invoice={invoice}
           onClose={() => setDeleteOpen(false)}
-          onDeleted={() => navigate('/billing')}
+          onDeleted={() => goBack()}
         />
       )}
     </>

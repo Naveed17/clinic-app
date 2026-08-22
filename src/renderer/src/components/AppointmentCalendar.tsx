@@ -910,7 +910,6 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
           anchorEl={anchorEl}
           placement={calView === 'day' ? 'bottom-start' : 'right-start'}
           transition
-          strategy="fixed"
           modifiers={[
             { name: 'offset', options: { offset: [0, 10] } },
             {

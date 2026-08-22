@@ -24,6 +24,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { FetchingBar, StatCardsSkeleton, TableRowsSkeleton } from '@/components/LoadingUI';
 import {
@@ -102,11 +103,14 @@ function DoctorCell({
 
 export function OpdReportsPage(): React.JSX.Element {
   const theme = useTheme();
+  const navigate = useNavigate();
   const [date, setDate] = useState(todayYmd);
   const [doctorId, setDoctorId] = useState('');
   const [tab, setTab] = useState<'invoices' | 'fees'>('invoices');
   const [search, setSearch] = useState('');
   const [preview, setPreview] = useState<{ report: OpdDailyReport; section: OpdPrintSection } | null>(null);
+
+  const detailFrom = '/opd-reports';
 
   const doctors = useQuery<TokenPerson[]>({
     queryKey: ['token-doctors'],
@@ -368,7 +372,12 @@ export function OpdReportsPage(): React.JSX.Element {
                     invoiceRows.map((row) => {
                       const cfg = invoiceStatusConfig[row.status] ?? { label: row.status, color: 'default' as const };
                       return (
-                        <TableRow key={row.id} sx={tableSx.row}>
+                        <TableRow
+                          key={row.id}
+                          hover
+                          sx={{ ...tableSx.row, cursor: 'pointer' }}
+                          onClick={() => navigate(`/opd-reports/invoices/${row.id}`, { state: { from: detailFrom } })}
+                        >
                           <TableCell><Typography fontSize={13.5} fontWeight={600}>{row.invoiceNumber}</Typography></TableCell>
                           <TableCell>{row.patientName}</TableCell>
                           <TableCell>
@@ -419,7 +428,12 @@ export function OpdReportsPage(): React.JSX.Element {
                     feeRows.map((row) => {
                       const cfg = feeStatusConfig[row.status] ?? { label: row.status, color: 'default' as const };
                       return (
-                        <TableRow key={row.id} sx={tableSx.row}>
+                        <TableRow
+                          key={row.id}
+                          hover
+                          sx={{ ...tableSx.row, cursor: 'pointer' }}
+                          onClick={() => navigate(`/opd-reports/fees/${row.id}`, { state: { from: detailFrom } })}
+                        >
                           <TableCell><Typography fontSize={13.5} fontWeight={600}>{String(row.tokenNumber).padStart(3, '0')}</Typography></TableCell>
                           <TableCell>{row.patientName}</TableCell>
                           <TableCell>

@@ -34,6 +34,7 @@ import { invoicesService } from '@/services/invoices.service';
 import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
 import { TokenPrintPreview } from '@/features/tokens/TokensPage';
+import { printTokenSlip } from '@/utils/printTokenSlip';
 import { InvoiceDialog } from '@/features/billing/InvoicesPage';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
@@ -182,9 +183,9 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       await qc.invalidateQueries({ queryKey: ['appointments'] });
       setCreatedToken(token);
       setStep(2);
-      // Auto-open slip preview + print dialog
-      setPreviewAutoPrint(true);
-      setPreviewToken(token);
+      void printTokenSlip(token, { silent: true }).catch(() => {
+        /* keep Token Issued step even if printer fails */
+      });
     },
     meta: { silent: true },
   });
@@ -333,7 +334,16 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
               <ConfirmationNumberOutlinedIcon sx={{ fontSize: 36, color: 'success.contrastText' }} />
             </Box>
             <Typography fontWeight={800} fontSize={20}>Token Issued!</Typography>
-            <Paper variant="outlined" sx={{ px: 4, py: 2, textAlign: 'center', borderRadius: 3 }}>
+            <Paper
+              variant="outlined"
+              sx={{
+                px: 4,
+                py: 2,
+                textAlign: 'center',
+                borderRadius: 1,
+                minWidth: 220,
+              }}
+            >
               <Typography variant="caption" color="text.secondary" letterSpacing={2}>TOKEN NO.</Typography>
               <Typography fontSize={56} fontWeight={900} color="primary.main" lineHeight={1}>
                 {String(createdToken.tokenNumber).padStart(3, '0')}
@@ -376,7 +386,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             disabled={!createdToken}
             onClick={() => {
               if (!createdToken) return;
-              setPreviewAutoPrint(true);
+              setPreviewAutoPrint(false);
               setPreviewToken(createdToken);
             }}
             sx={dialogCancelBtnSx}
@@ -873,53 +883,64 @@ function AttentionStat({
   const alertColor = theme.palette[tone].main;
 
   return (
-    <Paper
-      elevation={0}
+    <Box
       onClick={onClick}
       sx={{
-        flex: 1,
         minWidth: 0,
-        p: 2,
-        borderRadius: 2,
+        px: 1.75,
+        py: 1.5,
+        borderRadius: 1,
         cursor: onClick ? 'pointer' : 'default',
-        bgcolor: active
-          ? alpha(alertColor, 0.12)
-          : theme.palette.mode === 'dark'
-            ? alpha(theme.palette.common.white, 0.06)
-            : 'grey.50',
+        bgcolor: theme.palette.mode === 'dark'
+          ? alpha(theme.palette.common.white, 0.04)
+          : alpha(theme.palette.common.black, 0.03),
         border: '1px solid',
-        borderColor: active ? `${tone}.light` : 'divider',
-        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+        borderColor: active ? alpha(alertColor, 0.45) : 'divider',
+        borderLeft: '3px solid',
+        borderLeftColor: active ? alertColor : 'divider',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1.5,
+        transition: 'border-color 0.15s ease, background-color 0.15s ease',
         '&:hover': {
-          transform: 'translateY(-2px)',
-          boxShadow: 2,
+          bgcolor: alpha(alertColor, theme.palette.mode === 'dark' ? 0.1 : 0.06),
+          borderColor: alpha(alertColor, 0.5),
+          borderLeftColor: alertColor,
         },
       }}
     >
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <Typography
-          variant="h5"
-          sx={{
-            fontWeight: 800,
-            lineHeight: 1,
-            color: active ? `${tone}.main` : 'text.disabled',
-          }}
-        >
-          {value}
+      <Box
+        sx={{
+          width: 36,
+          height: 36,
+          flexShrink: 0,
+          borderRadius: 1,
+          display: 'grid',
+          placeItems: 'center',
+          bgcolor: alpha(alertColor, active ? 0.18 : 0.08),
+          color: active ? alertColor : 'text.disabled',
+        }}
+      >
+        {icon}
+      </Box>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography variant="subtitle2" fontWeight={700} noWrap>
+          {label}
         </Typography>
-        <Box sx={{ color: active ? `${tone}.main` : 'text.disabled', display: 'flex' }}>
-          {icon}
-        </Box>
-      </Stack>
-      <Typography variant="subtitle2" fontWeight={600} color="text.primary">
-        {label}
+        {hint ? (
+          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+            {hint}
+          </Typography>
+        ) : null}
+      </Box>
+      <Typography
+        fontWeight={800}
+        fontSize={22}
+        sx={{ lineHeight: 1, color: active ? alertColor : 'text.disabled', fontVariantNumeric: 'tabular-nums' }}
+      >
+        {value}
       </Typography>
-      {hint ? (
-        <Typography variant="caption" color={active ? 'text.secondary' : 'text.disabled'} sx={{ display: 'block' }}>
-          {hint}
-        </Typography>
-      ) : null}
-    </Paper>
+    </Box>
   );
 }
 
@@ -1108,13 +1129,14 @@ export function ReceptionistDashboard(): React.JSX.Element {
   const upcomingToday = todaysAppts.filter(
     (a) => a.status === 'SCHEDULED' && new Date(a.startsAt).getTime() > nowMs,
   ).length;
-  const pendingBilling = invoices.filter((i) => i.status === 'DRAFT').length;
+  const todayBilled = invoices
+    .filter((i) => i.status !== 'VOID' && sameDay(new Date(i.createdAt), today))
+    .reduce((sum, i) => sum + Number(i.total || 0), 0);
   const paidToday = invoices.filter((i) => {
     if (i.status !== 'PAID') return false;
     return sameDay(new Date(i.createdAt), today);
   }).length;
-  const recoveryRate =
-    todaysAppts.length > 0 ? `${Math.round((completedToday / todaysAppts.length) * 100)}%` : '—';
+  const todayBillLabel = `Rs. ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 0 }).format(todayBilled)}`;
 
   const nextAppt = selectedDayAppts.find((a) => a.status === 'SCHEDULED' || a.status === 'CHECKED_IN') ?? selectedDayAppts[0];
 
@@ -1231,99 +1253,90 @@ export function ReceptionistDashboard(): React.JSX.Element {
             </Box>
           </Paper>
 
-          {/* Needs attention + metric grid */}
-          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1.1fr 1fr' } }}>
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 3,
-                borderRadius: 1,
-                bgcolor: 'background.paper',
-              }}
-            >
-              <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
-                Needs attention
-              </Typography>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          {/* Attention strip — no outer box */}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={800} color="text.secondary" sx={{ mb: 1, letterSpacing: '0.02em' }}>
+              Needs attention
+            </Typography>
+            <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' } }}>
+              <AttentionStat
+                label="In queue"
+                hint="waiting for doctor"
+                value={waitingNow}
+                tone="warning"
+                icon={<GroupsOutlinedIcon fontSize="small" />}
+                onClick={() => navigate('/tokens')}
+              />
+              <AttentionStat
+                label="Late check-in"
+                hint="appointment time passed"
+                value={lateArrivals}
+                tone="error"
+                icon={<AccessTimeOutlinedIcon fontSize="small" />}
+                onClick={() => navigate('/appointments')}
+              />
+              {showBilling ? (
                 <AttentionStat
-                  label="In queue"
-                  hint="waiting for doctor"
-                  value={waitingNow}
-                  tone="warning"
-                  icon={<GroupsOutlinedIcon fontSize="small" />}
-                  onClick={() => navigate('/tokens')}
+                  label="Unpaid bills"
+                  hint="to collect"
+                  value={unpaidBills}
+                  tone="info"
+                  icon={<ReceiptLongOutlinedIcon fontSize="small" />}
+                  onClick={() => navigate('/billing')}
                 />
+              ) : (
                 <AttentionStat
-                  label="Late check-in"
-                  hint="appointment time passed"
-                  value={lateArrivals}
-                  tone="error"
-                  icon={<AccessTimeOutlinedIcon fontSize="small" />}
+                  label="Upcoming"
+                  hint="appointments left"
+                  value={upcomingToday}
+                  tone="info"
+                  icon={<EventOutlinedIcon fontSize="small" />}
                   onClick={() => navigate('/appointments')}
                 />
-                {showBilling ? (
-                  <AttentionStat
-                    label="Unpaid bills"
-                    hint="to collect"
-                    value={unpaidBills}
-                    tone="info"
-                    icon={<ReceiptLongOutlinedIcon fontSize="small" />}
-                    onClick={() => navigate('/billing')}
-                  />
-                ) : (
-                  <AttentionStat
-                    label="Upcoming"
-                    hint="appointments left"
-                    value={upcomingToday}
-                    tone="info"
-                    icon={<EventOutlinedIcon fontSize="small" />}
-                    onClick={() => navigate('/appointments')}
-                  />
-                )}
-              </Stack>
-            </Paper>
-
-            <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: '1fr 1fr' }}>
-              {isLoading ? (
-                Array.from({ length: 4 }, (_, i) => (
-                  <Paper key={i} elevation={0} sx={{ p: 2, borderRadius: '16px', minHeight: 88 }}>
-                    <Skeleton variant="text" width={56} height={28} />
-                    <Skeleton variant="text" width={90} height={16} />
-                  </Paper>
-                ))
-              ) : (
-              [
-                { label: 'Total Patients', value: patientsData?.total ?? 0, bg: alpha(theme.palette.grey[500], 0.12) },
-                { label: 'Patients Today', value: todaysAppts.length, bg: alpha(theme.palette.success.main, 0.14), accent: theme.palette.success.dark },
-                ...(showBilling
-                  ? [{ label: 'Pending Billing', value: pendingBilling, bg: alpha(theme.palette.info.main, 0.12), accent: theme.palette.info.dark }]
-                  : []),
-                { label: 'Completion Rate', value: recoveryRate, bg: alpha(theme.palette.secondary.main, 0.12), accent: theme.palette.secondary.dark },
-              ].map((m) => (
-                <Paper
-                  key={m.label}
-                  elevation={0}
-                  sx={{
-                    p: 2,
-                    borderRadius: '16px',
-                    border: 'none',
-                    bgcolor: m.bg,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    minHeight: 88,
-                  }}
-                >
-                  <Typography fontWeight={800} fontSize={22} sx={{ color: m.accent ?? 'text.primary', lineHeight: 1.1 }}>
-                    {m.value}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mt: 0.5 }}>
-                    {m.label}
-                  </Typography>
-                </Paper>
-              ))
               )}
             </Box>
+          </Box>
+
+          <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
+            {isLoading ? (
+              Array.from({ length: 4 }, (_, i) => (
+                <Paper key={i} elevation={0} sx={{ p: 2, borderRadius: 1, minHeight: 88 }}>
+                  <Skeleton variant="text" width={56} height={28} />
+                  <Skeleton variant="text" width={90} height={16} />
+                </Paper>
+              ))
+            ) : (
+            [
+              { label: 'Total Patients', value: patientsData?.total ?? 0, bg: alpha(theme.palette.grey[500], 0.12) },
+              { label: 'Patients Today', value: todaysAppts.length, bg: alpha(theme.palette.success.main, 0.14), accent: theme.palette.success.dark },
+              ...(showBilling
+                ? [{ label: 'Total today bill', value: todayBillLabel, bg: alpha(theme.palette.info.main, 0.12), accent: theme.palette.info.dark }]
+                : []),
+              { label: 'Completed today', value: completedToday, bg: alpha(theme.palette.secondary.main, 0.12), accent: theme.palette.secondary.dark },
+            ].map((m) => (
+              <Paper
+                key={m.label}
+                elevation={0}
+                sx={{
+                  p: 2,
+                  borderRadius: 1,
+                  border: 'none',
+                  bgcolor: m.bg,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  minHeight: 88,
+                }}
+              >
+                <Typography fontWeight={800} fontSize={22} sx={{ color: m.accent ?? 'text.primary', lineHeight: 1.1 }}>
+                  {m.value}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mt: 0.5 }}>
+                  {m.label}
+                </Typography>
+              </Paper>
+            ))
+            )}
           </Box>
 
           {/* Day queue */}

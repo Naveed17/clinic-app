@@ -9,6 +9,7 @@ import { AppointmentDetailPage } from '@/features/appointments/AppointmentDetail
 import { InvoicesPage } from '@/features/billing/InvoicesPage';
 import { InvoiceDetailPage } from '@/features/billing/InvoiceDetailPage';
 import { OpdReportsPage } from '@/features/reports/OpdReportsPage';
+import { OpdFeeDetailPage } from '@/features/reports/OpdFeeDetailPage';
 import { MedicinesPage } from '@/features/medicines/MedicinesPage';
 import { StatisticsPage } from '@/features/statistics/StatisticsPage';
 import { LabPage } from '@/features/lab/LabPage';
@@ -24,6 +25,7 @@ import { SettingsPage } from '@/features/settings/SettingsPage';
 import { ChatPage } from '@/features/chat/ChatPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { RouteAccessGate } from '@/components/RouteAccessGate';
+import { RouteErrorPage } from '@/components/RouteErrorPage';
 import { LicensePage } from '@/features/auth/LicensePage';
 import { LicenseDisabledOverlay } from '@/features/auth/LicenseDisabledOverlay';
 import { SetupWizard } from '@/features/auth/SetupWizard';
@@ -32,179 +34,202 @@ import Box from '@mui/material/Box';
 import { CircularProgress } from '@mui/material';
 
 const router = createHashRouter([
-  { path: '/login', element: <LoginPage /> },
   {
-    element: <ProtectedRoute />,
+    errorElement: <RouteErrorPage />,
     children: [
+      { path: '/login', element: <LoginPage /> },
       {
-        element: <AppShell />,
+        element: <ProtectedRoute />,
+        errorElement: <RouteErrorPage />,
         children: [
-          { index: true, element: <Navigate to="/dashboard" replace /> },
           {
-            path: '/dashboard',
-            element: (
-              <RouteAccessGate route="/dashboard">
-                <DashboardPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/patients',
-            element: (
-              <RouteAccessGate route="/patients">
-                <PatientsPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/patients/:id',
-            element: (
-              <RouteAccessGate route="/patients/:id">
-                <PatientProfilePage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/appointments',
-            element: (
-              <RouteAccessGate route="/appointments">
-                <AppointmentsPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/appointments/:id',
-            element: (
-              <RouteAccessGate route="/appointments">
-                <AppointmentDetailPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/billing',
-            element: (
-              <RouteAccessGate route="/billing">
-                <InvoicesPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/billing/:id',
-            element: (
-              <RouteAccessGate route="/billing">
-                <InvoiceDetailPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/opd-reports',
-            element: (
-              <RouteAccessGate route="/opd-reports">
-                <OpdReportsPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/medicines',
-            element: (
-              <RouteAccessGate route="/medicines">
-                <MedicinesPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/lab',
-            element: (
-              <RouteAccessGate route="/lab">
-                <LabPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/lab/:id',
-            element: (
-              <RouteAccessGate route="/lab">
-                <LabOrderDetailPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/statistics',
-            element: (
-              <RouteAccessGate route="/statistics">
-                <StatisticsPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/users',
-            element: (
-              <RouteAccessGate route="/users">
-                <UsersPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/doctors',
-            element: (
-              <RouteAccessGate route="/doctors">
-                <DoctorsPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/doctors/:id',
-            element: (
-              <RouteAccessGate route="/doctors">
-                <DoctorDetailPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/schedule',
-            element: (
-              <RouteAccessGate route="/schedule">
-                <DoctorSchedulePage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/tokens',
-            element: (
-              <RouteAccessGate route="/tokens">
-                <TokensPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/waiting-room',
-            element: (
-              <RouteAccessGate route="/waiting-room">
-                <WaitingRoomPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/chat',
-            element: (
-              <RouteAccessGate route="/chat">
-                <ChatPage />
-              </RouteAccessGate>
-            ),
-          },
-          {
-            path: '/settings',
-            element: (
-              <RouteAccessGate route="/settings">
-                <SettingsPage />
-              </RouteAccessGate>
-            ),
+            element: <AppShell />,
+            errorElement: <RouteErrorPage />,
+            children: [
+              { index: true, element: <Navigate to="/dashboard" replace /> },
+              {
+                path: '/dashboard',
+                element: (
+                  <RouteAccessGate route="/dashboard">
+                    <DashboardPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/patients',
+                element: (
+                  <RouteAccessGate route="/patients">
+                    <PatientsPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/patients/:id',
+                element: (
+                  <RouteAccessGate route="/patients/:id">
+                    <PatientProfilePage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/appointments',
+                element: (
+                  <RouteAccessGate route="/appointments">
+                    <AppointmentsPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/appointments/:id',
+                element: (
+                  <RouteAccessGate route="/appointments">
+                    <AppointmentDetailPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/billing',
+                element: (
+                  <RouteAccessGate route="/billing">
+                    <InvoicesPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/billing/:id',
+                element: (
+                  <RouteAccessGate route="/billing">
+                    <InvoiceDetailPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/opd-reports',
+                element: (
+                  <RouteAccessGate route="/opd-reports">
+                    <OpdReportsPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/opd-reports/invoices/:id',
+                element: (
+                  <RouteAccessGate route="/opd-reports">
+                    <InvoiceDetailPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/opd-reports/fees/:id',
+                element: (
+                  <RouteAccessGate route="/opd-reports">
+                    <OpdFeeDetailPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/medicines',
+                element: (
+                  <RouteAccessGate route="/medicines">
+                    <MedicinesPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/lab',
+                element: (
+                  <RouteAccessGate route="/lab">
+                    <LabPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/lab/:id',
+                element: (
+                  <RouteAccessGate route="/lab">
+                    <LabOrderDetailPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/statistics',
+                element: (
+                  <RouteAccessGate route="/statistics">
+                    <StatisticsPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/users',
+                element: (
+                  <RouteAccessGate route="/users">
+                    <UsersPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/doctors',
+                element: (
+                  <RouteAccessGate route="/doctors">
+                    <DoctorsPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/doctors/:id',
+                element: (
+                  <RouteAccessGate route="/doctors">
+                    <DoctorDetailPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/schedule',
+                element: (
+                  <RouteAccessGate route="/schedule">
+                    <DoctorSchedulePage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/tokens',
+                element: (
+                  <RouteAccessGate route="/tokens">
+                    <TokensPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/waiting-room',
+                element: (
+                  <RouteAccessGate route="/waiting-room">
+                    <WaitingRoomPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/chat',
+                element: (
+                  <RouteAccessGate route="/chat">
+                    <ChatPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/settings',
+                element: (
+                  <RouteAccessGate route="/settings">
+                    <SettingsPage />
+                  </RouteAccessGate>
+                ),
+              },
+            ],
           },
         ],
       },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
-  { path: '*', element: <NotFoundPage /> },
 ]);
 
 

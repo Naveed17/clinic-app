@@ -37,9 +37,19 @@ export function TokenFeeFields({
       {followUp ? (
         <Alert
           severity="info"
+          sx={{
+            alignItems: 'center',
+            '& .MuiAlert-action': { flexShrink: 0, pt: 0, pl: 1.5 },
+            '& .MuiAlert-message': { pr: 1 },
+          }}
           action={
             fee > 0 ? (
-              <Button color="inherit" size="small" onClick={applyHalf}>
+              <Button
+                color="inherit"
+                size="small"
+                onClick={applyHalf}
+                sx={{ whiteSpace: 'nowrap', minWidth: 'max-content', flexShrink: 0 }}
+              >
                 Half fee
               </Button>
             ) : undefined
