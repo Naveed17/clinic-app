@@ -10,6 +10,7 @@ import FormatListBulletedOutlinedIcon from '@mui/icons-material/FormatListBullet
 import TodayOutlinedIcon from '@mui/icons-material/TodayOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
+import MeetingRoomOutlinedIcon from '@mui/icons-material/MeetingRoomOutlined';
 import {
   alpha, Avatar, Box, Button, Chip, Dialog, DialogActions, DialogContent,
   Divider, IconButton, ListItemIcon, ListItemText,
@@ -250,7 +251,7 @@ export function DoctorDashboard(): React.JSX.Element {
             <Box key={appt.id}>
               {idx > 0 && <Divider />}
               <Box
-                onClick={() => navigate(`/appointments/${appt.id}`)}
+                onClick={() => navigate(`/appointments/${appt.id}`, { state: { from: '/dashboard' } })}
                 sx={{
                   px: 3, py: 2,
                   borderLeft: '4px solid',
@@ -375,16 +376,6 @@ export function DoctorDashboard(): React.JSX.Element {
         </Box>
         {/* Stats pills */}
         <Stack direction="row" spacing={1} alignItems="center">
-          {showWaitingRoom && (
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => navigate('/waiting-room')}
-              sx={{ fontWeight: 700, borderRadius: 1, textTransform: 'none', mr: 0.5 }}
-            >
-              Waiting Room{waitingRoomCount > 0 ? ` · ${waitingRoomCount}` : ''}
-            </Button>
-          )}
           {[
             { label: 'Scheduled', value: appointments.filter((a) => a.status === 'SCHEDULED').length, color: theme.palette.primary.main },
             { label: 'Checked In', value: appointments.filter((a) => a.status === 'CHECKED_IN').length, color: theme.palette.warning.main },
@@ -418,7 +409,13 @@ export function DoctorDashboard(): React.JSX.Element {
         <Box sx={{ px: 2, py: 1.25, borderBottom: 1, borderColor: 'divider', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
           <Tabs
             value={activeTab}
-            onChange={(_, v) => setActiveTab(v)}
+            onChange={(_, v: number) => {
+              if (showWaitingRoom && v === 3) {
+                navigate('/waiting-room');
+                return;
+              }
+              setActiveTab(v);
+            }}
             sx={{
               bgcolor: (t) => alpha(t.palette.text.primary, 0.05),
               borderRadius: 99,
@@ -472,6 +469,24 @@ export function DoctorDashboard(): React.JSX.Element {
               }
               sx={tabSx}
             />
+            {showWaitingRoom && (
+              <Tab
+                disableRipple
+                icon={<MeetingRoomOutlinedIcon sx={{ fontSize: 15 }} />}
+                iconPosition="start"
+                label={
+                  <Stack direction="row" alignItems="center" gap={0.75}>
+                    Waiting Room
+                    {waitingRoomCount > 0 && (
+                      <Box sx={{ px: 0.75, py: 0.1, borderRadius: 99, bgcolor: 'success.main', color: '#fff', fontSize: 10, fontWeight: 800, lineHeight: 1.6 }}>
+                        {waitingRoomCount}
+                      </Box>
+                    )}
+                  </Stack>
+                }
+                sx={tabSx}
+              />
+            )}
           </Tabs>
         </Box>
 
@@ -492,7 +507,7 @@ export function DoctorDashboard(): React.JSX.Element {
             }}
             onDayContextMenu={(date, anchor) => { setContextDate(date); setCtxMenu(anchor); }}
             onAppointmentContextMenu={(appt, anchor) => setApptCtxMenu({ ...anchor, appointment: appt })}
-            onAppointmentClick={(appt) => navigate(`/appointments/${appt.id}`)}
+            onAppointmentClick={(appt) => navigate(`/appointments/${appt.id}`, { state: { from: '/dashboard' } })}
             onPrescriptionClick={(appt) => openPrescription(appt)}
             onPatientHistoryClick={canViewPatientHistory ? (appt) => openPatientHistory(appt) : undefined}
             onLabOrderClick={canOrderLab ? (appt) => openLabOrder(appt) : undefined}

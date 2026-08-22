@@ -26,7 +26,6 @@ export interface NavigationItem {
 
 const ALL_NAV_ITEMS: NavigationItem[] = [
   { label: 'Dashboard',    path: '/dashboard',    icon: <DashboardOutlinedIcon /> },
-  { label: 'Waiting Room', path: '/waiting-room', icon: <MeetingRoomOutlinedIcon /> },
   { label: 'Patients',     path: '/patients',     icon: <GroupOutlinedIcon /> },
   { label: 'Appointments', path: '/appointments', icon: <CalendarMonthOutlinedIcon /> },
   { label: 'Tokens',       path: '/tokens',       icon: <ConfirmationNumberOutlinedIcon /> },
@@ -39,6 +38,7 @@ const ALL_NAV_ITEMS: NavigationItem[] = [
   { label: 'Schedule',     path: '/schedule',     icon: <EventAvailableOutlinedIcon /> },
   { label: 'Users',        path: '/users',        icon: <ManageAccountsOutlinedIcon /> },
   { label: 'Chat',         path: '/chat',         icon: <ChatOutlinedIcon /> },
+  { label: 'Waiting Room', path: '/waiting-room', icon: <MeetingRoomOutlinedIcon /> },
 ];
 
 export function getNavItems(role: UserRole, modules: LicenseModules | undefined): NavigationItem[] {

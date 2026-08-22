@@ -27,7 +27,7 @@ import {
 import { alpha, useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { StatCardsSkeleton } from '@/components/LoadingUI';
 import { ConfirmDialog } from '@/components/DialogUI';
@@ -53,6 +53,7 @@ export function AppointmentDetailPage(): React.JSX.Element {
   const theme = useTheme();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const qc = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
@@ -64,6 +65,19 @@ export function AppointmentDetailPage(): React.JSX.Element {
     borderColor: 'divider',
     boxShadow: `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,
   } as const;
+
+  function goBack(): void {
+    const from = (location.state as { from?: string } | null)?.from;
+    if (from) {
+      navigate(from);
+      return;
+    }
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate('/appointments');
+  }
 
   const query = useQuery({
     queryKey: ['appointment', id],
@@ -98,7 +112,7 @@ export function AppointmentDetailPage(): React.JSX.Element {
     mutationFn: () => appointmentsService.delete(id!),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['appointments'] });
-      navigate('/appointments');
+      goBack();
     },
     meta: { toast: 'Appointment deleted', errorToast: 'Could not delete.' },
   });
@@ -122,7 +136,7 @@ export function AppointmentDetailPage(): React.JSX.Element {
         <Button
           sx={{ mt: 2, borderRadius: 2, fontWeight: 700 }}
           startIcon={<ArrowBackOutlinedIcon />}
-          onClick={() => navigate('/appointments')}
+          onClick={() => goBack()}
         >
           Back to Appointments
         </Button>
@@ -226,9 +240,9 @@ export function AppointmentDetailPage(): React.JSX.Element {
           }}
         >
           <Stack direction="row" alignItems="flex-start" spacing={1.5}>
-            <Tooltip title="Back to appointments">
+            <Tooltip title="Back">
               <IconButton
-                onClick={() => navigate('/appointments')}
+                onClick={() => goBack()}
                 size="small"
                 sx={{ mt: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
               >

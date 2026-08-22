@@ -500,104 +500,122 @@ export function DoctorDetailPage(): React.JSX.Element {
               {attendanceQuery.isLoading ? (
                 <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5 }}>
                   {Array.from({ length: 35 }, (_, i) => (
-                    <Skeleton key={i} variant="rounded" height={36} />
+                    <Skeleton key={i} variant="rounded" height={52} />
                   ))}
                 </Box>
-              ) : attendance.length === 0 ? (
-                <Box
-                  sx={{
-                    py: 5,
-                    textAlign: 'center',
-                    borderRadius: 1,
-                    bgcolor: alpha(theme.palette.text.primary, 0.02),
-                    border: '1px dashed',
-                    borderColor: 'divider',
-                  }}
-                >
-                  <EventAvailableOutlinedIcon sx={{ fontSize: 32, color: 'text.disabled', mb: 1 }} />
-                  <Typography fontWeight={700} color="text.secondary">
-                    No attendance this month
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Check-in records will appear here once the doctor starts seeing patients.
-                  </Typography>
-                </Box>
               ) : (
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                    gap: 1.25,
-                  }}
-                >
-                  {attendance.map((rec) => {
-                    const d = new Date(`${rec.date}T00:00:00`);
-                    const hours = diffHours(rec.checkInAt, rec.checkOutAt);
-                    return (
-                      <Box
-                        key={rec.date}
-                        sx={{
-                          p: 1.5,
-                          borderRadius: 1,
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          bgcolor: alpha(green, 0.03),
-                          borderLeft: '4px solid',
-                          borderLeftColor: rec.checkOutAt ? success : warning,
-                        }}
+                <Box>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5, mb: 0.75 }}>
+                    {DAYS.map((d) => (
+                      <Typography
+                        key={d}
+                        variant="caption"
+                        color="text.disabled"
+                        fontWeight={700}
+                        sx={{ textAlign: 'center', letterSpacing: '0.04em' }}
                       >
-                        <Typography fontSize={12} fontWeight={700} color="text.secondary">
-                          {DAYS[d.getDay()]}, {d.getDate()} {MONTHS[d.getMonth()].slice(0, 3)}
-                        </Typography>
-                        <Stack direction="row" gap={0.75} sx={{ mt: 1 }} flexWrap="wrap">
-                          <Chip
-                            label={`In ${formatTime(rec.checkInAt)}`}
-                            size="small"
-                            sx={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              height: 24,
-                              borderRadius: 1.5,
-                              bgcolor: alpha(success, 0.12),
-                              color: 'success.dark',
-                            }}
-                          />
-                          {rec.checkOutAt ? (
-                            <Chip
-                              label={`Out ${formatTime(rec.checkOutAt)}`}
-                              size="small"
+                        {d}
+                      </Typography>
+                    ))}
+                  </Box>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5 }}>
+                    {(() => {
+                      const firstDow = new Date(year, month - 1, 1).getDay();
+                      const byDate = new Map(attendance.map((r) => [r.date, r]));
+                      const cells: React.ReactNode[] = [];
+                      for (let i = 0; i < firstDow; i++) {
+                        cells.push(<Box key={`pad-${i}`} sx={{ minHeight: 52 }} />);
+                      }
+                      for (let day = 1; day <= lastDay; day++) {
+                        const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                        const rec = byDate.get(dateKey);
+                        const isToday =
+                          now.getFullYear() === year &&
+                          now.getMonth() + 1 === month &&
+                          now.getDate() === day;
+                        const hours = rec ? diffHours(rec.checkInAt, rec.checkOutAt) : null;
+                        const tip = rec
+                          ? [
+                              `In ${formatTime(rec.checkInAt)}`,
+                              rec.checkOutAt ? `Out ${formatTime(rec.checkOutAt)}` : 'Still in',
+                              hours ? `${hours} hrs` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')
+                          : 'No attendance';
+                        cells.push(
+                          <Tooltip key={dateKey} title={tip} arrow>
+                            <Box
                               sx={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                height: 24,
+                                minHeight: 52,
                                 borderRadius: 1.5,
-                                bgcolor: alpha(green, 0.12),
-                                color: 'primary.dark',
+                                border: '1px solid',
+                                borderColor: rec
+                                  ? alpha(rec.checkOutAt ? success : warning, 0.45)
+                                  : 'divider',
+                                bgcolor: rec
+                                  ? alpha(rec.checkOutAt ? success : warning, 0.12)
+                                  : alpha(theme.palette.text.primary, 0.02),
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 0.25,
+                                position: 'relative',
+                                outline: isToday ? `2px solid ${green}` : 'none',
+                                outlineOffset: -1,
                               }}
-                            />
-                          ) : (
-                            <Chip
-                              label="Still in"
-                              size="small"
-                              sx={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                height: 24,
-                                borderRadius: 1.5,
-                                bgcolor: alpha(warning, 0.14),
-                                color: 'warning.dark',
-                              }}
-                            />
-                          )}
-                        </Stack>
-                        {hours && (
-                          <Typography fontSize={11.5} color="text.secondary" fontWeight={600} sx={{ mt: 0.75 }}>
-                            {hours} hrs
-                          </Typography>
-                        )}
-                      </Box>
-                    );
-                  })}
+                            >
+                              <Typography
+                                fontSize={13}
+                                fontWeight={isToday || rec ? 800 : 600}
+                                color={rec ? (rec.checkOutAt ? 'success.dark' : 'warning.dark') : 'text.secondary'}
+                              >
+                                {day}
+                              </Typography>
+                              {rec && (
+                                <Typography
+                                  sx={{
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                    color: rec.checkOutAt ? 'success.dark' : 'warning.dark',
+                                    opacity: 0.9,
+                                    lineHeight: 1,
+                                  }}
+                                >
+                                  {formatTime(rec.checkInAt)}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Tooltip>,
+                        );
+                      }
+                      return cells;
+                    })()}
+                  </Box>
+                  {attendance.length === 0 && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: 'block', textAlign: 'center', mt: 1.5 }}
+                    >
+                      No check-ins this month yet. Present days will highlight on the calendar.
+                    </Typography>
+                  )}
+                  <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 1.75 }} flexWrap="wrap" useFlexGap>
+                    <Stack direction="row" spacing={0.75} alignItems="center">
+                      <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: alpha(success, 0.7) }} />
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>Present</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={0.75} alignItems="center">
+                      <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: alpha(warning, 0.7) }} />
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>Still in</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={0.75} alignItems="center">
+                      <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: alpha(theme.palette.text.primary, 0.12) }} />
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>Absent</Typography>
+                    </Stack>
+                  </Stack>
                 </Box>
               )}
             </Paper>

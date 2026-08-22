@@ -37,7 +37,7 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
@@ -645,11 +645,21 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
 
 export function AppointmentsPage(): React.JSX.Element {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [active, setActive] = useState<Appointment | undefined>();
   const [open, setOpen] = useState(false);
   const [defaultDate, setDefaultDate] = useState<string | undefined>();
-  const [view, setView] = useState<'table' | 'calendar'>('table');
+  const view: 'table' | 'calendar' = searchParams.get('view') === 'calendar' ? 'calendar' : 'table';
+  const setView = (next: 'table' | 'calendar') => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      if (next === 'calendar') p.set('view', 'calendar');
+      else p.delete('view');
+      return p;
+    }, { replace: true });
+  };
   const [search, setSearch] = useState('');
   const [doctorFilter, setDoctorFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -657,6 +667,8 @@ export function AppointmentsPage(): React.JSX.Element {
   const rowsPerPage = 10;
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+
+  const detailNavState = { from: `${location.pathname}${location.search}` };
 
   const [deleteTarget, setDeleteTarget] = useState<Appointment | undefined>();
   const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
@@ -839,7 +851,7 @@ export function AppointmentsPage(): React.JSX.Element {
               onStatusChange={(id, status) => statusMutation.mutate({ id, status })}
               statusPendingId={statusMutation.isPending ? statusMutation.variables?.id : null}
               onDateClick={isAdmin ? undefined : (date) => { setActive(undefined); setDefaultDate(date); setOpen(true); }}
-              onAppointmentClick={isAdmin ? undefined : (appt) => navigate(`/appointments/${appt.id}`)}
+              onAppointmentClick={isAdmin ? undefined : (appt) => navigate(`/appointments/${appt.id}`, { state: detailNavState })}
               readOnly={isAdmin}
               hideCheckIn={user?.role !== 'doctor'}
             />
@@ -886,7 +898,7 @@ export function AppointmentsPage(): React.JSX.Element {
                 <TableRow
                   key={a.id}
                   sx={{ ...tableSx.row, cursor: 'pointer' }}
-                  onClick={() => navigate(`/appointments/${a.id}`)}
+                  onClick={() => navigate(`/appointments/${a.id}`, { state: detailNavState })}
                 >
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
@@ -933,7 +945,7 @@ export function AppointmentsPage(): React.JSX.Element {
                     <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                       <Stack direction="row" gap={0.5} justifyContent="flex-end">
                         <Tooltip title="View details">
-                          <IconButton sx={actionBtnSx} onClick={() => navigate(`/appointments/${a.id}`)}>
+                          <IconButton sx={actionBtnSx} onClick={() => navigate(`/appointments/${a.id}`, { state: detailNavState })}>
                             <VisibilityOutlinedIcon sx={{ fontSize: 17 }} />
                           </IconButton>
                         </Tooltip>
