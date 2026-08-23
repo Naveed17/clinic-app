@@ -1,7 +1,39 @@
-import { Stack, Typography } from '@mui/material';
+import { makeStyles, tokens } from '@fluentui/react-components';
 import { useEffect, useState } from 'react';
 
+const useStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: '0.35rem',
+    userSelect: 'none',
+  },
+  time: {
+    fontWeight: tokens.fontWeightBold,
+    fontSize: '40px',
+    lineHeight: 1,
+    color: tokens.colorNeutralForeground1,
+  },
+  dots: {
+    fontWeight: tokens.fontWeightBold,
+    fontSize: '40px',
+    lineHeight: 1,
+    color: tokens.colorNeutralForeground1,
+    transitionProperty: 'opacity',
+    transitionDuration: '0.15s',
+    transitionTimingFunction: 'linear',
+  },
+  period: {
+    fontWeight: tokens.fontWeightBold,
+    fontSize: '16px',
+    color: tokens.colorNeutralForeground2,
+    marginLeft: tokens.spacingHorizontalXXS,
+  },
+});
+
 export function LiveClock(): React.JSX.Element {
+  const styles = useStyles();
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -17,34 +49,13 @@ export function LiveClock(): React.JSX.Element {
   const showDots = now.getSeconds() % 2 === 0;
 
   return (
-    <Stack
-      direction="row"
-      alignItems="baseline"
-      spacing={0.6}
-      className="digital-clock"
-      sx={{ userSelect: 'none' }}
-    >
-      <Typography fontWeight={800} fontSize={40} sx={{ lineHeight: 1, color: 'text.primary' }}>
-        {hour12}
-      </Typography>
-      <Typography
-        fontWeight={800}
-        fontSize={40}
-        sx={{
-          lineHeight: 1,
-          color: 'text.primary',
-          opacity: showDots ? 1 : 0.18,
-          transition: 'opacity 0.15s linear',
-        }}
-      >
+    <div className={`${styles.root} digital-clock`}>
+      <span className={styles.time}>{hour12}</span>
+      <span className={styles.dots} style={{ opacity: showDots ? 1 : 0.18 }}>
         :
-      </Typography>
-      <Typography fontWeight={800} fontSize={40} sx={{ lineHeight: 1, color: 'text.primary' }}>
-        {minute}
-      </Typography>
-      <Typography fontWeight={800} fontSize={16} sx={{ color: 'text.secondary', ml: 0.5 }}>
-        {period}
-      </Typography>
-    </Stack>
+      </span>
+      <span className={styles.time}>{minute}</span>
+      <span className={styles.period}>{period}</span>
+    </div>
   );
 }

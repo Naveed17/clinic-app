@@ -1,31 +1,28 @@
-import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
-import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
-import CalendarViewMonthOutlinedIcon from '@mui/icons-material/CalendarViewMonthOutlined';
-import CalendarViewWeekOutlinedIcon from '@mui/icons-material/CalendarViewWeekOutlined';
-import ViewDayOutlinedIcon from '@mui/icons-material/ViewDayOutlined';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import CloseIcon from '@mui/icons-material/Close';
-import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined';
-import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
-import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
-import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import EventBusyOutlinedIcon from '@mui/icons-material/EventBusyOutlined';
-import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
 import {
-  alpha, Avatar, Box, Button, ButtonGroup, Chip, Dialog, Divider, Fade, IconButton,
-  LinearProgress, Paper, Popper, Stack, Typography, useTheme,
-} from '@mui/material';
+  Avatar,
+  Badge,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  Divider,
+  ProgressBar,
+  Spinner,
+  Text,
+  Title3,
+  Tooltip,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Appointment } from '@/types/appointment';
 import type { Token } from '@/types/token';
 import { CalendarSkeleton } from '@/components/LoadingUI';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
+import { AccessTimeOutlinedIcon, AddOutlinedIcon, ArrowForwardIcon, BiotechOutlinedIcon, CalendarTodayOutlinedIcon, CalendarViewMonthOutlinedIcon, CalendarViewWeekOutlinedIcon, CheckCircleOutlineIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, EditOutlinedIcon, EventBusyOutlinedIcon, HistoryOutlinedIcon, LabelOutlinedIcon, MedicalServicesOutlinedIcon, PersonOutlineIcon, ViewDayOutlinedIcon } from '@/icons/fluent';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -219,6 +216,242 @@ function dedupeSameDayVisits(appts: Appointment[]): Appointment[] {
   return [...best.values()];
 }
 
+
+const STATUS_COLOR: Record<string, string> = {
+  SCHEDULED: tokens.colorBrandForeground1,
+  CHECKED_IN: tokens.colorPaletteDarkOrangeForeground1,
+  COMPLETED: tokens.colorPaletteGreenForeground1,
+  CANCELLED: tokens.colorNeutralForegroundDisabled,
+  NO_SHOW: tokens.colorPaletteRedForeground1,
+};
+
+const NEXT_STATUS: Partial<Record<string, string>> = {
+  SCHEDULED: 'CHECKED_IN',
+  CHECKED_IN: 'COMPLETED',
+};
+
+const useStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexDirection: 'row',
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
+    position: 'relative',
+  },
+  fetchBar: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2 },
+  left: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    padding: tokens.spacingVerticalXL,
+    paddingTop: tokens.spacingVerticalL,
+    overflow: 'hidden',
+    minWidth: 0,
+    minHeight: 0,
+  },
+  toolbar: {
+    flexShrink: 0,
+    zIndex: 3,
+    paddingBottom: '6px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+  },
+  toolbarRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    flexWrap: 'wrap',
+  },
+  grow: { flex: 1 },
+  viewToggle: {
+    display: 'flex',
+    padding: '4px',
+    borderRadius: '999px',
+    backgroundColor: tokens.colorNeutralBackground3,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    gap: '2px',
+  },
+  dayHeaders: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7,1fr)',
+  },
+  dayHeader: {
+    textAlign: 'center',
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    letterSpacing: '0.04em',
+    color: tokens.colorNeutralForegroundDisabled,
+    fontWeight: tokens.fontWeightBold,
+    fontSize: tokens.fontSizeBase100,
+  },
+  scroll: { flex: 1, minHeight: 0, overflow: 'auto' },
+  monthGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7,1fr)',
+    gridAutoRows: '100px',
+    gap: '4px',
+  },
+  dayCell: {
+    height: '100%',
+    minHeight: 0,
+    padding: '6px',
+    borderRadius: tokens.borderRadiusMedium,
+    cursor: 'pointer',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    transitionProperty: 'background-color, border-color',
+    transitionDuration: tokens.durationNormal,
+    ':hover': {
+      backgroundColor: tokens.colorBrandBackground2,
+      border: `1px solid ${tokens.colorBrandStroke1}`,
+    },
+  },
+  dayNum: {
+    width: '24px',
+    height: '24px',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '0.8rem',
+  },
+  eventDot: { width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0 },
+  eventRow: { display: 'flex', alignItems: 'center', gap: '4px' },
+  timedEvent: {
+    position: 'absolute',
+    borderRadius: '12px',
+    borderLeftWidth: '4px',
+    borderLeftStyle: 'solid',
+    paddingLeft: '10px',
+    paddingRight: '10px',
+    paddingTop: '6px',
+    paddingBottom: '6px',
+    overflow: 'hidden',
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+    zIndex: 2,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow4,
+  },
+  timeGrid: { width: '100%', height: '100%' },
+  timeHead: {
+    display: 'grid',
+    position: 'sticky',
+    top: 0,
+    zIndex: 4,
+    backgroundColor: tokens.colorNeutralBackground1,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    paddingBottom: '8px',
+  },
+  hoverCard: {
+    position: 'fixed',
+    zIndex: 1400,
+    width: '300px',
+    maxWidth: 'calc(100vw - 24px)',
+    borderRadius: tokens.borderRadiusMedium,
+    overflow: 'hidden',
+    backgroundColor: tokens.colorNeutralBackground1,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    boxShadow: tokens.shadow16,
+  },
+  hoverHead: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalM,
+  },
+  hoverRow: {
+    display: 'flex',
+    alignItems: 'center',
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+  },
+  hoverLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    width: '90px',
+    color: tokens.colorNeutralForegroundDisabled,
+  },
+  dayDialog: {
+    width: 'min(820px, 94vw)',
+    maxWidth: '820px',
+    height: 'min(80vh, 88vh)',
+    maxHeight: '88vh',
+    borderRadius: '28px',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  dayHero: {
+    position: 'relative',
+    paddingLeft: tokens.spacingHorizontalXL,
+    paddingRight: tokens.spacingHorizontalXL,
+    paddingTop: '22px',
+    paddingBottom: '20px',
+    color: '#fff',
+    backgroundImage: `linear-gradient(135deg, ${tokens.colorBrandBackgroundSelected} 0%, ${tokens.colorBrandBackground} 58%, ${tokens.colorBrandBackground2} 100%)`,
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  dayBody: {
+    padding: tokens.spacingVerticalXL,
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflowY: 'auto',
+    backgroundColor: tokens.colorNeutralBackground2,
+  },
+  dayFoot: {
+    paddingLeft: tokens.spacingHorizontalXL,
+    paddingRight: tokens.spacingHorizontalXL,
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: tokens.spacingHorizontalS,
+    flexShrink: 0,
+    backgroundColor: tokens.colorNeutralBackground1,
+  },
+  visitRow: {
+    display: 'grid',
+    gridTemplateColumns: '76px 1fr',
+    gap: tokens.spacingHorizontalM,
+    alignItems: 'center',
+  },
+  visitCard: {
+    paddingTop: '8px',
+    paddingBottom: '8px',
+    paddingLeft: '16px',
+    paddingRight: '12px',
+    borderRadius: '16px',
+    backgroundColor: tokens.colorNeutralBackground1,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    position: 'relative',
+    overflow: 'hidden',
+    boxShadow: tokens.shadow4,
+  },
+  visitAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: '4px',
+  },
+});
+
 interface Props {
   appointments: Appointment[];
   onStatusChange: (id: string, status: string) => void;
@@ -236,31 +469,21 @@ interface Props {
   statusPendingId?: string | null;
 }
 
-export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu, onPrescriptionClick, onPatientHistoryClick, onLabOrderClick, readOnly = false, hideCheckIn = false, loading = false, fetching = false, statusPendingId = null }: Props): React.JSX.Element {
-  const theme = useTheme();
+export function AppointmentCalendar({
+  appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu,
+  onPrescriptionClick, onPatientHistoryClick, onLabOrderClick, readOnly = false, hideCheckIn = false,
+  loading = false, fetching = false, statusPendingId = null,
+}: Props): React.JSX.Element {
+  const styles = useStyles();
   const today = new Date();
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
   const [labLoadingId, setLabLoadingId] = useState<string | null>(null);
-
-  const STATUS_COLOR: Record<string, string> = {
-    SCHEDULED: theme.palette.primary.main,
-    CHECKED_IN: theme.palette.warning.main,
-    COMPLETED: theme.palette.success.main,
-    CANCELLED: theme.palette.text.disabled,
-    NO_SHOW: theme.palette.error.main,
-  };
-
-  const NEXT_STATUS: Partial<Record<string, string>> = {
-    SCHEDULED: 'CHECKED_IN',
-    CHECKED_IN: 'COMPLETED',
-  };
-
   const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selected, setSelected] = useState<Date>(today);
   const [calView, setCalView] = useState<CalView>('month');
   const [dayListOpen, setDayListOpen] = useState(false);
   const [hoveredAppt, setHoveredAppt] = useState<Appointment | null>(null);
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const weekDays = useMemo(() => getWeekDays(selected), [selected]);
@@ -268,9 +491,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
   const selectedDateKey = selected.toLocaleDateString('en-CA');
 
   const timedScopeAppts = useMemo(() => {
-    if (calView === 'day') {
-      return appointments.filter((a) => isSameDay(new Date(a.startsAt), selected));
-    }
+    if (calView === 'day') return appointments.filter((a) => isSameDay(new Date(a.startsAt), selected));
     if (calView === 'week') {
       const keys = new Set(weekDays.map((d) => d.toLocaleDateString('en-CA')));
       return appointments.filter((a) => keys.has(new Date(a.startsAt).toLocaleDateString('en-CA')));
@@ -278,20 +499,12 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
     return [];
   }, [appointments, calView, selected, weekDays]);
 
-  const { startHour, endHour } = useMemo(
-    () => visibleHourRange(timedScopeAppts),
-    [timedScopeAppts],
-  );
+  const { startHour, endHour } = useMemo(() => visibleHourRange(timedScopeAppts), [timedScopeAppts]);
   const hourCount = endHour - startHour;
-  const hours = useMemo(
-    () => Array.from({ length: hourCount }, (_, i) => startHour + i),
-    [hourCount, startHour],
-  );
+  const hours = useMemo(() => Array.from({ length: hourCount }, (_, i) => startHour + i), [hourCount, startHour]);
 
   const headerTitle = useMemo(() => {
-    if (calView === 'month') {
-      return { primary: MONTHS[cursor.getMonth()], secondary: String(cursor.getFullYear()) };
-    }
+    if (calView === 'month') return { primary: MONTHS[cursor.getMonth()], secondary: String(cursor.getFullYear()) };
     if (calView === 'week') {
       const start = weekDays[0];
       const end = weekDays[6];
@@ -312,16 +525,12 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
     queryFn: () => window.clinic.tokens.list(selectedDateKey) as Promise<Token[]>,
   });
 
-  useEffect(() => {
-    if (loading) setDayListOpen(false);
-  }, [loading]);
+  useEffect(() => { if (loading) setDayListOpen(false); }, [loading]);
 
   const selectedAppts = useMemo(
     () =>
       dedupeSameDayVisits(
-        appointments
-          .filter((a) => isSameDay(new Date(a.startsAt), selected))
-          .map((a) => withDayToken(a, dayTokens)),
+        appointments.filter((a) => isSameDay(new Date(a.startsAt), selected)).map((a) => withDayToken(a, dayTokens)),
       ).sort(sortByTokenDesc),
     [appointments, selected, dayTokens],
   );
@@ -335,43 +544,40 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
   }
 
   function goPrev(): void {
-    if (calView === 'month') {
-      setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1));
-      return;
-    }
+    if (calView === 'month') { setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1)); return; }
     if (calView === 'week') {
       const next = addDays(selected, -7);
-      setSelected(next);
-      setCursor(new Date(next.getFullYear(), next.getMonth(), 1));
-      return;
+      setSelected(next); setCursor(new Date(next.getFullYear(), next.getMonth(), 1)); return;
     }
     const next = addDays(selected, -1);
-    setSelected(next);
-    setCursor(new Date(next.getFullYear(), next.getMonth(), 1));
+    setSelected(next); setCursor(new Date(next.getFullYear(), next.getMonth(), 1));
   }
 
   function goNext(): void {
-    if (calView === 'month') {
-      setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1));
-      return;
-    }
+    if (calView === 'month') { setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)); return; }
     if (calView === 'week') {
       const next = addDays(selected, 7);
-      setSelected(next);
-      setCursor(new Date(next.getFullYear(), next.getMonth(), 1));
-      return;
+      setSelected(next); setCursor(new Date(next.getFullYear(), next.getMonth(), 1)); return;
     }
     const next = addDays(selected, 1);
-    setSelected(next);
-    setCursor(new Date(next.getFullYear(), next.getMonth(), 1));
+    setSelected(next); setCursor(new Date(next.getFullYear(), next.getMonth(), 1));
   }
 
   function handleViewChange(next: CalView): void {
     setCalView(next);
-    if (next === 'month') {
-      setCursor(new Date(selected.getFullYear(), selected.getMonth(), 1));
-    }
+    if (next === 'month') setCursor(new Date(selected.getFullYear(), selected.getMonth(), 1));
     if (next === 'day') setDayListOpen(false);
+  }
+
+  function showHover(a: Appointment, el: HTMLElement): void {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    const rect = el.getBoundingClientRect();
+    setHoverPos({ x: calView === 'day' ? rect.left : rect.right + 10, y: rect.top });
+    setHoveredAppt(a);
+  }
+
+  function hideHover(): void {
+    hoverTimer.current = setTimeout(() => { setHoveredAppt(null); setHoverPos(null); }, 200);
   }
 
   function renderDayCell(day: Date, opts?: { tall?: boolean; showWeekday?: boolean }): React.JSX.Element {
@@ -380,17 +586,18 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
     const isSelected = isSameDay(day, selected);
     const dayAppts = apptsByDay(day);
     const maxShown = opts?.tall ? 8 : 3;
-
     return (
-      <Box
+      <div
+        className={styles.dayCell}
+        style={{
+          backgroundColor: isSelected ? tokens.colorBrandBackground2 : isToday ? tokens.colorNeutralBackground3 : undefined,
+          borderColor: isSelected ? tokens.colorBrandStroke1 : undefined,
+          opacity: calView === 'month' && !isCurrentMonth ? 0.4 : 1,
+        }}
         onClick={() => {
           setSelected(day);
           setCursor(new Date(day.getFullYear(), day.getMonth(), 1));
           if (calView === 'day') return;
-          if (calView === 'week') {
-            setDayListOpen(true);
-            return;
-          }
           setDayListOpen(true);
         }}
         onContextMenu={(e) => {
@@ -399,315 +606,156 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
           setSelected(day);
           onDayContextMenu(day.toLocaleDateString('en-CA'), { mouseX: e.clientX, mouseY: e.clientY });
         }}
-        sx={{
-          height: '100%',
-          minHeight: 0,
-          p: 0.75,
-          borderRadius: 1,
-          cursor: 'pointer',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          backdropFilter: 'blur(8px)',
-          bgcolor: isSelected
-            ? alpha(theme.palette.primary.main, 0.22)
-            : isToday
-              ? alpha(theme.palette.primary.main, 0.1)
-              : alpha(theme.palette.common.white, 0.04),
-          border: '1px solid',
-          borderColor: isSelected
-            ? alpha(theme.palette.primary.main, 0.6)
-            : 'divider',
-          opacity: calView === 'month' && !isCurrentMonth ? 0.4 : 1,
-          transition: 'all 0.15s',
-          '&:hover': {
-            bgcolor: alpha(theme.palette.primary.main, 0.12),
-            borderColor: alpha(theme.palette.primary.main, 0.3),
-          },
-        }}
       >
-        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.5 }}>
-          <Typography
-            variant="body2"
-            fontWeight={isToday ? 800 : 500}
-            sx={{
-              width: 24, height: 24, borderRadius: '50%', display: 'flex',
-              alignItems: 'center', justifyContent: 'center',
-              bgcolor: isToday ? 'primary.main' : 'transparent',
-              color: isToday ? '#fff' : 'text.primary',
-              fontSize: '0.8rem',
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+          <Text
+            className={styles.dayNum}
+            weight={isToday ? 'bold' : 'regular'}
+            style={{
+              backgroundColor: isToday ? tokens.colorBrandBackground : 'transparent',
+              color: isToday ? '#fff' : tokens.colorNeutralForeground1,
+              fontWeight: isToday ? 800 : 500,
             }}
           >
             {day.getDate()}
-          </Typography>
+          </Text>
           {opts?.showWeekday && (
-            <Typography variant="caption" color="text.secondary" fontWeight={700}>
-              {DAYS[day.getDay()]}
-            </Typography>
+            <Text size={100} weight="bold" style={{ color: tokens.colorNeutralForeground2 }}>{DAYS[day.getDay()]}</Text>
           )}
-        </Stack>
-        <Stack spacing={0.25} sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {dayAppts.slice(0, maxShown).map((a) => (
-            <Box
+            <div
               key={a.id}
-              onMouseEnter={(e) => {
-                if (hoverTimer.current) clearTimeout(hoverTimer.current);
-                setAnchorEl(e.currentTarget);
-                setHoveredAppt(a);
-              }}
-              onMouseLeave={() => {
-                hoverTimer.current = setTimeout(() => {
-                  setHoveredAppt(null);
-                  setAnchorEl(null);
-                }, 200);
-              }}
+              className={styles.eventRow}
+              onMouseEnter={(e) => showHover(a, e.currentTarget)}
+              onMouseLeave={hideHover}
               onClick={(e) => { e.stopPropagation(); onAppointmentClick?.(a); }}
               onContextMenu={(e) => {
                 if (!onAppointmentContextMenu) return;
-                e.preventDefault();
-                e.stopPropagation();
-                setHoveredAppt(null);
-                setAnchorEl(null);
+                e.preventDefault(); e.stopPropagation();
+                setHoveredAppt(null); setHoverPos(null);
                 onAppointmentContextMenu(a, { mouseX: e.clientX, mouseY: e.clientY });
               }}
-              sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}
             >
-              <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: STATUS_COLOR[a.status], flexShrink: 0 }} />
-              <Typography variant="caption" noWrap sx={{ fontSize: '0.65rem', color: 'text.secondary', lineHeight: 1.2 }}>
+              <span className={styles.eventDot} style={{ backgroundColor: STATUS_COLOR[a.status] }} />
+              <Text size={100} truncate style={{ color: tokens.colorNeutralForeground2, fontSize: '0.65rem', lineHeight: 1.2 }}>
                 {opts?.tall
                   ? `${new Date(a.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${a.patient.firstName}`
                   : a.patient.firstName}
-              </Typography>
-            </Box>
+              </Text>
+            </div>
           ))}
           {dayAppts.length > maxShown && (
-            <Typography variant="caption" sx={{ fontSize: '0.6rem', color: 'text.disabled' }}>
+            <Text size={100} style={{ fontSize: '0.6rem', color: tokens.colorNeutralForegroundDisabled }}>
               +{dayAppts.length - maxShown} more
-            </Typography>
+            </Text>
           )}
-        </Stack>
-      </Box>
+        </div>
+      </div>
     );
   }
 
   function renderTimedEventCard(laid: LaidOutAppt): React.JSX.Element {
     const a = laid.appt;
     const start = new Date(a.startsAt);
-    const color = STATUS_COLOR[a.status] ?? theme.palette.primary.main;
+    const color = STATUS_COLOR[a.status] ?? tokens.colorBrandForeground1;
     const initials = `${a.patient.firstName[0] ?? ''}${a.patient.lastName[0] ?? ''}`.toUpperCase();
     const tall = laid.height >= 78;
     const tok = tokenNum(a.tokenNumber);
-
     return (
-      <Box
+      <div
         key={a.id}
-        onMouseEnter={(e) => {
-          if (hoverTimer.current) clearTimeout(hoverTimer.current);
-          setAnchorEl(e.currentTarget);
-          setHoveredAppt(a);
-        }}
-        onMouseLeave={() => {
-          hoverTimer.current = setTimeout(() => {
-            setHoveredAppt(null);
-            setAnchorEl(null);
-          }, 200);
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          onAppointmentClick?.(a);
-        }}
-        onContextMenu={(e) => {
-          if (!onAppointmentContextMenu) return;
-          e.preventDefault();
-          e.stopPropagation();
-          setHoveredAppt(null);
-          setAnchorEl(null);
-          onAppointmentContextMenu(a, { mouseX: e.clientX, mouseY: e.clientY });
-        }}
-        sx={{
-          position: 'absolute',
+        className={styles.timedEvent}
+        style={{
           top: laid.top,
           left: `calc(${laid.leftPct}% + 4px)`,
           width: `calc(${laid.widthPct}% - 8px)`,
           height: laid.height,
-          borderRadius: '12px',
-          bgcolor: (t) => t.palette.background.paper,
-          backgroundImage: `linear-gradient(${alpha(color, theme.palette.mode === 'dark' ? 0.28 : 0.16)}, ${alpha(color, theme.palette.mode === 'dark' ? 0.28 : 0.16)})`,
-          border: `1px solid ${alpha(color, 0.28)}`,
-          borderLeft: `4px solid ${color}`,
-          px: 1.25,
-          py: 0.85,
-          overflow: 'hidden',
-          cursor: 'pointer',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 0.35,
-          zIndex: 2,
-          boxShadow: (t) =>
-            t.palette.mode === 'dark'
-              ? `0 1px 0 ${alpha('#000', 0.35)}`
-              : `0 1px 2px ${alpha('#000', 0.06)}`,
-          transition: 'box-shadow 0.15s, transform 0.15s',
-          '&:hover': {
-            boxShadow: `0 8px 20px ${alpha(color, 0.22)}`,
-            transform: 'translateY(-1px)',
-            zIndex: 3,
-          },
+          borderLeftColor: color,
+          backgroundImage: `linear-gradient(${color}22, ${color}22)`,
+          border: `1px solid ${color}44`,
+          borderLeftWidth: 4,
+          borderLeftStyle: 'solid',
+        }}
+        onMouseEnter={(e) => showHover(a, e.currentTarget)}
+        onMouseLeave={hideHover}
+        onClick={(e) => { e.stopPropagation(); onAppointmentClick?.(a); }}
+        onContextMenu={(e) => {
+          if (!onAppointmentContextMenu) return;
+          e.preventDefault(); e.stopPropagation();
+          setHoveredAppt(null); setHoverPos(null);
+          onAppointmentContextMenu(a, { mouseX: e.clientX, mouseY: e.clientY });
         }}
       >
-        <Typography
-          sx={{
-            fontSize: 11.5,
-            fontWeight: 700,
-            color,
-            lineHeight: 1.25,
-            opacity: 0.95,
-            letterSpacing: '0.01em',
-          }}
-          noWrap
-        >
-          {formatEventTime(start)}
-          {tok > 0 ? ` · #${String(tok).padStart(3, '0')}` : ''}
-        </Typography>
-        <Typography
-          sx={{
-            fontSize: tall ? 14 : 13,
-            fontWeight: 800,
-            color: 'text.primary',
-            lineHeight: 1.3,
-            letterSpacing: '-0.01em',
-          }}
-          noWrap
-        >
+        <Text weight="bold" style={{ fontSize: 11.5, color, lineHeight: 1.25 }} truncate>
+          {formatEventTime(start)}{tok > 0 ? ` · #${String(tok).padStart(3, '0')}` : ''}
+        </Text>
+        <Text weight="bold" style={{ fontSize: tall ? 14 : 13, lineHeight: 1.3 }} truncate>
           {a.patient.firstName} {a.patient.lastName}
-        </Typography>
+        </Text>
         {tall && (
-          <Stack direction="row" alignItems="center" spacing={0.4} sx={{ minWidth: 0, mt: 0.15 }}>
-            <MedicalServicesOutlinedIcon sx={{ fontSize: 13, color, opacity: 0.85, flexShrink: 0 }} />
-            <Typography sx={{ fontSize: 11.5, fontWeight: 600, color, opacity: 0.9 }} noWrap>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, marginTop: 2 }}>
+            <MedicalServicesOutlinedIcon style={{ fontSize: 13, color, opacity: 0.85, flexShrink: 0 }} />
+            <Text weight="semibold" style={{ fontSize: 11.5, color, opacity: 0.9 }} truncate>
               Dr. {a.provider.firstName} {a.provider.lastName}
-            </Typography>
-          </Stack>
+            </Text>
+          </div>
         )}
         {laid.height >= 110 && (
-          <Avatar
-            src={a.patient.avatar ?? undefined}
-            sx={{
-              width: 24,
-              height: 24,
-              fontSize: 10,
-              fontWeight: 800,
-              mt: 'auto',
-              bgcolor: alpha(color, 0.28),
-              color,
-            }}
-          >
-            {initials}
-          </Avatar>
+          <Avatar name={initials} color="brand" size={24} style={{ marginTop: 'auto', backgroundColor: `${color}44`, color }} />
         )}
-      </Box>
+      </div>
     );
   }
 
   function renderTimeGrid(days: Date[]): React.JSX.Element {
     const gridHeight = hourCount * HOUR_PX;
     const colTemplate = `${TIME_GUTTER_PX}px repeat(${days.length}, minmax(0, 1fr))`;
-
     return (
-      <Box sx={{ minWidth: days.length === 1 ? 0 : 720, width: '100%', height: '100%' }}>
-        {/* Day headers */}
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: colTemplate,
-            position: 'sticky',
-            top: 0,
-            zIndex: 4,
-            bgcolor: (t) => alpha(t.palette.background.default, 0.92),
-            backdropFilter: 'blur(8px)',
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-            pb: 1,
-          }}
-        >
-          <Box />
+      <div className={styles.timeGrid} style={{ minWidth: days.length === 1 ? 0 : 720 }}>
+        <div className={styles.timeHead} style={{ gridTemplateColumns: colTemplate }}>
+          <div />
           {days.map((day) => {
             const isToday = isSameDay(day, today);
             const isSelected = isSameDay(day, selected);
             return (
-              <Box
+              <div
                 key={day.toISOString()}
-                onClick={() => {
-                  setSelected(day);
-                  setCursor(new Date(day.getFullYear(), day.getMonth(), 1));
-                }}
-                sx={{
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  py: 0.5,
-                  borderRadius: 1,
-                  '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
-                }}
+                style={{ textAlign: 'center', cursor: 'pointer', padding: 4, borderRadius: 8 }}
+                onClick={() => { setSelected(day); setCursor(new Date(day.getFullYear(), day.getMonth(), 1)); }}
               >
-                <Typography
-                  variant="caption"
-                  fontWeight={700}
-                  color={isToday ? 'primary.main' : 'text.disabled'}
-                  sx={{ letterSpacing: '0.06em', display: 'block' }}
-                >
+                <Text size={100} weight="bold" style={{ letterSpacing: '0.06em', display: 'block', color: isToday ? tokens.colorBrandForeground1 : tokens.colorNeutralForegroundDisabled }}>
                   {DAYS[day.getDay()].toUpperCase()}
-                </Typography>
-                <Box
-                  sx={{
-                    width: 34,
-                    height: 34,
-                    mx: 'auto',
-                    mt: 0.35,
-                    borderRadius: '50%',
-                    display: 'grid',
-                    placeItems: 'center',
-                    fontWeight: 800,
-                    fontSize: 15,
-                    bgcolor: isToday ? 'primary.main' : isSelected ? alpha(theme.palette.primary.main, 0.16) : 'transparent',
-                    color: isToday ? '#fff' : 'text.primary',
-                  }}
-                >
+                </Text>
+                <div style={{
+                  width: 34, height: 34, margin: '4px auto 0', borderRadius: '50%', display: 'grid', placeItems: 'center',
+                  fontWeight: 800, fontSize: 15,
+                  backgroundColor: isToday ? tokens.colorBrandBackground : isSelected ? tokens.colorBrandBackground2 : 'transparent',
+                  color: isToday ? '#fff' : tokens.colorNeutralForeground1,
+                }}>
                   {day.getDate()}
-                </Box>
-              </Box>
+                </div>
+              </div>
             );
           })}
-        </Box>
-
-        {/* Body: time gutter + day columns */}
-        <Box sx={{ display: 'grid', gridTemplateColumns: colTemplate, position: 'relative' }}>
-          {/* Hour labels */}
-          <Box sx={{ position: 'relative', height: gridHeight }}>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: colTemplate, position: 'relative' }}>
+          <div style={{ position: 'relative', height: gridHeight }}>
             {hours.map((h) => (
-              <Typography
-                key={h}
-                variant="caption"
-                color="text.disabled"
-                fontWeight={600}
-                sx={{
-                  position: 'absolute',
-                  top: (h - startHour) * HOUR_PX,
-                  right: 10,
-                  transform: 'translateY(-50%)',
-                  fontSize: 11,
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
+              <Text key={h} size={100} weight="semibold" style={{
+                position: 'absolute', top: (h - startHour) * HOUR_PX, right: 10, transform: 'translateY(-50%)',
+                fontSize: 11, color: tokens.colorNeutralForegroundDisabled, fontVariantNumeric: 'tabular-nums',
+              }}>
                 {formatHourLabel(h)}
-              </Typography>
+              </Text>
             ))}
-          </Box>
-
+          </div>
           {days.map((day) => {
             const dayAppts = apptsByDay(day);
             const laid = layoutDayEvents(dayAppts, startHour, endHour);
             return (
-              <Box
+              <div
                 key={day.toISOString()}
                 onClick={() => setSelected(day)}
                 onContextMenu={(e) => {
@@ -716,706 +764,334 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                   setSelected(day);
                   onDayContextMenu(day.toLocaleDateString('en-CA'), { mouseX: e.clientX, mouseY: e.clientY });
                 }}
-                sx={{
-                  position: 'relative',
-                  isolation: 'isolate',
-                  height: gridHeight,
-                  borderLeft: '1px solid',
-                  borderColor: alpha(theme.palette.divider, 0.8),
-                  bgcolor: isSameDay(day, today)
-                    ? alpha(theme.palette.primary.main, 0.03)
-                    : 'transparent',
+                style={{
+                  position: 'relative', isolation: 'isolate', height: gridHeight,
+                  borderLeft: `1px solid ${tokens.colorNeutralStroke2}`,
+                  backgroundColor: isSameDay(day, today) ? tokens.colorBrandBackground2 : 'transparent',
                 }}
               >
-                {/* Grid lines stay behind event cards */}
-                <Box
-                  aria-hidden
-                  sx={{
-                    position: 'absolute',
-                    inset: 0,
-                    zIndex: 0,
-                    pointerEvents: 'none',
-                  }}
-                >
+                <div aria-hidden style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
                   {hours.map((h) => (
-                    <Box
-                      key={h}
-                      sx={{
-                        position: 'absolute',
-                        left: 0,
-                        right: 0,
-                        top: (h - startHour) * HOUR_PX,
-                        height: HOUR_PX,
-                        borderTop: '1px solid',
-                        borderColor: alpha(theme.palette.divider, 0.7),
-                        '&::after': {
-                          content: '""',
-                          position: 'absolute',
-                          left: 0,
-                          right: 0,
-                          top: '50%',
-                          borderTop: '1px dashed',
-                          borderColor: alpha(theme.palette.divider, 0.35),
-                        },
-                      }}
-                    />
+                    <div key={h} style={{
+                      position: 'absolute', left: 0, right: 0, top: (h - startHour) * HOUR_PX, height: HOUR_PX,
+                      borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+                    }} />
                   ))}
-                </Box>
-                <Box sx={{ position: 'absolute', inset: 0, zIndex: 1 }}>
+                </div>
+                <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
                   {laid.map((item) => renderTimedEventCard(item))}
-                </Box>
-              </Box>
+                </div>
+              </div>
             );
           })}
-        </Box>
-      </Box>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        display: 'flex',
-        flexDirection: 'row',
-        flex: 1,
-        minHeight: 0,
-        borderRadius: 0,
-        overflow: 'hidden',
-        border: 'none',
-        bgcolor: 'transparent',
-        backgroundImage: 'none',
-        position: 'relative',
-      }}
-    >
-      {fetching && !loading ? (
-        <LinearProgress
-          sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, zIndex: 2, borderRadius: 0 }}
-        />
-      ) : null}
+    <div className={styles.root}>
+      {fetching && !loading ? <ProgressBar className={styles.fetchBar} thickness="medium" /> : null}
       {loading ? <CalendarSkeleton /> : (
-      <>
-      {/* ── Left: Calendar grid ── */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 3, pt: 2.5, overflow: 'hidden', minWidth: 0, minHeight: 0 }}>
-        <Box
-          sx={{
-            flexShrink: 0,
-            zIndex: 3,
-            bgcolor: 'transparent',
-            pb: 0.75,
-          }}
-        >
-          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1.5 }} flexWrap="wrap" useFlexGap>
-            <Typography variant="h6" fontWeight={700}>{headerTitle.primary}</Typography>
-            <Typography variant="h6" fontWeight={700} color="text.secondary">{headerTitle.secondary}</Typography>
-            <Box sx={{ flex: 1 }} />
-            <ButtonGroup
-              variant="text"
-              size="small"
-              aria-label="Calendar view"
-              sx={{
-                p: 0.4,
-                borderRadius: 999,
-                bgcolor: (t) =>
-                  t.palette.mode === 'dark'
-                    ? alpha('#000', 0.45)
-                    : alpha(t.palette.text.primary, 0.06),
-                border: '1px solid',
-                borderColor: (t) =>
-                  t.palette.mode === 'dark'
-                    ? alpha('#fff', 0.08)
-                    : alpha(t.palette.text.primary, 0.08),
-                '& .MuiButtonGroup-grouped': {
-                  border: 'none !important',
-                  borderRadius: '999px !important',
-                  minWidth: 0,
-                  px: 1.5,
-                  py: 0.65,
-                  textTransform: 'none',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  gap: 0.6,
-                  color: 'text.secondary',
-                  boxShadow: 'none',
-                  '&:hover': {
-                    bgcolor: alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.06 : 0.4),
-                  },
-                },
-              }}
-            >
-              {([
-                { value: 'month' as const, label: 'Month', Icon: CalendarViewMonthOutlinedIcon },
-                { value: 'week' as const, label: 'Week', Icon: CalendarViewWeekOutlinedIcon },
-                { value: 'day' as const, label: 'Day', Icon: ViewDayOutlinedIcon },
-              ]).map(({ value, label, Icon }) => {
-                const active = calView === value;
-                return (
-                  <Button
-                    key={value}
-                    startIcon={<Icon sx={{ fontSize: '16px !important' }} />}
-                    onClick={() => handleViewChange(value)}
-                    sx={
-                      active
-                        ? {
-                            bgcolor: `${theme.palette.primary.main} !important`,
-                            color: '#fff !important',
-                            '&:hover': { bgcolor: `${theme.palette.primary.dark} !important` },
-                            '& .MuiButton-startIcon': { color: '#fff' },
-                          }
-                        : undefined
-                    }
-                  >
-                    {label}
-                  </Button>
-                );
-              })}
-            </ButtonGroup>
-            <IconButton size="small" onClick={goPrev}>
-              <ChevronLeftIcon />
-            </IconButton>
-            <IconButton size="small" onClick={goNext}>
-              <ChevronRightIcon />
-            </IconButton>
-          </Stack>
-
-          {calView === 'month' && (
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
-              {DAYS.map((d) => (
-                <Typography key={d} variant="caption" color="text.disabled" fontWeight={700}
-                  sx={{ textAlign: 'center', py: 0.75, letterSpacing: '0.04em' }}>{d}</Typography>
-              ))}
-            </Box>
-          )}
-        </Box>
-
-        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-          {calView === 'month' && (
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gridAutoRows: 100, gap: 0.5 }}>
-              {calDays.map((day, i) => (
-                <Box key={i} sx={{ minHeight: 0 }}>
-                  {renderDayCell(day)}
-                </Box>
-              ))}
-            </Box>
-          )}
-
-          {calView === 'week' && renderTimeGrid(weekDays)}
-
-          {calView === 'day' && renderTimeGrid([selected])}
-        </Box>
-
-        {/* Hover Popper — day cards are full-width: open below and keep inside viewport */}
-        <Popper
-          open={Boolean(hoveredAppt && anchorEl)}
-          anchorEl={anchorEl}
-          placement={calView === 'day' ? 'bottom-start' : 'right-start'}
-          transition
-          modifiers={[
-            { name: 'offset', options: { offset: [0, 10] } },
-            {
-              name: 'flip',
-              enabled: true,
-              options: {
-                fallbackPlacements:
-                  calView === 'day'
-                    ? ['top-start', 'bottom-end', 'top-end', 'left-start']
-                    : ['left-start', 'bottom-start', 'top-start'],
-              },
-            },
-            {
-              name: 'preventOverflow',
-              enabled: true,
-              options: { padding: 12, altAxis: true, boundary: 'viewport' },
-            },
-          ]}
-          sx={{ zIndex: 1400 }}
-        >
-          {({ TransitionProps }) => (
-            <Fade {...TransitionProps} timeout={150}>
-              <Paper
-                elevation={12}
-                onMouseEnter={() => { if (hoverTimer.current) clearTimeout(hoverTimer.current); }}
-                onMouseLeave={() => { setHoveredAppt(null); setAnchorEl(null); }}
-                sx={{
-                  width: 300,
-                  maxWidth: 'calc(100vw - 24px)',
-                  borderRadius: 2,
-                  overflow: 'hidden',
-                  backdropFilter: 'blur(16px)',
-                  bgcolor: (t) => alpha(t.palette.background.paper, 0.94),
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  boxShadow: theme.shadows[12],
-                }}
-              >
-                {hoveredAppt && (() => {
-                  const start = new Date(hoveredAppt.startsAt);
-                  const end = new Date(hoveredAppt.endsAt);
-                  const color = STATUS_COLOR[hoveredAppt.status];
+        <div className={styles.left}>
+          <div className={styles.toolbar}>
+            <div className={styles.toolbarRow}>
+              <Title3>{headerTitle.primary}</Title3>
+              <Title3 style={{ color: tokens.colorNeutralForeground2 }}>{headerTitle.secondary}</Title3>
+              <div className={styles.grow} />
+              <div className={styles.viewToggle} role="group" aria-label="Calendar view">
+                {([
+                  { value: 'month' as const, label: 'Month', Icon: CalendarViewMonthOutlinedIcon },
+                  { value: 'week' as const, label: 'Week', Icon: CalendarViewWeekOutlinedIcon },
+                  { value: 'day' as const, label: 'Day', Icon: ViewDayOutlinedIcon },
+                ]).map(({ value, label, Icon }) => {
+                  const active = calView === value;
                   return (
-                    <>
-                      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2, pt: 2, pb: 1.5 }}>
-                        <Typography variant="subtitle1" fontWeight={700}>
-                          {hoveredAppt.patient.firstName} {hoveredAppt.patient.lastName}
-                        </Typography>
-                        <IconButton size="small" onClick={() => { setHoveredAppt(null); setAnchorEl(null); }}
-                          sx={{ width: 22, height: 22, bgcolor: alpha(theme.palette.text.primary, 0.08) }}>
-                          <CloseIcon sx={{ fontSize: 13 }} />
-                        </IconButton>
-                      </Stack>
-                      <Divider />
-                      <Stack spacing={0} sx={{ px: 2, py: 1.5 }}>
-                        <Stack direction="row" alignItems="center" sx={{ py: 1 }}>
-                          <Stack direction="row" alignItems="center" spacing={1} sx={{ width: 90 }}>
-                            <CalendarTodayOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                            <Typography variant="caption" color="text.disabled" fontWeight={500}>Date</Typography>
-                          </Stack>
-                          <Typography variant="caption" color="text.secondary">
-                            {start.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })}
-                          </Typography>
-                        </Stack>
-                        <Divider sx={{ opacity: 0.4 }} />
-                        <Stack direction="row" alignItems="center" sx={{ py: 1 }}>
-                          <Stack direction="row" alignItems="center" spacing={1} sx={{ width: 90 }}>
-                            <LabelOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                            <Typography variant="caption" color="text.disabled" fontWeight={500}>Type</Typography>
-                          </Stack>
-                          <Stack direction="row" alignItems="center" spacing={0.75}>
-                            <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color }} />
-                            <Typography variant="caption" color="text.secondary" fontWeight={500}>
-                              {hoveredAppt.status.replace('_', ' ')}
-                            </Typography>
-                          </Stack>
-                        </Stack>
-                        <Divider sx={{ opacity: 0.4 }} />
-                        <Stack direction="row" alignItems="center" sx={{ py: 1 }}>
-                          <Stack direction="row" alignItems="center" spacing={1} sx={{ width: 90 }}>
-                            <AccessTimeOutlinedIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                            <Typography variant="caption" color="text.disabled" fontWeight={500}>Hour</Typography>
-                          </Stack>
-                          <Typography variant="caption" color="text.secondary">
-                            {start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            {' – '}
-                            {end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </Typography>
-                        </Stack>
-                        <Divider sx={{ opacity: 0.4 }} />
-                        <Stack direction="row" alignItems="center" sx={{ py: 1 }}>
-                          <Stack direction="row" alignItems="center" spacing={1} sx={{ width: 90 }}>
-                            <PersonOutlineIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                            <Typography variant="caption" color="text.disabled" fontWeight={500}>Note</Typography>
-                          </Stack>
-                          <Typography variant="caption"
-                            color={hoveredAppt.reason ? 'text.secondary' : 'text.disabled'}
-                            sx={{ fontStyle: hoveredAppt.reason ? 'normal' : 'italic' }}>
-                            {hoveredAppt.reason || 'No note'}
-                          </Typography>
-                        </Stack>
-                        <Divider sx={{ opacity: 0.4 }} />
-                        <Stack direction="row" alignItems="center" sx={{ py: 1 }}>
-                          <Stack direction="row" alignItems="center" spacing={1} sx={{ width: 90 }}>
-                            <PersonOutlineIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                            <Typography variant="caption" color="text.disabled" fontWeight={500}>Doctor</Typography>
-                          </Stack>
-                          <Stack direction="row" alignItems="center" spacing={0.75}>
-                            <DoctorAvatar
-                              src={hoveredAppt.provider.avatar}
-                              name={`Dr. ${hoveredAppt.provider.firstName} ${hoveredAppt.provider.lastName}`}
-                              size={20}
-                            />
-                            <Typography variant="caption" color="text.secondary">
-                              Dr. {hoveredAppt.provider.firstName} {hoveredAppt.provider.lastName}
-                            </Typography>
-                          </Stack>
-                        </Stack>
-                      </Stack>
-                    </>
+                    <Button
+                      key={value}
+                      size="small"
+                      appearance={active ? 'primary' : 'subtle'}
+                      icon={<Icon style={{ fontSize: 16 }} />}
+                      onClick={() => handleViewChange(value)}
+                      style={active ? undefined : { fontWeight: 700 }}
+                    >
+                      {label}
+                    </Button>
                   );
-                })()}
-              </Paper>
-            </Fade>
+                })}
+              </div>
+              <Button appearance="subtle" size="small" icon={<ChevronLeftIcon />} onClick={goPrev} aria-label="Previous" />
+              <Button appearance="subtle" size="small" icon={<ChevronRightIcon />} onClick={goNext} aria-label="Next" />
+            </div>
+            {calView === 'month' && (
+              <div className={styles.dayHeaders}>
+                {DAYS.map((d) => <Text key={d} className={styles.dayHeader}>{d}</Text>)}
+              </div>
+            )}
+          </div>
+
+          <div className={styles.scroll}>
+            {calView === 'month' && (
+              <div className={styles.monthGrid}>
+                {calDays.map((day, i) => <div key={i}>{renderDayCell(day)}</div>)}
+              </div>
+            )}
+            {calView === 'week' && renderTimeGrid(weekDays)}
+            {calView === 'day' && renderTimeGrid([selected])}
+          </div>
+
+          {hoveredAppt && hoverPos && (
+            <div
+              className={styles.hoverCard}
+              style={{ left: hoverPos.x, top: hoverPos.y }}
+              onMouseEnter={() => { if (hoverTimer.current) clearTimeout(hoverTimer.current); }}
+              onMouseLeave={() => { setHoveredAppt(null); setHoverPos(null); }}
+            >
+              {(() => {
+                const start = new Date(hoveredAppt.startsAt);
+                const end = new Date(hoveredAppt.endsAt);
+                const color = STATUS_COLOR[hoveredAppt.status];
+                return (
+                  <>
+                    <div className={styles.hoverHead}>
+                      <Text weight="bold" size={400}>
+                        {hoveredAppt.patient.firstName} {hoveredAppt.patient.lastName}
+                      </Text>
+                      <Button
+                        appearance="subtle"
+                        size="small"
+                        icon={<CloseIcon style={{ fontSize: 13 }} />}
+                        onClick={() => { setHoveredAppt(null); setHoverPos(null); }}
+                      />
+                    </div>
+                    <Divider />
+                    <div>
+                      {[
+                        { icon: <CalendarTodayOutlinedIcon style={{ fontSize: 14 }} />, label: 'Date', value: start.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' }) },
+                        { icon: <LabelOutlinedIcon style={{ fontSize: 14 }} />, label: 'Type', value: (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color }} />
+                            {hoveredAppt.status.replace('_', ' ')}
+                          </span>
+                        ) },
+                        { icon: <AccessTimeOutlinedIcon style={{ fontSize: 14 }} />, label: 'Hour', value: `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` },
+                        { icon: <PersonOutlineIcon style={{ fontSize: 14 }} />, label: 'Note', value: hoveredAppt.reason || 'No note' },
+                        { icon: <PersonOutlineIcon style={{ fontSize: 14 }} />, label: 'Doctor', value: (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <DoctorAvatar src={hoveredAppt.provider.avatar} name={`Dr. ${hoveredAppt.provider.firstName} ${hoveredAppt.provider.lastName}`} size={20} />
+                            Dr. {hoveredAppt.provider.firstName} {hoveredAppt.provider.lastName}
+                          </span>
+                        ) },
+                      ].map((row) => (
+                        <div key={row.label}>
+                          <div className={styles.hoverRow}>
+                            <div className={styles.hoverLabel}>{row.icon}<Text size={100} weight="medium">{row.label}</Text></div>
+                            <Text size={200} style={{ color: tokens.colorNeutralForeground2 }}>{row.value}</Text>
+                          </div>
+                          <Divider style={{ opacity: 0.4 }} />
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
           )}
-        </Popper>
-      </Box>
-      </>
+        </div>
       )}
 
-      <Dialog
-        open={dayListOpen && !loading}
-        onClose={() => setDayListOpen(false)}
-        fullWidth
-        maxWidth={false}
-        slotProps={{
-          backdrop: { sx: { bgcolor: alpha('#0b1f14', 0.45), backdropFilter: 'blur(6px)' } },
-        }}
-        PaperProps={{
-          sx: {
-            width: { xs: '94vw', sm: 820 },
-            maxWidth: 820,
-            height: { xs: '88vh', sm: '80vh' },
-            maxHeight: '88vh',
-            borderRadius: '28px',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            bgcolor: 'background.paper',
-            backgroundImage: 'none',
-            boxShadow: `0 28px 80px ${alpha('#052e16', 0.28)}`,
-            border: '1px solid',
-            borderColor: alpha(theme.palette.primary.main, 0.12),
-          },
-        }}
-      >
-        <Box
-          sx={{
-            position: 'relative',
-            px: 3,
-            pt: 2.75,
-            pb: 2.5,
-            color: '#fff',
-            background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 58%, ${theme.palette.primary.light} 100%)`,
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}
-        >
-          <Box sx={{ position: 'absolute', right: -28, top: -48, width: 160, height: 160, borderRadius: '50%', border: `2px solid ${alpha('#fff', 0.14)}` }} />
-          <Box sx={{ position: 'absolute', right: 70, bottom: -70, width: 140, height: 140, borderRadius: '50%', border: `2px solid ${alpha('#fff', 0.08)}` }} />
-          <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ position: 'relative', zIndex: 1 }}>
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Box
-                sx={{
-                  width: 64,
-                  height: 72,
-                  borderRadius: '16px',
-                  bgcolor: alpha('#fff', 0.16),
-                  border: `1px solid ${alpha('#fff', 0.28)}`,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backdropFilter: 'blur(8px)',
-                }}
-              >
-                <Typography sx={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', opacity: 0.85 }}>
-                  {selected.toLocaleDateString([], { month: 'short' }).toUpperCase()}
-                </Typography>
-                <Typography sx={{ fontSize: 28, fontWeight: 900, lineHeight: 1, letterSpacing: '-0.04em' }}>
-                  {selected.getDate()}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', opacity: 0.8 }}>
-                  Day schedule
-                </Typography>
-                <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: '-0.03em', mt: 0.25, lineHeight: 1.2 }}>
-                  {selected.toLocaleDateString([], { weekday: 'long' })}
-                </Typography>
-                <Typography sx={{ mt: 0.4, fontWeight: 600, opacity: 0.88, fontSize: 13 }}>
-                  {selectedAppts.length} visit{selectedAppts.length === 1 ? '' : 's'}
-                  {' · '}
-                  {selected.toLocaleDateString([], { month: 'long', year: 'numeric' })}
-                </Typography>
-              </Box>
-            </Stack>
-            <IconButton
-              onClick={() => setDayListOpen(false)}
-              sx={{
-                color: '#fff',
-                bgcolor: alpha('#fff', 0.12),
-                '&:hover': { bgcolor: alpha('#fff', 0.22) },
-              }}
-            >
-              <CloseIcon />
-            </IconButton>
-          </Stack>
-        </Box>
+      <Dialog open={dayListOpen && !loading} onOpenChange={(_, d) => { if (!d.open) setDayListOpen(false); }}>
+        <DialogSurface className={styles.dayDialog}>
+          <div className={styles.dayHero}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
+              <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                <div style={{
+                  width: 64, height: 72, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.16)',
+                  border: '1px solid rgba(255,255,255,0.28)', display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Text style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', opacity: 0.85 }}>
+                    {selected.toLocaleDateString([], { month: 'short' }).toUpperCase()}
+                  </Text>
+                  <Text style={{ fontSize: 28, fontWeight: 900, lineHeight: 1 }}>{selected.getDate()}</Text>
+                </div>
+                <div>
+                  <Text style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', opacity: 0.8 }}>Day schedule</Text>
+                  <Text style={{ fontSize: 22, fontWeight: 800, display: 'block', marginTop: 2 }}>{selected.toLocaleDateString([], { weekday: 'long' })}</Text>
+                  <Text style={{ marginTop: 4, fontWeight: 600, opacity: 0.88, fontSize: 13 }}>
+                    {selectedAppts.length} visit{selectedAppts.length === 1 ? '' : 's'}
+                    {' · '}
+                    {selected.toLocaleDateString([], { month: 'long', year: 'numeric' })}
+                  </Text>
+                </div>
+              </div>
+              <Button appearance="subtle" icon={<CloseIcon />} onClick={() => setDayListOpen(false)} style={{ color: '#fff', backgroundColor: 'rgba(255,255,255,0.12)' }} />
+            </div>
+          </div>
 
-        <Box
-          sx={{
-            px: 2.5,
-            py: 2.25,
-            flex: '1 1 auto',
-            minHeight: 0,
-            overflowY: 'auto',
-            bgcolor: (t) => (t.palette.mode === 'light' ? '#f4f7f5' : alpha(t.palette.common.white, 0.03)),
-          }}
-        >
-          {selectedAppts.length === 0 ? (
-            <Box
-              sx={{
-                py: 6,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                textAlign: 'center',
-              }}
-            >
-              <Box
-                sx={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: '20px',
-                  display: 'grid',
-                  placeItems: 'center',
-                  mb: 1.5,
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  color: 'primary.main',
-                }}
-              >
-                <EventBusyOutlinedIcon sx={{ fontSize: 30 }} />
-              </Box>
-              <Typography fontWeight={800}>No visits this day</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, maxWidth: 260 }}>
-                This date is free. Book a patient or pick another day on the calendar.
-              </Typography>
-            </Box>
-          ) : (
-            <Stack spacing={1.25}>
-              {selectedAppts.map((a, index) => {
-                const start = new Date(a.startsAt);
-                const end = new Date(a.endsAt);
-                const mins = Math.round((end.getTime() - start.getTime()) / 60000);
-                const next = NEXT_STATUS[a.status];
-                const initials = `${a.patient.firstName[0]}${a.patient.lastName[0]}`.toUpperCase();
-                const color = STATUS_COLOR[a.status];
-                const tok = tokenNum(a.tokenNumber);
-
-                return (
-                  <Box
-                    key={a.id}
-                    onContextMenu={(e) => {
-                      if (!onAppointmentContextMenu) return;
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onAppointmentContextMenu(a, { mouseX: e.clientX, mouseY: e.clientY });
-                    }}
-                    sx={{
-                      display: 'grid',
-                      gridTemplateColumns: '76px 1fr',
-                      gap: 1.5,
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Box sx={{ textAlign: 'right', pr: 0.5, whiteSpace: 'nowrap' }}>
-                      <Typography
-                        component="span"
-                        sx={{
-                          fontSize: 13,
-                          fontWeight: 800,
-                          color: 'text.primary',
-                          fontVariantNumeric: 'tabular-nums',
-                          letterSpacing: '-0.02em',
-                          lineHeight: 1,
+          <DialogBody style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <DialogContent className={styles.dayBody}>
+              {selectedAppts.length === 0 ? (
+                <div style={{ padding: '48px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                  <div style={{
+                    width: 64, height: 64, borderRadius: 20, display: 'grid', placeItems: 'center', marginBottom: 12,
+                    backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1,
+                  }}>
+                    <EventBusyOutlinedIcon style={{ fontSize: 30 }} />
+                  </div>
+                  <Text weight="bold">No visits this day</Text>
+                  <Text size={300} style={{ color: tokens.colorNeutralForeground2, marginTop: 4, maxWidth: 260 }}>
+                    This date is free. Book a patient or pick another day on the calendar.
+                  </Text>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {selectedAppts.map((a, index) => {
+                    const start = new Date(a.startsAt);
+                    const end = new Date(a.endsAt);
+                    const mins = Math.round((end.getTime() - start.getTime()) / 60000);
+                    const next = NEXT_STATUS[a.status];
+                    const initials = `${a.patient.firstName[0]}${a.patient.lastName[0]}`.toUpperCase();
+                    const color = STATUS_COLOR[a.status];
+                    const tok = tokenNum(a.tokenNumber);
+                    return (
+                      <div
+                        key={a.id}
+                        className={styles.visitRow}
+                        onContextMenu={(e) => {
+                          if (!onAppointmentContextMenu) return;
+                          e.preventDefault(); e.stopPropagation();
+                          onAppointmentContextMenu(a, { mouseX: e.clientX, mouseY: e.clientY });
                         }}
                       >
-                        {start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                      </Typography>
-                      {index < selectedAppts.length - 1 && (
-                        <Box sx={{ mt: 1, mr: 0.5, ml: 'auto', width: 2, height: 18, borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, 0.18) }} />
-                      )}
-                    </Box>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        py: 1.1,
-                        px: 1.5,
-                        pl: 2,
-                        borderRadius: '16px',
-                        bgcolor: 'background.paper',
-                        border: '1px solid',
-                        borderColor: alpha(color, 0.22),
-                        boxShadow: `0 8px 24px ${alpha('#052e16', 0.06)}`,
-                        position: 'relative',
-                        overflow: 'hidden',
-                        '&::before': {
-                          content: '""',
-                          position: 'absolute',
-                          left: 0,
-                          top: 0,
-                          bottom: 0,
-                          width: 4,
-                          bgcolor: color,
-                        },
-                      }}
-                    >
-                      <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0 }}>
-                        <Stack
-                          direction="row"
-                          alignItems="center"
-                          spacing={1.25}
-                          sx={{ minWidth: 0, flex: 1 }}
-                        >
-                          <Avatar sx={{ width: 34, height: 34, fontSize: 12, fontWeight: 800, bgcolor: alpha(color, 0.18), color, flexShrink: 0 }}>
-                            {initials}
-                          </Avatar>
-                          <Box sx={{ minWidth: 0 }}>
-                            <Stack direction="row" spacing={0.75} alignItems="center">
-                              <Typography fontWeight={800} fontSize={14} noWrap title={a.reason || undefined}>
-                                {a.patient.firstName} {a.patient.lastName}
-                              </Typography>
-                              {tok > 0 && (
-                                <Chip
+                        <div style={{ textAlign: 'right', paddingRight: 4, whiteSpace: 'nowrap' }}>
+                          <Text weight="bold" style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
+                            {start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                          </Text>
+                          {index < selectedAppts.length - 1 && (
+                            <div style={{ marginTop: 8, marginLeft: 'auto', marginRight: 4, width: 2, height: 18, borderRadius: 4, backgroundColor: tokens.colorBrandBackground2 }} />
+                          )}
+                        </div>
+                        <div className={styles.visitCard}>
+                          <div className={styles.visitAccent} style={{ backgroundColor: color }} />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                              <Avatar name={initials} size={32} style={{ backgroundColor: `${color}2e`, color, fontWeight: 800, flexShrink: 0 }} />
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                  <Text weight="bold" size={300} truncate title={a.reason || undefined}>
+                                    {a.patient.firstName} {a.patient.lastName}
+                                  </Text>
+                                  {tok > 0 && (
+                                    <Badge appearance="tint" color="brand" size="small" style={{ fontFamily: 'ui-monospace, Consolas, monospace', fontWeight: 800 }}>
+                                      #{String(tok).padStart(3, '0')}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <AccessTimeOutlinedIcon style={{ fontSize: 13 }} />
+                                  <Text size={100} weight="semibold" truncate style={{ color: tokens.colorNeutralForeground2 }}>
+                                    {start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                    {' – '}
+                                    {end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                    {' · '}
+                                    {mins} min
+                                  </Text>
+                                </div>
+                              </div>
+                              <Badge appearance="tint" size="small" style={{ backgroundColor: `${color}24`, color, fontWeight: 800, borderRadius: 99, textTransform: 'capitalize', flexShrink: 0 }}>
+                                {a.status.replace('_', ' ')}
+                              </Badge>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                              {!readOnly && onAppointmentClick && (
+                                <Button appearance="outline" size="small" icon={<EditOutlinedIcon style={{ fontSize: 15 }} />} onClick={() => onAppointmentClick(a)} />
+                              )}
+                              {onPatientHistoryClick && (
+                                <Tooltip content="Patient History" relationship="label">
+                                  <Button
+                                    appearance="outline"
+                                    size="small"
+                                    disabled={historyLoadingId === a.id}
+                                    icon={historyLoadingId === a.id ? <Spinner size="tiny" /> : <HistoryOutlinedIcon style={{ fontSize: 15 }} />}
+                                    onClick={() => {
+                                      void (async () => {
+                                        setHistoryLoadingId(a.id);
+                                        try { await onPatientHistoryClick(a); } finally { setHistoryLoadingId(null); }
+                                      })();
+                                    }}
+                                  />
+                                </Tooltip>
+                              )}
+                              {onLabOrderClick && a.status !== 'CANCELLED' && a.status !== 'NO_SHOW' && (
+                                <Tooltip content="Order lab" relationship="label">
+                                  <Button
+                                    appearance="outline"
+                                    size="small"
+                                    disabled={labLoadingId === a.id}
+                                    icon={labLoadingId === a.id ? <Spinner size="tiny" /> : <BiotechOutlinedIcon style={{ fontSize: 15 }} />}
+                                    onClick={() => {
+                                      void (async () => {
+                                        setLabLoadingId(a.id);
+                                        try { await onLabOrderClick(a); } finally { setLabLoadingId(null); }
+                                      })();
+                                    }}
+                                  />
+                                </Tooltip>
+                              )}
+                              {onPrescriptionClick && a.status === 'COMPLETED' && (
+                                <Button
+                                  appearance="outline"
                                   size="small"
-                                  label={`#${String(tok).padStart(3, '0')}`}
-                                  sx={{
-                                    height: 20,
-                                    fontWeight: 800,
-                                    fontFamily: 'ui-monospace, Consolas, monospace',
-                                    bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                    color: 'primary.dark',
-                                  }}
+                                  icon={<MedicalServicesOutlinedIcon style={{ fontSize: 15 }} />}
+                                  onClick={() => onPrescriptionClick(a)}
+                                  style={{ borderColor: tokens.colorPaletteGreenBorderActive, color: tokens.colorPaletteGreenForeground1 }}
                                 />
                               )}
-                            </Stack>
-                            <Stack direction="row" alignItems="center" spacing={0.5}>
-                              <AccessTimeOutlinedIcon sx={{ fontSize: 13, color: 'text.disabled' }} />
-                              <Typography variant="caption" color="text.secondary" fontWeight={600} noWrap>
-                                {start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                                {' – '}
-                                {end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                                {' · '}
-                                {mins} min
-                              </Typography>
-                            </Stack>
-                          </Box>
-                          <Chip
-                            size="small"
-                            label={a.status.replace('_', ' ')}
-                            sx={{
-                              bgcolor: alpha(color, 0.14),
-                              color,
-                              fontWeight: 800,
-                              borderRadius: 99,
-                              fontSize: '0.68rem',
-                              textTransform: 'capitalize',
-                              flexShrink: 0,
-                            }}
-                          />
-                        </Stack>
-
-                        <Stack direction="row" alignItems="center" gap={0.5} flexShrink={0}>
-                          {!readOnly && onAppointmentClick && (
-                            <IconButton size="small" onClick={() => onAppointmentClick(a)}
-                              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 0.45 }}>
-                              <EditOutlinedIcon sx={{ fontSize: 15 }} />
-                            </IconButton>
-                          )}
-                          {onPatientHistoryClick && (
-                            <IconButton
-                              size="small"
-                              title="Patient History"
-                              loading={historyLoadingId === a.id}
-                              disabled={historyLoadingId === a.id}
-                              onClick={() => {
-                                void (async () => {
-                                  setHistoryLoadingId(a.id);
-                                  try {
-                                    await onPatientHistoryClick(a);
-                                  } finally {
-                                    setHistoryLoadingId(null);
-                                  }
-                                })();
-                              }}
-                              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 0.45 }}
-                            >
-                              <HistoryOutlinedIcon sx={{ fontSize: 15 }} />
-                            </IconButton>
-                          )}
-                          {onLabOrderClick && a.status !== 'CANCELLED' && a.status !== 'NO_SHOW' && (
-                            <IconButton
-                              size="small"
-                              title="Order lab"
-                              loading={labLoadingId === a.id}
-                              disabled={labLoadingId === a.id}
-                              onClick={() => {
-                                void (async () => {
-                                  setLabLoadingId(a.id);
-                                  try {
-                                    await onLabOrderClick(a);
-                                  } finally {
-                                    setLabLoadingId(null);
-                                  }
-                                })();
-                              }}
-                              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 0.45 }}
-                            >
-                              <BiotechOutlinedIcon sx={{ fontSize: 15 }} />
-                            </IconButton>
-                          )}
-                          {onPrescriptionClick && a.status === 'COMPLETED' && (
-                            <IconButton size="small" onClick={() => onPrescriptionClick(a)}
-                              sx={{ border: '1px solid', borderColor: 'success.main', borderRadius: 2, p: 0.45, color: 'success.main' }}>
-                              <MedicalServicesOutlinedIcon sx={{ fontSize: 15 }} />
-                            </IconButton>
-                          )}
-                          {!readOnly && next && !(hideCheckIn && next === 'CHECKED_IN') && (
-                            <Button
-                              size="small"
-                              variant="contained"
-                              loading={statusPendingId === a.id}
-                              endIcon={next === 'COMPLETED' ? <CheckCircleOutlineIcon /> : <ArrowForwardIcon />}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                event.preventDefault();
-                                onStatusChange(a.id, next);
-                              }}
-                              sx={{
-                                fontSize: '0.72rem',
-                                py: 0.4,
-                                px: 1.2,
-                                borderRadius: 99,
-                                fontWeight: 800,
-                                textTransform: 'none',
-                                bgcolor: STATUS_COLOR[next],
-                                boxShadow: 'none',
-                                '&:hover': { bgcolor: STATUS_COLOR[next], filter: 'brightness(0.94)', boxShadow: 'none' },
-                              }}
-                            >
-                              {next === 'CHECKED_IN' ? 'Check In' : 'Complete'}
-                            </Button>
-                          )}
-                        </Stack>
-                      </Stack>
-                    </Paper>
-                  </Box>
-                );
-              })}
-            </Stack>
-          )}
-        </Box>
-
-        <Box
-          sx={{
-            px: 2.5,
-            py: 1.75,
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: 1,
-            flexShrink: 0,
-            bgcolor: 'background.paper',
-          }}
-        >
-          <Button
-            onClick={() => setDayListOpen(false)}
-            sx={{ borderRadius: 99, fontWeight: 700, textTransform: 'none', px: 2 }}
-          >
-            Close
-          </Button>
-          {onDateClick && (
-            <Button
-              variant="contained"
-              startIcon={<AddOutlinedIcon />}
-              onClick={() => {
-                setDayListOpen(false);
-                onDateClick(selected.toLocaleDateString('en-CA'));
-              }}
-              sx={{ borderRadius: 99, fontWeight: 800, textTransform: 'none', px: 2.25, boxShadow: 'none' }}
-            >
-              New appointment
-            </Button>
-          )}
-        </Box>
+                              {!readOnly && next && !(hideCheckIn && next === 'CHECKED_IN') && (
+                                <Button
+                                  appearance="primary"
+                                  size="small"
+                                  disabled={statusPendingId === a.id}
+                                  icon={statusPendingId === a.id ? <Spinner size="tiny" /> : (next === 'COMPLETED' ? <CheckCircleOutlineIcon /> : <ArrowForwardIcon />)}
+                                  iconPosition="after"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    event.preventDefault();
+                                    onStatusChange(a.id, next);
+                                  }}
+                                  style={{ backgroundColor: STATUS_COLOR[next], fontWeight: 800, borderRadius: 99 }}
+                                >
+                                  {next === 'CHECKED_IN' ? 'Check In' : 'Complete'}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </DialogContent>
+          </DialogBody>
+          <DialogActions className={styles.dayFoot}>
+            <Button appearance="secondary" onClick={() => setDayListOpen(false)}>Close</Button>
+            {onDateClick && (
+              <Button
+                appearance="primary"
+                icon={<AddOutlinedIcon />}
+                onClick={() => {
+                  setDayListOpen(false);
+                  onDateClick(selected.toLocaleDateString('en-CA'));
+                }}
+              >
+                New appointment
+              </Button>
+            )}
+          </DialogActions>
+        </DialogSurface>
       </Dialog>
-    </Paper>
+    </div>
   );
 }

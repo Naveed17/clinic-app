@@ -1,13 +1,46 @@
-import ChatOutlinedIcon from '@mui/icons-material/ChatOutlined';
-import CloseIcon from '@mui/icons-material/Close';
-import { Badge, Box, Fab, Paper, Tooltip, Zoom } from '@mui/material';
+import { Badge, Button, Tooltip, makeStyles, tokens } from '@fluentui/react-components';
+import { Chat24Regular, Dismiss24Regular } from '@fluentui/react-icons';
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { ChatWorkspace } from './ChatWorkspace';
 
+const useStyles = makeStyles({
+  panel: {
+    position: 'fixed',
+    right: '24px',
+    bottom: '92px',
+    width: '360px',
+    maxWidth: 'calc(100vw - 32px)',
+    height: '520px',
+    maxHeight: 'calc(100vh - 130px)',
+    zIndex: 1400,
+    overflow: 'hidden',
+    borderRadius: '12px',
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: tokens.shadow64,
+    backgroundColor: tokens.colorNeutralBackground1,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  fabWrap: {
+    position: 'fixed',
+    right: '24px',
+    bottom: '24px',
+    zIndex: 1400,
+  },
+  fab: {
+    width: '56px',
+    height: '56px',
+    borderRadius: '50%',
+    minWidth: '56px',
+    boxShadow: '0 12px 28px rgba(22, 163, 74, 0.35)',
+  },
+});
+
 export function ChatWidget(): React.JSX.Element | null {
+  const styles = useStyles();
   const { user } = useAuth();
   const { can } = useLicense();
   const location = useLocation();
@@ -18,43 +51,42 @@ export function ChatWidget(): React.JSX.Element | null {
 
   return (
     <>
-      <Paper
-        elevation={12}
-        sx={{
-          position: 'fixed',
-          right: 24,
-          bottom: 92,
-          width: { xs: 'calc(100vw - 32px)', sm: 360 },
-          height: { xs: 'min(560px, calc(100vh - 130px))', sm: 520 },
-          zIndex: 1400,
-          overflow: 'hidden',
-          borderRadius: '12px',
-          display: open ? 'flex' : 'none',
-          flexDirection: 'column',
-        }}
-      >
+      <div className={styles.panel} style={{ display: open ? 'flex' : 'none' }}>
         <ChatWorkspace variant="widget" onUnreadChange={setUnread} />
-      </Paper>
-      <Zoom in>
-        <Box sx={{ position: 'fixed', right: 24, bottom: 24, zIndex: 1400 }}>
-          <Tooltip title={open ? 'Close chat' : 'Staff chat'} placement="left">
-            <Badge
-              overlap="circular"
-              badgeContent={open ? 0 : unread}
-              color="error"
-              max={9}
-            >
-              <Fab
-                color="primary"
-                onClick={() => setOpen((value) => !value)}
-                sx={{ boxShadow: '0 12px 28px rgba(22, 163, 74, 0.35)' }}
+      </div>
+      <div className={styles.fabWrap}>
+        <Tooltip content={open ? 'Close chat' : 'Staff chat'} relationship="label" positioning="before">
+          <Badge
+            appearance="filled"
+            color="danger"
+            size="medium"
+            style={open || unread === 0 ? { visibility: 'hidden' } : undefined}
+          >
+            {/* Badge wraps button via children in Fluent — use separate badge overlay */}
+          </Badge>
+        </Tooltip>
+        <Tooltip content={open ? 'Close chat' : 'Staff chat'} relationship="label" positioning="before">
+          <div style={{ position: 'relative' }}>
+            {!open && unread > 0 && (
+              <Badge
+                appearance="filled"
+                color="danger"
+                size="small"
+                style={{ position: 'absolute', top: -4, right: -4, zIndex: 1 }}
               >
-                {open ? <CloseIcon /> : <ChatOutlinedIcon />}
-              </Fab>
-            </Badge>
-          </Tooltip>
-        </Box>
-      </Zoom>
+                {Math.min(unread, 9)}
+              </Badge>
+            )}
+            <Button
+              appearance="primary"
+              className={styles.fab}
+              icon={open ? <Dismiss24Regular /> : <Chat24Regular />}
+              onClick={() => setOpen((value) => !value)}
+              aria-label={open ? 'Close chat' : 'Staff chat'}
+            />
+          </div>
+        </Tooltip>
+      </div>
     </>
   );
 }

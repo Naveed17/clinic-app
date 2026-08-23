@@ -1,14 +1,58 @@
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
-import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
-import { Box, Button, Paper, Stack, Typography } from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+import { Button, Text, Title2, makeStyles, tokens } from '@fluentui/react-components';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { ErrorOutlineIcon, HomeOutlinedIcon, RefreshOutlinedIcon } from '@/icons/fluent';
 import {
   isRouteErrorResponse,
   useNavigate,
   useRouteError,
 } from 'react-router-dom';
+
+const useStyles = makeStyles({
+  page: {
+    minHeight: '100vh',
+  },
+  center: {
+    minHeight: '100%',
+    display: 'grid',
+    placeItems: 'center',
+    padding: tokens.spacingVerticalXXL,
+    backgroundColor: tokens.colorNeutralBackground2,
+  },
+  card: {
+    maxWidth: '440px',
+    width: '100%',
+    padding: '28px',
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    textAlign: 'center',
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow8,
+  },
+  iconBox: {
+    width: '64px',
+    height: '64px',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    marginBottom: tokens.spacingVerticalL,
+    borderRadius: tokens.borderRadiusLarge,
+    display: 'grid',
+    placeItems: 'center',
+    backgroundColor: tokens.colorPaletteRedBackground2,
+    color: tokens.colorPaletteRedForeground1,
+  },
+  detail: {
+    marginTop: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalXXL,
+    color: tokens.colorNeutralForeground2,
+  },
+  actions: {
+    display: 'flex',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: tokens.spacingHorizontalM,
+    justifyContent: 'center',
+  },
+});
 
 function errorMessage(error: unknown): { title: string; detail: string } {
   if (isRouteErrorResponse(error)) {
@@ -43,89 +87,46 @@ function ErrorFallback({
   onRetry: () => void;
   onHome: () => void;
 }): React.JSX.Element {
-  const theme = useTheme();
+  const styles = useStyles();
   return (
-    <Box
-      sx={{
-        minHeight: '100%',
-        display: 'grid',
-        placeItems: 'center',
-        p: 3,
-        bgcolor: 'background.default',
-      }}
-    >
-      <Paper
-        elevation={0}
-        sx={{
-          maxWidth: 440,
-          width: '100%',
-          p: 3.5,
-          borderRadius: 1,
-          border: '1px solid',
-          borderColor: 'divider',
-          textAlign: 'center',
-          boxShadow: `0 8px 28px ${alpha(theme.palette.common.black, 0.06)}`,
-        }}
-      >
-        <Box
-          sx={{
-            width: 64,
-            height: 64,
-            mx: 'auto',
-            mb: 2,
-            borderRadius: 2,
-            display: 'grid',
-            placeItems: 'center',
-            bgcolor: alpha(theme.palette.error.main, 0.1),
-            color: 'error.main',
-          }}
-        >
-          <ErrorOutlineIcon sx={{ fontSize: 32 }} />
-        </Box>
-        <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: '-0.02em' }}>
-          {title}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 3 }}>
+    <div className={styles.center}>
+      <div className={styles.card}>
+        <div className={styles.iconBox}>
+          <ErrorOutlineIcon style={{ fontSize: 32 }} />
+        </div>
+        <Title2>{title}</Title2>
+        <Text className={styles.detail} block>
           {detail}
-        </Typography>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} justifyContent="center">
-          <Button
-            variant="contained"
-            startIcon={<RefreshOutlinedIcon />}
-            onClick={onRetry}
-            sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
-          >
+        </Text>
+        <div className={styles.actions}>
+          <Button appearance="primary" icon={<RefreshOutlinedIcon />} onClick={onRetry}>
             Try again
           </Button>
-          <Button
-            variant="outlined"
-            startIcon={<HomeOutlinedIcon />}
-            onClick={onHome}
-            sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
-          >
+          <Button appearance="secondary" icon={<HomeOutlinedIcon />} onClick={onHome}>
             Go to dashboard
           </Button>
-        </Stack>
-      </Paper>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 }
 
 /** React Router route error UI (`errorElement`). */
 export function RouteErrorPage(): React.JSX.Element {
+  const styles = useStyles();
   const error = useRouteError();
   const navigate = useNavigate();
   const { title, detail } = errorMessage(error);
 
   return (
-    <Box sx={{ minHeight: '100vh' }}>
+    <div className={styles.page}>
       <ErrorFallback
         title={title}
         detail={detail}
         onRetry={() => navigate(0)}
         onHome={() => navigate('/dashboard', { replace: true })}
       />
-    </Box>
+    </div>
   );
 }
 
@@ -149,7 +150,7 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, Boundar
     if (!this.state.error) return this.props.children;
     const { title, detail } = errorMessage(this.state.error);
     return (
-      <Box sx={{ minHeight: '100vh' }}>
+      <div style={{ minHeight: '100vh' }}>
         <ErrorFallback
           title={title}
           detail={detail}
@@ -159,7 +160,7 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, Boundar
             window.location.hash = '#/dashboard';
           }}
         />
-      </Box>
+      </div>
     );
   }
 }

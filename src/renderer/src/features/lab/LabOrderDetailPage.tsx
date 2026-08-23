@@ -1,48 +1,211 @@
-import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
-import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
-import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
-import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
-import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
-import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
-import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
-import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined';
-import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
 import {
-  Alert,
-  Box,
   Button,
-  Chip,
-  IconButton,
-  Paper,
+  MessageBar,
+  MessageBarBody,
   Skeleton,
-  Stack,
+  Spinner,
+  Text,
+  Title3,
   Tooltip,
-  Typography,
-} from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+  makeStyles,
+  tokens,
+  type BadgeProps,
+} from '@fluentui/react-components';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { StatCardsSkeleton } from '@/components/LoadingUI';
-import { chipSx } from '@/components/TableUI';
+import { StatusBadge } from '@/components/TableUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { LabReportBuilderDialog } from '@/features/lab/LabReportBuilderDialog';
 import { LabReportPrint } from '@/features/lab/LabReportPrint';
 import { ResultBody } from '@/features/lab/LabOrderResultView';
 import { labReportNumber } from '@/features/lab/labReportNumber';
 import type { LabOrderStatus } from '@/types/lab';
+import {
+  AccessTimeOutlinedIcon,
+  ArrowBackOutlinedIcon,
+  BadgeOutlinedIcon,
+  BiotechOutlinedIcon,
+  ConfirmationNumberOutlinedIcon,
+  LocalPhoneOutlinedIcon,
+  NotesOutlinedIcon,
+  PersonOutlinedIcon,
+  PrintOutlinedIcon,
+  ScienceOutlinedIcon,
+} from '@/icons/fluent';
 
-const statusColor: Record<LabOrderStatus, 'warning' | 'primary' | 'success' | 'error'> = {
+type StatusColor = NonNullable<BadgeProps['color']>;
+
+const statusColor: Record<LabOrderStatus, StatusColor> = {
   PENDING: 'warning',
-  IN_PROGRESS: 'primary',
+  IN_PROGRESS: 'brand',
   COMPLETED: 'success',
-  CANCELLED: 'error',
+  CANCELLED: 'danger',
 };
 
+const useStyles = makeStyles({
+  page: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXL,
+    paddingBottom: tokens.spacingVerticalL,
+  },
+  loading: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalL,
+    padding: tokens.spacingVerticalS,
+  },
+  notFound: {
+    padding: tokens.spacingVerticalXXL,
+  },
+  backBtn: {
+    marginTop: tokens.spacingVerticalL,
+  },
+  header: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalL,
+    flexWrap: 'wrap',
+  },
+  headerLeft: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: tokens.spacingHorizontalM,
+  },
+  backIconBtn: {
+    marginTop: tokens.spacingVerticalXXS,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  eyebrow: {
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  titleRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    flexWrap: 'wrap',
+    marginTop: tokens.spacingVerticalXXS,
+  },
+  title: {
+    letterSpacing: '-0.02em',
+    fontWeight: tokens.fontWeightBold,
+  },
+  subtitle: {
+    color: tokens.colorNeutralForeground2,
+    marginTop: tokens.spacingVerticalXXS,
+    fontWeight: tokens.fontWeightMedium,
+  },
+  actions: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalS,
+    flexWrap: 'wrap',
+  },
+  statsGrid: {
+    display: 'grid',
+    gap: tokens.spacingHorizontalM,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+  },
+  softCard: {
+    borderRadius: '20px',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow4,
+  },
+  statCard: {
+    padding: tokens.spacingVerticalL,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  statBlob: {
+    position: 'absolute',
+    top: '-18px',
+    right: '-18px',
+    width: '72px',
+    height: '72px',
+    borderRadius: '50%',
+  },
+  statInner: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  caption: {
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightBold,
+    fontSize: tokens.fontSizeBase200,
+  },
+  statValue: {
+    marginTop: tokens.spacingVerticalXXS,
+    letterSpacing: '-0.02em',
+    fontWeight: tokens.fontWeightBold,
+    wordBreak: 'break-word',
+  },
+  iconBox: {
+    width: '36px',
+    height: '36px',
+    borderRadius: tokens.borderRadiusMedium,
+    display: 'grid',
+    placeItems: 'center',
+    flexShrink: 0,
+  },
+  mainGrid: {
+    display: 'grid',
+    gap: tokens.spacingVerticalXL,
+    gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+    alignItems: 'start',
+  },
+  cardPad: {
+    padding: tokens.spacingVerticalXL,
+  },
+  sectionTitle: {
+    fontWeight: tokens.fontWeightBold,
+    marginBottom: tokens.spacingVerticalL,
+  },
+  rows: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+  row: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalM,
+    alignItems: 'flex-start',
+  },
+  rowIconBox: {
+    width: '34px',
+    height: '34px',
+    borderRadius: tokens.borderRadiusMedium,
+    display: 'grid',
+    placeItems: 'center',
+    flexShrink: 0,
+    backgroundColor: tokens.colorBrandBackground2,
+    color: tokens.colorBrandForeground1,
+  },
+  personValue: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+  },
+  muted: {
+    color: tokens.colorNeutralForeground2,
+  },
+});
+
 export function LabOrderDetailPage(): React.JSX.Element {
-  const theme = useTheme();
+  const styles = useStyles();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -53,13 +216,6 @@ export function LabOrderDetailPage(): React.JSX.Element {
 
   const [builderOpen, setBuilderOpen] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
-
-  const softCard = {
-    borderRadius: '20px',
-    border: '1px solid',
-    borderColor: 'divider',
-    boxShadow: `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,
-  } as const;
 
   const query = useQuery({
     queryKey: ['lab-order', id],
@@ -82,28 +238,29 @@ export function LabOrderDetailPage(): React.JSX.Element {
 
   if (query.isLoading) {
     return (
-      <Stack spacing={2} sx={{ p: 1 }}>
-        <Skeleton variant="rounded" height={88} sx={{ borderRadius: 3 }} />
+      <div className={styles.loading}>
+        <Skeleton appearance="opaque" style={{ height: 88, borderRadius: 12 }} />
         <StatCardsSkeleton count={4} />
-        <Skeleton variant="rounded" height={240} sx={{ borderRadius: 3 }} />
-      </Stack>
+        <Skeleton appearance="opaque" style={{ height: 240, borderRadius: 12 }} />
+      </div>
     );
   }
 
   if (!order) {
     return (
-      <Box sx={{ p: 4 }}>
-        <Alert severity="error" sx={{ borderRadius: 2 }}>
-          Lab order not found.
-        </Alert>
+      <div className={styles.notFound}>
+        <MessageBar intent="error">
+          <MessageBarBody>Lab order not found.</MessageBarBody>
+        </MessageBar>
         <Button
-          sx={{ mt: 2, borderRadius: 2, fontWeight: 700 }}
-          startIcon={<ArrowBackOutlinedIcon />}
+          className={styles.backBtn}
+          appearance="secondary"
+          icon={<ArrowBackOutlinedIcon />}
           onClick={() => navigate('/lab')}
         >
           Back to Lab Orders
         </Button>
-      </Box>
+      </div>
     );
   }
 
@@ -112,65 +269,77 @@ export function LabOrderDetailPage(): React.JSX.Element {
   const canPrint = order.status === 'COMPLETED' && Boolean(order.result?.trim());
   const tokenLabel = order.tokenNumber != null ? `#${String(order.tokenNumber).padStart(3, '0')}` : '—';
 
+  const colors = {
+    primary: tokens.colorBrandForeground1,
+    info: tokens.colorPaletteBlueForeground2,
+    warning: tokens.colorPaletteDarkOrangeForeground1,
+    success: tokens.colorPaletteGreenForeground1,
+  };
+
   const summaryCards = [
     {
       label: 'Status',
       value: statusLabel,
       note: 'Current',
-      icon: <ScienceOutlinedIcon fontSize="small" />,
-      color: theme.palette.primary.main,
+      icon: <ScienceOutlinedIcon style={{ fontSize: 18 }} />,
+      color: colors.primary,
+      fontSize: 22,
     },
     {
       label: 'Report no.',
       value: reportNo,
       note: 'Accession',
-      icon: <BiotechOutlinedIcon fontSize="small" />,
-      color: theme.palette.info.main,
+      icon: <BiotechOutlinedIcon style={{ fontSize: 18 }} />,
+      color: colors.info,
+      fontSize: 16,
+      mono: true,
     },
     {
       label: 'Ordered',
       value: new Date(order.orderedAt).toLocaleDateString([], { month: 'short', day: 'numeric' }),
       note: new Date(order.orderedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      icon: <AccessTimeOutlinedIcon fontSize="small" />,
-      color: theme.palette.warning.main,
+      icon: <AccessTimeOutlinedIcon style={{ fontSize: 18 }} />,
+      color: colors.warning,
+      fontSize: 22,
     },
     {
       label: 'Token',
       value: tokenLabel,
       note: 'Visit token',
-      icon: <ConfirmationNumberOutlinedIcon fontSize="small" />,
-      color: theme.palette.success.main,
+      icon: <ConfirmationNumberOutlinedIcon style={{ fontSize: 18 }} />,
+      color: colors.success,
+      fontSize: 22,
     },
   ];
 
   const infoRows: { icon: React.ReactNode; label: string; value: React.ReactNode }[] = [
     {
-      icon: <PersonOutlinedIcon sx={{ fontSize: 18 }} />,
+      icon: <PersonOutlinedIcon style={{ fontSize: 18 }} />,
       label: 'Patient',
       value: order.patientName,
     },
     {
-      icon: <BadgeOutlinedIcon sx={{ fontSize: 18 }} />,
+      icon: <BadgeOutlinedIcon style={{ fontSize: 18 }} />,
       label: 'MR number',
       value: order.patientMrNumber || '—',
     },
     {
-      icon: <LocalPhoneOutlinedIcon sx={{ fontSize: 18 }} />,
+      icon: <LocalPhoneOutlinedIcon style={{ fontSize: 18 }} />,
       label: 'Phone',
       value: order.patientPhone?.trim() || '—',
     },
     {
-      icon: <PersonOutlinedIcon sx={{ fontSize: 18 }} />,
+      icon: <PersonOutlinedIcon style={{ fontSize: 18 }} />,
       label: 'Ordered by',
       value: (
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <div className={styles.personValue}>
           <DoctorAvatar name={order.orderedByName} size={28} />
-          <Typography fontWeight={600}>{order.orderedByName}</Typography>
-        </Stack>
+          <Text weight="semibold">{order.orderedByName}</Text>
+        </div>
       ),
     },
     {
-      icon: <NotesOutlinedIcon sx={{ fontSize: 18 }} />,
+      icon: <NotesOutlinedIcon style={{ fontSize: 18 }} />,
       label: 'Notes',
       value: order.notes?.trim() || '—',
     },
@@ -178,55 +347,38 @@ export function LabOrderDetailPage(): React.JSX.Element {
 
   return (
     <>
-      <Stack spacing={2.5} sx={{ pb: 2 }}>
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: { sm: 'flex-end' },
-            flexDirection: { xs: 'column', sm: 'row' },
-            gap: 2,
-            justifyContent: 'space-between',
-          }}
-        >
-          <Stack direction="row" alignItems="flex-start" spacing={1.5}>
-            <Tooltip title="Back to lab orders">
-              <IconButton
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <div className={styles.headerLeft}>
+            <Tooltip content="Back to lab orders" relationship="label">
+              <Button
+                appearance="subtle"
+                icon={<ArrowBackOutlinedIcon style={{ fontSize: 18 }} />}
                 onClick={() => navigate('/lab')}
-                size="small"
-                sx={{ mt: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
-              >
-                <ArrowBackOutlinedIcon fontSize="small" />
-              </IconButton>
+                className={styles.backIconBtn}
+              />
             </Tooltip>
-            <Box>
-              <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                Lab test details
-              </Typography>
-              <Stack direction="row" alignItems="center" gap={1.25} flexWrap="wrap" sx={{ mt: 0.25 }}>
-                <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em' }}>
-                  {order.test}
-                </Typography>
-                <Chip color={statusColor[order.status]} label={statusLabel} size="small" sx={chipSx} />
-              </Stack>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }} fontWeight={500}>
+            <div>
+              <Text className={styles.eyebrow}>Lab test details</Text>
+              <div className={styles.titleRow}>
+                <Title3 className={styles.title}>{order.test}</Title3>
+                <StatusBadge color={statusColor[order.status]}>{statusLabel}</StatusBadge>
+              </div>
+              <Text className={styles.subtitle}>
                 {order.patientName} · {reportNo}
-              </Typography>
-            </Box>
-          </Stack>
+              </Text>
+            </div>
+          </div>
 
-          <Stack direction="row" gap={1} flexWrap="wrap">
-            <Button
-              variant="outlined"
-              sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
-              onClick={() => navigate(`/patients/${order.patientId}`)}
-            >
+          <div className={styles.actions}>
+            <Button appearance="secondary" onClick={() => navigate(`/patients/${order.patientId}`)}>
               Open patient
             </Button>
             {isLabTech && order.status === 'PENDING' && (
               <Button
-                variant="contained"
-                loading={statusMutation.isPending}
-                sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                appearance="primary"
+                icon={statusMutation.isPending ? <Spinner size="tiny" /> : undefined}
+                disabled={statusMutation.isPending}
                 onClick={() => statusMutation.mutate('IN_PROGRESS')}
               >
                 Start
@@ -234,10 +386,8 @@ export function LabOrderDetailPage(): React.JSX.Element {
             )}
             {canBuild && (order.status === 'IN_PROGRESS' || order.status === 'COMPLETED') && (
               <Button
-                startIcon={<ScienceOutlinedIcon />}
-                variant={order.status === 'IN_PROGRESS' ? 'contained' : 'outlined'}
-                color={order.status === 'IN_PROGRESS' ? 'success' : 'primary'}
-                sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                appearance={order.status === 'IN_PROGRESS' ? 'primary' : 'secondary'}
+                icon={<ScienceOutlinedIcon />}
                 onClick={() => setBuilderOpen(true)}
               >
                 {order.status === 'IN_PROGRESS' ? 'Build report' : 'Open report'}
@@ -245,137 +395,82 @@ export function LabOrderDetailPage(): React.JSX.Element {
             )}
             {canPrint && (
               <Button
-                startIcon={<PrintOutlinedIcon />}
-                variant="outlined"
-                sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                appearance="secondary"
+                icon={<PrintOutlinedIcon />}
                 onClick={() => setPrintOpen(true)}
               >
                 Print
               </Button>
             )}
-          </Stack>
-        </Box>
+          </div>
+        </div>
 
-        <Box
-          sx={{
-            display: 'grid',
-            gap: 1.75,
-            gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' },
-          }}
-        >
+        <div className={styles.statsGrid}>
           {summaryCards.map((c) => (
-            <Paper key={c.label} elevation={0} sx={{ p: 2.25, ...softCard, position: 'relative', overflow: 'hidden' }}>
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: -18,
-                  right: -18,
-                  width: 72,
-                  height: 72,
-                  borderRadius: '50%',
-                  bgcolor: alpha(c.color, 0.1),
-                }}
-              />
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                <Box sx={{ minWidth: 0, pr: 1 }}>
-                  <Typography variant="caption" color="text.secondary" fontWeight={700}>
-                    {c.label}
-                  </Typography>
-                  <Typography
-                    fontWeight={900}
-                    fontSize={c.label === 'Report no.' ? 16 : 22}
-                    sx={{
-                      mt: 0.25,
-                      letterSpacing: '-0.02em',
-                      fontFamily: c.label === 'Report no.' ? 'ui-monospace, Consolas, monospace' : undefined,
-                      wordBreak: 'break-word',
+            <div key={c.label} className={`${styles.softCard} ${styles.statCard}`}>
+              <div className={styles.statBlob} style={{ backgroundColor: `${c.color}1a` }} />
+              <div className={styles.statInner}>
+                <div style={{ minWidth: 0, paddingRight: 8 }}>
+                  <Text className={styles.caption}>{c.label}</Text>
+                  <Text
+                    className={styles.statValue}
+                    block
+                    style={{
+                      fontSize: c.fontSize,
+                      fontFamily: c.mono ? 'ui-monospace, Consolas, monospace' : undefined,
                     }}
                   >
                     {c.value}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                    {c.note}
-                  </Typography>
-                </Box>
-                <Box
-                  sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 2,
-                    display: 'grid',
-                    placeItems: 'center',
-                    bgcolor: alpha(c.color, 0.12),
-                    color: c.color,
-                    flexShrink: 0,
-                  }}
+                  </Text>
+                  <Text className={styles.caption}>{c.note}</Text>
+                </div>
+                <div
+                  className={styles.iconBox}
+                  style={{ backgroundColor: `${c.color}1f`, color: c.color }}
                 >
                   {c.icon}
-                </Box>
-              </Stack>
-            </Paper>
+                </div>
+              </div>
+            </div>
           ))}
-        </Box>
+        </div>
 
-        <Box
-          sx={{
-            display: 'grid',
-            gap: 2.5,
-            gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) minmax(0, 1fr)' },
-            alignItems: 'start',
-          }}
-        >
-          <Paper elevation={0} sx={{ p: 2.5, ...softCard }}>
-            <Typography fontWeight={800} sx={{ mb: 2 }}>
+        <div className={styles.mainGrid}>
+          <div className={`${styles.softCard} ${styles.cardPad}`}>
+            <Text className={styles.sectionTitle} block>
               Order details
-            </Typography>
-            <Stack spacing={1.75}>
+            </Text>
+            <div className={styles.rows}>
               {infoRows.map((row) => (
-                <Stack key={row.label} direction="row" spacing={1.5} alignItems="flex-start">
-                  <Box
-                    sx={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 2,
-                      display: 'grid',
-                      placeItems: 'center',
-                      bgcolor: alpha(theme.palette.primary.main, 0.08),
-                      color: 'primary.main',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {row.icon}
-                  </Box>
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="caption" color="text.secondary" fontWeight={700}>
-                      {row.label}
-                    </Typography>
+                <div key={row.label} className={styles.row}>
+                  <div className={styles.rowIconBox}>{row.icon}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <Text className={styles.caption}>{row.label}</Text>
                     {typeof row.value === 'string' ? (
-                      <Typography fontWeight={600} sx={{ wordBreak: 'break-word' }}>
+                      <Text weight="semibold" style={{ wordBreak: 'break-word' }}>
                         {row.value}
-                      </Typography>
+                      </Text>
                     ) : (
                       row.value
                     )}
-                  </Box>
-                </Stack>
+                  </div>
+                </div>
               ))}
-            </Stack>
-          </Paper>
+            </div>
+          </div>
 
-          <Paper elevation={0} sx={{ p: 2.5, ...softCard }}>
-            <Typography fontWeight={800} sx={{ mb: 1.5 }}>
+          <div className={`${styles.softCard} ${styles.cardPad}`}>
+            <Text className={styles.sectionTitle} block style={{ marginBottom: 12 }}>
               Result
-            </Typography>
+            </Text>
             {order.result?.trim() || order.notes?.trim() ? (
               <ResultBody result={order.result} notes={order.notes} />
             ) : (
-              <Typography variant="body2" color="text.secondary">
-                No result recorded yet.
-              </Typography>
+              <Text className={styles.muted}>No result recorded yet.</Text>
             )}
-          </Paper>
-        </Box>
-      </Stack>
+          </div>
+        </div>
+      </div>
 
       {builderOpen && (
         <LabReportBuilderDialog

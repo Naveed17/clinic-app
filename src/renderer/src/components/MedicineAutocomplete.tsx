@@ -1,10 +1,43 @@
-import MedicationOutlinedIcon from '@mui/icons-material/MedicationOutlined';
-import { Autocomplete, Box, IconButton, TextField, Tooltip, Typography } from '@mui/material';
+import {
+  Button,
+  Combobox,
+  Field,
+  Input,
+  Option,
+  Text,
+  Tooltip,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { Medicine } from '@/types/medicine';
 import { MedicinePickerDialog } from './MedicinePickerDialog';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
+import { MedicationOutlinedIcon } from '@/icons/fluent';
+
+const useStyles = makeStyles({
+  optionRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+  },
+  price: {
+    color: tokens.colorNeutralForeground2,
+    fontSize: tokens.fontSizeBase200,
+  },
+  wrap: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: tokens.spacingHorizontalXS,
+    width: '100%',
+  },
+  field: {
+    flex: 1,
+    minWidth: 0,
+  },
+});
 
 interface Props {
   value: string;
@@ -13,7 +46,12 @@ interface Props {
   size?: 'small' | 'medium';
 }
 
-export function MedicineAutocomplete({ value, onChange, label = 'Medicine', size = 'medium' }: Props) {
+export function MedicineAutocomplete({
+  value,
+  onChange,
+  label = 'Medicine',
+}: Props): React.JSX.Element {
+  const styles = useStyles();
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
   const catalogOn = useLicense().can('manageMedicines');
@@ -26,59 +64,52 @@ export function MedicineAutocomplete({ value, onChange, label = 'Medicine', size
 
   if (!catalogOn) {
     return (
-      <TextField
-        label={label}
-        size={size}
-        value={value}
-        onChange={(e) => onChange(e.target.value, 0)}
-      />
+      <Field label={label}>
+        <Input value={value} onChange={(_, d) => onChange(d.value, 0)} />
+      </Field>
     );
   }
 
-  const selected = medicines.find((m) => m.name === value) ?? null;
-
   return (
     <>
-      <Autocomplete
-        options={medicines}
-        getOptionLabel={(m) => m.name}
-        value={selected}
-        onChange={(_, med) => {
-          if (med) onChange(med.name, Number(med.price));
-          else onChange('', 0);
-        }}
-        isOptionEqualToValue={(o, v) => o.id === v.id}
-        renderOption={(props, m) => (
-          <Box component="li" {...props} key={m.id}>
-            <Box sx={{ flex: 1 }}>
-              <Typography fontSize={13.5}>{m.name}</Typography>
-              <Typography fontSize={11.5} color="text.secondary">
-                Rs. {Number(m.price).toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-              </Typography>
-            </Box>
-          </Box>
-        )}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            label={label}
-            size={size}
-            InputProps={{
-              ...params.InputProps,
-              endAdornment: (
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  {params.InputProps.endAdornment}
-                  <Tooltip title="Add new medicine">
-                    <IconButton size="small" onMouseDown={(e) => e.preventDefault()} onClick={() => setAddOpen(true)}>
-                      <MedicationOutlinedIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              ),
+      <div className={styles.wrap}>
+        <Field label={label} className={styles.field}>
+          <Combobox
+            value={value}
+            freeform
+            placeholder="Select or type…"
+            onChange={(e) => onChange((e.target as HTMLInputElement).value, 0)}
+            onOptionSelect={(_, data) => {
+              const med = medicines.find((m) => m.name === data.optionValue);
+              if (med) onChange(med.name, Number(med.price));
+              else if (data.optionText) onChange(data.optionText, 0);
             }}
+          >
+            {medicines.map((m) => (
+              <Option key={m.id} value={m.name} text={m.name}>
+                <div className={styles.optionRow}>
+                  <Text size={300}>{m.name}</Text>
+                  <Text className={styles.price}>
+                    Rs.{' '}
+                    {Number(m.price).toLocaleString('en-PK', {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })}
+                  </Text>
+                </div>
+              </Option>
+            ))}
+          </Combobox>
+        </Field>
+        <Tooltip content="Add new medicine" relationship="label">
+          <Button
+            appearance="subtle"
+            icon={<MedicationOutlinedIcon style={{ fontSize: 18 }} />}
+            aria-label="Add new medicine"
+            onClick={() => setAddOpen(true)}
           />
-        )}
-      />
+        </Tooltip>
+      </div>
       <MedicinePickerDialog
         open={addOpen}
         onClose={() => setAddOpen(false)}

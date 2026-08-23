@@ -7,26 +7,14 @@ import {
   StyleSheet,
   Font,
 } from '@react-pdf/renderer';
-import {
-  Dialog,
-  DialogContent,
-  Box,
-  IconButton,
-  Tooltip,
-  Typography,
-  Alert,
-  CircularProgress,
-} from '@mui/material';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
-import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import type { Invoice } from '@/types/invoice';
 import { useEffect, useMemo, useRef, useState } from 'react';
 // cspell:ignore bwipjs
 import bwipjs from 'bwip-js';
-import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
 import { printInvoiceReceipt } from '@/utils/printInvoiceReceipt';
 import { POS_PAPER, POS_RECEIPT } from '@shared/invoicePaper';
 import { DEFAULT_CLINIC_LOGO, useClinicBrandLogo } from '@/utils/clinicBrandLogo';
+import { PdfPreviewDialog } from '@/components/PdfPreviewDialog';
 
 function generateBarcode(text: string): string | null {
   try {
@@ -296,84 +284,15 @@ export function InvoicePrintPreview({
   }, [autoPrint, pdfDocument]);
 
   return (
-    <Dialog
-      open
+    <PdfPreviewDialog
+      title="Invoice Receipt"
       onClose={onClose}
-      maxWidth="xs"
-      fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: 1,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          maxHeight: '90vh',
-        },
-      }}
-    >
-      <Box
-        sx={{
-          px: 2.5,
-          py: 1.5,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          flexShrink: 0,
-        }}
-      >
-        <Typography fontWeight={700} fontSize={15}>
-          Invoice Receipt
-        </Typography>
-        <Tooltip title="Close">
-          <IconButton size="small" onClick={onClose} aria-label="Close">
-            <CloseOutlinedIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Box>
-      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'auto', bgcolor: '#f1f5f9' }}>
-        {pdfDocument ? (
-          <PdfBlobPreview documentKey={documentKey} pdfDocument={pdfDocument} height={560} />
-        ) : (
-          <Box sx={{ height: 560, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Typography color="text.secondary">Loading...</Typography>
-          </Box>
-        )}
-      </DialogContent>
-      <Box
-        sx={{
-          px: 2,
-          py: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 1,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-        }}
-      >
-        {printError && <Alert severity="error">{printError}</Alert>}
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
-          <Tooltip title="Close">
-            <IconButton onClick={onClose} aria-label="Close" size="small">
-              <CloseOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={printing ? 'Printing...' : 'Print'}>
-            <span>
-              <IconButton
-                color="primary"
-                disabled={printing || !pdfDocument}
-                onClick={() => void handlePrint()}
-                aria-label="Print"
-                size="small"
-              >
-                {printing ? <CircularProgress size={18} /> : <PrintOutlinedIcon fontSize="small" />}
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
-      </Box>
-    </Dialog>
+      documentKey={documentKey}
+      pdfDocument={pdfDocument ?? undefined}
+      ready={Boolean(pdfDocument)}
+      printing={printing}
+      printError={printError}
+      onPrint={() => void handlePrint()}
+    />
   );
 }

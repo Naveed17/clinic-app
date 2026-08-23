@@ -1,22 +1,46 @@
-import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import {
-  Alert,
-  Box,
   Button,
   Dialog,
   DialogActions,
+  DialogBody,
   DialogContent,
-  InputAdornment,
-  Stack,
-  TextField,
-} from '@mui/material';
-import {
-  FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps,
-} from '@/components/DialogUI';
+  DialogSurface,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
+import { FormDialogTitle, SubmitButton } from '@/components/DialogUI';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { Medicine } from '@/types/medicine';
+import { AddOutlinedIcon } from '@/icons/fluent';
+
+const useStyles = makeStyles({
+  surface: {
+    maxWidth: '400px',
+    width: '100%',
+  },
+  body: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+  },
+  actions: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    gap: tokens.spacingHorizontalS,
+  },
+});
 
 interface Props {
   open: boolean;
@@ -25,6 +49,7 @@ interface Props {
 }
 
 export function MedicinePickerDialog({ open, onClose, onAdded }: Props) {
+  const styles = useStyles();
   const qc = useQueryClient();
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
@@ -34,7 +59,9 @@ export function MedicinePickerDialog({ open, onClose, onAdded }: Props) {
     mutationFn: () => window.clinic.medicines.create(name.trim(), parseFloat(price) || 0),
     onSuccess: async (med: Medicine) => {
       await qc.invalidateQueries({ queryKey: ['medicines'] });
-      setName(''); setPrice(''); setError('');
+      setName('');
+      setPrice('');
+      setError('');
       onAdded(med);
       onClose();
     },
@@ -43,52 +70,69 @@ export function MedicinePickerDialog({ open, onClose, onAdded }: Props) {
   });
 
   function handleClose() {
-    setName(''); setPrice(''); setError('');
+    setName('');
+    setPrice('');
+    setError('');
     onClose();
   }
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
-      <FormDialogTitle title="Add New Medicine" subtitle="Quick-add a medicine to the catalog." />
-      <DialogContent sx={dialogContentSx}>
-        <Stack spacing={2} sx={{ mt: 0.5 }}>
-          {error && <Alert severity="error">{error}</Alert>}
-          <TextField
-            label="Medicine name"
-            fullWidth
-            size="small"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-          />
-          <TextField
-            label="Price"
-            size="small"
-            type="number"
-            fullWidth
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            InputProps={{ startAdornment: <InputAdornment position="start">Rs.</InputAdornment> }}
-            slotProps={{ htmlInput: { min: 0, step: 'any' } }}
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={dialogActionsSx}>
-        <Button onClick={handleClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
-        <SubmitButton
-          startIcon={<AddOutlinedIcon />}
-          disabled={!name.trim()}
-          loading={mutation.isPending}
-          onClick={() => mutation.mutate()}
-        >
-          Add Medicine
-        </SubmitButton>
-      </DialogActions>
+    <Dialog
+      open={open}
+      onOpenChange={(_, data) => {
+        if (!data.open) handleClose();
+      }}
+    >
+      <DialogSurface className={styles.surface}>
+        <FormDialogTitle title="Add New Medicine" subtitle="Quick-add a medicine to the catalog." />
+        <DialogBody>
+          <DialogContent className={styles.body}>
+            {error ? (
+              <MessageBar intent="error">
+                <MessageBarBody>{error}</MessageBarBody>
+              </MessageBar>
+            ) : null}
+            <Field label="Medicine name">
+              <Input value={name} onChange={(_, d) => setName(d.value)} autoFocus />
+            </Field>
+            <Field label="Price">
+              <Input
+                type="number"
+                value={price}
+                onChange={(_, d) => setPrice(d.value)}
+                contentBefore="Rs."
+                min={0}
+                step="any"
+              />
+            </Field>
+          </DialogContent>
+        </DialogBody>
+        <DialogActions className={styles.actions}>
+          <Button appearance="secondary" onClick={handleClose} disabled={mutation.isPending}>
+            Cancel
+          </Button>
+          <SubmitButton
+            icon={<AddOutlinedIcon />}
+            disabled={!name.trim()}
+            loading={mutation.isPending}
+            onClick={() => mutation.mutate()}
+          >
+            Add Medicine
+          </SubmitButton>
+        </DialogActions>
+      </DialogSurface>
     </Dialog>
   );
 }
 
-export function MedicineUpdatePriceDialog({ medicine, onClose }: { medicine: Medicine; onClose: () => void }) {
+export function MedicineUpdatePriceDialog({
+  medicine,
+  onClose,
+}: {
+  medicine: Medicine;
+  onClose: () => void;
+}) {
+  const styles = useStyles();
   const qc = useQueryClient();
   const [price, setPrice] = useState(String(medicine.price));
 
@@ -102,29 +146,41 @@ export function MedicineUpdatePriceDialog({ medicine, onClose }: { medicine: Med
   });
 
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
-      <FormDialogTitle title={`Update Price — ${medicine.name}`} subtitle="Set the new sale price for this medicine." />
-      <DialogContent sx={dialogContentSx}>
-        <Box sx={{ mt: 0.5 }}>
-          <TextField
-            label="New Price"
-            size="small"
-            type="number"
-            fullWidth
-            autoFocus
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            InputProps={{ startAdornment: <InputAdornment position="start">Rs.</InputAdornment> }}
-            slotProps={{ htmlInput: { min: 0, step: 'any' } }}
-          />
-        </Box>
-      </DialogContent>
-      <DialogActions sx={dialogActionsSx}>
-        <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
-        <SubmitButton loading={mutation.isPending} onClick={() => mutation.mutate()}>
-          Save
-        </SubmitButton>
-      </DialogActions>
+    <Dialog
+      open
+      onOpenChange={(_, data) => {
+        if (!data.open) onClose();
+      }}
+    >
+      <DialogSurface className={styles.surface}>
+        <FormDialogTitle
+          title={`Update Price — ${medicine.name}`}
+          subtitle="Set the new sale price for this medicine."
+        />
+        <DialogBody>
+          <DialogContent className={styles.body}>
+            <Field label="New Price">
+              <Input
+                type="number"
+                value={price}
+                onChange={(_, d) => setPrice(d.value)}
+                contentBefore="Rs."
+                autoFocus
+                min={0}
+                step="any"
+              />
+            </Field>
+          </DialogContent>
+        </DialogBody>
+        <DialogActions className={styles.actions}>
+          <Button appearance="secondary" onClick={onClose} disabled={mutation.isPending}>
+            Cancel
+          </Button>
+          <SubmitButton loading={mutation.isPending} onClick={() => mutation.mutate()}>
+            Save
+          </SubmitButton>
+        </DialogActions>
+      </DialogSurface>
     </Dialog>
   );
 }

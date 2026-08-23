@@ -1,20 +1,52 @@
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import FormatBoldIcon from '@mui/icons-material/FormatBold';
-import FormatItalicIcon from '@mui/icons-material/FormatItalic';
-import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
-import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
-import HorizontalRuleIcon from '@mui/icons-material/HorizontalRule';
-import RedoIcon from '@mui/icons-material/Redo';
-import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
-import TitleOutlinedIcon from '@mui/icons-material/TitleOutlined';
-import UndoIcon from '@mui/icons-material/Undo';
-import { Box, IconButton, Stack, Tooltip } from '@mui/material';
+import { Button, Tooltip, makeStyles } from '@fluentui/react-components';
 import { useEffect, useState } from 'react';
 import { labTableExtensions } from './labTiptapTable';
+import {
+  FormatBoldIcon,
+  FormatItalicIcon,
+  FormatListBulletedIcon,
+  FormatListNumberedIcon,
+  HorizontalRuleIcon,
+  RedoIcon,
+  TableChartOutlinedIcon,
+  TitleOutlinedIcon,
+  UndoIcon,
+} from '@/icons/fluent';
 
 const INK = '#0f172a';
 const BLUE = '#1a6fa8';
+
+const useStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 0,
+    flex: 1,
+  },
+  toolbar: {
+    display: 'flex',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: '2px',
+    paddingLeft: '8px',
+    paddingRight: '8px',
+    paddingTop: '4px',
+    paddingBottom: '4px',
+    borderBottom: '1px solid #e2e8f0',
+    backgroundColor: '#f8fafc',
+  },
+  editor: {
+    flex: 1,
+    overflow: 'auto',
+    paddingLeft: '20px',
+    paddingRight: '20px',
+    paddingTop: '16px',
+    paddingBottom: '16px',
+    backgroundColor: '#fff',
+  },
+});
 
 interface LabTiptapEditorProps {
   content: string;
@@ -29,6 +61,7 @@ export function LabTiptapEditor({
   onEditor,
   minHeight = 420,
 }: LabTiptapEditorProps): React.JSX.Element {
+  const styles = useStyles();
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -64,138 +97,109 @@ export function LabTiptapEditor({
   const tools = [
     {
       title: 'Heading',
-      icon: <TitleOutlinedIcon fontSize="small" />,
+      icon: <TitleOutlinedIcon style={{ fontSize: 18 }} />,
       run: () => editor?.chain().focus().toggleHeading({ level: 3 }).run(),
       active: editor?.isActive('heading', { level: 3 }),
     },
     {
       title: 'Bold',
-      icon: <FormatBoldIcon fontSize="small" />,
+      icon: <FormatBoldIcon style={{ fontSize: 18 }} />,
       run: () => editor?.chain().focus().toggleBold().run(),
       active: editor?.isActive('bold'),
     },
     {
       title: 'Italic',
-      icon: <FormatItalicIcon fontSize="small" />,
+      icon: <FormatItalicIcon style={{ fontSize: 18 }} />,
       run: () => editor?.chain().focus().toggleItalic().run(),
       active: editor?.isActive('italic'),
     },
     {
       title: 'Bullets',
-      icon: <FormatListBulletedIcon fontSize="small" />,
+      icon: <FormatListBulletedIcon style={{ fontSize: 18 }} />,
       run: () => editor?.chain().focus().toggleBulletList().run(),
       active: editor?.isActive('bulletList'),
     },
     {
       title: 'Numbers',
-      icon: <FormatListNumberedIcon fontSize="small" />,
+      icon: <FormatListNumberedIcon style={{ fontSize: 18 }} />,
       run: () => editor?.chain().focus().toggleOrderedList().run(),
       active: editor?.isActive('orderedList'),
     },
     {
       title: 'Insert table',
-      icon: <TableChartOutlinedIcon fontSize="small" />,
+      icon: <TableChartOutlinedIcon style={{ fontSize: 18 }} />,
       run: () => editor?.chain().focus().insertLabTable(4, 4).run(),
     },
     {
       title: 'Divider',
-      icon: <HorizontalRuleIcon fontSize="small" />,
+      icon: <HorizontalRuleIcon style={{ fontSize: 18 }} />,
       run: () => editor?.chain().focus().setHorizontalRule().run(),
     },
     {
       title: 'Undo',
-      icon: <UndoIcon fontSize="small" />,
+      icon: <UndoIcon style={{ fontSize: 18 }} />,
       run: () => editor?.chain().focus().undo().run(),
     },
     {
       title: 'Redo',
-      icon: <RedoIcon fontSize="small" />,
+      icon: <RedoIcon style={{ fontSize: 18 }} />,
       run: () => editor?.chain().focus().redo().run(),
     },
   ];
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
-      <Stack
-        direction="row"
-        spacing={0.25}
-        sx={{
-          px: 1,
-          py: 0.5,
-          borderBottom: '1px solid #e2e8f0',
-          bgcolor: '#f8fafc',
-          flexWrap: 'wrap',
-        }}
-      >
+    <div className={styles.root}>
+      <div className={styles.toolbar}>
         {tools.map((tool) => (
-          <Tooltip key={tool.title} title={tool.title}>
-            <span>
-              <IconButton
-                size="small"
-                disabled={!editor}
-                onClick={tool.run}
-                sx={{ color: tool.active ? BLUE : '#64748b' }}
-              >
-                {tool.icon}
-              </IconButton>
-            </span>
+          <Tooltip key={tool.title} content={tool.title} relationship="label">
+            <Button
+              appearance="subtle"
+              size="small"
+              disabled={!editor}
+              icon={tool.icon}
+              onClick={tool.run}
+              style={{ color: tool.active ? BLUE : '#64748b' }}
+            />
           </Tooltip>
         ))}
-      </Stack>
-      <Box
-        sx={{
-          flex: 1,
-          minHeight,
-          overflow: 'auto',
-          px: 2.5,
-          py: 2,
-          bgcolor: '#fff',
-          '& .ProseMirror': {
-            outline: 'none',
-            minHeight,
-            fontSize: 14,
-            lineHeight: 1.65,
-            color: `${INK} !important`,
-            caretColor: BLUE,
-            '& p': { m: 0, mb: 1 },
-            '& h2': { fontSize: 20, fontWeight: 800, color: `${BLUE} !important`, mt: 0, mb: 0.75 },
-            '& h3': {
-              fontSize: 13.5,
-              fontWeight: 800,
-              letterSpacing: 0.4,
-              textTransform: 'uppercase',
-              color: `${BLUE} !important`,
-              mt: 2,
-              mb: 0.75,
-            },
-            '& ul, & ol': { pl: 2.75, my: 1 },
-            '& strong': { fontWeight: 700 },
-            '& .lab-tiptap-table, & table': {
-              width: '100%',
-              borderCollapse: 'collapse',
-              margin: '8px 0 16px',
-              fontSize: 13,
-            },
-            '& th, & td': {
-              border: '1px solid #cbd5e1',
-              padding: '6px 8px',
-              verticalAlign: 'top',
-            },
-            '& th': {
-              background: '#e8f1f8',
-              color: BLUE,
-              fontWeight: 800,
-              textAlign: 'left',
-              fontSize: 11.5,
-              letterSpacing: 0.3,
-              textTransform: 'uppercase',
-            },
-            '& th p, & td p': { mb: 0 },
-          },
-        }}
-      >
-        <EditorContent editor={editor} />
-      </Box>
-    </Box>
+      </div>
+      <div className={styles.editor} style={{ minHeight }}>
+        <style>{`
+          .lab-tiptap-root .ProseMirror {
+            outline: none;
+            min-height: ${minHeight}px;
+            font-size: 14px;
+            line-height: 1.65;
+            color: ${INK} !important;
+            caret-color: ${BLUE};
+          }
+          .lab-tiptap-root .ProseMirror p { margin: 0 0 8px; }
+          .lab-tiptap-root .ProseMirror h2 { font-size: 20px; font-weight: 800; color: ${BLUE} !important; margin: 0 0 6px; }
+          .lab-tiptap-root .ProseMirror h3 {
+            font-size: 13.5px; font-weight: 800; letter-spacing: 0.4px;
+            text-transform: uppercase; color: ${BLUE} !important; margin: 16px 0 6px;
+          }
+          .lab-tiptap-root .ProseMirror ul, .lab-tiptap-root .ProseMirror ol { padding-left: 22px; margin: 8px 0; }
+          .lab-tiptap-root .ProseMirror strong { font-weight: 700; }
+          .lab-tiptap-root .ProseMirror .lab-tiptap-table,
+          .lab-tiptap-root .ProseMirror table {
+            width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 13px;
+          }
+          .lab-tiptap-root .ProseMirror th,
+          .lab-tiptap-root .ProseMirror td {
+            border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: top;
+          }
+          .lab-tiptap-root .ProseMirror th {
+            background: #e8f1f8; color: ${BLUE}; font-weight: 800; text-align: left;
+            font-size: 11.5px; letter-spacing: 0.3px; text-transform: uppercase;
+          }
+          .lab-tiptap-root .ProseMirror th p,
+          .lab-tiptap-root .ProseMirror td p { margin-bottom: 0; }
+        `}</style>
+        <div className="lab-tiptap-root">
+          <EditorContent editor={editor} />
+        </div>
+      </div>
+    </div>
   );
 }

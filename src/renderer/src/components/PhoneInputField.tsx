@@ -1,82 +1,104 @@
 import type { JSX } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { getCountryCallingCode, parsePhoneNumberFromString } from 'libphonenumber-js';
-import { MuiTelInput, type MuiTelInputCountry, type MuiTelInputInfo, type MuiTelInputProps } from 'mui-tel-input';
+import { Field } from '@fluentui/react-components';
+import PhoneInput, {
+  getCountryCallingCode,
+  type Country,
+} from 'react-phone-number-input';
 import { toPhoneDigits } from '@shared/whatsappPhone';
 
-export type PhoneInputFieldProps = Omit<
-  MuiTelInputProps,
-  'value' | 'onChange' | 'defaultCountry' | 'forceCallingCode'
-> & {
+export type PhoneInputFieldProps = {
   value?: string | null;
   onChange: (digits: string) => void;
   /** ISO country when the field is empty. Default PK. */
-  defaultCountry?: MuiTelInputCountry;
+  defaultCountry?: Country;
+  label?: string;
+  required?: boolean;
+  disabled?: boolean;
+  placeholder?: string;
+  className?: string;
+  validationMessage?: string;
+  validationState?: 'error' | 'warning' | 'success' | 'none';
+  /** Ignored — MUI-compat */
+  size?: string;
+  fullWidth?: boolean;
 };
 
 function digitsOf(raw: string | null | undefined): string {
   return String(raw || '').replace(/\D/g, '');
 }
 
-/** Stored 92300… / 97150… → +92300… / +97150… when hydrating from outside the input. */
-function toTelValue(raw: string | null | undefined, defaultCountry: MuiTelInputCountry): string {
+/** Stored 92300… → E.164 +92300… for the phone widget. */
+function toE164(raw: string | null | undefined): string | undefined {
   const n = digitsOf(raw);
-  if (!n) return '';
-  const parsed =
-    parsePhoneNumberFromString(`+${n}`) || parsePhoneNumberFromString(n, defaultCountry);
-  if (parsed?.number && digitsOf(parsed.number) === n) return parsed.number;
-  if (n.startsWith('0')) {
-    try {
-      return `+${getCountryCallingCode(defaultCountry)}${n.replace(/^0+/, '')}`;
-    } catch {
-      return `+${n}`;
-    }
-  }
-  return `+${n}`;
+  return n ? `+${n}` : undefined;
 }
 
 /**
- * Country-aware phone input. Emits digits-only E.164 without '+'
- * using the calling code of the selected flag (PK → 92, AE → 971, US → 1, …).
+ * Country-aware phone input (`react-phone-number-input`).
+ * Emits digits-only E.164 without '+' (same contract as before).
  */
 export function PhoneInputField({
   value,
   onChange,
   defaultCountry = 'PK',
-  fullWidth = true,
-  MenuProps,
-  ...rest
+  label,
+  required,
+  disabled,
+  placeholder,
+  className,
+  validationMessage,
+  validationState,
 }: PhoneInputFieldProps): JSX.Element {
   const incoming = digitsOf(value);
-  const [display, setDisplay] = useState(() => toTelValue(value, defaultCountry));
+  const [e164, setE164] = useState<string | undefined>(() => toE164(value));
+  const [country, setCountry] = useState<Country>(defaultCountry);
   const lastEmitted = useRef(incoming);
 
   useEffect(() => {
     if (incoming === lastEmitted.current) return;
     lastEmitted.current = incoming;
-    setDisplay(toTelValue(value, defaultCountry));
-  }, [incoming, value, defaultCountry]);
+    setE164(toE164(value));
+  }, [incoming, value]);
 
-  return (
-    <MuiTelInput
-      {...rest}
-      fullWidth={fullWidth}
+  const input = (
+    <PhoneInput
+      className={['PhoneInputField', className].filter(Boolean).join(' ')}
+      international
       defaultCountry={defaultCountry}
-      forceCallingCode
-      disableFormatting
-      focusOnSelectCountry
-      preferredCountries={['PK', 'US', 'GB', 'AE', 'SA']}
-      MenuProps={{ disableAutoFocusItem: true, sx: { zIndex: 2000 }, ...MenuProps }}
-      value={display}
-      onChange={(next, info: MuiTelInputInfo) => {
-        setDisplay(next);
-        const cc = info.countryCallingCode || '';
-        // Use the typed string, not info.numberValue — that is often just +92
-        // until the national number is complete, which wipes digits as you type.
-        const out = toPhoneDigits(next, cc);
+      country={country}
+      value={e164}
+      disabled={disabled}
+      placeholder={placeholder ?? 'Enter phone number'}
+      onCountryChange={(next) => {
+        if (next) setCountry(next);
+      }}
+      onChange={(next) => {
+        const v = next || undefined;
+        setE164(v);
+        let cc = '';
+        try {
+          cc = String(getCountryCallingCode(country));
+        } catch {
+          cc = '';
+        }
+        const out = toPhoneDigits(v || '', cc);
         lastEmitted.current = out;
         onChange(out);
       }}
     />
+  );
+
+  if (!label) return input;
+
+  return (
+    <Field
+      label={label}
+      required={required}
+      validationMessage={validationMessage}
+      validationState={validationState}
+    >
+      {input}
+    </Field>
   );
 }

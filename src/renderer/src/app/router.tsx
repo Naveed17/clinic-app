@@ -30,8 +30,7 @@ import { LicensePage } from '@/features/auth/LicensePage';
 import { LicenseDisabledOverlay } from '@/features/auth/LicenseDisabledOverlay';
 import { SetupWizard } from '@/features/auth/SetupWizard';
 import { useState, useEffect, useCallback } from 'react';
-import Box from '@mui/material/Box';
-import { CircularProgress } from '@mui/material';
+import { Spinner } from '@fluentui/react-components';
 
 const router = createHashRouter([
   {
@@ -270,9 +269,16 @@ export function AppRouter(): React.JSX.Element {
 
   if (gate === null || (gate.state === 'ok' && setupDone === null)) {
     return (
-      <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default' }}>
-        <CircularProgress />
-      </Box>
+      <div
+        style={{
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Spinner size="large" label="Loading…" />
+      </div>
     );
   }
 

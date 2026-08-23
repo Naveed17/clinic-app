@@ -1,40 +1,44 @@
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
-import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
-import PersonOffOutlinedIcon from '@mui/icons-material/PersonOffOutlined';
-import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import TableRowsOutlinedIcon from '@mui/icons-material/TableRowsOutlined';
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
-import RepeatOutlinedIcon from '@mui/icons-material/RepeatOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  Alert,
   Avatar,
-  Box,
+  Badge,
   Button,
-  Chip,
+  Combobox,
   Dialog,
   DialogActions,
+  DialogBody,
   DialogContent,
-  FormControl,
-  FormControlLabel,
-  IconButton,
-  InputLabel,
-  MenuItem,
-  Paper,
-  Stack,
+  DialogSurface,
+  Dropdown,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  Option,
   Switch,
-  TextField,
-  ToggleButton,
-  ToggleButtonGroup,
+  TableCellLayout,
+  Text,
+  Textarea,
   Tooltip,
-  Typography,
-  Autocomplete,
-  Select,
-} from '@mui/material';
+  createTableColumn,
+  makeStyles,
+  tokens,
+  type BadgeProps,
+  type TableColumnDefinition,
+} from '@fluentui/react-components';
+import {
+  Add24Regular,
+  ArrowRepeatAll24Regular,
+  CalendarLtr24Regular,
+  CheckmarkCircle24Regular,
+  Delete24Regular,
+  DismissCircle24Regular,
+  Edit24Regular,
+  Eye24Regular,
+  PersonArrowRight24Regular,
+  PersonDelete24Regular,
+  Table24Regular,
+} from '@fluentui/react-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -42,38 +46,34 @@ import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { AppointmentCalendar } from '@/components/AppointmentCalendar';
+import { FluentDateField, FluentTimeField, formatDateIso, parseDateIso } from '@/components/FluentDateField';
 import { appointmentsService } from '@/services/appointments.service';
 import { patientsService } from '@/services/patients.service';
 import type { Appointment, AppointmentInput, AppointmentPerson } from '@/types/appointment';
 import type { Token, TokenPerson } from '@/types/token';
 import { TokenFeeFields } from '@/features/tokens/TokenFeeFields';
 import { nextFreeSlot, doctorOfflineReason, slotSearchFrom, type SlotAdjustReason } from '@/utils/appointmentSlot';
-import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
-import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
-  ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogFormSx, dialogPaperProps,
-} from '@/components/DialogUI';
+  actionBtnStyle,
+  TablePageShell,
+  SearchField,
+  TablePager,
+  DataGridTable,
+} from '@/components/TableUI';
+import { TableRowsSkeleton } from '@/components/LoadingUI';
+import { ConfirmDialog, FormDialogTitle, SubmitButton } from '@/components/DialogUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
 
-const statusConfig: Record<string, { label: string; color: 'default' | 'primary' | 'warning' | 'success' | 'error'; hex: string }> = {
-  SCHEDULED: { label: 'Scheduled', color: 'primary', hex: '#1976d2' },
-  CHECKED_IN: { label: 'Checked In', color: 'warning', hex: '#ed6c02' },
-  COMPLETED: { label: 'Completed', color: 'success', hex: '#2e7d32' },
-  CANCELLED: { label: 'Cancelled', color: 'default', hex: '#9e9e9e' },
-  NO_SHOW: { label: 'No Show', color: 'error', hex: '#d32f2f' },
+type StatusColor = NonNullable<BadgeProps['color']>;
+
+const statusConfig: Record<string, { label: string; color: StatusColor }> = {
+  SCHEDULED: { label: 'Scheduled', color: 'brand' },
+  CHECKED_IN: { label: 'Checked In', color: 'warning' },
+  COMPLETED: { label: 'Completed', color: 'success' },
+  CANCELLED: { label: 'Cancelled', color: 'subtle' },
+  NO_SHOW: { label: 'No Show', color: 'danger' },
 };
-
-const filterSelectSx = {
-  borderRadius: 0.5,
-  fontSize: 13.5,
-  fontWeight: 500,
-  bgcolor: 'background.paper',
-  '& .MuiOutlinedInput-notchedOutline': { borderRadius: 0.5 },
-} as const;
 
 type FormValues = {
   patientId: string;
@@ -122,12 +122,195 @@ function personLabel(person: AppointmentPerson): string {
   return `${person.firstName} ${person.lastName}`;
 }
 
-function IssueTokenInline({ patientId, date, providerId, onIssued }: {
+const useStyles = makeStyles({
+  surface: {
+    maxWidth: '520px',
+    width: '100%',
+    maxHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
+  },
+  body: {
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflowY: 'auto',
+  },
+  fields: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+  actionsBar: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    gap: tokens.spacingHorizontalS,
+    flexShrink: 0,
+  },
+  grid2: {
+    display: 'grid',
+    gap: tokens.spacingHorizontalM,
+    gridTemplateColumns: '1fr 1fr',
+  },
+  personMeta: {
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 0,
+  },
+  name: {
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  muted: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground2,
+  },
+  actions: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalXXS,
+    justifyContent: 'flex-end',
+  },
+  toolbar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    flex: 1,
+    minWidth: 0,
+    flexWrap: 'wrap',
+  },
+  filter: {
+    minWidth: '150px',
+    flexShrink: 0,
+  },
+  errorBar: {
+    marginLeft: tokens.spacingHorizontalL,
+    marginRight: tokens.spacingHorizontalL,
+    marginBottom: tokens.spacingVerticalS,
+  },
+  page: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    minHeight: 0,
+  },
+  calendarPage: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalL,
+    flex: 1,
+    minHeight: 0,
+  },
+  calendarHeader: {
+    display: 'flex',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalL,
+    flexWrap: 'wrap',
+  },
+  titles: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+  },
+  subtitle: {
+    color: tokens.colorNeutralForeground2,
+  },
+  headerActions: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalS,
+    alignItems: 'center',
+  },
+  viewToggle: {
+    display: 'flex',
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    borderRadius: tokens.borderRadiusMedium,
+    overflow: 'hidden',
+  },
+  calendarCard: {
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    position: 'relative',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusXLarge,
+    backgroundColor: tokens.colorNeutralBackground1,
+  },
+  tokenWarn: {
+    marginTop: tokens.spacingVerticalS,
+    padding: tokens.spacingVerticalM,
+    border: `1px dashed ${tokens.colorPaletteYellowBorder2}`,
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorPaletteYellowBackground1,
+  },
+  tokenWarnTitle: {
+    display: 'block',
+    marginBottom: tokens.spacingVerticalS,
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorPaletteYellowForeground1,
+    fontSize: tokens.fontSizeBase200,
+  },
+  tokenRow: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalS,
+    alignItems: 'flex-end',
+    marginTop: tokens.spacingVerticalS,
+  },
+  doctorOption: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    width: '100%',
+  },
+  doctorFee: {
+    marginLeft: 'auto',
+    whiteSpace: 'nowrap',
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground2,
+  },
+  recurringRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+  },
+  nowrap: {
+    whiteSpace: 'nowrap',
+  },
+  mono: {
+    fontFamily: 'ui-monospace, Consolas, monospace',
+    fontWeight: tokens.fontWeightBold,
+  },
+});
+
+function IssueTokenInline({
+  patientId,
+  date,
+  providerId,
+  onIssued,
+}: {
   patientId: string;
   date: string;
   providerId: string;
   onIssued: (token: Token) => void;
-}) {
+}): React.JSX.Element {
+  const styles = useStyles();
   const qc = useQueryClient();
   const { can } = useLicense();
   const showLabReason = can('labDashboard');
@@ -168,11 +351,10 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
     },
     meta: { silent: true },
   });
+  const reasonLabel = reason || '— None —';
   return (
-    <Box sx={{ mt: 1.5, p: 1.5, border: '1px dashed', borderColor: 'warning.main', borderRadius: 2, bgcolor: 'warning.50' }}>
-      <Typography variant="caption" color="warning.dark" fontWeight={600} sx={{ mb: 1, display: 'block' }}>
-        No token found — issue one now
-      </Typography>
+    <div className={styles.tokenWarn}>
+      <Text className={styles.tokenWarnTitle}>No token found — issue one now</Text>
       <TokenFeeFields
         consultationFee={consultationFee}
         feeDiscount={feeDiscount}
@@ -181,38 +363,51 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
         priorVisitsThisWeek={weekVisits?.count ?? 0}
         compact
       />
-      <Stack direction="row" spacing={1}>
-        <TextField
-          select size="small" label="Reason (optional)" value={reason}
-          onChange={(e) => setReason(e.target.value)} sx={{ flex: 1 }}
-        >
-          <MenuItem value="">— None —</MenuItem>
-          <MenuItem value="Checkup">Checkup</MenuItem>
-          <MenuItem value="Follow-up">Follow-up</MenuItem>
-          <MenuItem value="Urgent">Urgent</MenuItem>
-          <MenuItem value="Consultation">Consultation</MenuItem>
-          {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
-          <MenuItem value="Vaccination">Vaccination</MenuItem>
-        </TextField>
+      <div className={styles.tokenRow}>
+        <Field label="Reason (optional)" style={{ flex: 1 }}>
+          <Dropdown
+            value={reasonLabel}
+            selectedOptions={[reason]}
+            onOptionSelect={(_, data) => {
+              if (data.optionValue !== undefined) setReason(data.optionValue);
+            }}
+          >
+            <Option value="" text="— None —">— None —</Option>
+            <Option value="Checkup" text="Checkup">Checkup</Option>
+            <Option value="Follow-up" text="Follow-up">Follow-up</Option>
+            <Option value="Urgent" text="Urgent">Urgent</Option>
+            <Option value="Consultation" text="Consultation">Consultation</Option>
+            {showLabReason && <Option value="Lab Results" text="Lab Results">Lab Results</Option>}
+            <Option value="Vaccination" text="Vaccination">Vaccination</Option>
+          </Dropdown>
+        </Field>
         <Button
-          variant="contained" color="warning" size="small"
-          disabled={!providerId}
-          loading={mutation.isPending}
+          appearance="primary"
+          disabled={!providerId || mutation.isPending}
           onClick={() => mutation.mutate()}
         >
           Issue Token
         </Button>
-      </Stack>
+      </div>
       {mutation.isError && (
-        <Typography variant="caption" color="error">
-          {(mutation.error as Error)?.message || 'Failed to issue token.'}
-        </Typography>
+        <MessageBar intent="error" style={{ marginTop: tokens.spacingVerticalS }}>
+          <MessageBarBody>
+            {(mutation.error as Error)?.message || 'Failed to issue token.'}
+          </MessageBarBody>
+        </MessageBar>
       )}
-    </Box>
+    </div>
   );
 }
 
-export function AppointmentDialog({ appointment, open, onClose, defaultDate, defaultProviderId, onSuccess }: {
+export function AppointmentDialog({
+  appointment,
+  open,
+  onClose,
+  defaultDate,
+  defaultProviderId,
+  onSuccess,
+}: {
   appointment?: Appointment;
   open: boolean;
   onClose: () => void;
@@ -220,8 +415,8 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   defaultProviderId?: string;
   onSuccess?: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const { can } = useLicense();
   const showLabReason = can('labDashboard');
   const [slotNotice, setSlotNotice] = useState<SlotAdjustReason | null>(null);
@@ -238,8 +433,8 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
     recurring: z.boolean(),
     recurrenceCount: z.number().min(2).max(52),
   });
-  type FormValues = z.infer<typeof schema>;
-  const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: empty });
+  type DialogFormValues = z.infer<typeof schema>;
+  const form = useForm<DialogFormValues>({ resolver: zodResolver(schema), defaultValues: empty });
   const patients = useQuery({
     queryKey: ['patients', { page: 1, pageSize: 1000 }],
     queryFn: () => patientsService.list({ page: 1, pageSize: 1000, search: '' }),
@@ -247,10 +442,13 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
     retry: 3,
   });
 
-  const doctors = useQuery({ queryKey: ['doctors'], queryFn: appointmentsService.doctors, staleTime: 5 * 60 * 1000, retry: 3 });
-  function personLabel(person: AppointmentPerson): string {
-    return `${person.firstName} ${person.lastName}`;
-  }
+  const doctors = useQuery({
+    queryKey: ['doctors'],
+    queryFn: appointmentsService.doctors,
+    staleTime: 5 * 60 * 1000,
+    retry: 3,
+  });
+
   function feeLabel(fee?: number): string {
     return `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(fee) || 0)}`;
   }
@@ -268,6 +466,8 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   const date = form.watch('date');
   const providerId = form.watch('providerId');
   const duration = form.watch('duration');
+  const reason = form.watch('reason');
+  const recurring = form.watch('recurring');
 
   const { data: tokenForPatient } = useQuery<Token | null>({
     queryKey: ['token-for-patient', patientId, date],
@@ -292,16 +492,15 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
     const slot = schedule.find((s) => s.dayOfWeek === day);
     return slot?.isActive ? `${slot.startTime}–${slot.endTime}` : null;
   }, [schedule, date]);
-  const offlineReason = open && providerId && date && scheduleFetched
-    ? doctorOfflineReason(schedule, date)
-    : null;
+  const offlineReason =
+    open && providerId && date && scheduleFetched ? doctorOfflineReason(schedule, date) : null;
 
   useEffect(() => {
     if (!appointment) form.setValue('tokenId', tokenForPatient?.id ?? '');
   }, [tokenForPatient, appointment, form]);
 
   const mutation = useMutation({
-    mutationFn: (values: FormValues) => {
+    mutationFn: (values: DialogFormValues) => {
       const startsAt = new Date(`${values.date}T${values.time}:00`);
       const input: AppointmentInput = {
         patientId: values.patientId,
@@ -324,8 +523,10 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
           const raw = saved as Appointment;
           const next: Appointment = {
             ...raw,
-            patient: raw.patient ?? patient ?? { id: values.patientId, firstName: '', lastName: '', role: 'patient' },
-            provider: raw.provider ?? provider ?? { id: values.providerId, firstName: '', lastName: '', role: 'doctor' },
+            patient:
+              raw.patient ?? patient ?? { id: values.patientId, firstName: '', lastName: '', role: 'patient' },
+            provider:
+              raw.provider ?? provider ?? { id: values.providerId, firstName: '', lastName: '', role: 'doctor' },
             status: raw.status ?? 'SCHEDULED',
           };
           const idx = list.findIndex((a) => a.id === next.id);
@@ -350,7 +551,11 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
     if (appointment) {
       form.reset(appointmentValues(appointment));
     } else {
-      form.reset({ ...empty, date: defaultDate ?? empty.date, providerId: defaultProviderId ?? empty.providerId });
+      form.reset({
+        ...empty,
+        date: defaultDate ?? empty.date,
+        providerId: defaultProviderId ?? empty.providerId,
+      });
     }
   }, [appointment, defaultDate, defaultProviderId, form, open]);
 
@@ -370,280 +575,286 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   }, [open, appointment, providerId, duration, schedule, doctorAppts, defaultDate, form]);
 
   const { errors } = form.formState;
+  const selectedPatient = patientOptions.find((p) => p.id === patientId) ?? null;
+  const selectedDoctor = doctorOptions.find((p) => p.id === providerId) ?? null;
 
   return (
-    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
-      <FormDialogTitle
-        title={appointment ? 'Update appointment' : 'Create appointment'}
-        subtitle={appointment ? 'Edit schedule, doctor, and visit details.' : 'Book a new patient visit.'}
-      />
-      <Box component="form" onSubmit={form.handleSubmit((v) => { if (offlineReason) return; mutation.mutate(v); })} sx={dialogFormSx}>
-        <DialogContent sx={dialogContentSx}>
-          <Stack spacing={2.25}>
-            {mutation.isError && (
-              <Alert severity="error">
-                {(mutation.error as Error)?.message || 'Unable to save the appointment.'}
-              </Alert>
-            )}
-            {offlineReason && (
-              <Alert severity="warning">{offlineReason}</Alert>
-            )}
-            {slotNotice === 'busy' && (
-              <Alert severity="warning">
-                This time is already booked. Moved 30 minutes forward, or to the end of the current visit.
-              </Alert>
-            )}
-            {slotNotice === 'schedule' && (
-              <Alert severity="info">
-                {hoursLabel
-                  ? `Outside doctor hours (${hoursLabel}). Moved to the next available time.`
-                  : 'This day is off in Doctor Schedule. Moved to the next working day.'}
-              </Alert>
-            )}
-
-            <Controller
-              name="patientId"
-              control={form.control}
-              render={({ field }) => (
-                <Autocomplete
-                  options={patientOptions}
-                  loading={patients.isLoading}
-                  value={patientOptions.find((p) => p.id === field.value) ?? null}
-                  isOptionEqualToValue={(option, value) => option.id === value.id}
-                  getOptionLabel={(option) => personLabel(option)}
-                  onChange={(_, value) => field.onChange(value?.id ?? '')}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      fullWidth
-                      label="Patient"
-                      error={Boolean(errors.patientId)}
-                      helperText={errors.patientId?.message}
-                      onBlur={field.onBlur}
-                    />
-                  )}
-                />
-              )}
-            />
-
-            <Controller
-              name="providerId"
-              control={form.control}
-              render={({ field }) => {
-                const selected = doctorOptions.find((p) => p.id === field.value) ?? null;
-                return (
-                <Autocomplete
-                  options={doctorOptions}
-                  loading={doctors.isLoading}
-                  value={selected}
-                  isOptionEqualToValue={(option, value) => option.id === value.id}
-                  getOptionLabel={(option) => personLabel(option)}
-                  onChange={(_, value) => field.onChange(value?.id ?? '')}
-                  renderOption={(props, option) => (
-                    <Box component="li" {...props} key={option.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                      <DoctorAvatar src={option.avatar} name={`Dr. ${personLabel(option)}`} size={32} />
-                      <Typography fontSize={13.5} fontWeight={600} sx={{ flex: 1 }} noWrap>
-                        {personLabel(option)}
-                      </Typography>
-                      <Typography fontSize={13} fontWeight={700} color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                        {feeLabel(option.consultationFee)}
-                      </Typography>
-                    </Box>
-                  )}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      fullWidth
-                      label="Doctor"
-                      error={Boolean(errors.providerId)}
-                      helperText={errors.providerId?.message}
-                      onBlur={field.onBlur}
-                      InputProps={{
-                        ...params.InputProps,
-                        startAdornment: selected ? (
-                          <>
-                            <DoctorAvatar
-                              src={selected.avatar}
-                              name={`Dr. ${personLabel(selected)}`}
-                              size={24}
-                              sx={{ ml: 0.5, mr: 0.5 }}
-                            />
-                            {params.InputProps.startAdornment}
-                          </>
-                        ) : params.InputProps.startAdornment,
-                      }}
-                    />
-                  )}
-                />
-                );
-              }}
-            />
-
-            {!appointment && (
-              <Box>
-                <TextField
-                  label="Token"
-                  fullWidth
-                  value={tokenForPatient ? `#${String(tokenForPatient.tokenNumber).padStart(3, '0')} — ${tokenForPatient.patient.firstName} ${tokenForPatient.patient.lastName}` : ''}
-                  placeholder={patientId && date ? 'No token found for this patient on selected date' : 'Select patient and date first'}
-                  InputProps={{ readOnly: true }}
-                  error={!!form.formState.errors.tokenId}
-                  helperText={form.formState.errors.tokenId?.message ?? (tokenForPatient ? 'Token auto-linked' : '')}
-                  color={tokenForPatient ? 'success' : undefined}
-                />
-                {patientId && date && !tokenForPatient && !offlineReason && (
-                  <IssueTokenInline patientId={patientId} date={date} providerId={form.watch('providerId')} onIssued={(t) => form.setValue('tokenId', t.id)} />
+    <Dialog open={open} onOpenChange={(_, data) => { if (!data.open) onClose(); }}>
+      <DialogSurface className={styles.surface}>
+        <FormDialogTitle
+          title={appointment ? 'Update appointment' : 'Create appointment'}
+          subtitle={appointment ? 'Edit schedule, doctor, and visit details.' : 'Book a new patient visit.'}
+        />
+        <form
+          className={styles.form}
+          onSubmit={form.handleSubmit((v) => {
+            if (offlineReason) return;
+            mutation.mutate(v);
+          })}
+        >
+          <DialogBody>
+            <DialogContent className={styles.body}>
+              <div className={styles.fields}>
+                {mutation.isError && (
+                  <MessageBar intent="error">
+                    <MessageBarBody>
+                      {(mutation.error as Error)?.message || 'Unable to save the appointment.'}
+                    </MessageBarBody>
+                  </MessageBar>
                 )}
-              </Box>
-            )}
+                {offlineReason && (
+                  <MessageBar intent="warning">
+                    <MessageBarBody>{offlineReason}</MessageBarBody>
+                  </MessageBar>
+                )}
+                {slotNotice === 'busy' && (
+                  <MessageBar intent="warning">
+                    <MessageBarBody>
+                      This time is already booked. Moved 30 minutes forward, or to the end of the current visit.
+                    </MessageBarBody>
+                  </MessageBar>
+                )}
+                {slotNotice === 'schedule' && (
+                  <MessageBar intent="info">
+                    <MessageBarBody>
+                      {hoursLabel
+                        ? `Outside doctor hours (${hoursLabel}). Moved to the next available time.`
+                        : 'This day is off in Doctor Schedule. Moved to the next working day.'}
+                    </MessageBarBody>
+                  </MessageBar>
+                )}
 
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-                <Controller
-                  name="date"
-                  control={form.control}
-                  render={({ field }) => (
-                    <DatePicker
-                      label="Date"
-                      value={field.value ? new Date(`${field.value}T12:00:00`) : null}
-                      onChange={(value) => {
-                        if (!value) {
-                          field.onChange('');
-                          return;
-                        }
-                        if (!providerId) {
-                          field.onChange(value.toLocaleDateString('en-CA'));
-                          return;
-                        }
-                        const dateStr = value.toLocaleDateString('en-CA');
-                        const next = nextFreeSlot({
-                          schedule,
-                          appointments: doctorAppts,
-                          providerId,
-                          durationMin: duration || 30,
-                          from: slotSearchFrom(dateStr),
-                          excludeId: appointment?.id,
-                        });
-                        if (next) {
-                          field.onChange(next.date);
-                          form.setValue('time', next.time);
-                          setSlotNotice(next.reason);
-                        } else {
-                          field.onChange(value.toLocaleDateString('en-CA'));
-                        }
-                      }}
-                      slotProps={{
-                        textField: {
-                          fullWidth: true,
-                          error: Boolean(errors.date),
-                          helperText: errors.date?.message,
-                        },
-                      }}
-                    />
-                  )}
-                />
+                <Field
+                  label="Patient"
+                  validationState={errors.patientId ? 'error' : undefined}
+                  validationMessage={errors.patientId?.message}
+                >
+                  <Combobox
+                    placeholder="Select patient"
+                    value={selectedPatient ? personLabel(selectedPatient) : ''}
+                    selectedOptions={patientId ? [patientId] : []}
+                    onOptionSelect={(_, data) => {
+                      if (data.optionValue) form.setValue('patientId', data.optionValue, { shouldValidate: true });
+                    }}
+                  >
+                    {patientOptions.map((p) => (
+                      <Option key={p.id} value={p.id} text={personLabel(p)}>
+                        {personLabel(p)}
+                      </Option>
+                    ))}
+                  </Combobox>
+                </Field>
 
-                <Controller
-                  name="time"
-                  control={form.control}
-                  render={({ field }) => (
-                    <TimePicker
-                      label="Time"
-                      value={field.value ? new Date(`1970-01-01T${field.value}:00`) : null}
-                      onChange={(value) => {
-                        const picked = value ? value.toTimeString().slice(0, 5) : '';
-                        if (!picked || !providerId || !date) {
-                          field.onChange(picked);
-                          return;
-                        }
-                        const next = nextFreeSlot({
-                          schedule,
-                          appointments: doctorAppts,
-                          providerId,
-                          durationMin: duration || 30,
-                          from: new Date(`${date}T${picked}:00`),
-                          excludeId: appointment?.id,
-                        });
-                        if (next) {
-                          form.setValue('date', next.date);
-                          field.onChange(next.time);
-                          setSlotNotice(next.reason);
-                        } else {
-                          field.onChange(picked);
-                        }
-                      }}
-                      slotProps={{
-                        textField: {
-                          fullWidth: true,
-                          error: Boolean(errors.time),
-                          helperText: errors.time?.message,
-                        },
-                      }}
-                    />
-                  )}
-                />
-              </Box>
-            </LocalizationProvider>
+                <Field
+                  label="Doctor"
+                  validationState={errors.providerId ? 'error' : undefined}
+                  validationMessage={errors.providerId?.message}
+                >
+                  <Combobox
+                    placeholder="Select doctor"
+                    value={selectedDoctor ? personLabel(selectedDoctor) : ''}
+                    selectedOptions={providerId ? [providerId] : []}
+                    onOptionSelect={(_, data) => {
+                      if (data.optionValue) form.setValue('providerId', data.optionValue, { shouldValidate: true });
+                    }}
+                  >
+                    {doctorOptions.map((d) => (
+                      <Option key={d.id} value={d.id} text={personLabel(d)}>
+                        <div className={styles.doctorOption}>
+                          <DoctorAvatar src={d.avatar} name={`Dr. ${personLabel(d)}`} size={28} />
+                          <Text weight="semibold" size={300}>
+                            {personLabel(d)}
+                          </Text>
+                          <Text size={200} className={styles.doctorFee}>
+                            {feeLabel(d.consultationFee)}
+                          </Text>
+                        </div>
+                      </Option>
+                    ))}
+                  </Combobox>
+                </Field>
 
-            <TextField fullWidth label="Duration (minutes)" type="number" {...form.register('duration', { valueAsNumber: true })} />
-            <Controller
-              name="reason"
-              control={form.control}
-              render={({ field }) => (
-                <TextField select fullWidth label="Reason" {...field}>
-                  <MenuItem value="">— None —</MenuItem>
-                  <MenuItem value="Checkup">Checkup</MenuItem>
-                  <MenuItem value="Follow-up">Follow-up</MenuItem>
-                  <MenuItem value="Urgent">Urgent</MenuItem>
-                  <MenuItem value="Consultation">Consultation</MenuItem>
-                  {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
-                  <MenuItem value="Vaccination">Vaccination</MenuItem>
-                </TextField>
-              )}
-            />
-            <TextField fullWidth label="Notes" minRows={2} multiline {...form.register('notes')} />
+                {!appointment && (
+                  <div>
+                    <Field
+                      label="Token"
+                      validationState={errors.tokenId ? 'error' : undefined}
+                      validationMessage={
+                        errors.tokenId?.message ?? (tokenForPatient ? 'Token auto-linked' : undefined)
+                      }
+                    >
+                      <Input
+                        readOnly
+                        value={
+                          tokenForPatient
+                            ? `#${String(tokenForPatient.tokenNumber).padStart(3, '0')} — ${tokenForPatient.patient.firstName} ${tokenForPatient.patient.lastName}`
+                            : ''
+                        }
+                        placeholder={
+                          patientId && date
+                            ? 'No token found for this patient on selected date'
+                            : 'Select patient and date first'
+                        }
+                      />
+                    </Field>
+                    {patientId && date && !tokenForPatient && !offlineReason && (
+                      <IssueTokenInline
+                        patientId={patientId}
+                        date={date}
+                        providerId={form.watch('providerId')}
+                        onIssued={(t) => form.setValue('tokenId', t.id)}
+                      />
+                    )}
+                  </div>
+                )}
 
-            {!appointment && (
-              <Box>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      {...form.register('recurring')}
-                      checked={form.watch('recurring')}
-                      onChange={(e) => form.setValue('recurring', e.target.checked)}
-                    />
-                  }
-                  label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}><RepeatOutlinedIcon sx={{ fontSize: 16 }} /><Typography fontSize={14}>Repeat weekly</Typography></Box>}
-                />
-                {form.watch('recurring') && (
-                  <TextField
-                    fullWidth
-                    label="Number of weeks"
-                    type="number"
-                    size="small"
-                    sx={{ mt: 1.5 }}
-                    {...form.register('recurrenceCount', { valueAsNumber: true })}
-                    slotProps={{ htmlInput: { min: 2, max: 52 } }}
-                    helperText={`Will create ${form.watch('recurrenceCount')} appointments, one per week`}
+                <div className={styles.grid2}>
+                  <Controller
+                    name="date"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FluentDateField
+                        label="Date"
+                        value={parseDateIso(field.value)}
+                        validationState={errors.date ? 'error' : undefined}
+                        validationMessage={errors.date?.message}
+                        onSelectDate={(value) => {
+                          if (!value) {
+                            field.onChange('');
+                            return;
+                          }
+                          if (!providerId) {
+                            field.onChange(formatDateIso(value));
+                            return;
+                          }
+                          const dateStr = formatDateIso(value);
+                          const next = nextFreeSlot({
+                            schedule,
+                            appointments: doctorAppts,
+                            providerId,
+                            durationMin: duration || 30,
+                            from: slotSearchFrom(dateStr),
+                            excludeId: appointment?.id,
+                          });
+                          if (next) {
+                            field.onChange(next.date);
+                            form.setValue('time', next.time);
+                            setSlotNotice(next.reason);
+                          } else {
+                            field.onChange(formatDateIso(value));
+                          }
+                        }}
+                      />
+                    )}
                   />
-                )}
-              </Box>
-            )}
-          </Stack>
-        </DialogContent>
+                  <Controller
+                    name="time"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FluentTimeField
+                        label="Time"
+                        selectedTime={field.value ? new Date(`1970-01-01T${field.value}:00`) : null}
+                        value={field.value}
+                        validationState={errors.time ? 'error' : undefined}
+                        validationMessage={errors.time?.message}
+                        onTimeChange={(_, data) => {
+                          const picked = data.selectedTime
+                            ? data.selectedTime.toTimeString().slice(0, 5)
+                            : '';
+                          if (!picked || !providerId || !date) {
+                            field.onChange(picked);
+                            return;
+                          }
+                          const next = nextFreeSlot({
+                            schedule,
+                            appointments: doctorAppts,
+                            providerId,
+                            durationMin: duration || 30,
+                            from: new Date(`${date}T${picked}:00`),
+                            excludeId: appointment?.id,
+                          });
+                          if (next) {
+                            form.setValue('date', next.date);
+                            field.onChange(next.time);
+                            setSlotNotice(next.reason);
+                          } else {
+                            field.onChange(picked);
+                          }
+                        }}
+                      />
+                    )}
+                  />
+                </div>
 
-        <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
-          <SubmitButton type="submit" loading={mutation.isPending} disabled={Boolean(offlineReason)}>
-            {appointment ? 'Save changes' : 'Create appointment'}
-          </SubmitButton>
-        </DialogActions>
-      </Box>
+                <Field label="Duration (minutes)">
+                  <Input type="number" {...form.register('duration', { valueAsNumber: true })} />
+                </Field>
+                <Field label="Reason">
+                  <Dropdown
+                    value={reason || '— None —'}
+                    selectedOptions={[reason]}
+                    onOptionSelect={(_, data) => {
+                      if (data.optionValue !== undefined) form.setValue('reason', data.optionValue);
+                    }}
+                  >
+                    <Option value="" text="— None —">— None —</Option>
+                    <Option value="Checkup" text="Checkup">Checkup</Option>
+                    <Option value="Follow-up" text="Follow-up">Follow-up</Option>
+                    <Option value="Urgent" text="Urgent">Urgent</Option>
+                    <Option value="Consultation" text="Consultation">Consultation</Option>
+                    {showLabReason && <Option value="Lab Results" text="Lab Results">Lab Results</Option>}
+                    <Option value="Vaccination" text="Vaccination">Vaccination</Option>
+                  </Dropdown>
+                </Field>
+                <Field label="Notes">
+                  <Textarea rows={2} {...form.register('notes')} />
+                </Field>
+
+                {!appointment && (
+                  <div>
+                    <div className={styles.recurringRow}>
+                      <Switch
+                        checked={recurring}
+                        onChange={(_, data) => form.setValue('recurring', data.checked)}
+                      />
+                      <ArrowRepeatAll24Regular style={{ fontSize: 16 }} />
+                      <Text size={300}>Repeat weekly</Text>
+                    </div>
+                    {recurring && (
+                      <Field
+                        label="Number of weeks"
+                        hint={`Will create ${form.watch('recurrenceCount')} appointments, one per week`}
+                        style={{ marginTop: tokens.spacingVerticalS }}
+                      >
+                        <Input
+                          type="number"
+                          min={2}
+                          max={52}
+                          {...form.register('recurrenceCount', { valueAsNumber: true })}
+                        />
+                      </Field>
+                    )}
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </DialogBody>
+          <DialogActions className={styles.actionsBar}>
+            <Button appearance="secondary" onClick={onClose} disabled={mutation.isPending} type="button">
+              Cancel
+            </Button>
+            <SubmitButton type="submit" loading={mutation.isPending} disabled={Boolean(offlineReason)}>
+              {appointment ? 'Save changes' : 'Create appointment'}
+            </SubmitButton>
+          </DialogActions>
+        </form>
+      </DialogSurface>
     </Dialog>
   );
 }
 
 export function AppointmentsPage(): React.JSX.Element {
+  const styles = useStyles();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -653,12 +864,15 @@ export function AppointmentsPage(): React.JSX.Element {
   const [defaultDate, setDefaultDate] = useState<string | undefined>();
   const view: 'table' | 'calendar' = searchParams.get('view') === 'calendar' ? 'calendar' : 'table';
   const setView = (next: 'table' | 'calendar') => {
-    setSearchParams((prev) => {
-      const p = new URLSearchParams(prev);
-      if (next === 'calendar') p.set('view', 'calendar');
-      else p.delete('view');
-      return p;
-    }, { replace: true });
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next === 'calendar') p.set('view', 'calendar');
+        else p.delete('view');
+        return p;
+      },
+      { replace: true },
+    );
   };
   const [search, setSearch] = useState('');
   const [doctorFilter, setDoctorFilter] = useState('ALL');
@@ -730,9 +944,10 @@ export function AppointmentsPage(): React.JSX.Element {
     meta: { silent: true },
   });
 
-  const allData = user?.role === 'doctor'
-    ? (appointments.data ?? []).filter((a) => a.providerId === user.id)
-    : (appointments.data ?? []);
+  const allData =
+    user?.role === 'doctor'
+      ? (appointments.data ?? []).filter((a) => a.providerId === user.id)
+      : (appointments.data ?? []);
   const doctorOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const a of allData) {
@@ -756,236 +971,408 @@ export function AppointmentsPage(): React.JSX.Element {
   const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   const showDoctorFilter = user?.role !== 'doctor';
+  const doctorFilterLabel =
+    doctorFilter === 'ALL'
+      ? 'All doctors'
+      : (doctorOptions.find(([id]) => id === doctorFilter)?.[1] ?? 'All doctors');
+  const statusFilterLabel =
+    statusFilter === 'ALL'
+      ? 'All statuses'
+      : (statusConfig[statusFilter]?.label ?? statusFilter);
+
   const appointmentFilters = (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
+    <div className={styles.toolbar}>
       <SearchField
         value={search}
-        onChange={(v) => { setSearch(v); setPage(0); }}
+        onChange={(v) => {
+          setSearch(v);
+          setPage(0);
+        }}
         placeholder="Search patient, doctor, reason..."
-        sx={{ flex: 1, maxWidth: 360, '& .MuiOutlinedInput-root': { borderRadius: 0.5 } }}
       />
       {showDoctorFilter && (
-        <FormControl size="small" sx={{ minWidth: 170, flexShrink: 0 }}>
-          <InputLabel>Doctor</InputLabel>
-          <Select
-            label="Doctor"
-            value={doctorFilter}
-            onChange={(e) => { setDoctorFilter(e.target.value); setPage(0); }}
-            sx={filterSelectSx}
-          >
-            <MenuItem value="ALL">All doctors</MenuItem>
-            {doctorOptions.map(([id, name]) => (
-              <MenuItem key={id} value={id}>{name}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      )}
-      <FormControl size="small" sx={{ minWidth: 160, flexShrink: 0 }}>
-        <InputLabel>Status</InputLabel>
-        <Select
-          label="Status"
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
-          sx={filterSelectSx}
+        <Dropdown
+          className={styles.filter}
+          value={doctorFilterLabel}
+          selectedOptions={[doctorFilter]}
+          onOptionSelect={(_, data) => {
+            if (data.optionValue) {
+              setDoctorFilter(data.optionValue);
+              setPage(0);
+            }
+          }}
         >
-          <MenuItem value="ALL">All statuses</MenuItem>
-          {Object.entries(statusConfig).map(([value, cfg]) => (
-            <MenuItem key={value} value={value}>{cfg.label}</MenuItem>
+          <Option value="ALL" text="All doctors">All doctors</Option>
+          {doctorOptions.map(([id, name]) => (
+            <Option key={id} value={id} text={name}>
+              {name}
+            </Option>
           ))}
-        </Select>
-      </FormControl>
-    </Box>
+        </Dropdown>
+      )}
+      <Dropdown
+        className={styles.filter}
+        value={statusFilterLabel}
+        selectedOptions={[statusFilter]}
+        onOptionSelect={(_, data) => {
+          if (data.optionValue) {
+            setStatusFilter(data.optionValue);
+            setPage(0);
+          }
+        }}
+      >
+        <Option value="ALL" text="All statuses">All statuses</Option>
+        {Object.entries(statusConfig).map(([value, cfg]) => (
+          <Option key={value} value={value} text={cfg.label}>
+            {cfg.label}
+          </Option>
+        ))}
+      </Dropdown>
+    </div>
   );
-
 
   const viewToggle = (
-    <ToggleButtonGroup
-      size="small"
-      value={view}
-      exclusive
-      onChange={(_, v) => v && setView(v)}
-      sx={{
-        border: '1px solid',
-        borderColor: 'divider',
-        borderRadius: 2,
-        overflow: 'hidden',
-        '& .MuiToggleButton-root': {
-          border: 'none',
-          borderRadius: 0,
-          px: 1.5,
-          py: 0.75,
-          color: 'text.secondary',
-          '&.Mui-selected': { bgcolor: 'action.selected', color: 'text.primary' },
-        },
-        '& .MuiToggleButtonGroup-grouped:not(:last-of-type)': {
-          borderRight: '1px solid',
-          borderColor: 'divider',
-        },
-      }}
-    >
-      <ToggleButton value="table"><Tooltip title="Table view"><TableRowsOutlinedIcon fontSize="small" /></Tooltip></ToggleButton>
-      <ToggleButton value="calendar"><Tooltip title="Calendar view"><CalendarMonthOutlinedIcon fontSize="small" /></Tooltip></ToggleButton>
-    </ToggleButtonGroup>
+    <div className={styles.viewToggle}>
+      <Tooltip content="Table view" relationship="label">
+        <Button
+          appearance={view === 'table' ? 'primary' : 'subtle'}
+          icon={<Table24Regular />}
+          onClick={() => setView('table')}
+          style={{ borderRadius: 0 }}
+        />
+      </Tooltip>
+      <Tooltip content="Calendar view" relationship="label">
+        <Button
+          appearance={view === 'calendar' ? 'primary' : 'subtle'}
+          icon={<CalendarLtr24Regular />}
+          onClick={() => setView('calendar')}
+          style={{ borderRadius: 0 }}
+        />
+      </Tooltip>
+    </div>
   );
 
+  const columns = useMemo<TableColumnDefinition<Appointment>[]>(() => {
+    const cols: TableColumnDefinition<Appointment>[] = [
+      createTableColumn<Appointment>({
+        columnId: 'patient',
+        compare: (a, b) => personLabel(a.patient).localeCompare(personLabel(b.patient)),
+        renderHeaderCell: () => 'Patient',
+        renderCell: (a) => (
+          <TableCellLayout
+            media={<Avatar name={personLabel(a.patient)} color="brand" size={32} />}
+          >
+            <div className={styles.personMeta}>
+              <Text className={styles.name}>{personLabel(a.patient)}</Text>
+              <Text className={styles.muted}>{a.patient.phone ?? '—'}</Text>
+            </div>
+          </TableCellLayout>
+        ),
+      }),
+      createTableColumn<Appointment>({
+        columnId: 'doctor',
+        compare: (a, b) => personLabel(a.provider).localeCompare(personLabel(b.provider)),
+        renderHeaderCell: () => 'Doctor',
+        renderCell: (a) => (
+          <TableCellLayout
+            media={
+              <DoctorAvatar
+                src={a.provider.avatar}
+                name={`Dr. ${a.provider.firstName} ${a.provider.lastName}`}
+                size={34}
+              />
+            }
+          >
+            <div className={styles.personMeta}>
+              <Text className={styles.name}>{personLabel(a.provider)}</Text>
+              <Text className={styles.muted}>{a.provider.role ?? 'Doctor'}</Text>
+            </div>
+          </TableCellLayout>
+        ),
+      }),
+      createTableColumn<Appointment>({
+        columnId: 'token',
+        compare: (a, b) => (a.tokenNumber ?? 0) - (b.tokenNumber ?? 0),
+        renderHeaderCell: () => 'Token',
+        renderCell: (a) =>
+          a.tokenNumber ? (
+            <Badge appearance="outline" color="brand" size="small" className={styles.mono}>
+              #{String(a.tokenNumber).padStart(3, '0')}
+            </Badge>
+          ) : (
+            <Text className={styles.muted}>—</Text>
+          ),
+      }),
+      createTableColumn<Appointment>({
+        columnId: 'date',
+        compare: (a, b) => a.startsAt.localeCompare(b.startsAt),
+        renderHeaderCell: () => 'Time',
+        renderCell: (a) => (
+          <Text size={300} className={styles.nowrap}>
+            {new Date(a.startsAt).toLocaleDateString([], {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </Text>
+        ),
+      }),
+      createTableColumn<Appointment>({
+        columnId: 'duration',
+        compare: (a, b) => a.startsAt.localeCompare(b.startsAt),
+        renderHeaderCell: () => 'Duration',
+        renderCell: (a) => (
+          <Text size={300} className={styles.nowrap}>
+            {new Date(a.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} –{' '}
+            {new Date(a.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        ),
+      }),
+      createTableColumn<Appointment>({
+        columnId: 'status',
+        compare: (a, b) => a.status.localeCompare(b.status),
+        renderHeaderCell: () => 'Status',
+        renderCell: (a) => (
+          <Badge
+            appearance="tint"
+            color={statusConfig[a.status]?.color ?? 'subtle'}
+            size="small"
+          >
+            {statusConfig[a.status]?.label ?? a.status}
+          </Badge>
+        ),
+      }),
+      createTableColumn<Appointment>({
+        columnId: 'reason',
+        compare: (a, b) => (a.reason ?? '').localeCompare(b.reason ?? ''),
+        renderHeaderCell: () => 'Reason',
+        renderCell: (a) => <Text size={300}>{a.reason || '—'}</Text>,
+      }),
+    ];
+
+    if (!isAdmin) {
+      cols.push(
+        createTableColumn<Appointment>({
+          columnId: 'actions',
+          renderHeaderCell: () => 'Actions',
+          renderCell: (a) => (
+            <div className={styles.actions} onClick={(e) => e.stopPropagation()}>
+              <Tooltip content="View details" relationship="label">
+                <Button
+                  appearance="subtle"
+                  icon={<Eye24Regular />}
+                  style={actionBtnStyle}
+                  onClick={() => navigate(`/appointments/${a.id}`, { state: detailNavState })}
+                />
+              </Tooltip>
+              <Tooltip content="Edit" relationship="label">
+                <Button
+                  appearance="subtle"
+                  icon={<Edit24Regular />}
+                  style={actionBtnStyle}
+                  disabled={['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status)}
+                  onClick={() => {
+                    setActive(a);
+                    setOpen(true);
+                  }}
+                />
+              </Tooltip>
+              {a.status === 'SCHEDULED' && (
+                <Tooltip content="Check In" relationship="label">
+                  <Button
+                    appearance="subtle"
+                    icon={<PersonArrowRight24Regular />}
+                    style={actionBtnStyle}
+                    disabled={statusMutation.isPending && statusMutation.variables?.id === a.id}
+                    onClick={() => statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' })}
+                  />
+                </Tooltip>
+              )}
+              {a.status === 'CHECKED_IN' && (
+                <Tooltip content="Mark Completed" relationship="label">
+                  <Button
+                    appearance="subtle"
+                    icon={<CheckmarkCircle24Regular />}
+                    style={actionBtnStyle}
+                    disabled={statusMutation.isPending && statusMutation.variables?.id === a.id}
+                    onClick={() => statusMutation.mutate({ id: a.id, status: 'COMPLETED' })}
+                  />
+                </Tooltip>
+              )}
+              {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
+                <Tooltip content="No Show" relationship="label">
+                  <Button
+                    appearance="subtle"
+                    icon={<PersonDelete24Regular />}
+                    style={actionBtnStyle}
+                    disabled={statusMutation.isPending && statusMutation.variables?.id === a.id}
+                    onClick={() => statusMutation.mutate({ id: a.id, status: 'NO_SHOW' })}
+                  />
+                </Tooltip>
+              )}
+              {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
+                <Tooltip content="Cancel" relationship="label">
+                  <Button
+                    appearance="subtle"
+                    icon={<DismissCircle24Regular />}
+                    style={actionBtnStyle}
+                    disabled={cancelMutation.isPending && cancelMutation.variables === a.id}
+                    onClick={() => cancelMutation.mutate(a.id)}
+                  />
+                </Tooltip>
+              )}
+              <Tooltip content="Delete" relationship="label">
+                <Button
+                  appearance="subtle"
+                  icon={<Delete24Regular />}
+                  style={actionBtnStyle}
+                  onClick={() => setDeleteTarget(a)}
+                />
+              </Tooltip>
+            </div>
+          ),
+        }),
+      );
+    }
+    return cols;
+  }, [
+    cancelMutation,
+    detailNavState,
+    isAdmin,
+    navigate,
+    statusMutation,
+    styles,
+  ]);
+
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+    <div className={styles.page}>
       {view === 'calendar' ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, flex: 1, minHeight: 0 }}>
-          <Box sx={{ display: 'flex', alignItems: { sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between' }}>
-            <Box>
-              <Typography variant="h5" fontWeight={700}>Appointments</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>Schedule and manage patient visits.</Typography>
-            </Box>
-            <Stack direction="row" gap={1}>
+        <div className={styles.calendarPage}>
+          <div className={styles.calendarHeader}>
+            <div className={styles.titles}>
+              <Text as="h2" size={600} weight="bold">
+                Appointments
+              </Text>
+              <Text className={styles.subtitle}>Schedule and manage patient visits.</Text>
+            </div>
+            <div className={styles.headerActions}>
               {viewToggle}
-              {!isAdmin && <Button startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }} onClick={() => { setActive(undefined); setDefaultDate(undefined); setOpen(true); }}>Create appointment</Button>}
-            </Stack>
-          </Box>
+              {!isAdmin && (
+                <Button
+                  appearance="primary"
+                  icon={<Add24Regular />}
+                  onClick={() => {
+                    setActive(undefined);
+                    setDefaultDate(undefined);
+                    setOpen(true);
+                  }}
+                >
+                  Create appointment
+                </Button>
+              )}
+            </div>
+          </div>
           {appointmentFilters}
-          <Paper variant="outlined" sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          <div className={styles.calendarCard}>
             <AppointmentCalendar
               appointments={filtered}
               loading={appointments.isLoading}
               fetching={appointments.isFetching && !appointments.isLoading}
               onStatusChange={(id, status) => statusMutation.mutate({ id, status })}
               statusPendingId={statusMutation.isPending ? statusMutation.variables?.id : null}
-              onDateClick={isAdmin ? undefined : (date) => { setActive(undefined); setDefaultDate(date); setOpen(true); }}
-              onAppointmentClick={isAdmin ? undefined : (appt) => navigate(`/appointments/${appt.id}`, { state: detailNavState })}
+              onDateClick={
+                isAdmin
+                  ? undefined
+                  : (d) => {
+                      setActive(undefined);
+                      setDefaultDate(d);
+                      setOpen(true);
+                    }
+              }
+              onAppointmentClick={
+                isAdmin
+                  ? undefined
+                  : (appt) => navigate(`/appointments/${appt.id}`, { state: detailNavState })
+              }
               readOnly={isAdmin}
               hideCheckIn={user?.role !== 'doctor'}
             />
-          </Paper>
-        </Box>
+          </div>
+        </div>
       ) : (
         <TablePageShell
           title="Appointments"
           subtitle="Schedule and manage patient visits."
           action={
-            <Stack direction="row" gap={1}>
+            <div className={styles.headerActions}>
               {viewToggle}
-              {!isAdmin && <Button startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }} onClick={() => { setActive(undefined); setDefaultDate(undefined); setOpen(true); }}>Create appointment</Button>}
-            </Stack>
+              {!isAdmin && (
+                <Button
+                  appearance="primary"
+                  icon={<Add24Regular />}
+                  onClick={() => {
+                    setActive(undefined);
+                    setDefaultDate(undefined);
+                    setOpen(true);
+                  }}
+                >
+                  Create appointment
+                </Button>
+              )}
+            </div>
           }
           toolbar={appointmentFilters}
           pager={
             filtered.length > rowsPerPage ? (
-              <TablePager page={page} rowsPerPage={rowsPerPage} total={filtered.length} onPageChange={setPage} />
+              <TablePager
+                page={page}
+                rowsPerPage={rowsPerPage}
+                total={filtered.length}
+                onPageChange={setPage}
+              />
             ) : undefined
           }
-          error={appointments.isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load appointments.</Alert>}
+          error={
+            appointments.isError && (
+              <MessageBar intent="error" className={styles.errorBar}>
+                <MessageBarBody>Unable to load appointments.</MessageBarBody>
+              </MessageBar>
+            )
+          }
           fetching={appointments.isFetching && !appointments.isLoading}
         >
-          <TableHead sx={tableSx.head}>
-            <TableRow>
-              <TableCell>Patient</TableCell>
-              <TableCell>Doctor</TableCell>
-              <TableCell>Token</TableCell>
-              <TableCell>Time</TableCell>
-              <TableCell>Duration</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Reason</TableCell>
-              {!isAdmin && <TableCell align="right">Actions</TableCell>}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {appointments.isLoading ? (
-              <TableRowsSkeleton cols={isAdmin ? 7 : 8} />
-            ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={isAdmin ? 7 : 8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No appointments scheduled.</TableCell></TableRow>
-            ) : (
-              paginated.map((a) => (
-                <TableRow
-                  key={a.id}
-                  sx={{ ...tableSx.row, cursor: 'pointer' }}
-                  onClick={() => navigate(`/appointments/${a.id}`, { state: detailNavState })}
-                >
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                      <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'primary.main' }}>
-                        {a.patient.firstName[0]}{a.patient.lastName[0]}
-                      </Avatar>
-                      <Box>
-                        <Typography fontSize={13.5} fontWeight={600}>{personLabel(a.patient)}</Typography>
-                        <Typography fontSize={11.5} color="text.secondary">
-                          {a.patient.phone ?? '—'}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                      <DoctorAvatar
-                        src={a.provider.avatar}
-                        name={`Dr. ${a.provider.firstName} ${a.provider.lastName}`}
-                        size={34}
-                      />
-                      <Box>
-                        <Typography fontSize={13.5} fontWeight={600}>{personLabel(a.provider)}</Typography>
-                        <Typography fontSize={11.5} color="text.secondary">{a.provider.role ?? 'Doctor'}</Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    {a.tokenNumber ? (
-                      <Chip label={`#${String(a.tokenNumber).padStart(3, '0')}`} size="small" color="primary" variant="outlined" sx={{ fontWeight: 700, fontFamily: 'monospace' }} />
-                    ) : '—'}
-                  </TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    {new Date(a.startsAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
-                  </TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    {new Date(a.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(a.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </TableCell>
-                  <TableCell>
-                    <Chip color={statusConfig[a.status]?.color ?? 'default'} label={statusConfig[a.status]?.label ?? a.status} size="small" sx={chipSx} />
-                  </TableCell>
-                  <TableCell>{a.reason || '—'}</TableCell>
-                  {!isAdmin && (
-                    <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                      <Stack direction="row" gap={0.5} justifyContent="flex-end">
-                        <Tooltip title="View details">
-                          <IconButton sx={actionBtnSx} onClick={() => navigate(`/appointments/${a.id}`, { state: detailNavState })}>
-                            <VisibilityOutlinedIcon sx={{ fontSize: 17 }} />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Edit"><span>
-                          <IconButton sx={actionBtnSx} disabled={['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status)} onClick={() => { setActive(a); setOpen(true); }}>
-                            <EditOutlinedIcon sx={{ fontSize: 17 }} />
-                          </IconButton>
-                        </span></Tooltip>
-                        {a.status === 'SCHEDULED' && (
-                          <Tooltip title="Check In"><IconButton sx={actionBtnSx} loading={statusMutation.isPending && statusMutation.variables?.id === a.id} onClick={() => statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' })}><LoginOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                        )}
-                        {a.status === 'CHECKED_IN' && (
-                          <Tooltip title="Mark Completed"><IconButton sx={actionBtnSx} loading={statusMutation.isPending && statusMutation.variables?.id === a.id} onClick={() => statusMutation.mutate({ id: a.id, status: 'COMPLETED' })}><CheckCircleOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                        )}
-                        {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
-                          <Tooltip title="No Show"><IconButton sx={actionBtnSx} loading={statusMutation.isPending && statusMutation.variables?.id === a.id} onClick={() => statusMutation.mutate({ id: a.id, status: 'NO_SHOW' })}><PersonOffOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                        )}
-                        {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
-                          <Tooltip title="Cancel"><IconButton sx={actionBtnSx} loading={cancelMutation.isPending && cancelMutation.variables === a.id} onClick={() => cancelMutation.mutate(a.id)}><CancelOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                        )}
-                        <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => setDeleteTarget(a)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                      </Stack>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
+          {appointments.isLoading ? (
+            <TableRowsSkeleton cols={isAdmin ? 7 : 8} />
+          ) : (
+            <DataGridTable
+              items={paginated}
+              columns={columns}
+              getRowId={(a) => a.id}
+              emptyMessage="No appointments scheduled."
+              onRowClick={(a) => navigate(`/appointments/${a.id}`, { state: detailNavState })}
+            />
+          )}
         </TablePageShell>
       )}
-      <AppointmentDialog appointment={active} open={open} defaultDate={defaultDate} defaultProviderId={user?.role === 'doctor' ? user.id : undefined} onClose={() => setOpen(false)} />
+      <AppointmentDialog
+        appointment={active}
+        open={open}
+        defaultDate={defaultDate}
+        defaultProviderId={user?.role === 'doctor' ? user.id : undefined}
+        onClose={() => setOpen(false)}
+      />
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="Delete appointment?"
-        message={deleteTarget ? `Delete appointment for ${deleteTarget.patient.firstName} ${deleteTarget.patient.lastName} on ${new Date(deleteTarget.startsAt).toLocaleString()}?` : ''}
+        message={
+          deleteTarget
+            ? `Delete appointment for ${deleteTarget.patient.firstName} ${deleteTarget.patient.lastName} on ${new Date(deleteTarget.startsAt).toLocaleString()}?`
+            : ''
+        }
         loading={deleteMutation.isPending}
         onClose={() => setDeleteTarget(undefined)}
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
       />
-    </Box>
+    </div>
   );
 }
-

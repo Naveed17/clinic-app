@@ -1,28 +1,25 @@
 import {
-  Alert,
   Avatar,
-  Box,
   Button,
   Dialog,
   DialogActions,
+  DialogBody,
   DialogContent,
-  Paper,
+  DialogSurface,
+  MessageBar,
+  MessageBarBody,
   Skeleton,
-  Stack,
-  Typography,
-} from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+  SkeletonItem,
+  Spinner,
+  Text,
+  Title2,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { showAppToast } from '@/components/AppToast';
-import {
-  dialogActionsSx,
-  dialogCancelBtnSx,
-  dialogContentSx,
-  dialogPaperProps,
-  dialogSubmitBtnSx,
-  FormDialogTitle,
-} from '@/components/DialogUI';
+import { FormDialogTitle, SubmitButton } from '@/components/DialogUI';
 import { LiveClock } from '@/components/LiveClock';
 import { FetchingBar, ListCardsSkeleton } from '@/components/LoadingUI';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -38,6 +35,234 @@ import type { Token } from '@/types/token';
 const DEFAULT_CONSULT_MIN = 30;
 const MIN_AVG_SAMPLES = 3;
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const useStyles = makeStyles({
+  header: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: tokens.spacingVerticalXL,
+    gap: tokens.spacingHorizontalL,
+  },
+  greeting: {
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  title: {
+    letterSpacing: '-0.02em',
+    marginTop: tokens.spacingVerticalXXS,
+  },
+  layout: {
+    display: 'grid',
+    gap: tokens.spacingVerticalXL,
+    gridTemplateColumns: 'minmax(0, 1fr) 340px',
+    alignItems: 'start',
+    '@media (max-width: 1024px)': {
+      gridTemplateColumns: '1fr',
+    },
+  },
+  col: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXL,
+    minWidth: 0,
+  },
+  softCard: {
+    borderRadius: '20px',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    boxShadow: tokens.shadow4,
+    backgroundColor: tokens.colorNeutralBackground1,
+  },
+  hero: {
+    padding: '36px',
+    borderRadius: '28px',
+    backgroundImage: `linear-gradient(135deg, ${tokens.colorBrandBackgroundSelected} 0%, ${tokens.colorBrandBackground} 55%, ${tokens.colorBrandBackground2} 100%)`,
+    color: tokens.colorNeutralForegroundOnBrand,
+    position: 'relative',
+    overflow: 'hidden',
+    minHeight: '180px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalXL,
+    boxShadow: tokens.shadow16,
+    border: 'none',
+  },
+  heroOrb1: {
+    position: 'absolute',
+    right: '-10px',
+    top: '-40px',
+    width: '220px',
+    height: '220px',
+    borderRadius: '50%',
+    border: '2px solid rgba(255,255,255,0.12)',
+  },
+  heroOrb2: {
+    position: 'absolute',
+    right: '80px',
+    bottom: '-70px',
+    width: '180px',
+    height: '180px',
+    borderRadius: '50%',
+    border: '2px solid rgba(255,255,255,0.08)',
+  },
+  heroBody: {
+    position: 'relative',
+    zIndex: 1,
+    flex: 1,
+    minWidth: 0,
+  },
+  heroEyebrow: {
+    opacity: 0.88,
+    fontWeight: tokens.fontWeightBold,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+    fontSize: tokens.fontSizeBase200,
+  },
+  heroTitle: {
+    letterSpacing: '-0.02em',
+    marginTop: '6px',
+    marginBottom: '4px',
+    lineHeight: 1.2,
+    fontWeight: 800,
+    fontSize: '28px',
+  },
+  heroSub: {
+    opacity: 0.9,
+    fontWeight: 500,
+    maxWidth: '440px',
+  },
+  heroActions: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalS,
+    marginTop: tokens.spacingVerticalL,
+    flexWrap: 'wrap',
+  },
+  heroWait: {
+    position: 'relative',
+    zIndex: 1,
+    flexShrink: 0,
+  },
+  heroWaitValue: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '6px',
+    marginTop: '4px',
+  },
+  metrics: {
+    display: 'grid',
+    gap: tokens.spacingHorizontalM,
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    '@media (max-width: 900px)': {
+      gridTemplateColumns: '1fr 1fr',
+    },
+  },
+  metricCard: {
+    padding: tokens.spacingVerticalL,
+    borderRadius: '16px',
+    border: 'none',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    minHeight: '88px',
+  },
+  metricValue: {
+    fontWeight: 800,
+    fontSize: '22px',
+    lineHeight: 1.1,
+  },
+  metricLabel: {
+    marginTop: '4px',
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightSemibold,
+    fontSize: tokens.fontSizeBase200,
+  },
+  section: {
+    padding: tokens.spacingVerticalXL,
+    position: 'relative',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  sectionHead: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: tokens.spacingVerticalL,
+  },
+  list: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+    maxHeight: '320px',
+    overflowY: 'auto',
+    paddingRight: '4px',
+  },
+  listTall: {
+    maxHeight: '420px',
+  },
+  row: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalL,
+    padding: tokens.spacingVerticalM,
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorBrandBackground2,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderLeftWidth: '4px',
+    borderLeftStyle: 'solid',
+  },
+  rowWaiting: {
+    borderLeftColor: tokens.colorPaletteYellowBorderActive,
+  },
+  rowAppt: {
+    borderLeftColor: tokens.colorPaletteBlueBorderActive,
+  },
+  rowBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rowActions: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '6px',
+    flexShrink: 0,
+  },
+  empty: {
+    display: 'grid',
+    minHeight: '100px',
+    placeItems: 'center',
+  },
+  nextCard: {
+    padding: tokens.spacingVerticalL,
+    borderRadius: '18px',
+    border: 'none',
+    backgroundImage: `linear-gradient(135deg, ${tokens.colorBrandBackground} 0%, ${tokens.colorBrandBackgroundSelected} 100%)`,
+    color: tokens.colorNeutralForegroundOnBrand,
+    boxShadow: tokens.shadow8,
+    display: 'flex',
+    gap: tokens.spacingHorizontalM,
+    alignItems: 'center',
+  },
+  sideCard: {
+    padding: tokens.spacingVerticalL,
+  },
+  surfaceXs: {
+    maxWidth: '400px',
+    width: '100%',
+  },
+  dialogBody: {
+    padding: tokens.spacingVerticalL,
+  },
+  dialogActions: {
+    padding: tokens.spacingVerticalM,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    gap: tokens.spacingHorizontalS,
+  },
+  errorBar: {
+    marginBottom: tokens.spacingVerticalL,
+  },
+});
 
 function todayStr(): string {
   return new Date().toLocaleDateString('en-CA');
@@ -102,12 +327,12 @@ function fallbackPatient(patientId: string, firstName: string, lastName: string)
 }
 
 export function WaitingRoomPage(): React.JSX.Element {
+  const styles = useStyles();
   const { user } = useAuth();
   const { can } = useLicense();
   const canViewPatientHistory = can('managePatients');
   const canOrderLab = can('labDashboard');
   const qc = useQueryClient();
-  const theme = useTheme();
   const date = todayStr();
 
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -123,7 +348,7 @@ export function WaitingRoomPage(): React.JSX.Element {
     return () => window.clearInterval(id);
   }, []);
 
-  const { data: tokens = [], isLoading, isFetching, isError } = useQuery<Token[]>({
+  const { data: tokenList = [], isLoading, isFetching, isError } = useQuery<Token[]>({
     queryKey: ['tokens', date],
     queryFn: () => window.clinic.tokens.list(date),
   });
@@ -134,8 +359,8 @@ export function WaitingRoomPage(): React.JSX.Element {
   });
 
   const mine = useMemo(
-    () => tokens.filter((t) => t.doctorId === user?.id),
-    [tokens, user?.id],
+    () => tokenList.filter((t) => t.doctorId === user?.id),
+    [tokenList, user?.id],
   );
   const appointments = useMemo(
     () => (rawAppts as Appointment[]).filter((a) => a.providerId === user?.id),
@@ -172,26 +397,6 @@ export function WaitingRoomPage(): React.JSX.Element {
     waitingAll.forEach((t, i) => map.set(t.id, i));
     return map;
   }, [waitingAll]);
-
-  const softCard = {
-    borderRadius: '20px',
-    border: '1px solid',
-    borderColor: 'divider',
-    boxShadow: `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,
-  } as const;
-
-  const outlineBtn = {
-    borderRadius: 2,
-    fontWeight: 700,
-    fontSize: 12,
-    px: 1.25,
-    py: 0.45,
-    textTransform: 'none' as const,
-    borderColor: alpha(theme.palette.primary.main, 0.4),
-    color: theme.palette.primary.main,
-    '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06), borderColor: theme.palette.primary.main },
-  } as const;
-
 
   async function ensureLinkedAppointment(token: Token): Promise<Appointment> {
     const existing = linkedAppointment(token, appointments);
@@ -320,21 +525,6 @@ export function WaitingRoomPage(): React.JSX.Element {
   const visitStarted = Boolean(
     currentToken && linkedAppointment(currentToken, appointments)?.status === 'CHECKED_IN',
   );
-  const heroFilledSx = {
-    borderRadius: 2,
-    fontWeight: 700,
-    bgcolor: '#fff',
-    color: theme.palette.primary.dark,
-    boxShadow: 'none',
-    '&:hover': { bgcolor: alpha('#fff', 0.92), boxShadow: 'none' },
-  } as const;
-  const heroOutlineSx = {
-    borderRadius: 2,
-    fontWeight: 700,
-    borderColor: alpha('#fff', 0.5),
-    color: '#fff',
-    '&:hover': { borderColor: '#fff', bgcolor: alpha('#fff', 0.08) },
-  } as const;
 
   const todayDayName = DAY_NAMES[new Date().getDay()];
 
@@ -347,409 +537,324 @@ export function WaitingRoomPage(): React.JSX.Element {
     setPendingIssue(null);
   }
 
+  const heroFilled = {
+    backgroundColor: '#fff',
+    color: tokens.colorBrandForeground1,
+    fontWeight: 700,
+  } as const;
+  const heroOutline = {
+    borderColor: 'rgba(255,255,255,0.5)',
+    color: '#fff',
+    fontWeight: 700,
+  } as const;
+
+  const metrics = [
+    { label: 'Waiting', value: waitingAll.length, bg: tokens.colorPaletteYellowBackground2, accent: tokens.colorPaletteYellowForeground2 },
+    { label: 'Now serving', value: currentToken ? 1 : 0, bg: tokens.colorPaletteBlueBackground2, accent: tokens.colorPaletteBlueForeground2 },
+    { label: 'No token', value: pendingAppointments.length, bg: tokens.colorPaletteGreenBackground2, accent: tokens.colorPaletteGreenForeground2 },
+    { label: 'Waiting time', value: waitingTime, bg: tokens.colorPaletteBerryBackground2, accent: tokens.colorPaletteBerryForeground2 },
+  ];
+
   return (
     <>
-      <Stack direction="row" justifyContent="space-between" alignItems="flex-end" sx={{ mb: 2.5, gap: 2 }}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant="body2" color="text.secondary" fontWeight={600}>
+      <div className={styles.header}>
+        <div style={{ minWidth: 0 }}>
+          <Text className={styles.greeting} size={300}>
             Hi {user?.name || 'Doctor'},
-          </Typography>
-          <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
-            Waiting Room
-          </Typography>
-        </Box>
+          </Text>
+          <Title2 className={styles.title}>Waiting Room</Title2>
+        </div>
         <LiveClock />
-      </Stack>
+      </div>
 
-      {isError && <Alert severity="error" sx={{ mb: 2 }}>Failed to load waiting room.</Alert>}
+      {isError && (
+        <MessageBar intent="error" className={styles.errorBar}>
+          <MessageBarBody>Failed to load waiting room.</MessageBarBody>
+        </MessageBar>
+      )}
 
-      <Box
-        sx={{
-          display: 'grid',
-          gap: 2.5,
-          gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 340px' },
-          alignItems: 'start',
-        }}
-      >
-        <Stack spacing={2.5} sx={{ minWidth: 0 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 3.5, md: 4.5 },
-              borderRadius: '28px',
-              background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 55%, ${theme.palette.primary.light} 100%)`,
-              color: theme.palette.primary.contrastText,
-              position: 'relative',
-              overflow: 'hidden',
-              minHeight: { xs: 180, sm: 200 },
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 3,
-              boxShadow: `0 12px 32px ${alpha(theme.palette.primary.main, 0.28)}`,
-              border: 'none',
-            }}
-          >
-            <Box sx={{ position: 'absolute', right: -10, top: -40, width: 220, height: 220, borderRadius: '50%', border: `2px solid ${alpha('#fff', 0.12)}` }} />
-            <Box sx={{ position: 'absolute', right: 80, bottom: -70, width: 180, height: 180, borderRadius: '50%', border: `2px solid ${alpha('#fff', 0.08)}` }} />
-            <Box sx={{ position: 'relative', zIndex: 1, flex: 1, minWidth: 0 }}>
-              <Typography variant="body2" sx={{ opacity: 0.88, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                Now Serving
-              </Typography>
+      <div className={styles.layout}>
+        <div className={styles.col}>
+          <div className={styles.hero}>
+            <div className={styles.heroOrb1} />
+            <div className={styles.heroOrb2} />
+            <div className={styles.heroBody}>
+              <Text className={styles.heroEyebrow}>Now Serving</Text>
               {isLoading ? (
-                <>
-                  <Skeleton variant="text" width={260} height={52} sx={{ bgcolor: alpha('#fff', 0.28), mt: 1 }} />
-                  <Skeleton variant="text" width={180} height={24} sx={{ bgcolor: alpha('#fff', 0.18) }} />
-                </>
+                <Skeleton>
+                  <SkeletonItem style={{ width: 260, height: 40, marginTop: 8 }} />
+                  <SkeletonItem style={{ width: 180, height: 20, marginTop: 8 }} />
+                </Skeleton>
               ) : currentToken ? (
                 <>
-                  <Typography variant="h3" fontWeight={800} sx={{ letterSpacing: '-0.02em', mt: 0.75, mb: 0.5, lineHeight: 1.2, textShadow: `0 2px 4px ${alpha(theme.palette.common.black, 0.1)}` }}>
-                    #{String(currentToken.tokenNumber).padStart(3, '0')}
-                    {' '}
+                  <Text className={styles.heroTitle} as="h3">
+                    #{String(currentToken.tokenNumber).padStart(3, '0')}{' '}
                     {currentToken.patient.firstName} {currentToken.patient.lastName}
-                  </Typography>
-                  <Typography variant="body1" sx={{ opacity: 0.9, fontWeight: 500, maxWidth: 440 }}>
+                  </Text>
+                  <Text className={styles.heroSub}>
                     {[currentToken.reason, currentToken.notes].filter(Boolean).join(' · ') || 'OPD visit'}
-                  </Typography>
-                  <Stack direction="row" spacing={1} sx={{ mt: 2.25 }} flexWrap="wrap" useFlexGap>
+                  </Text>
+                  <div className={styles.heroActions}>
                     <Button
-                      variant={visitStarted ? 'outlined' : 'contained'}
-                      loading={startVisitMutation.isPending}
-                      disabled={busy || visitStarted}
+                      appearance={visitStarted ? 'outline' : 'primary'}
+                      disabled={busy || visitStarted || startVisitMutation.isPending}
+                      icon={startVisitMutation.isPending ? <Spinner size="tiny" /> : undefined}
                       onClick={() => startVisitMutation.mutate(currentToken)}
-                      sx={visitStarted ? heroOutlineSx : heroFilledSx}
+                      style={visitStarted ? heroOutline : heroFilled}
                     >
                       Start visit
                     </Button>
                     <Button
-                      variant={visitStarted ? 'contained' : 'outlined'}
-                      loading={completeMutation.isPending}
-                      disabled={busy}
+                      appearance={visitStarted ? 'primary' : 'outline'}
+                      disabled={busy || completeMutation.isPending}
+                      icon={completeMutation.isPending ? <Spinner size="tiny" /> : undefined}
                       onClick={() => completeMutation.mutate(currentToken)}
-                      sx={visitStarted ? heroFilledSx : heroOutlineSx}
+                      style={visitStarted ? heroFilled : heroOutline}
                     >
                       Complete
                     </Button>
                     <Button
-                      variant="outlined"
+                      appearance="outline"
                       onClick={() => setPrescriptionToken(currentToken)}
-                      sx={heroOutlineSx}
+                      style={heroOutline}
                     >
                       Write Rx
                     </Button>
                     {canOrderLab && visitStarted && (
                       <Button
-                        variant="outlined"
+                        appearance="outline"
                         onClick={() => setLabOrderToken(currentToken)}
-                        sx={heroOutlineSx}
+                        style={heroOutline}
                       >
                         Order lab
                       </Button>
                     )}
                     <Button
-                      variant="outlined"
-                      loading={skipMutation.isPending}
-                      disabled={busy}
+                      appearance="outline"
+                      disabled={busy || skipMutation.isPending}
+                      icon={skipMutation.isPending ? <Spinner size="tiny" /> : undefined}
                       onClick={() => skipMutation.mutate(currentToken.id)}
-                      sx={heroOutlineSx}
+                      style={heroOutline}
                     >
                       Skip
                     </Button>
                     {canViewPatientHistory && (
                       <Button
-                        variant="outlined"
-                        loading={historyLoadingId === currentToken.id}
+                        appearance="outline"
+                        disabled={historyLoadingId === currentToken.id}
+                        icon={historyLoadingId === currentToken.id ? <Spinner size="tiny" /> : undefined}
                         onClick={() => void openPatientHistory(currentToken.patientId, currentToken.patient.firstName, currentToken.patient.lastName, currentToken.id)}
-                        sx={heroOutlineSx}
+                        style={heroOutline}
                       >
                         History
                       </Button>
                     )}
-                  </Stack>
+                  </div>
                 </>
               ) : (
                 <>
-                  <Typography variant="h3" fontWeight={800} sx={{ letterSpacing: '-0.02em', mt: 0.75, mb: 1, lineHeight: 1.3 }}>
-                    No one in chair
-                  </Typography>
-                  <Typography variant="body1" sx={{ opacity: 0.9, fontWeight: 500, maxWidth: 440 }}>
+                  <Text className={styles.heroTitle} as="h3">No one in chair</Text>
+                  <Text className={styles.heroSub}>
                     {waitingAll.length === 0
                       ? 'Reception will issue tokens — they appear here live.'
                       : 'Call the next patient from the waiting list.'}
-                  </Typography>
+                  </Text>
                 </>
               )}
-            </Box>
+            </div>
             {currentToken && (
-              <Box sx={{ position: 'relative', zIndex: 1, flexShrink: 0, pr: { xs: 0, md: 1 } }}>
-                <Typography variant="body2" sx={{ opacity: 0.85, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                  Waiting
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, mt: 0.5 }}>
-                  <Typography variant="h3" fontWeight={800} sx={{ letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              <div className={styles.heroWait}>
+                <Text className={styles.heroEyebrow}>Waiting</Text>
+                <div className={styles.heroWaitValue}>
+                  <Text style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
                     {Math.max(0, Math.floor((nowMs - new Date(currentToken.createdAt).getTime()) / 60_000))}
-                  </Typography>
-                  <Typography variant="body1" sx={{ opacity: 0.8, fontWeight: 600, fontSize: 16, lineHeight: 1.2 }}>
-                    min
-                  </Typography>
-                </Box>
-              </Box>
+                  </Text>
+                  <Text style={{ opacity: 0.8, fontWeight: 600, fontSize: 16 }}>min</Text>
+                </div>
+              </div>
             )}
-          </Paper>
+          </div>
 
-          <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
+          <div className={styles.metrics}>
             {isLoading ? (
               Array.from({ length: 4 }, (_, i) => (
-                <Paper key={i} elevation={0} sx={{ p: 2, borderRadius: '16px', minHeight: 88 }}>
-                  <Skeleton variant="text" width={56} height={28} />
-                  <Skeleton variant="text" width={90} height={16} />
-                </Paper>
+                <div key={i} className={styles.metricCard} style={{ backgroundColor: tokens.colorNeutralBackground2 }}>
+                  <Skeleton>
+                    <SkeletonItem style={{ width: 56, height: 28 }} />
+                    <SkeletonItem style={{ width: 90, height: 16, marginTop: 8 }} />
+                  </Skeleton>
+                </div>
               ))
             ) : (
-              <>
-                {[
-                  { label: 'Waiting', value: waitingAll.length, bg: alpha(theme.palette.warning.main, 0.12), accent: theme.palette.warning.dark },
-                  { label: 'Now serving', value: currentToken ? 1 : 0, bg: alpha(theme.palette.info.main, 0.12), accent: theme.palette.info.dark },
-                  { label: 'No token', value: pendingAppointments.length, bg: alpha(theme.palette.success.main, 0.14), accent: theme.palette.success.dark },
-                  { label: 'Waiting time', value: waitingTime, bg: alpha(theme.palette.secondary.main, 0.12), accent: theme.palette.secondary.dark },
-                ].map((m) => (
-                  <Paper
-                    key={m.label}
-                    elevation={0}
-                    sx={{
-                      p: 2,
-                      borderRadius: '16px',
-                      border: 'none',
-                      bgcolor: m.bg,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                      minHeight: 88,
-                    }}
-                  >
-                    <Typography fontWeight={800} fontSize={22} sx={{ color: m.accent ?? 'text.primary', lineHeight: 1.1 }}>
-                      {m.value}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mt: 0.5 }}>
-                      {m.label}
-                    </Typography>
-                  </Paper>
-                ))}
-              </>
+              metrics.map((m) => (
+                <div key={m.label} className={styles.metricCard} style={{ backgroundColor: m.bg }}>
+                  <Text className={styles.metricValue} style={{ color: m.accent }}>{m.value}</Text>
+                  <Text className={styles.metricLabel}>{m.label}</Text>
+                </div>
+              ))
             )}
-          </Box>
+          </div>
 
-          <Paper elevation={0} sx={{ p: 2.5, ...softCard, borderRadius: 1, position: 'relative' }}>
+          <div className={`${styles.softCard} ${styles.section}`}>
             <FetchingBar show={isFetching && !isLoading} />
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-              <Box>
-                <Typography fontWeight={800} fontSize={16}>Waiting</Typography>
-                <Typography variant="caption" color="text.secondary">
+            <div className={styles.sectionHead}>
+              <div>
+                <Text weight="bold" size={400}>Waiting</Text>
+                <Text size={200} style={{ color: tokens.colorNeutralForeground2, display: 'block' }}>
                   {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
                   {waitingRest.length > 0 ? ` · ${waitingRest.length} next in line` : ''}
-                </Typography>
-              </Box>
-            </Stack>
+                </Text>
+              </div>
+            </div>
             {isLoading && mine.length === 0 ? (
               <ListCardsSkeleton count={4} />
             ) : waitingRest.length === 0 ? (
-              <Box sx={{ display: 'grid', minHeight: 100, placeItems: 'center' }}>
-                <Typography variant="body2" color="text.secondary">
+              <div className={styles.empty}>
+                <Text size={300} style={{ color: tokens.colorNeutralForeground2 }}>
                   {currentToken ? 'No one else in line.' : 'No patients waiting.'}
-                </Typography>
-              </Box>
+                </Text>
+              </div>
             ) : (
-              <Stack
-                spacing={1}
-                sx={{
-                  maxHeight: 320,
-                  overflowY: 'auto',
-                  pr: 0.5,
-                  '&::-webkit-scrollbar': { width: 4 },
-                  '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
-                }}
-              >
+              <div className={styles.list}>
                 {waitingRest.map((token) => {
                   const eta = etaFor(token);
                   return (
-                    <Box
-                      key={token.id}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 2,
-                        p: 1.5,
-                        borderRadius: 1,
-                        bgcolor: alpha(theme.palette.primary.main, 0.03),
-                        border: `1px solid ${theme.palette.divider}`,
-                        borderLeft: '4px solid',
-                        borderLeftColor: 'warning.main',
-                      }}
-                    >
+                    <div key={token.id} className={`${styles.row} ${styles.rowWaiting}`}>
                       <Avatar
-                        sx={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 1,
-                          bgcolor: alpha(theme.palette.primary.main, 0.12),
-                          color: 'primary.main',
-                          fontSize: 12,
-                          fontWeight: 700,
-                        }}
-                      >
-                        {String(token.tokenNumber).padStart(3, '0')}
-                      </Avatar>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body2" fontWeight={700} noWrap>
+                        name={`${token.patient.firstName} ${token.patient.lastName}`}
+                        initials={String(token.tokenNumber).padStart(3, '0')}
+                        color="brand"
+                        style={{ borderRadius: 8, width: 36, height: 36, fontSize: 12, fontWeight: 700 }}
+                      />
+                      <div className={styles.rowBody}>
+                        <Text weight="bold" size={300} truncate>
                           {token.patient.firstName} {token.patient.lastName}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        </Text>
+                        <Text size={200} style={{ color: tokens.colorNeutralForeground2, display: 'block' }}>
                           {token.reason || 'OPD visit'}
                           {' · waited '}
                           {formatElapsed(token.createdAt, nowMs)}
                           {eta ? ` · est. ${eta}` : ''}
-                        </Typography>
-                      </Box>
-                      <Stack direction="row" spacing={0.75} flexShrink={0}>
-                        <Button size="small" variant="outlined" loading={startVisitMutation.isPending} disabled={busy} onClick={() => startVisitMutation.mutate(token)} sx={outlineBtn}>
+                        </Text>
+                      </div>
+                      <div className={styles.rowActions}>
+                        <Button
+                          size="small"
+                          appearance="outline"
+                          disabled={busy || startVisitMutation.isPending}
+                          icon={startVisitMutation.isPending ? <Spinner size="tiny" /> : undefined}
+                          onClick={() => startVisitMutation.mutate(token)}
+                        >
                           Start
                         </Button>
-                        <Button size="small" variant="outlined" disabled={busy} onClick={() => skipMutation.mutate(token.id)} sx={outlineBtn}>
+                        <Button
+                          size="small"
+                          appearance="outline"
+                          disabled={busy}
+                          onClick={() => skipMutation.mutate(token.id)}
+                        >
                           Skip
                         </Button>
                         {canViewPatientHistory && (
-                          <Button size="small" variant="outlined" loading={historyLoadingId === token.id} onClick={() => void openPatientHistory(token.patientId, token.patient.firstName, token.patient.lastName, token.id)} sx={outlineBtn}>
+                          <Button
+                            size="small"
+                            appearance="outline"
+                            disabled={historyLoadingId === token.id}
+                            icon={historyLoadingId === token.id ? <Spinner size="tiny" /> : undefined}
+                            onClick={() => void openPatientHistory(token.patientId, token.patient.firstName, token.patient.lastName, token.id)}
+                          >
                             History
                           </Button>
                         )}
-                      </Stack>
-                    </Box>
+                      </div>
+                    </div>
                   );
                 })}
-              </Stack>
+              </div>
             )}
-          </Paper>
-        </Stack>
+          </div>
+        </div>
 
-        <Stack spacing={2} sx={{ minWidth: 0 }}>
+        <div className={styles.col}>
           {currentToken && (
-            <Paper
-              elevation={0}
-              sx={{
-                p: 2,
-                borderRadius: '18px',
-                border: 'none',
-                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-                color: 'primary.contrastText',
-                boxShadow: `0 8px 20px ${alpha(theme.palette.primary.main, 0.3)}`,
-                display: 'flex',
-                gap: 1.5,
-                alignItems: 'center',
-              }}
-            >
-              <Box sx={{ minWidth: 0 }}>
-                <Typography variant="caption" sx={{ opacity: 0.85, fontWeight: 700 }}>Up next in chair</Typography>
-                <Typography fontWeight={800} fontSize={15} sx={{ mt: 0.15 }} noWrap>
+            <div className={styles.nextCard}>
+              <div style={{ minWidth: 0 }}>
+                <Text size={200} style={{ opacity: 0.85, fontWeight: 700 }}>Up next in chair</Text>
+                <Text weight="bold" size={400} truncate style={{ display: 'block', marginTop: 2 }}>
                   {currentToken.patient.firstName} {currentToken.patient.lastName}
-                </Typography>
-                <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mt: 0.35 }}>
+                </Text>
+                <Text size={200} style={{ opacity: 0.9, display: 'block', marginTop: 4 }}>
                   Token #{String(currentToken.tokenNumber).padStart(3, '0')}
                   {' · '}
                   {formatElapsed(currentToken.createdAt, nowMs)}
-                </Typography>
-              </Box>
-            </Paper>
+                </Text>
+              </div>
+            </div>
           )}
 
-          <Paper elevation={0} sx={{ p: 2, ...softCard }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-              <Typography fontWeight={800} fontSize={14}>Appointments</Typography>
-              <Typography variant="caption" color="text.secondary">
+          <div className={`${styles.softCard} ${styles.sideCard}`}>
+            <div className={styles.sectionHead}>
+              <Text weight="bold" size={300}>Appointments</Text>
+              <Text size={200} style={{ color: tokens.colorNeutralForeground2 }}>
                 {pendingAppointments.length} without token
-              </Typography>
-            </Stack>
+              </Text>
+            </div>
             {pendingAppointments.length === 0 ? (
-              <Typography variant="caption" color="text.disabled">All today&apos;s appointments have a token.</Typography>
+              <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
+                All today&apos;s appointments have a token.
+              </Text>
             ) : (
-              <Stack
-                spacing={1}
-                sx={{
-                  maxHeight: 420,
-                  overflowY: 'auto',
-                  pr: 0.5,
-                  '&::-webkit-scrollbar': { width: 4 },
-                  '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
-                }}
-              >
+              <div className={`${styles.list} ${styles.listTall}`}>
                 {pendingAppointments.map((appt) => (
-                  <Box
-                    key={appt.id}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 2,
-                      p: 1.5,
-                      borderRadius: 1,
-                      bgcolor: alpha(theme.palette.primary.main, 0.03),
-                      border: `1px solid ${theme.palette.divider}`,
-                      borderLeft: '4px solid',
-                      borderLeftColor: 'info.main',
-                    }}
-                  >
+                  <div key={appt.id} className={`${styles.row} ${styles.rowAppt}`}>
                     <Avatar
-                      sx={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 1,
-                        bgcolor: alpha(theme.palette.primary.main, 0.12),
-                        color: 'primary.main',
-                        fontSize: 12,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {appt.patient.firstName[0]}
-                      {appt.patient.lastName[0]}
-                    </Avatar>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" fontWeight={700} noWrap>
+                      name={`${appt.patient.firstName} ${appt.patient.lastName}`}
+                      color="brand"
+                      style={{ borderRadius: 8, width: 36, height: 36, fontSize: 12, fontWeight: 700 }}
+                    />
+                    <div className={styles.rowBody}>
+                      <Text weight="bold" size={300} truncate>
                         {appt.patient.firstName} {appt.patient.lastName}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
+                      </Text>
+                      <Text size={200} style={{ color: tokens.colorNeutralForeground2, display: 'block' }}>
                         {formatClock(appt.startsAt)}
                         {' · '}
                         {appt.reason || 'Appointment'}
-                      </Typography>
-                    </Box>
-                    <Stack direction="row" spacing={0.75} flexShrink={0}>
+                      </Text>
+                    </div>
+                    <div className={styles.rowActions}>
                       <Button
                         size="small"
-                        variant="outlined"
-                        loading={issueTokenMutation.isPending && issueTokenMutation.variables?.id === appt.id}
+                        appearance="outline"
                         disabled={issueTokenMutation.isPending}
+                        icon={
+                          issueTokenMutation.isPending && issueTokenMutation.variables?.id === appt.id
+                            ? <Spinner size="tiny" />
+                            : undefined
+                        }
                         onClick={() => issueForAppointment(appt)}
-                        sx={outlineBtn}
                       >
                         Issue
                       </Button>
                       {canViewPatientHistory && (
                         <Button
                           size="small"
-                          variant="outlined"
-                          loading={historyLoadingId === appt.id}
+                          appearance="outline"
+                          disabled={historyLoadingId === appt.id}
+                          icon={historyLoadingId === appt.id ? <Spinner size="tiny" /> : undefined}
                           onClick={() => void openPatientHistory(appt.patientId, appt.patient.firstName, appt.patient.lastName, appt.id)}
-                          sx={outlineBtn}
                         >
                           History
                         </Button>
                       )}
-                    </Stack>
-                  </Box>
+                    </div>
+                  </div>
                 ))}
-              </Stack>
+              </div>
             )}
-          </Paper>
-        </Stack>
-      </Box>
+          </div>
+        </div>
+      </div>
 
       {prescriptionToken && (
         <PrescriptionPadDialog token={prescriptionToken} onClose={() => setPrescriptionToken(null)} />
@@ -767,31 +872,33 @@ export function WaitingRoomPage(): React.JSX.Element {
       {historyPatient && (
         <PatientHistoryDialog patient={historyPatient} onClose={() => setHistoryPatient(undefined)} />
       )}
-      <Dialog open={offDayOpen} onClose={closeOffDayDialog} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
-        <FormDialogTitle title="Not available today" subtitle={todayDayName} />
-        <DialogContent sx={dialogContentSx}>
-          <Typography variant="body2" color="text.secondary">
-            Today is {todayDayName}. This day is marked as a holiday / off in Doctor Schedule.
-            {pendingIssue
-              ? ` ${pendingIssue.patient.firstName} ${pendingIssue.patient.lastName} already has a booked appointment — issue a token to add them to the queue?`
-              : ' A token cannot be issued for a walk-in today.'}
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={dialogActionsSx}>
-          <Button onClick={closeOffDayDialog} sx={dialogCancelBtnSx}>
-            Cancel
-          </Button>
-          {pendingIssue && (
-            <Button
-              variant="contained"
-              loading={issueTokenMutation.isPending}
-              onClick={() => issueTokenMutation.mutate(pendingIssue)}
-              sx={dialogSubmitBtnSx}
-            >
-              Issue token
+      <Dialog open={offDayOpen} onOpenChange={(_, d) => { if (!d.open) closeOffDayDialog(); }}>
+        <DialogSurface className={styles.surfaceXs}>
+          <FormDialogTitle title="Not available today" subtitle={todayDayName} />
+          <DialogBody>
+            <DialogContent className={styles.dialogBody}>
+              <Text size={300} style={{ color: tokens.colorNeutralForeground2 }}>
+                Today is {todayDayName}. This day is marked as a holiday / off in Doctor Schedule.
+                {pendingIssue
+                  ? ` ${pendingIssue.patient.firstName} ${pendingIssue.patient.lastName} already has a booked appointment — issue a token to add them to the queue?`
+                  : ' A token cannot be issued for a walk-in today.'}
+              </Text>
+            </DialogContent>
+          </DialogBody>
+          <DialogActions className={styles.dialogActions}>
+            <Button appearance="secondary" onClick={closeOffDayDialog}>
+              Cancel
             </Button>
-          )}
-        </DialogActions>
+            {pendingIssue && (
+              <SubmitButton
+                loading={issueTokenMutation.isPending}
+                onClick={() => issueTokenMutation.mutate(pendingIssue)}
+              >
+                Issue token
+              </SubmitButton>
+            )}
+          </DialogActions>
+        </DialogSurface>
       </Dialog>
     </>
   );

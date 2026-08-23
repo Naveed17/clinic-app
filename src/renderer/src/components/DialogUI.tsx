@@ -1,40 +1,111 @@
-import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import {
-  Box,
   Button,
   Dialog,
   DialogActions,
+  DialogBody,
   DialogContent,
+  DialogSurface,
   DialogTitle,
-  Typography,
-  type DialogProps,
-} from '@mui/material';
-import { alpha } from '@mui/material/styles';
-import type { ComponentProps, ReactNode } from 'react';
+  Spinner,
+  Text,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
+import { Warning24Regular } from '@fluentui/react-icons';
+import type { ButtonProps } from '@fluentui/react-components';
+import type { CSSProperties, ReactNode } from 'react';
 
-/** Paper: column layout, capped height — body scrolls, chrome stays put */
-export const dialogPaperProps = {
-  sx: {
-    borderRadius: '20px',
-    overflow: 'hidden',
+const useStyles = makeStyles({
+  surface: {
+    maxWidth: '520px',
+    width: '100%',
+    maxHeight: '90vh',
     display: 'flex',
     flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  surfaceXs: {
+    maxWidth: '400px',
+  },
+  surfaceWide: {
+    maxWidth: '720px',
+  },
+  titleBar: {
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorBrandBackground2,
+    flexShrink: 0,
+  },
+  titleBarDanger: {
+    backgroundColor: tokens.colorPaletteRedBackground1,
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: tokens.spacingHorizontalM,
+  },
+  warnIcon: {
+    width: '40px',
+    height: '40px',
+    borderRadius: tokens.borderRadiusMedium,
+    display: 'grid',
+    placeItems: 'center',
+    backgroundColor: tokens.colorPaletteRedBackground2,
+    color: tokens.colorPaletteRedForeground1,
+    flexShrink: 0,
+  },
+  body: {
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflowY: 'auto',
+  },
+  actions: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    gap: tokens.spacingHorizontalS,
+    flexShrink: 0,
+  },
+  subtitle: {
+    marginTop: tokens.spacingVerticalXXS,
+    color: tokens.colorNeutralForeground2,
+    fontSize: tokens.fontSizeBase200,
+  },
+});
+
+/**
+ * Legacy MUI Dialog PaperProps — kept until all dialogs use Fluent DialogSurface.
+ * Compatible with MUI `PaperProps={dialogPaperProps}`.
+ */
+export const dialogPaperProps = {
+  sx: {
+    borderRadius: 1,
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column' as const,
     maxHeight: '90vh',
-    boxShadow: (theme: { palette: { common: { black: string } } }) =>
-      `0 12px 40px ${alpha(theme.palette.common.black, 0.12)}`,
+    boxShadow: '0 12px 40px rgba(0,0,0,0.12)',
   },
 };
 
-/** Scrollable body */
+/** Legacy MUI DialogContent sx */
 export const dialogContentSx = {
   px: 3,
   py: 2.5,
   flex: '1 1 auto',
   minHeight: 0,
   overflowY: 'auto',
-};
+} as const;
 
-/** Sticky footer actions */
+/** Legacy MUI DialogActions sx */
 export const dialogActionsSx = {
   px: 3,
   py: 2,
@@ -43,9 +114,8 @@ export const dialogActionsSx = {
   gap: 1,
   flexShrink: 0,
   bgcolor: 'background.paper',
-};
+} as const;
 
-/** Wrap DialogContent + DialogActions when using <Box component="form"> */
 export const dialogFormSx = {
   display: 'flex',
   flexDirection: 'column',
@@ -54,38 +124,55 @@ export const dialogFormSx = {
   overflow: 'hidden',
 } as const;
 
-/** MuiTelInput / country menu inside Dialog — without this, digits often cannot be typed. */
-export const telInputDialogProps: Pick<DialogProps, 'disableEnforceFocus' | 'disableRestoreFocus'> = {
+/** Tel input inside MUI Dialog — focus quirks. */
+export const telInputDialogProps = {
   disableEnforceFocus: true,
   disableRestoreFocus: true,
-};
+} as const;
 
 export const dialogCancelBtnSx = {
   borderRadius: 2,
   fontWeight: 700,
   px: 2,
-};
+} as CSSProperties;
 
 export const dialogSubmitBtnSx = {
   borderRadius: 2,
   fontWeight: 700,
   px: 2.5,
+} as CSSProperties;
+
+type SubmitButtonProps = ButtonProps & {
+  loading?: boolean;
+  /** MUI-compat alias for Fluent `icon` */
+  startIcon?: ReactNode;
+  /** Ignored — Fluent uses className */
+  sx?: unknown;
+  variant?: string;
+  color?: string;
+  fullWidth?: boolean;
 };
 
-/** Primary dialog/page action button — shows MUI loading spinner during API calls. */
+/** Primary action button with loading spinner (Fluent). */
 export function SubmitButton({
   loading = false,
   children,
   disabled,
-  sx,
+  startIcon,
+  icon,
+  sx: _sx,
+  variant: _variant,
+  color: _color,
+  fullWidth,
+  style,
   ...rest
-}: ComponentProps<typeof Button> & { loading?: boolean }): React.JSX.Element {
+}: SubmitButtonProps): React.JSX.Element {
   return (
     <Button
-      variant="contained"
-      loading={loading}
+      appearance="primary"
       disabled={disabled || loading}
-      sx={{ ...dialogSubmitBtnSx, ...((sx as object) || {}) }}
+      icon={loading ? <Spinner size="tiny" /> : (icon ?? (startIcon as ButtonProps['icon']))}
+      style={{ width: fullWidth ? '100%' : undefined, ...style }}
       {...rest}
     >
       {children}
@@ -99,27 +186,12 @@ interface FormDialogTitleProps {
 }
 
 export function FormDialogTitle({ title, subtitle }: FormDialogTitleProps): React.JSX.Element {
+  const styles = useStyles();
   return (
-    <Box
-      sx={{
-        px: 3,
-        pt: 2.75,
-        pb: 2,
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-        bgcolor: (theme) => alpha(theme.palette.primary.main, 0.04),
-        flexShrink: 0,
-      }}
-    >
-      <Typography variant="h6" fontWeight={800} sx={{ letterSpacing: '-0.01em' }}>
-        {title}
-      </Typography>
-      {subtitle && (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
-          {subtitle}
-        </Typography>
-      )}
-    </Box>
+    <div className={styles.titleBar}>
+      <DialogTitle as="h2">{title}</DialogTitle>
+      {subtitle ? <Text className={styles.subtitle}>{subtitle}</Text> : null}
+    </div>
   );
 }
 
@@ -133,7 +205,7 @@ interface ConfirmDialogProps {
   error?: ReactNode;
   onConfirm: () => void;
   onClose: () => void;
-  maxWidth?: DialogProps['maxWidth'];
+  maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | false;
 }
 
 export function ConfirmDialog({
@@ -148,59 +220,46 @@ export function ConfirmDialog({
   onClose,
   maxWidth = 'xs',
 }: ConfirmDialogProps): React.JSX.Element {
+  const styles = useStyles();
+  const wide = maxWidth === 'md' || maxWidth === 'lg';
+
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth={maxWidth} PaperProps={dialogPaperProps}>
-      <Box
-        sx={{
-          px: 3,
-          pt: 2.75,
-          pb: 2,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          bgcolor: (theme) => alpha(theme.palette.error.main, 0.05),
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: 1.5,
-          flexShrink: 0,
-        }}
-      >
-        <Box
-          sx={{
-            width: 40,
-            height: 40,
-            borderRadius: 2,
-            display: 'grid',
-            placeItems: 'center',
-            bgcolor: (theme) => alpha(theme.palette.error.main, 0.12),
-            color: 'error.main',
-            flexShrink: 0,
-          }}
-        >
-          <WarningAmberOutlinedIcon />
-        </Box>
-        <Box>
-          <DialogTitle sx={{ p: 0, fontWeight: 800, fontSize: 18, lineHeight: 1.3 }}>{title}</DialogTitle>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            This action cannot be undone.
-          </Typography>
-        </Box>
-      </Box>
-      <DialogContent sx={dialogContentSx}>
-        {typeof message === 'string' ? <Typography>{message}</Typography> : message}
-        {error}
-      </DialogContent>
-      <DialogActions sx={dialogActionsSx}>
-        <Button onClick={onClose} disabled={loading} sx={dialogCancelBtnSx}>{cancelLabel}</Button>
-        <Button
-          color="error"
-          loading={loading}
-          onClick={onConfirm}
-          variant="contained"
-          sx={dialogSubmitBtnSx}
-        >
-          {confirmLabel}
-        </Button>
-      </DialogActions>
+    <Dialog
+      open={open}
+      onOpenChange={(_, data) => {
+        if (!data.open) onClose();
+      }}
+    >
+      <DialogSurface className={`${styles.surface} ${wide ? styles.surfaceWide : styles.surfaceXs}`}>
+        <div className={`${styles.titleBar} ${styles.titleBarDanger}`}>
+          <div className={styles.warnIcon}>
+            <Warning24Regular />
+          </div>
+          <div>
+            <DialogTitle>{title}</DialogTitle>
+            <Text className={styles.subtitle}>This action cannot be undone.</Text>
+          </div>
+        </div>
+        <DialogBody>
+          <DialogContent className={styles.body}>
+            {typeof message === 'string' ? <Text>{message}</Text> : message}
+            {error}
+          </DialogContent>
+        </DialogBody>
+        <DialogActions className={styles.actions}>
+          <Button appearance="secondary" onClick={onClose} disabled={loading}>
+            {cancelLabel}
+          </Button>
+          <Button
+            appearance="primary"
+            onClick={onConfirm}
+            disabled={loading}
+            icon={loading ? <Spinner size="tiny" /> : undefined}
+          >
+            {confirmLabel}
+          </Button>
+        </DialogActions>
+      </DialogSurface>
     </Dialog>
   );
 }

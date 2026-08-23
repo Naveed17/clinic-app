@@ -12,13 +12,10 @@ import {
   Stop,
   Image,
 } from '@react-pdf/renderer';
-import { Alert, Box, Button, Dialog, DialogContent, Typography } from '@mui/material';
-import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import { useMemo, useState } from 'react';
 import { DEFAULT_CLINIC_LOGO } from '@/utils/clinicBrandLogo';
 import { printReactPdfDocument } from '@/utils/printPdf';
-import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
+import { PdfPreviewDialog } from '@/components/PdfPreviewDialog';
 
 /** Sample palette — soft medical blue */
 export const PAD_BLUE = '#2B5F8A';
@@ -631,59 +628,14 @@ export function PrescriptionPadPdfPreview({
   }
 
   return (
-    <Dialog
-      open
+    <PdfPreviewDialog
+      title="Prescription PDF"
       onClose={onClose}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: 1,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          maxHeight: '90vh',
-        },
-      }}
-    >
-      <Box
-        sx={{
-          px: 2.5,
-          py: 1.5,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          flexShrink: 0,
-        }}
-      >
-        <Typography fontWeight={700} fontSize={15}>
-          Prescription PDF
-        </Typography>
-        <Button onClick={onClose} size="small" startIcon={<CloseOutlinedIcon />}>
-          Close
-        </Button>
-      </Box>
-      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'auto', bgcolor: '#f1f5f9' }}>
-        <PdfBlobPreview documentKey={documentKey} pdfDocument={pdfDocument} height={560} />
-      </DialogContent>
-      <Box sx={{ px: 2.5, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-        {printError && <Alert severity="error">{printError}</Alert>}
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-          <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 1 }}>Close</Button>
-          <Button
-            variant="contained"
-            startIcon={<PrintOutlinedIcon />}
-            loading={printing}
-            disabled={printing}
-            onClick={() => void handlePrint()}
-            sx={{ borderRadius: 1 }}
-          >
-            Print
-          </Button>
-        </Box>
-      </Box>
-    </Dialog>
+      documentKey={documentKey}
+      pdfDocument={pdfDocument}
+      printing={printing}
+      printError={printError}
+      onPrint={() => void handlePrint()}
+    />
   );
 }

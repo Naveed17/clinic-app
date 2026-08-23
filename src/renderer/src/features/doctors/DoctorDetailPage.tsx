@@ -1,30 +1,16 @@
-import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
-import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
-import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined';
-import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
-import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
-import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
-import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
-import WorkOutlineOutlinedIcon from '@mui/icons-material/WorkOutlineOutlined';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
-  Alert,
   Avatar,
-  Box,
+  Badge,
   Button,
-  Chip,
-  IconButton,
-  Paper,
+  MessageBar,
+  MessageBarBody,
   Skeleton,
-  Stack,
+  Text,
+  Title3,
   Tooltip,
-  Typography,
-} from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -32,6 +18,21 @@ import { StatCardsSkeleton } from '@/components/LoadingUI';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import type { Doctor } from '@/types/doctor';
 import { DoctorEditDialog } from './DoctorEditDialog';
+import {
+  ArrowBackOutlinedIcon,
+  CalendarMonthOutlinedIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ConfirmationNumberOutlinedIcon,
+  EditOutlinedIcon,
+  EmailOutlinedIcon,
+  EventAvailableOutlinedIcon,
+  LocalPhoneOutlinedIcon,
+  MedicalServicesOutlinedIcon,
+  PaymentsOutlinedIcon,
+  SchoolOutlinedIcon,
+  WorkOutlineOutlinedIcon,
+} from '@/icons/fluent';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -56,8 +57,312 @@ function diffHours(checkIn: string, checkOut: string | null) {
   return diff.toFixed(1);
 }
 
+const useStyles = makeStyles({
+  page: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXL,
+    paddingBottom: tokens.spacingVerticalL,
+  },
+  loading: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalL,
+    padding: tokens.spacingVerticalS,
+  },
+  notFound: {
+    padding: tokens.spacingVerticalXXL,
+  },
+  backBtn: {
+    marginTop: tokens.spacingVerticalL,
+  },
+  header: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalL,
+    flexWrap: 'wrap',
+  },
+  headerLeft: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: tokens.spacingHorizontalM,
+  },
+  backIconBtn: {
+    marginTop: tokens.spacingVerticalXXS,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  eyebrow: {
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  titleRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    flexWrap: 'wrap',
+    marginTop: tokens.spacingVerticalXXS,
+  },
+  title: {
+    letterSpacing: '-0.02em',
+    fontWeight: tokens.fontWeightBold,
+  },
+  statusPill: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    paddingLeft: '9px',
+    paddingRight: '9px',
+    paddingTop: '3px',
+    paddingBottom: '3px',
+    borderRadius: '8px',
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+  },
+  statusDot: {
+    width: '7px',
+    height: '7px',
+    borderRadius: '50%',
+  },
+  subtitle: {
+    color: tokens.colorNeutralForeground2,
+    marginTop: tokens.spacingVerticalXXS,
+    fontWeight: tokens.fontWeightMedium,
+  },
+  actions: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalS,
+    flexWrap: 'wrap',
+  },
+  statsGrid: {
+    display: 'grid',
+    gap: tokens.spacingHorizontalM,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+  },
+  softCard: {
+    borderRadius: '20px',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow4,
+  },
+  statCard: {
+    padding: tokens.spacingVerticalL,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  statBlob: {
+    position: 'absolute',
+    bottom: '-14px',
+    right: '-14px',
+    width: '72px',
+    height: '72px',
+    borderRadius: '50%',
+  },
+  statInner: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  caption: {
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightSemibold,
+    fontSize: tokens.fontSizeBase200,
+  },
+  statValue: {
+    marginTop: tokens.spacingVerticalM,
+    fontSize: '28px',
+    fontWeight: tokens.fontWeightBold,
+    letterSpacing: '-0.02em',
+    lineHeight: 1,
+  },
+  iconBox: {
+    width: '36px',
+    height: '36px',
+    borderRadius: '12px',
+    display: 'grid',
+    placeItems: 'center',
+    flexShrink: 0,
+  },
+  mainGrid: {
+    display: 'grid',
+    gap: tokens.spacingVerticalXL,
+    gridTemplateColumns: 'minmax(0, 1fr) 340px',
+    alignItems: 'start',
+  },
+  col: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXL,
+    minWidth: 0,
+  },
+  cardPad: {
+    padding: tokens.spacingVerticalXL,
+  },
+  sectionHead: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalS,
+    flexWrap: 'wrap',
+    marginBottom: tokens.spacingVerticalL,
+  },
+  sectionTitle: {
+    fontWeight: tokens.fontWeightBold,
+    letterSpacing: '-0.01em',
+  },
+  dayGrid: {
+    display: 'grid',
+    gap: tokens.spacingVerticalS,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  },
+  dayRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    padding: tokens.spacingVerticalM,
+    borderRadius: tokens.borderRadiusXLarge,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  monthNav: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXXS,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    borderRadius: tokens.borderRadiusMedium,
+    paddingLeft: tokens.spacingHorizontalXXS,
+    paddingRight: tokens.spacingHorizontalXXS,
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    backgroundColor: tokens.colorNeutralBackground3,
+  },
+  monthLabel: {
+    minWidth: '110px',
+    textAlign: 'center',
+    fontWeight: tokens.fontWeightSemibold,
+    fontSize: tokens.fontSizeBase300,
+  },
+  calGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, 1fr)',
+    gap: '4px',
+  },
+  calHead: {
+    textAlign: 'center',
+    letterSpacing: '0.04em',
+    color: tokens.colorNeutralForegroundDisabled,
+    fontWeight: tokens.fontWeightBold,
+    fontSize: tokens.fontSizeBase200,
+  },
+  calCell: {
+    minHeight: '52px',
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '2px',
+    position: 'relative',
+    backgroundColor: tokens.colorNeutralBackground3,
+  },
+  emptyCal: {
+    display: 'block',
+    textAlign: 'center',
+    marginTop: tokens.spacingVerticalM,
+    color: tokens.colorNeutralForeground2,
+  },
+  legend: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalL,
+    justifyContent: 'center',
+    marginTop: tokens.spacingVerticalL,
+    flexWrap: 'wrap',
+  },
+  legendItem: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+  },
+  legendSwatch: {
+    width: '10px',
+    height: '10px',
+    borderRadius: '4px',
+  },
+  profileHead: {
+    paddingTop: tokens.spacingVerticalXL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalXL,
+    paddingRight: tokens.spacingHorizontalXL,
+    background: `linear-gradient(145deg, ${tokens.colorBrandBackground2} 0%, ${tokens.colorNeutralBackground1} 100%)`,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  profileHeadRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalM,
+    alignItems: 'center',
+  },
+  profileName: {
+    fontWeight: tokens.fontWeightBold,
+    fontSize: tokens.fontSizeBase400,
+    letterSpacing: '-0.01em',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  infoList: {
+    padding: tokens.spacingVerticalS,
+  },
+  infoRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: tokens.spacingHorizontalM,
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalM,
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  infoIcon: {
+    width: '32px',
+    height: '32px',
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorBrandBackground2,
+    color: tokens.colorBrandForeground1,
+    display: 'grid',
+    placeItems: 'center',
+    flexShrink: 0,
+    marginTop: '2px',
+  },
+  bioWrap: {
+    paddingLeft: tokens.spacingHorizontalXL,
+    paddingRight: tokens.spacingHorizontalXL,
+    paddingBottom: tokens.spacingVerticalXL,
+  },
+  bioBox: {
+    marginTop: tokens.spacingVerticalXS,
+    padding: tokens.spacingVerticalM,
+    borderRadius: tokens.borderRadiusXLarge,
+    backgroundColor: tokens.colorNeutralBackground3,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    lineHeight: 1.55,
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightMedium,
+    fontSize: tokens.fontSizeBase300,
+  },
+});
+
 export function DoctorDetailPage(): React.JSX.Element {
-  const theme = useTheme();
+  const styles = useStyles();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [editOpen, setEditOpen] = useState(false);
@@ -77,13 +382,6 @@ export function DoctorDetailPage(): React.JSX.Element {
     queryFn: () => window.clinic.doctors.attendance(id!, year, month),
     enabled: Boolean(id),
   });
-
-  const softCard = {
-    borderRadius: '20px',
-    border: '1px solid',
-    borderColor: 'divider',
-    boxShadow: `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,
-  } as const;
 
   const doctor = doctorQuery.data as
     | (Doctor & {
@@ -115,81 +413,82 @@ export function DoctorDetailPage(): React.JSX.Element {
 
   if (doctorQuery.isLoading) {
     return (
-      <Stack spacing={2} sx={{ p: 1 }}>
-        <Skeleton variant="rounded" height={88} sx={{ borderRadius: 3 }} />
+      <div className={styles.loading}>
+        <Skeleton appearance="opaque" style={{ height: 88, borderRadius: 12 }} />
         <StatCardsSkeleton count={4} />
-        <Skeleton variant="rounded" height={280} sx={{ borderRadius: 3 }} />
-      </Stack>
+        <Skeleton appearance="opaque" style={{ height: 280, borderRadius: 12 }} />
+      </div>
     );
   }
 
   if (!doctor) {
     return (
-      <Box sx={{ p: 4 }}>
-        <Alert severity="error" sx={{ borderRadius: 2 }}>
-          Doctor not found.
-        </Alert>
+      <div className={styles.notFound}>
+        <MessageBar intent="error">
+          <MessageBarBody>Doctor not found.</MessageBarBody>
+        </MessageBar>
         <Button
-          sx={{ mt: 2, borderRadius: 2, fontWeight: 700 }}
-          startIcon={<ArrowBackOutlinedIcon />}
+          className={styles.backBtn}
+          appearance="secondary"
+          icon={<ArrowBackOutlinedIcon />}
           onClick={() => navigate('/doctors')}
         >
           Back to Doctors
         </Button>
-      </Box>
+      </div>
     );
   }
 
-  const green = theme.palette.primary.main;
-  const success = theme.palette.success.main;
-  const warning = theme.palette.warning.main;
-  const info = theme.palette.info.main;
+  const green = tokens.colorBrandForeground1;
+  const success = tokens.colorPaletteGreenForeground1;
+  const warning = tokens.colorPaletteDarkOrangeForeground1;
+  const info = tokens.colorPaletteBlueForeground2;
 
   const summaryCards = [
     {
       label: 'Appointments',
       value: doctor.totalAppointments,
       note: 'All time',
-      icon: <CalendarMonthOutlinedIcon fontSize="small" />,
+      icon: <CalendarMonthOutlinedIcon style={{ fontSize: 18 }} />,
       color: green,
     },
     {
       label: "Today's Tokens",
       value: doctor.todayTokens,
       note: new Date().toLocaleDateString(),
-      icon: <ConfirmationNumberOutlinedIcon fontSize="small" />,
+      icon: <ConfirmationNumberOutlinedIcon style={{ fontSize: 18 }} />,
       color: warning,
     },
     {
       label: 'Active Days',
       value: activeDays,
       note: 'Per week',
-      icon: <EventAvailableOutlinedIcon fontSize="small" />,
+      icon: <EventAvailableOutlinedIcon style={{ fontSize: 18 }} />,
       color: success,
     },
     {
       label: 'Present Days',
       value: presentDays,
       note: `${MONTHS[month - 1].slice(0, 3)} ${year}`,
-      icon: <WorkOutlineOutlinedIcon fontSize="small" />,
+      icon: <WorkOutlineOutlinedIcon style={{ fontSize: 18 }} />,
       color: info,
     },
   ];
 
   const infoRows = [
-    { icon: <EmailOutlinedIcon sx={{ fontSize: 18 }} />, label: 'Email', value: doctor.email },
+    { icon: <EmailOutlinedIcon style={{ fontSize: 18 }} />, label: 'Email', value: doctor.email },
     {
-      icon: <MedicalServicesOutlinedIcon sx={{ fontSize: 18 }} />,
+      icon: <MedicalServicesOutlinedIcon style={{ fontSize: 18 }} />,
       label: 'Specialization',
       value: doctor.doctorProfile?.specialization ?? '—',
     },
     {
-      icon: <SchoolOutlinedIcon sx={{ fontSize: 18 }} />,
+      icon: <SchoolOutlinedIcon style={{ fontSize: 18 }} />,
       label: 'Qualification',
       value: doctor.doctorProfile?.qualification ?? '—',
     },
     {
-      icon: <WorkOutlineOutlinedIcon sx={{ fontSize: 18 }} />,
+      icon: <WorkOutlineOutlinedIcon style={{ fontSize: 18 }} />,
       label: 'Experience',
       value:
         doctor.doctorProfile?.experienceYears != null
@@ -197,12 +496,12 @@ export function DoctorDetailPage(): React.JSX.Element {
           : '—',
     },
     {
-      icon: <PaymentsOutlinedIcon sx={{ fontSize: 18 }} />,
+      icon: <PaymentsOutlinedIcon style={{ fontSize: 18 }} />,
       label: 'Consultation fee',
       value: `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(doctor.doctorProfile?.consultationFee ?? 0))}`,
     },
     {
-      icon: <LocalPhoneOutlinedIcon sx={{ fontSize: 18 }} />,
+      icon: <LocalPhoneOutlinedIcon style={{ fontSize: 18 }} />,
       label: 'Phone',
       value: doctor.doctorProfile?.phone ?? '—',
     },
@@ -210,321 +509,202 @@ export function DoctorDetailPage(): React.JSX.Element {
 
   return (
     <>
-      <Stack spacing={2.5} sx={{ pb: 2 }}>
-        {/* Header */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: { sm: 'flex-end' },
-            flexDirection: { xs: 'column', sm: 'row' },
-            gap: 2,
-            justifyContent: 'space-between',
-          }}
-        >
-          <Stack direction="row" alignItems="flex-start" spacing={1.5}>
-            <Tooltip title="Back to doctors">
-              <IconButton
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <div className={styles.headerLeft}>
+            <Tooltip content="Back to doctors" relationship="label">
+              <Button
+                appearance="subtle"
+                icon={<ArrowBackOutlinedIcon style={{ fontSize: 18 }} />}
                 onClick={() => navigate('/doctors')}
-                size="small"
-                sx={{ mt: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
-              >
-                <ArrowBackOutlinedIcon fontSize="small" />
-              </IconButton>
+                className={styles.backIconBtn}
+              />
             </Tooltip>
-            <Box>
-              <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                Doctor profile
-              </Typography>
-              <Stack direction="row" alignItems="center" gap={1.25} flexWrap="wrap" sx={{ mt: 0.25 }}>
-                <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em' }}>
+            <div>
+              <Text className={styles.eyebrow}>Doctor profile</Text>
+              <div className={styles.titleRow}>
+                <Title3 className={styles.title}>
                   Dr. {doctor.firstName} {doctor.lastName}
-                </Typography>
-                <Box
-                  sx={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 0.75,
-                    px: 1.1,
-                    py: 0.35,
-                    borderRadius: '8px',
-                    border: '1px solid',
-                    borderColor: doctor.isActive ? alpha(success, 0.25) : 'divider',
-                    bgcolor: doctor.isActive ? alpha(success, 0.1) : alpha(theme.palette.text.primary, 0.04),
+                </Title3>
+                <div
+                  className={styles.statusPill}
+                  style={{
+                    borderColor: doctor.isActive ? `${success}40` : tokens.colorNeutralStroke1,
+                    backgroundColor: doctor.isActive ? `${success}1a` : tokens.colorNeutralBackground3,
                   }}
                 >
-                  <Box
-                    sx={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: '50%',
-                      bgcolor: doctor.isActive ? success : 'text.disabled',
-                    }}
+                  <div
+                    className={styles.statusDot}
+                    style={{ backgroundColor: doctor.isActive ? success : tokens.colorNeutralForegroundDisabled }}
                   />
-                  <Typography
-                    fontSize={12}
-                    fontWeight={700}
-                    color={doctor.isActive ? 'success.dark' : 'text.secondary'}
+                  <Text
+                    size={200}
+                    weight="semibold"
+                    style={{ color: doctor.isActive ? success : tokens.colorNeutralForeground2 }}
                   >
                     {doctor.isActive ? 'Active' : 'Inactive'}
-                  </Typography>
-                </Box>
-              </Stack>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }} fontWeight={500}>
+                  </Text>
+                </div>
+              </div>
+              <Text className={styles.subtitle}>
                 {doctor.doctorProfile?.specialization ?? 'General practice'}
                 {' · '}
                 Joined {new Date(doctor.createdAt).toLocaleDateString()}
-              </Typography>
-            </Box>
-          </Stack>
+              </Text>
+            </div>
+          </div>
 
-          <Stack direction="row" gap={1} flexWrap="wrap">
+          <div className={styles.actions}>
             <Button
-              startIcon={<CalendarMonthOutlinedIcon />}
-              variant="outlined"
-              sx={{ borderRadius: 2, fontWeight: 700, px: 2, textTransform: 'none' }}
+              appearance="secondary"
+              icon={<CalendarMonthOutlinedIcon />}
               onClick={() => navigate(`/schedule?doctorId=${doctor.id}`)}
             >
               Edit schedule
             </Button>
             <Button
-              startIcon={<EditOutlinedIcon />}
-              variant="contained"
-              sx={{ borderRadius: 2, fontWeight: 700, px: 2.25, py: 1, textTransform: 'none' }}
+              appearance="primary"
+              icon={<EditOutlinedIcon />}
               onClick={() => setEditOpen(true)}
             >
               Edit profile
             </Button>
-          </Stack>
-        </Box>
+          </div>
+        </div>
 
-        {/* Summary metrics */}
-        <Box
-          sx={{
-            display: 'grid',
-            gap: 1.75,
-            gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' },
-          }}
-        >
+        <div className={styles.statsGrid}>
           {summaryCards.map((c) => (
-            <Paper
-              key={c.label}
-              elevation={0}
-              sx={{
-                p: 2.25,
-                ...softCard,
-                position: 'relative',
-                overflow: 'hidden',
-              }}
-            >
-              <Box
-                sx={{
-                  position: 'absolute',
-                  bottom: -14,
-                  right: -14,
-                  width: 72,
-                  height: 72,
-                  borderRadius: '50%',
-                  bgcolor: alpha(c.color, 0.1),
-                }}
-              />
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                <Box>
-                  <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                    {c.label}
-                  </Typography>
-                  <Typography sx={{ mt: 1.25, fontSize: 28, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1 }}>
+            <div key={c.label} className={`${styles.softCard} ${styles.statCard}`}>
+              <div className={styles.statBlob} style={{ backgroundColor: `${c.color}1a` }} />
+              <div className={styles.statInner}>
+                <div>
+                  <Text className={styles.caption}>{c.label}</Text>
+                  <Text className={styles.statValue} block>
                     {c.value}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" fontWeight={500} sx={{ mt: 0.75, display: 'block' }}>
+                  </Text>
+                  <Text className={styles.caption} style={{ marginTop: 6, display: 'block' }}>
                     {c.note}
-                  </Typography>
-                </Box>
-                <Box
-                  sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '12px',
-                    bgcolor: alpha(c.color, 0.12),
-                    color: c.color,
-                    display: 'grid',
-                    placeItems: 'center',
-                  }}
+                  </Text>
+                </div>
+                <div
+                  className={styles.iconBox}
+                  style={{ backgroundColor: `${c.color}1f`, color: c.color }}
                 >
                   {c.icon}
-                </Box>
-              </Stack>
-            </Paper>
+                </div>
+              </div>
+            </div>
           ))}
-        </Box>
+        </div>
 
-        {/* Main + sidebar */}
-        <Box
-          sx={{
-            display: 'grid',
-            gap: 2.5,
-            gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 340px' },
-            alignItems: 'start',
-          }}
-        >
-          <Stack spacing={2.5} sx={{ minWidth: 0 }}>
-            {/* Weekly schedule */}
-            <Paper elevation={0} sx={{ p: 2.5, ...softCard }}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }} flexWrap="wrap" gap={1}>
-                <Box>
-                  <Typography fontWeight={800} letterSpacing="-0.01em">
+        <div className={styles.mainGrid}>
+          <div className={styles.col}>
+            <div className={`${styles.softCard} ${styles.cardPad}`}>
+              <div className={styles.sectionHead}>
+                <div>
+                  <Text className={styles.sectionTitle} block>
                     Weekly Schedule
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" fontWeight={500}>
+                  </Text>
+                  <Text className={styles.caption}>
                     Availability used when booking appointments & tokens
-                  </Typography>
-                </Box>
+                  </Text>
+                </div>
                 <Button
+                  appearance="secondary"
                   size="small"
-                  variant="outlined"
-                  startIcon={<EditOutlinedIcon sx={{ fontSize: 16 }} />}
+                  icon={<EditOutlinedIcon style={{ fontSize: 16 }} />}
                   onClick={() => navigate(`/schedule?doctorId=${doctor.id}`)}
-                  sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
                 >
                   Edit
                 </Button>
-              </Stack>
+              </div>
 
-              <Box
-                sx={{
-                  display: 'grid',
-                  gap: 1,
-                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                }}
-              >
+              <div className={styles.dayGrid}>
                 {DAY_FULL.map((day, i) => {
                   const slot = doctor.schedules.find((s) => s.dayOfWeek === i);
                   const active = slot?.isActive ?? false;
                   return (
-                    <Box
+                    <div
                       key={day}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1.25,
-                        p: 1.35,
-                        borderRadius: 2.5,
-                        border: '1px solid',
-                        borderColor: active ? alpha(green, 0.2) : 'divider',
-                        bgcolor: active ? alpha(green, 0.05) : alpha(theme.palette.text.primary, 0.02),
+                      className={styles.dayRow}
+                      style={{
+                        borderColor: active ? `${green}33` : tokens.colorNeutralStroke2,
+                        backgroundColor: active ? `${green}0d` : tokens.colorNeutralBackground3,
                         opacity: active ? 1 : 0.72,
                       }}
                     >
                       <Avatar
-                        sx={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 2,
-                          fontSize: 12,
+                        name={DAYS[i]}
+                        initials={DAYS[i]}
+                        color="neutral"
+                        size={36}
+                        style={{
+                          borderRadius: tokens.borderRadiusMedium,
+                          backgroundColor: active ? `${green}24` : tokens.colorNeutralBackground4,
+                          color: active ? green : tokens.colorNeutralForeground2,
                           fontWeight: 800,
-                          bgcolor: active ? alpha(green, 0.14) : alpha(theme.palette.text.primary, 0.06),
-                          color: active ? green : 'text.secondary',
-                        }}
-                      >
-                        {DAYS[i]}
-                      </Avatar>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography fontSize={13} fontWeight={700} noWrap>
-                          {day}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" fontWeight={500}>
-                          {active && slot ? `${slot.startTime} – ${slot.endTime}` : 'Off'}
-                        </Typography>
-                      </Box>
-                      <Chip
-                        label={active ? 'On' : 'Off'}
-                        size="small"
-                        sx={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          borderRadius: 1.5,
-                          height: 24,
-                          bgcolor: active ? alpha(success, 0.12) : alpha(theme.palette.text.primary, 0.06),
-                          color: active ? 'success.dark' : 'text.secondary',
+                          fontSize: 12,
                         }}
                       />
-                    </Box>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <Text weight="semibold" size={300} block style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {day}
+                        </Text>
+                        <Text className={styles.caption}>
+                          {active && slot ? `${slot.startTime} – ${slot.endTime}` : 'Off'}
+                        </Text>
+                      </div>
+                      <Badge appearance="tint" color={active ? 'success' : 'subtle'} size="small">
+                        {active ? 'On' : 'Off'}
+                      </Badge>
+                    </div>
                   );
                 })}
-              </Box>
-            </Paper>
+              </div>
+            </div>
 
-            {/* Monthly attendance */}
-            <Paper elevation={0} sx={{ p: 2.5, ...softCard }}>
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                sx={{ mb: 2 }}
-                flexWrap="wrap"
-                gap={1.5}
-              >
-                <Box>
-                  <Typography fontWeight={800} letterSpacing="-0.01em">
+            <div className={`${styles.softCard} ${styles.cardPad}`}>
+              <div className={styles.sectionHead}>
+                <div>
+                  <Text className={styles.sectionTitle} block>
                     Monthly Attendance
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" fontWeight={500}>
+                  </Text>
+                  <Text className={styles.caption}>
                     {presentDays} day{presentDays !== 1 ? 's' : ''} present out of {lastDay} in{' '}
                     {MONTHS[month - 1]} {year}
-                  </Typography>
-                </Box>
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  gap={0.5}
-                  sx={{
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 2,
-                    px: 0.5,
-                    py: 0.25,
-                    bgcolor: alpha(theme.palette.common.black, 0.02),
-                  }}
-                >
-                  <IconButton size="small" onClick={prevMonth} sx={{ borderRadius: 1.5 }}>
-                    <ChevronLeftIcon fontSize="small" />
-                  </IconButton>
-                  <Typography fontWeight={700} fontSize={13} sx={{ minWidth: 110, textAlign: 'center' }}>
+                  </Text>
+                </div>
+                <div className={styles.monthNav}>
+                  <Button appearance="subtle" size="small" icon={<ChevronLeftIcon style={{ fontSize: 18 }} />} onClick={prevMonth} />
+                  <Text className={styles.monthLabel}>
                     {MONTHS[month - 1].slice(0, 3)} {year}
-                  </Typography>
-                  <IconButton size="small" onClick={nextMonth} sx={{ borderRadius: 1.5 }}>
-                    <ChevronRightIcon fontSize="small" />
-                  </IconButton>
-                </Stack>
-              </Stack>
+                  </Text>
+                  <Button appearance="subtle" size="small" icon={<ChevronRightIcon style={{ fontSize: 18 }} />} onClick={nextMonth} />
+                </div>
+              </div>
 
               {attendanceQuery.isLoading ? (
-                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5 }}>
+                <div className={styles.calGrid}>
                   {Array.from({ length: 35 }, (_, i) => (
-                    <Skeleton key={i} variant="rounded" height={52} />
+                    <Skeleton key={i} appearance="opaque" style={{ height: 52, borderRadius: 8 }} />
                   ))}
-                </Box>
+                </div>
               ) : (
-                <Box>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5, mb: 0.75 }}>
+                <div>
+                  <div className={styles.calGrid} style={{ marginBottom: 6 }}>
                     {DAYS.map((d) => (
-                      <Typography
-                        key={d}
-                        variant="caption"
-                        color="text.disabled"
-                        fontWeight={700}
-                        sx={{ textAlign: 'center', letterSpacing: '0.04em' }}
-                      >
+                      <Text key={d} className={styles.calHead}>
                         {d}
-                      </Typography>
+                      </Text>
                     ))}
-                  </Box>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5 }}>
+                  </div>
+                  <div className={styles.calGrid}>
                     {(() => {
                       const firstDow = new Date(year, month - 1, 1).getDay();
                       const byDate = new Map(attendance.map((r) => [r.date, r]));
                       const cells: React.ReactNode[] = [];
                       for (let i = 0; i < firstDow; i++) {
-                        cells.push(<Box key={`pad-${i}`} sx={{ minHeight: 52 }} />);
+                        cells.push(<div key={`pad-${i}`} style={{ minHeight: 52 }} />);
                       }
                       for (let day = 1; day <= lastDay; day++) {
                         const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -543,182 +723,116 @@ export function DoctorDetailPage(): React.JSX.Element {
                               .filter(Boolean)
                               .join(' · ')
                           : 'No attendance';
+                        const tone = rec ? (rec.checkOutAt ? success : warning) : null;
                         cells.push(
-                          <Tooltip key={dateKey} title={tip} arrow>
-                            <Box
-                              sx={{
-                                minHeight: 52,
-                                borderRadius: 1.5,
-                                border: '1px solid',
-                                borderColor: rec
-                                  ? alpha(rec.checkOutAt ? success : warning, 0.45)
-                                  : 'divider',
-                                bgcolor: rec
-                                  ? alpha(rec.checkOutAt ? success : warning, 0.12)
-                                  : alpha(theme.palette.text.primary, 0.02),
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 0.25,
-                                position: 'relative',
+                          <Tooltip key={dateKey} content={tip} relationship="label">
+                            <div
+                              className={styles.calCell}
+                              style={{
+                                borderColor: tone ? `${tone}73` : tokens.colorNeutralStroke2,
+                                backgroundColor: tone ? `${tone}1f` : tokens.colorNeutralBackground3,
                                 outline: isToday ? `2px solid ${green}` : 'none',
                                 outlineOffset: -1,
                               }}
                             >
-                              <Typography
-                                fontSize={13}
-                                fontWeight={isToday || rec ? 800 : 600}
-                                color={rec ? (rec.checkOutAt ? 'success.dark' : 'warning.dark') : 'text.secondary'}
+                              <Text
+                                size={300}
+                                weight={isToday || rec ? 'bold' : 'semibold'}
+                                style={{ color: tone ?? tokens.colorNeutralForeground2 }}
                               >
                                 {day}
-                              </Typography>
+                              </Text>
                               {rec && (
-                                <Typography
-                                  sx={{
+                                <Text
+                                  style={{
                                     fontSize: 9,
                                     fontWeight: 700,
-                                    color: rec.checkOutAt ? 'success.dark' : 'warning.dark',
+                                    color: tone ?? undefined,
                                     opacity: 0.9,
                                     lineHeight: 1,
                                   }}
                                 >
                                   {formatTime(rec.checkInAt)}
-                                </Typography>
+                                </Text>
                               )}
-                            </Box>
+                            </div>
                           </Tooltip>,
                         );
                       }
                       return cells;
                     })()}
-                  </Box>
+                  </div>
                   {attendance.length === 0 && (
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: 'block', textAlign: 'center', mt: 1.5 }}
-                    >
+                    <Text className={styles.emptyCal} size={200}>
                       No check-ins this month yet. Present days will highlight on the calendar.
-                    </Typography>
+                    </Text>
                   )}
-                  <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 1.75 }} flexWrap="wrap" useFlexGap>
-                    <Stack direction="row" spacing={0.75} alignItems="center">
-                      <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: alpha(success, 0.7) }} />
-                      <Typography variant="caption" color="text.secondary" fontWeight={600}>Present</Typography>
-                    </Stack>
-                    <Stack direction="row" spacing={0.75} alignItems="center">
-                      <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: alpha(warning, 0.7) }} />
-                      <Typography variant="caption" color="text.secondary" fontWeight={600}>Still in</Typography>
-                    </Stack>
-                    <Stack direction="row" spacing={0.75} alignItems="center">
-                      <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: alpha(theme.palette.text.primary, 0.12) }} />
-                      <Typography variant="caption" color="text.secondary" fontWeight={600}>Absent</Typography>
-                    </Stack>
-                  </Stack>
-                </Box>
+                  <div className={styles.legend}>
+                    <div className={styles.legendItem}>
+                      <div className={styles.legendSwatch} style={{ backgroundColor: `${success}b3` }} />
+                      <Text className={styles.caption}>Present</Text>
+                    </div>
+                    <div className={styles.legendItem}>
+                      <div className={styles.legendSwatch} style={{ backgroundColor: `${warning}b3` }} />
+                      <Text className={styles.caption}>Still in</Text>
+                    </div>
+                    <div className={styles.legendItem}>
+                      <div className={styles.legendSwatch} style={{ backgroundColor: tokens.colorNeutralStroke1 }} />
+                      <Text className={styles.caption}>Absent</Text>
+                    </div>
+                  </div>
+                </div>
               )}
-            </Paper>
-          </Stack>
+            </div>
+          </div>
 
-          {/* Sidebar profile card */}
-          <Stack spacing={2.5}>
-            <Paper elevation={0} sx={{ ...softCard, overflow: 'hidden' }}>
-              <Box
-                sx={{
-                  px: 2.5,
-                  pt: 2.5,
-                  pb: 2,
-                  background: `linear-gradient(145deg, ${alpha(green, 0.14)} 0%, ${alpha(green, 0.04)} 100%)`,
-                  borderBottom: '1px solid',
-                  borderColor: 'divider',
-                }}
-              >
-                <Stack direction="row" spacing={1.75} alignItems="center">
+          <div className={styles.col}>
+            <div className={`${styles.softCard}`} style={{ overflow: 'hidden' }}>
+              <div className={styles.profileHead}>
+                <div className={styles.profileHeadRow}>
                   <DoctorAvatar
                     src={doctor.doctorProfile?.avatar}
                     name={`Dr. ${doctor.firstName} ${doctor.lastName}`}
                     size={64}
-                    sx={{ boxShadow: `0 8px 20px ${alpha(green, 0.35)}` }}
+                    style={{ boxShadow: `0 8px 20px ${green}59` }}
                   />
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography fontWeight={800} fontSize={16} noWrap letterSpacing="-0.01em">
+                  <div style={{ minWidth: 0 }}>
+                    <Text className={styles.profileName} block>
                       Dr. {doctor.firstName} {doctor.lastName}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600} noWrap sx={{ display: 'block' }}>
+                    </Text>
+                    <Text className={styles.caption} block style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {doctor.doctorProfile?.specialization ?? 'Doctor'}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Box>
+                    </Text>
+                  </div>
+                </div>
+              </div>
 
-              <Stack spacing={0} sx={{ p: 1.25 }}>
+              <div className={styles.infoList}>
                 {infoRows.map((row) => (
-                  <Box
-                    key={row.label}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: 1.25,
-                      px: 1.25,
-                      py: 1.15,
-                      borderRadius: 1,
-                      '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.03) },
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 1,
-                        bgcolor: alpha(green, 0.1),
-                        color: green,
-                        display: 'grid',
-                        placeItems: 'center',
-                        flexShrink: 0,
-                        mt: 0.15,
-                      }}
-                    >
-                      {row.icon}
-                    </Box>
-                    <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                        {row.label}
-                      </Typography>
-                      <Typography fontSize={13.5} fontWeight={600} sx={{ wordBreak: 'break-word' }}>
+                  <div key={row.label} className={styles.infoRow}>
+                    <div className={styles.infoIcon}>{row.icon}</div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <Text className={styles.caption}>{row.label}</Text>
+                      <Text weight="semibold" size={300} style={{ wordBreak: 'break-word' }}>
                         {row.value}
-                      </Typography>
-                    </Box>
-                  </Box>
+                      </Text>
+                    </div>
+                  </div>
                 ))}
-              </Stack>
+              </div>
 
               {doctor.doctorProfile?.bio ? (
-                <Box sx={{ px: 2.5, pb: 2.5 }}>
-                  <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ display: 'block', mb: 0.75 }}>
+                <div className={styles.bioWrap}>
+                  <Text className={styles.caption} weight="bold" block>
                     Bio
-                  </Typography>
-                  <Typography
-                    fontSize={13}
-                    color="text.secondary"
-                    fontWeight={500}
-                    sx={{
-                      p: 1.5,
-                      borderRadius: 2.5,
-                      bgcolor: alpha(theme.palette.text.primary, 0.03),
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      lineHeight: 1.55,
-                    }}
-                  >
-                    {doctor.doctorProfile.bio}
-                  </Typography>
-                </Box>
+                  </Text>
+                  <div className={styles.bioBox}>{doctor.doctorProfile.bio}</div>
+                </div>
               ) : null}
-            </Paper>
-          </Stack>
-        </Box>
-      </Stack>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <DoctorEditDialog open={editOpen} doctorId={id!} onClose={() => setEditOpen(false)} />
     </>

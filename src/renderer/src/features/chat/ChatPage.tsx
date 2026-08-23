@@ -1,30 +1,43 @@
-import { Box, Paper, Typography } from '@mui/material';
-import { softCardSx } from '@/components/TableUI';
+import { Text, Title2, makeStyles, tokens } from '@fluentui/react-components';
 import { ChatWorkspace } from './ChatWorkspace';
 
+const useStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalL,
+    flexGrow: 1,
+    minHeight: 0,
+  },
+  subtitle: {
+    marginTop: tokens.spacingVerticalXXS,
+    color: tokens.colorNeutralForeground2,
+  },
+  card: {
+    flexGrow: 1,
+    minHeight: '420px',
+    height: 'min(720px, calc(100vh - 190px))',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusXLarge,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow4,
+  },
+});
+
 export function ChatPage(): React.JSX.Element {
+  const styles = useStyles();
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, flexGrow: 1, minHeight: 0 }}>
-      <Box>
-        <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em' }}>
-          Staff Chat
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+    <div className={styles.root}>
+      <div>
+        <Title2 style={{ letterSpacing: '-0.02em', fontWeight: 900 }}>Staff Chat</Title2>
+        <Text className={styles.subtitle} block>
           Team chat plus direct messages. Green dot means that person is online now.
-        </Typography>
-      </Box>
-      <Paper
-        elevation={0}
-        sx={{
-          ...softCardSx,
-          flexGrow: 1,
-          minHeight: 420,
-          height: { xs: 'calc(100vh - 210px)', md: 'min(720px, calc(100vh - 190px))' },
-          overflow: 'hidden',
-        }}
-      >
+        </Text>
+      </div>
+      <div className={styles.card}>
         <ChatWorkspace variant="page" />
-      </Paper>
-    </Box>
+      </div>
+    </div>
   );
 }

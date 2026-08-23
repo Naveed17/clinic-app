@@ -1,20 +1,16 @@
-import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
-import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import {
-  Alert,
-  Box,
   Button,
-  CircularProgress,
-  IconButton,
-  Paper,
+  MessageBar,
+  MessageBarActions,
+  MessageBarBody,
   Skeleton,
+  Spinner,
+  Text,
   Tooltip,
-  Typography,
-} from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
+import { DismissRegular } from '@fluentui/react-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -26,11 +22,106 @@ import { openWhatsAppWeb } from '@/utils/whatsappWeb';
 import { showAppToast } from '@/components/AppToast';
 import type { Patient } from '@/types/patient';
 import { DocViewerDialog, type DocViewerData } from './DocViewerDialog';
+import { AttachFileOutlinedIcon, DeleteOutlineIcon, FolderOpenOutlinedIcon, InsertDriveFileOutlinedIcon, WhatsAppIcon } from '@/icons/fluent';
 
 type DocItem = { id: string; name: string; filePath: string; uploadedAt: string };
 
+const useStyles = makeStyles({
+  root: {
+    padding: tokens.spacingVerticalL,
+  },
+  stickyAlert: {
+    marginBottom: tokens.spacingVerticalM,
+    position: 'sticky',
+    top: 0,
+    zIndex: 2,
+  },
+  uploadRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: tokens.spacingVerticalM,
+  },
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+    gap: tokens.spacingHorizontalM,
+  },
+  empty: {
+    color: tokens.colorNeutralForeground2,
+    textAlign: 'center',
+    paddingTop: tokens.spacingVerticalXXL,
+    paddingBottom: tokens.spacingVerticalXXL,
+  },
+  card: {
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    borderRadius: tokens.borderRadiusMedium,
+    overflow: 'hidden',
+    '&:hover .docActions': {
+      opacity: 1,
+    },
+  },
+  thumb: {
+    height: '96px',
+    backgroundColor: tokens.colorBrandBackground2,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    color: tokens.colorBrandForeground1,
+  },
+  actions: {
+    position: 'absolute',
+    inset: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: tokens.spacingHorizontalXXS,
+    opacity: 0,
+    transitionProperty: 'opacity',
+    transitionDuration: tokens.durationNormal,
+  },
+  actionBtn: {
+    color: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  waHover: {
+    ':hover': {
+      backgroundColor: 'rgba(37,211,102,0.8)',
+    },
+  },
+  meta: {
+    paddingLeft: tokens.spacingHorizontalS,
+    paddingRight: tokens.spacingHorizontalS,
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+  },
+  name: {
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightSemibold,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  date: {
+    fontSize: '11px',
+    color: tokens.colorNeutralForeground3,
+  },
+  toastHost: {
+    position: 'fixed',
+    top: '20px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: 2147483647,
+    pointerEvents: 'auto',
+    minWidth: '280px',
+    boxShadow: tokens.shadow16,
+  },
+});
+
 export function PatientDocumentsPanel({ patient }: { patient: Patient }): React.JSX.Element {
-  const theme = useTheme();
+  const styles = useStyles();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const { can } = useLicense();
@@ -96,99 +187,109 @@ export function PatientDocumentsPanel({ patient }: { patient: Patient }): React.
     }
   }
 
-  const softCard = {
-    border: '1px solid',
-    borderColor: 'divider',
-    bgcolor: 'background.paper',
-  } as const;
-
   return (
-    <Box sx={{ p: 2 }}>
+    <div className={styles.root}>
       {waSnack.open && waSnack.msg && (
-        <Box ref={waAlertRef} sx={{ mb: 1.5, position: 'sticky', top: 0, zIndex: 2 }}>
-          <Alert
-            severity={waSnack.success ? 'success' : 'error'}
-            onClose={() => setWaSnack((s) => ({ ...s, open: false }))}
-          >
-            {waSnack.msg}
-          </Alert>
-        </Box>
+        <div ref={waAlertRef} className={styles.stickyAlert}>
+          <MessageBar intent={waSnack.success ? 'success' : 'error'}>
+            <MessageBarBody>{waSnack.msg}</MessageBarBody>
+            <MessageBarActions
+              containerAction={
+                <Button
+                  appearance="transparent"
+                  icon={<DismissRegular />}
+                  aria-label="Dismiss"
+                  onClick={() => setWaSnack((s) => ({ ...s, open: false }))}
+                />
+              }
+            />
+          </MessageBar>
+        </div>
       )}
       {!isAdmin && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1.5 }}>
+        <div className={styles.uploadRow}>
           <Button
-            startIcon={<AttachFileOutlinedIcon />}
-            loading={uploadMutation.isPending}
-            onClick={() => uploadMutation.mutate()}
-            variant="contained"
+            appearance="primary"
             size="small"
-            sx={{ borderRadius: 2, fontWeight: 700 }}
+            icon={uploadMutation.isPending ? <Spinner size="tiny" /> : <AttachFileOutlinedIcon />}
+            disabled={uploadMutation.isPending}
+            onClick={() => uploadMutation.mutate()}
+            style={{ fontWeight: 700 }}
           >
             Upload file
           </Button>
-        </Box>
+        </div>
       )}
       {docs.isLoading ? (
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 1.5 }}>
+        <div className={styles.grid}>
           {Array.from({ length: 4 }, (_, i) => (
-            <Skeleton key={i} variant="rounded" height={140} sx={{ borderRadius: 2 }} />
+            <Skeleton key={i} style={{ height: 140, borderRadius: tokens.borderRadiusMedium }} />
           ))}
-        </Box>
+        </div>
       ) : (docs.data ?? []).length === 0 ? (
-        <Typography color="text.secondary" textAlign="center" sx={{ py: 4 }}>
-          No documents uploaded.
-        </Typography>
+        <Text className={styles.empty} block>No documents uploaded.</Text>
       ) : (
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 1.5 }}>
+        <div className={styles.grid}>
           {(docs.data ?? []).map((doc) => (
-            <Paper key={doc.id} elevation={0} sx={{ ...softCard, borderRadius: 1, overflow: 'hidden', '&:hover .doc-actions': { opacity: 1 } }}>
-              <Box sx={{ height: 96, bgcolor: alpha(theme.palette.primary.main, 0.05), display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                <InsertDriveFileOutlinedIcon sx={{ fontSize: 36, color: 'primary.main', opacity: 0.7 }} />
-                <Box className="doc-actions" sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, opacity: 0, transition: 'opacity 0.15s' }}>
-                  <Tooltip title="Open">
-                    <IconButton size="small" sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.15)' }} onClick={async () => {
-                      const result = await window.clinic.docs.patient.open(doc.id);
-                      if (result) setViewerDoc(result);
-                    }}>
-                      <FolderOpenOutlinedIcon sx={{ fontSize: 16 }} />
-                    </IconButton>
+            <div key={doc.id} className={styles.card}>
+              <div className={styles.thumb}>
+                <InsertDriveFileOutlinedIcon style={{ fontSize: 36, opacity: 0.7 }} />
+                <div className={`${styles.actions} docActions`}>
+                  <Tooltip content="Open" relationship="label">
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      className={styles.actionBtn}
+                      icon={<FolderOpenOutlinedIcon style={{ fontSize: 16 }} />}
+                      onClick={async () => {
+                        const result = await window.clinic.docs.patient.open(doc.id);
+                        if (result) setViewerDoc(result);
+                      }}
+                    />
                   </Tooltip>
-                  <Tooltip title={phone ? (can('whatsapp') ? 'Send on WhatsApp' : 'Open WhatsApp Web') : 'Patient has no WhatsApp number'}>
-                    <span>
-                      <IconButton
-                        size="small"
-                        disabled={waSending === doc.id || !phone}
-                        sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.15)', '&:hover': { bgcolor: 'rgba(37,211,102,0.8)' } }}
-                        onClick={() => {
-                          if (can('whatsapp')) {
-                            void sendDoc(doc.id);
-                            return;
-                          }
-                          openWhatsAppWeb(phone);
-                        }}
-                      >
-                          {waSending === doc.id
-                            ? <CircularProgress size={14} sx={{ color: '#fff' }} />
-                            : <WhatsAppIcon sx={{ fontSize: 16 }} />}
-                        </IconButton>
-                      </span>
-                    </Tooltip>
+                  <Tooltip
+                    content={phone ? (can('whatsapp') ? 'Send on WhatsApp' : 'Open WhatsApp Web') : 'Patient has no WhatsApp number'}
+                    relationship="label"
+                  >
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      className={`${styles.actionBtn} ${styles.waHover}`}
+                      disabled={waSending === doc.id || !phone}
+                      icon={
+                        waSending === doc.id
+                          ? <Spinner size="tiny" />
+                          : <WhatsAppIcon style={{ fontSize: 16 }} />
+                      }
+                      onClick={() => {
+                        if (can('whatsapp')) {
+                          void sendDoc(doc.id);
+                          return;
+                        }
+                        openWhatsAppWeb(phone);
+                      }}
+                    />
+                  </Tooltip>
                   {!isAdmin && (
-                    <Tooltip title="Delete">
-                      <IconButton size="small" sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.15)' }} onClick={() => setDeleteDocId(doc.id)}>
-                        <DeleteOutlineIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
+                    <Tooltip content="Delete" relationship="label">
+                      <Button
+                        appearance="subtle"
+                        size="small"
+                        className={styles.actionBtn}
+                        icon={<DeleteOutlineIcon style={{ fontSize: 16 }} />}
+                        onClick={() => setDeleteDocId(doc.id)}
+                      />
                     </Tooltip>
                   )}
-                </Box>
-              </Box>
-              <Box sx={{ px: 1.25, py: 1.1 }}>
-                <Typography fontSize={12} fontWeight={600} noWrap title={doc.name}>{doc.name}</Typography>
-                <Typography fontSize={11} color="text.disabled">{new Date(doc.uploadedAt).toLocaleDateString()}</Typography>
-              </Box>
-            </Paper>
+                </div>
+              </div>
+              <div className={styles.meta}>
+                <Text className={styles.name} title={doc.name} block>{doc.name}</Text>
+                <Text className={styles.date} block>{new Date(doc.uploadedAt).toLocaleDateString()}</Text>
+              </div>
+            </div>
           ))}
-        </Box>
+        </div>
       )}
       {viewerDoc && <DocViewerDialog doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
       <ConfirmDialog
@@ -201,28 +302,24 @@ export function PatientDocumentsPanel({ patient }: { patient: Patient }): React.
       />
       {createPortal(
         waSnack.open ? (
-          <Box
-            sx={{
-              position: 'fixed',
-              top: 20,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 2147483647,
-              pointerEvents: 'auto',
-            }}
-          >
-            <Alert
-              severity={waSnack.success ? 'success' : 'error'}
-              onClose={() => setWaSnack((s) => ({ ...s, open: false }))}
-              variant="filled"
-              sx={{ fontWeight: 700, boxShadow: 6, minWidth: 280 }}
-            >
-              {waSnack.msg}
-            </Alert>
-          </Box>
+          <div className={styles.toastHost}>
+            <MessageBar intent={waSnack.success ? 'success' : 'error'}>
+              <MessageBarBody style={{ fontWeight: 700 }}>{waSnack.msg}</MessageBarBody>
+              <MessageBarActions
+                containerAction={
+                  <Button
+                    appearance="transparent"
+                    icon={<DismissRegular />}
+                    aria-label="Dismiss"
+                    onClick={() => setWaSnack((s) => ({ ...s, open: false }))}
+                  />
+                }
+              />
+            </MessageBar>
+          </div>
         ) : null,
         document.body,
       )}
-    </Box>
+    </div>
   );
 }

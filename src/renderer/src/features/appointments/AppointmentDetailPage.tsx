@@ -1,56 +1,213 @@
-import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
-import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
-import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
-import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
-import PersonOffOutlinedIcon from '@mui/icons-material/PersonOffOutlined';
-import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
-import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined';
-import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
-import RepeatOutlinedIcon from '@mui/icons-material/RepeatOutlined';
 import {
-  Alert,
-  Box,
   Button,
-  Chip,
-  IconButton,
-  Paper,
+  MessageBar,
+  MessageBarBody,
   Skeleton,
-  Stack,
+  Spinner,
+  Text,
+  Title3,
   Tooltip,
-  Typography,
-} from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+  makeStyles,
+  tokens,
+  type BadgeProps,
+} from '@fluentui/react-components';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { StatCardsSkeleton } from '@/components/LoadingUI';
 import { ConfirmDialog } from '@/components/DialogUI';
-import { chipSx } from '@/components/TableUI';
+import { StatusBadge } from '@/components/TableUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { AppointmentDialog } from '@/features/appointments/AppointmentsPage';
 import { appointmentsService } from '@/services/appointments.service';
 import type { Appointment } from '@/types/appointment';
+import {
+  AccessTimeOutlinedIcon,
+  ArrowBackOutlinedIcon,
+  CalendarMonthOutlinedIcon,
+  CancelOutlinedIcon,
+  CheckCircleOutlinedIcon,
+  ConfirmationNumberOutlinedIcon,
+  DeleteOutlineIcon,
+  EditOutlinedIcon,
+  LocalPhoneOutlinedIcon,
+  LoginOutlinedIcon,
+  NotesOutlinedIcon,
+  PersonOffOutlinedIcon,
+  PersonOutlinedIcon,
+  RepeatOutlinedIcon,
+} from '@/icons/fluent';
 
-const statusConfig: Record<string, { label: string; color: 'default' | 'primary' | 'warning' | 'success' | 'error' }> = {
-  SCHEDULED: { label: 'Scheduled', color: 'primary' },
+type StatusColor = NonNullable<BadgeProps['color']>;
+
+const statusConfig: Record<string, { label: string; color: StatusColor }> = {
+  SCHEDULED: { label: 'Scheduled', color: 'brand' },
   CHECKED_IN: { label: 'Checked In', color: 'warning' },
   COMPLETED: { label: 'Completed', color: 'success' },
-  CANCELLED: { label: 'Cancelled', color: 'default' },
-  NO_SHOW: { label: 'No Show', color: 'error' },
+  CANCELLED: { label: 'Cancelled', color: 'subtle' },
+  NO_SHOW: { label: 'No Show', color: 'danger' },
 };
+
+const useStyles = makeStyles({
+  page: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXL,
+    paddingBottom: tokens.spacingVerticalL,
+  },
+  loading: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalL,
+    padding: tokens.spacingVerticalS,
+  },
+  notFound: {
+    padding: tokens.spacingVerticalXXL,
+  },
+  backBtn: {
+    marginTop: tokens.spacingVerticalL,
+  },
+  header: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalL,
+    flexWrap: 'wrap',
+  },
+  headerLeft: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: tokens.spacingHorizontalM,
+  },
+  backIconBtn: {
+    marginTop: tokens.spacingVerticalXXS,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  eyebrow: {
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  titleRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    flexWrap: 'wrap',
+    marginTop: tokens.spacingVerticalXXS,
+  },
+  title: {
+    letterSpacing: '-0.02em',
+    fontWeight: tokens.fontWeightBold,
+  },
+  subtitle: {
+    color: tokens.colorNeutralForeground2,
+    marginTop: tokens.spacingVerticalXXS,
+    fontWeight: tokens.fontWeightMedium,
+  },
+  actions: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalS,
+    flexWrap: 'wrap',
+  },
+  statsGrid: {
+    display: 'grid',
+    gap: tokens.spacingHorizontalM,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+  },
+  softCard: {
+    borderRadius: '20px',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow4,
+  },
+  statCard: {
+    padding: tokens.spacingVerticalL,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  statBlob: {
+    position: 'absolute',
+    top: '-18px',
+    right: '-18px',
+    width: '72px',
+    height: '72px',
+    borderRadius: '50%',
+  },
+  statInner: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  caption: {
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightBold,
+    fontSize: tokens.fontSizeBase200,
+  },
+  statValue: {
+    marginTop: tokens.spacingVerticalXXS,
+    letterSpacing: '-0.02em',
+    fontWeight: tokens.fontWeightBold,
+    fontSize: tokens.fontSizeHero700,
+  },
+  iconBox: {
+    width: '36px',
+    height: '36px',
+    borderRadius: tokens.borderRadiusMedium,
+    display: 'grid',
+    placeItems: 'center',
+    flexShrink: 0,
+  },
+  cardPad: {
+    padding: tokens.spacingVerticalXL,
+  },
+  sectionTitle: {
+    fontWeight: tokens.fontWeightBold,
+    marginBottom: tokens.spacingVerticalL,
+  },
+  rows: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+  row: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalM,
+    alignItems: 'flex-start',
+  },
+  rowIconBox: {
+    width: '34px',
+    height: '34px',
+    borderRadius: tokens.borderRadiusMedium,
+    display: 'grid',
+    placeItems: 'center',
+    flexShrink: 0,
+    backgroundColor: tokens.colorBrandBackground2,
+    color: tokens.colorBrandForeground1,
+  },
+  doctorValue: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+  },
+  dangerBtn: {
+    color: tokens.colorPaletteRedForeground1,
+  },
+});
 
 function personName(first: string, last: string): string {
   return `${first} ${last}`.trim();
 }
 
 export function AppointmentDetailPage(): React.JSX.Element {
-  const theme = useTheme();
+  const styles = useStyles();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -58,13 +215,6 @@ export function AppointmentDetailPage(): React.JSX.Element {
   const qc = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-
-  const softCard = {
-    borderRadius: '20px',
-    border: '1px solid',
-    borderColor: 'divider',
-    boxShadow: `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,
-  } as const;
 
   function goBack(): void {
     const from = (location.state as { from?: string } | null)?.from;
@@ -119,32 +269,33 @@ export function AppointmentDetailPage(): React.JSX.Element {
 
   if (query.isLoading) {
     return (
-      <Stack spacing={2} sx={{ p: 1 }}>
-        <Skeleton variant="rounded" height={88} sx={{ borderRadius: 3 }} />
+      <div className={styles.loading}>
+        <Skeleton appearance="opaque" style={{ height: 88, borderRadius: 12 }} />
         <StatCardsSkeleton count={4} />
-        <Skeleton variant="rounded" height={220} sx={{ borderRadius: 3 }} />
-      </Stack>
+        <Skeleton appearance="opaque" style={{ height: 220, borderRadius: 12 }} />
+      </div>
     );
   }
 
   if (!appointment || forbidden) {
     return (
-      <Box sx={{ p: 4 }}>
-        <Alert severity="error" sx={{ borderRadius: 2 }}>
-          Appointment not found.
-        </Alert>
+      <div className={styles.notFound}>
+        <MessageBar intent="error">
+          <MessageBarBody>Appointment not found.</MessageBarBody>
+        </MessageBar>
         <Button
-          sx={{ mt: 2, borderRadius: 2, fontWeight: 700 }}
-          startIcon={<ArrowBackOutlinedIcon />}
+          className={styles.backBtn}
+          appearance="secondary"
+          icon={<ArrowBackOutlinedIcon />}
           onClick={() => goBack()}
         >
           Back to Appointments
         </Button>
-      </Box>
+      </div>
     );
   }
 
-  const status = statusConfig[appointment.status] ?? { label: appointment.status, color: 'default' as const };
+  const status = statusConfig[appointment.status] ?? { label: appointment.status, color: 'subtle' as const };
   const closed = ['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(appointment.status);
   const patientLabel = personName(appointment.patient.firstName, appointment.patient.lastName);
   const doctorLabel = `Dr. ${personName(appointment.provider.firstName, appointment.provider.lastName)}`;
@@ -159,67 +310,74 @@ export function AppointmentDetailPage(): React.JSX.Element {
     ? `#${String(appointment.tokenNumber).padStart(3, '0')}`
     : '—';
 
+  const colors = {
+    primary: tokens.colorBrandForeground1,
+    info: tokens.colorPaletteBlueForeground2,
+    warning: tokens.colorPaletteDarkOrangeForeground1,
+    success: tokens.colorPaletteGreenForeground1,
+  };
+
   const summaryCards = [
     {
       label: 'Date',
       value: new Date(appointment.startsAt).toLocaleDateString([], { month: 'short', day: 'numeric' }),
       note: new Date(appointment.startsAt).toLocaleDateString([], { weekday: 'long' }),
-      icon: <CalendarMonthOutlinedIcon fontSize="small" />,
-      color: theme.palette.primary.main,
+      icon: <CalendarMonthOutlinedIcon style={{ fontSize: 18 }} />,
+      color: colors.primary,
     },
     {
       label: 'Time',
       value: new Date(appointment.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       note: `Until ${new Date(appointment.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-      icon: <AccessTimeOutlinedIcon fontSize="small" />,
-      color: theme.palette.info.main,
+      icon: <AccessTimeOutlinedIcon style={{ fontSize: 18 }} />,
+      color: colors.info,
     },
     {
       label: 'Token',
       value: tokenLabel,
       note: 'Same-day queue',
-      icon: <ConfirmationNumberOutlinedIcon fontSize="small" />,
-      color: theme.palette.warning.main,
+      icon: <ConfirmationNumberOutlinedIcon style={{ fontSize: 18 }} />,
+      color: colors.warning,
     },
     {
       label: 'Status',
       value: status.label,
       note: 'Current',
-      icon: <CheckCircleOutlinedIcon fontSize="small" />,
-      color: theme.palette.success.main,
+      icon: <CheckCircleOutlinedIcon style={{ fontSize: 18 }} />,
+      color: colors.success,
     },
   ];
 
-  const detailRows = [
+  const detailRows: { icon: React.ReactNode; label: string; value: React.ReactNode }[] = [
     {
-      icon: <PersonOutlinedIcon sx={{ fontSize: 18 }} />,
+      icon: <PersonOutlinedIcon style={{ fontSize: 18 }} />,
       label: 'Doctor',
       value: (
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <div className={styles.doctorValue}>
           <DoctorAvatar src={appointment.provider.avatar} name={doctorLabel} size={28} />
-          <Typography fontWeight={600}>{doctorLabel}</Typography>
-        </Stack>
+          <Text weight="semibold">{doctorLabel}</Text>
+        </div>
       ),
     },
     {
-      icon: <LocalPhoneOutlinedIcon sx={{ fontSize: 18 }} />,
+      icon: <LocalPhoneOutlinedIcon style={{ fontSize: 18 }} />,
       label: 'Patient phone',
       value: appointment.patient.phone || '—',
     },
     {
-      icon: <NotesOutlinedIcon sx={{ fontSize: 18 }} />,
+      icon: <NotesOutlinedIcon style={{ fontSize: 18 }} />,
       label: 'Reason',
       value: appointment.reason || '—',
     },
     {
-      icon: <NotesOutlinedIcon sx={{ fontSize: 18 }} />,
+      icon: <NotesOutlinedIcon style={{ fontSize: 18 }} />,
       label: 'Notes',
       value: appointment.notes || '—',
     },
     ...(appointment.recurrenceRule
       ? [
           {
-            icon: <RepeatOutlinedIcon sx={{ fontSize: 18 }} />,
+            icon: <RepeatOutlinedIcon style={{ fontSize: 18 }} />,
             label: 'Recurrence',
             value: appointment.recurrenceRule,
           },
@@ -229,57 +387,39 @@ export function AppointmentDetailPage(): React.JSX.Element {
 
   return (
     <>
-      <Stack spacing={2.5} sx={{ pb: 2 }}>
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: { sm: 'flex-end' },
-            flexDirection: { xs: 'column', sm: 'row' },
-            gap: 2,
-            justifyContent: 'space-between',
-          }}
-        >
-          <Stack direction="row" alignItems="flex-start" spacing={1.5}>
-            <Tooltip title="Back">
-              <IconButton
-                onClick={() => goBack()}
-                size="small"
-                sx={{ mt: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
-              >
-                <ArrowBackOutlinedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Box>
-              <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                Appointment details
-              </Typography>
-              <Stack direction="row" alignItems="center" gap={1.25} flexWrap="wrap" sx={{ mt: 0.25 }}>
-                <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em' }}>
-                  {patientLabel}
-                </Typography>
-                <Chip color={status.color} label={status.label} size="small" sx={chipSx} />
-              </Stack>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }} fontWeight={500}>
-                {dateLabel} · {timeLabel}
-              </Typography>
-            </Box>
-          </Stack>
-
-          <Stack direction="row" gap={1} flexWrap="wrap">
-            {(user?.role === 'receptionist' || user?.role === 'doctor' || user?.role === 'lab_technician') && (
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <div className={styles.headerLeft}>
+            <Tooltip content="Back" relationship="label">
               <Button
-                variant="outlined"
-                sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
-                onClick={() => navigate(`/patients/${appointment.patientId}`)}
-              >
+                appearance="subtle"
+                icon={<ArrowBackOutlinedIcon style={{ fontSize: 18 }} />}
+                onClick={() => goBack()}
+                className={styles.backIconBtn}
+              />
+            </Tooltip>
+            <div>
+              <Text className={styles.eyebrow}>Appointment details</Text>
+              <div className={styles.titleRow}>
+                <Title3 className={styles.title}>{patientLabel}</Title3>
+                <StatusBadge color={status.color}>{status.label}</StatusBadge>
+              </div>
+              <Text className={styles.subtitle}>
+                {dateLabel} · {timeLabel}
+              </Text>
+            </div>
+          </div>
+
+          <div className={styles.actions}>
+            {(user?.role === 'receptionist' || user?.role === 'doctor' || user?.role === 'lab_technician') && (
+              <Button appearance="secondary" onClick={() => navigate(`/patients/${appointment.patientId}`)}>
                 Open patient
               </Button>
             )}
             {!closed && (
               <Button
-                startIcon={<EditOutlinedIcon />}
-                variant="contained"
-                sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                appearance="primary"
+                icon={<EditOutlinedIcon />}
                 onClick={() => setEditOpen(true)}
               >
                 Edit
@@ -287,10 +427,9 @@ export function AppointmentDetailPage(): React.JSX.Element {
             )}
             {appointment.status === 'SCHEDULED' && (
               <Button
-                startIcon={<LoginOutlinedIcon />}
-                variant="outlined"
-                loading={statusMutation.isPending}
-                sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                appearance="secondary"
+                icon={statusMutation.isPending ? <Spinner size="tiny" /> : <LoginOutlinedIcon />}
+                disabled={statusMutation.isPending}
                 onClick={() => statusMutation.mutate('CHECKED_IN')}
               >
                 Check in
@@ -298,11 +437,9 @@ export function AppointmentDetailPage(): React.JSX.Element {
             )}
             {appointment.status === 'CHECKED_IN' && (
               <Button
-                startIcon={<CheckCircleOutlinedIcon />}
-                variant="outlined"
-                color="success"
-                loading={statusMutation.isPending}
-                sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                appearance="secondary"
+                icon={statusMutation.isPending ? <Spinner size="tiny" /> : <CheckCircleOutlinedIcon />}
+                disabled={statusMutation.isPending}
                 onClick={() => statusMutation.mutate('COMPLETED')}
               >
                 Complete
@@ -311,21 +448,17 @@ export function AppointmentDetailPage(): React.JSX.Element {
             {['SCHEDULED', 'CHECKED_IN'].includes(appointment.status) && (
               <>
                 <Button
-                  startIcon={<PersonOffOutlinedIcon />}
-                  variant="outlined"
-                  color="warning"
-                  loading={statusMutation.isPending}
-                  sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                  appearance="secondary"
+                  icon={statusMutation.isPending ? <Spinner size="tiny" /> : <PersonOffOutlinedIcon />}
+                  disabled={statusMutation.isPending}
                   onClick={() => statusMutation.mutate('NO_SHOW')}
                 >
                   No show
                 </Button>
                 <Button
-                  startIcon={<CancelOutlinedIcon />}
-                  variant="outlined"
-                  color="inherit"
-                  loading={cancelMutation.isPending}
-                  sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                  appearance="secondary"
+                  icon={cancelMutation.isPending ? <Spinner size="tiny" /> : <CancelOutlinedIcon />}
+                  disabled={cancelMutation.isPending}
                   onClick={() => cancelMutation.mutate()}
                 >
                   Cancel
@@ -333,105 +466,62 @@ export function AppointmentDetailPage(): React.JSX.Element {
               </>
             )}
             <Button
-              startIcon={<DeleteOutlineIcon />}
-              variant="outlined"
-              color="error"
-              sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+              appearance="secondary"
+              className={styles.dangerBtn}
+              icon={<DeleteOutlineIcon />}
               onClick={() => setDeleteOpen(true)}
             >
               Delete
             </Button>
-          </Stack>
-        </Box>
+          </div>
+        </div>
 
-        <Box
-          sx={{
-            display: 'grid',
-            gap: 1.75,
-            gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' },
-          }}
-        >
+        <div className={styles.statsGrid}>
           {summaryCards.map((c) => (
-            <Paper key={c.label} elevation={0} sx={{ p: 2.25, ...softCard, position: 'relative', overflow: 'hidden' }}>
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: -18,
-                  right: -18,
-                  width: 72,
-                  height: 72,
-                  borderRadius: '50%',
-                  bgcolor: alpha(c.color, 0.1),
-                }}
-              />
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                <Box>
-                  <Typography variant="caption" color="text.secondary" fontWeight={700}>
-                    {c.label}
-                  </Typography>
-                  <Typography fontWeight={900} fontSize={22} sx={{ mt: 0.25, letterSpacing: '-0.02em' }}>
+            <div key={c.label} className={`${styles.softCard} ${styles.statCard}`}>
+              <div className={styles.statBlob} style={{ backgroundColor: `${c.color}1a` }} />
+              <div className={styles.statInner}>
+                <div>
+                  <Text className={styles.caption}>{c.label}</Text>
+                  <Text className={styles.statValue} block>
                     {c.value}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                    {c.note}
-                  </Typography>
-                </Box>
-                <Box
-                  sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 2,
-                    display: 'grid',
-                    placeItems: 'center',
-                    bgcolor: alpha(c.color, 0.12),
-                    color: c.color,
-                  }}
+                  </Text>
+                  <Text className={styles.caption}>{c.note}</Text>
+                </div>
+                <div
+                  className={styles.iconBox}
+                  style={{ backgroundColor: `${c.color}1f`, color: c.color }}
                 >
                   {c.icon}
-                </Box>
-              </Stack>
-            </Paper>
+                </div>
+              </div>
+            </div>
           ))}
-        </Box>
+        </div>
 
-        <Paper elevation={0} sx={{ p: 2.5, ...softCard }}>
-          <Typography fontWeight={800} sx={{ mb: 2 }}>
+        <div className={`${styles.softCard} ${styles.cardPad}`}>
+          <Text className={styles.sectionTitle} block>
             Visit details
-          </Typography>
-          <Stack spacing={1.75}>
+          </Text>
+          <div className={styles.rows}>
             {detailRows.map((row) => (
-              <Stack key={row.label} direction="row" spacing={1.5} alignItems="flex-start">
-                <Box
-                  sx={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 2,
-                    display: 'grid',
-                    placeItems: 'center',
-                    bgcolor: alpha(theme.palette.primary.main, 0.08),
-                    color: 'primary.main',
-                    flexShrink: 0,
-                  }}
-                >
-                  {row.icon}
-                </Box>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography variant="caption" color="text.secondary" fontWeight={700}>
-                    {row.label}
-                  </Typography>
+              <div key={row.label} className={styles.row}>
+                <div className={styles.rowIconBox}>{row.icon}</div>
+                <div style={{ minWidth: 0 }}>
+                  <Text className={styles.caption}>{row.label}</Text>
                   {typeof row.value === 'string' ? (
-                    <Typography fontWeight={600} sx={{ wordBreak: 'break-word' }}>
+                    <Text weight="semibold" style={{ wordBreak: 'break-word' }}>
                       {row.value}
-                    </Typography>
+                    </Text>
                   ) : (
                     row.value
                   )}
-                </Box>
-              </Stack>
+                </div>
+              </div>
             ))}
-          </Stack>
-        </Paper>
-      </Stack>
+          </div>
+        </div>
+      </div>
 
       <AppointmentDialog
         appointment={appointment}

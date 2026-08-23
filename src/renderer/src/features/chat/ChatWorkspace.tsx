@@ -1,23 +1,18 @@
-import ChatOutlinedIcon from '@mui/icons-material/ChatOutlined';
-import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
-import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
-import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
 import {
-  Badge,
-  Box,
-  IconButton,
-  InputAdornment,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+  Button,
+  Input,
+  Text,
+  Textarea,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DoctorAvatar, avatarFallbackFromRole } from '@/components/DoctorAvatar';
 import { useAuth } from '@/features/auth/AuthContext';
 import { chatService, type ChatInboxItem, type ChatMessage, type ChatStaff } from '@/services/chat.service';
 import { realtimeService } from '@/services/realtime.service';
+import { ChatOutlinedIcon, GroupsOutlinedIcon, SearchOutlinedIcon, SendOutlinedIcon } from '@/icons/fluent';
 import {
   CHAT_ROOM_STORAGE,
   TEAM_CHAT_ROOM,
@@ -68,6 +63,23 @@ function dayLabel(value: string): string {
   return date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
+const useOnlineStyles = makeStyles({
+  wrap: {
+    position: 'relative',
+    display: 'inline-flex',
+  },
+  dot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
+    backgroundColor: '#22c55e',
+    border: `2px solid ${tokens.colorNeutralBackground1}`,
+  },
+});
+
 function OnlineAvatar({
   src,
   name,
@@ -81,25 +93,12 @@ function OnlineAvatar({
   size: number;
   online?: boolean;
 }): React.JSX.Element {
+  const styles = useOnlineStyles();
   return (
-    <Badge
-      overlap="circular"
-      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      variant="dot"
-      invisible={!online}
-      sx={{
-        '& .MuiBadge-dot': {
-          width: 10,
-          height: 10,
-          borderRadius: '50%',
-          bgcolor: '#22c55e',
-          border: '2px solid',
-          borderColor: 'background.paper',
-        },
-      }}
-    >
+    <div className={styles.wrap}>
       <DoctorAvatar src={src} name={name} size={size} fallback={avatarFallbackFromRole(role)} />
-    </Badge>
+      {online ? <span className={styles.dot} /> : null}
+    </div>
   );
 }
 
@@ -108,8 +107,252 @@ type ChatWorkspaceProps = {
   onUnreadChange?: (count: number) => void;
 };
 
+const useStyles = makeStyles({
+  root: {
+    display: 'flex',
+    flexGrow: 1,
+    minHeight: 0,
+    height: '100%',
+    overflow: 'hidden',
+    backgroundColor: tokens.colorNeutralBackground1,
+  },
+  sidebar: {
+    width: '280px',
+    flexShrink: 0,
+    borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 0,
+    backgroundColor: tokens.colorNeutralBackground1,
+  },
+  sidebarHead: {
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalS,
+  },
+  sidebarTitle: {
+    fontWeight: tokens.fontWeightBold,
+    marginBottom: tokens.spacingVerticalM,
+    display: 'block',
+  },
+  searchInput: {
+    borderRadius: '10px',
+    backgroundColor: tokens.colorNeutralBackground2,
+  },
+  threadList: {
+    flexGrow: 1,
+    overflow: 'auto',
+    paddingLeft: '6px',
+    paddingRight: '6px',
+    paddingBottom: tokens.spacingVerticalS,
+  },
+  main: {
+    flexGrow: 1,
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  header: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  headerPage: {
+    color: tokens.colorNeutralForeground1,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    paddingLeft: '20px',
+    paddingRight: '20px',
+    paddingTop: '14px',
+    paddingBottom: '14px',
+    backgroundColor: 'transparent',
+  },
+  headerWidget: {
+    color: tokens.colorNeutralForegroundOnBrand,
+    borderBottom: 'none',
+    padding: 0,
+    background: `linear-gradient(105deg, ${tokens.colorBrandBackgroundSelected} 0%, ${tokens.colorBrandBackground} 48%, ${tokens.colorBrandBackground2} 100%)`,
+  },
+  headerRow: {
+    position: 'relative',
+    zIndex: 1,
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '10px',
+  },
+  avatarStack: {
+    display: 'flex',
+    paddingLeft: '4px',
+  },
+  avatarOverlap: {
+    marginLeft: '-8px',
+  },
+  headerMeta: {
+    minWidth: 0,
+  },
+  headerTitle: {
+    fontWeight: tokens.fontWeightBold,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    display: 'block',
+  },
+  headerSub: {
+    color: tokens.colorNeutralForeground2,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    display: 'block',
+  },
+  waveBand: {
+    position: 'relative',
+    paddingLeft: '14px',
+    paddingRight: '14px',
+    paddingTop: '3px',
+    paddingBottom: '38px',
+    backgroundColor: 'rgba(0,0,0,0.14)',
+  },
+  waveHidden: {
+    visibility: 'hidden',
+    position: 'relative',
+    zIndex: 1,
+    display: 'block',
+  },
+  waveSvg: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: '-1px',
+    width: '100%',
+    height: '52px',
+    display: 'block',
+    pointerEvents: 'none',
+  },
+  messages: {
+    flexGrow: 1,
+    overflow: 'auto',
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+  },
+  messagesPage: {
+    paddingLeft: '20px',
+    paddingRight: '20px',
+    backgroundColor: tokens.colorBrandBackground2,
+  },
+  messagesWidget: {
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalM,
+    backgroundColor: tokens.colorNeutralBackground1,
+  },
+  emptyMsg: {
+    color: tokens.colorNeutralForeground2,
+    textAlign: 'center',
+    marginTop: '64px',
+    display: 'block',
+  },
+  dayLabel: {
+    display: 'block',
+    textAlign: 'center',
+    marginTop: '10px',
+    marginBottom: '10px',
+    color: tokens.colorNeutralForeground3,
+  },
+  bubbleRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: tokens.spacingHorizontalS,
+    width: '100%',
+  },
+  bubbleMeta: {
+    display: 'block',
+    marginBottom: '3px',
+    color: tokens.colorNeutralForeground3,
+  },
+  bubble: {
+    position: 'relative',
+    overflow: 'visible',
+    width: '100%',
+    paddingLeft: '11px',
+    paddingRight: '11px',
+    paddingTop: '7px',
+    paddingBottom: '7px',
+    boxShadow: '0 4px 14px rgba(0,0,0,0.05)',
+  },
+  composer: {
+    paddingTop: '10px',
+    paddingBottom: '10px',
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  composerRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+  },
+  sendBtn: {
+    width: '40px',
+    height: '40px',
+    minWidth: '40px',
+    flexShrink: 0,
+    backgroundColor: tokens.colorBrandBackground,
+    color: tokens.colorNeutralForegroundOnBrand,
+    ':hover': {
+      backgroundColor: tokens.colorBrandBackgroundHover,
+      color: tokens.colorNeutralForegroundOnBrand,
+    },
+    ':disabled': {
+      backgroundColor: tokens.colorNeutralBackgroundDisabled,
+    },
+  },
+  threadRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    borderRadius: '10px',
+    cursor: 'pointer',
+    marginBottom: '3px',
+    ':hover': {
+      backgroundColor: tokens.colorBrandBackground2,
+    },
+  },
+  threadActive: {
+    backgroundColor: tokens.colorBrandBackground2,
+  },
+  teamIcon: {
+    borderRadius: '50%',
+    backgroundColor: tokens.colorBrandBackground,
+    color: tokens.colorNeutralForegroundOnBrand,
+    display: 'grid',
+    placeItems: 'center',
+    flexShrink: 0,
+  },
+  threadMeta: {
+    minWidth: 0,
+    flexGrow: 1,
+  },
+  threadTitleRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: '4px',
+  },
+  unreadDot: {
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    backgroundColor: tokens.colorBrandBackground,
+    flexShrink: 0,
+  },
+  truncate: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+});
+
 export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspaceProps): React.JSX.Element {
-  const theme = useTheme();
+  const styles = useStyles();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const me = user?.id || '';
@@ -248,121 +491,67 @@ export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspac
   }
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexGrow: 1,
-        minHeight: 0,
-        height: '100%',
-        overflow: 'hidden',
-        bgcolor: 'background.paper',
-      }}
-    >
+    <div className={styles.root}>
       {!compact && (
-      <Box
-        sx={{
-          width: 280,
-          flexShrink: 0,
-          borderRight: '1px solid',
-          borderColor: 'divider',
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: 0,
-          bgcolor: 'background.paper',
-        }}
-      >
-        <Box sx={{ px: 2, pt: 2, pb: 1 }}>
-          <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1.25 }}>
-            Messages
-          </Typography>
-          <TextField
-            size="small"
-            fullWidth
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search staff"
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchOutlinedIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
-                  </InputAdornment>
-                ),
-              },
-            }}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'background.default' } }}
-          />
-        </Box>
-        <Box sx={{ flexGrow: 1, overflow: 'auto', px: 0.75, pb: 1 }}>
-          <ThreadRow
-            active={isTeamRoom(roomId)}
-            compact={false}
-            title="Staff team"
-            subtitle={inboxByRoom.get(TEAM_CHAT_ROOM)?.lastMessage || 'Clinic-wide chat'}
-            time={inboxByRoom.get(TEAM_CHAT_ROOM)?.lastAt}
-            unread={isThreadUnread(TEAM_CHAT_ROOM, inboxByRoom.get(TEAM_CHAT_ROOM)?.lastAt, inboxByRoom.get(TEAM_CHAT_ROOM)?.senderId, me)}
-            icon={<GroupsOutlinedIcon sx={{ fontSize: 22 }} />}
-            onClick={() => openRoom(TEAM_CHAT_ROOM)}
-          />
-          {filtered.map((person) => {
-            const room = dmRoomId(me, person.id);
-            const item = inboxByRoom.get(room);
-            return (
-              <ThreadRow
-                key={person.id}
-                active={roomId === room}
-                compact={false}
-                title={person.name}
-                subtitle={item?.lastMessage || roleLabel(person.role)}
-                time={item?.lastAt}
-                unread={isThreadUnread(room, item?.lastAt, item?.senderId, me)}
-                online={online.has(person.id)}
-                avatar={<OnlineAvatar src={person.avatar} name={person.name} role={person.role} size={40} online={online.has(person.id)} />}
-                onClick={() => openRoom(room)}
-              />
-            );
-          })}
-        </Box>
-      </Box>
+        <div className={styles.sidebar}>
+          <div className={styles.sidebarHead}>
+            <Text className={styles.sidebarTitle} size={400}>Messages</Text>
+            <Input
+              size="small"
+              value={search}
+              onChange={(_, d) => setSearch(d.value)}
+              placeholder="Search staff"
+              className={styles.searchInput}
+              contentBefore={<SearchOutlinedIcon style={{ fontSize: 18, color: 'currentColor' }} />}
+            />
+          </div>
+          <div className={styles.threadList}>
+            <ThreadRow
+              active={isTeamRoom(roomId)}
+              compact={false}
+              title="Staff team"
+              subtitle={inboxByRoom.get(TEAM_CHAT_ROOM)?.lastMessage || 'Clinic-wide chat'}
+              time={inboxByRoom.get(TEAM_CHAT_ROOM)?.lastAt}
+              unread={isThreadUnread(TEAM_CHAT_ROOM, inboxByRoom.get(TEAM_CHAT_ROOM)?.lastAt, inboxByRoom.get(TEAM_CHAT_ROOM)?.senderId, me)}
+              icon={<GroupsOutlinedIcon style={{ fontSize: 22 }} />}
+              onClick={() => openRoom(TEAM_CHAT_ROOM)}
+            />
+            {filtered.map((person) => {
+              const room = dmRoomId(me, person.id);
+              const item = inboxByRoom.get(room);
+              return (
+                <ThreadRow
+                  key={person.id}
+                  active={roomId === room}
+                  compact={false}
+                  title={person.name}
+                  subtitle={item?.lastMessage || roleLabel(person.role)}
+                  time={item?.lastAt}
+                  unread={isThreadUnread(room, item?.lastAt, item?.senderId, me)}
+                  online={online.has(person.id)}
+                  avatar={<OnlineAvatar src={person.avatar} name={person.name} role={person.role} size={40} online={online.has(person.id)} />}
+                  onClick={() => openRoom(room)}
+                />
+              );
+            })}
+          </div>
+        </div>
       )}
 
-      <Box sx={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <Box
-          sx={{
-            position: 'relative',
-            color: compact ? 'primary.contrastText' : 'text.primary',
-            borderBottom: compact ? 'none' : '1px solid',
-            borderColor: 'divider',
-            overflow: 'hidden',
-            px: compact ? 0 : 2.5,
-            pt: compact ? 0 : 1.75,
-            pb: compact ? 0 : 1.75,
-            bgcolor: compact ? 'primary.main' : 'transparent',
-            background: compact
-              ? `linear-gradient(105deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 48%, ${theme.palette.primary.light} 100%)`
-              : undefined,
-          }}
-        >
-          <Stack
-            direction="row"
-            spacing={1.25}
-            alignItems="center"
-            sx={{
-              position: 'relative',
-              zIndex: 1,
-              px: compact ? 1.75 : 0,
-              pt: compact ? 1.5 : 0,
-              pb: compact ? 1 : 0,
-            }}
+      <div className={styles.main}>
+        <div className={`${styles.header} ${compact ? styles.headerWidget : styles.headerPage}`}>
+          <div
+            className={styles.headerRow}
+            style={compact ? { paddingLeft: 14, paddingRight: 14, paddingTop: 12, paddingBottom: 8 } : undefined}
           >
             {isTeamRoom(roomId) ? (
-              <Box sx={{ display: 'flex', pl: 0.5 }}>
+              <div className={styles.avatarStack}>
                 {others.slice(0, 3).map((person, index) => (
-                  <Box key={person.id} sx={{ ml: index === 0 ? 0 : -1 }}>
+                  <div key={person.id} className={index === 0 ? undefined : styles.avatarOverlap} style={index === 0 ? undefined : { marginLeft: -8 }}>
                     <OnlineAvatar src={person.avatar} name={person.name} role={person.role} size={compact ? 28 : 34} online={online.has(person.id)} />
-                  </Box>
+                  </div>
                 ))}
-              </Box>
+              </div>
             ) : (
               <OnlineAvatar
                 src={selectedStaff?.avatar}
@@ -372,95 +561,61 @@ export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspac
                 online={Boolean(selectedStaff && online.has(selectedStaff.id))}
               />
             )}
-            <Box sx={{ minWidth: 0 }}>
-              <Typography fontWeight={800} noWrap fontSize={compact ? 14 : 16}>
+            <div className={styles.headerMeta}>
+              <Text className={styles.headerTitle} style={{ fontSize: compact ? 14 : 16 }}>
                 {compact && isTeamRoom(roomId) ? 'Chat with the team' : headerTitle}
-              </Typography>
+              </Text>
               {!compact ? (
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  {headerSub}
-                </Typography>
+                <Text size={200} className={styles.headerSub}>{headerSub}</Text>
               ) : null}
-            </Box>
-          </Stack>
+            </div>
+          </div>
           {compact ? (
-            <Box
-              sx={{
-                position: 'relative',
-                px: 1.75,
-                pt: 0.4,
-                pb: 4.75,
-                bgcolor: alpha(theme.palette.common.black, 0.14),
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{ visibility: 'hidden', position: 'relative', zIndex: 1, display: 'block' }}
-                noWrap
-              >
+            <div className={styles.waveBand}>
+              <Text size={200} className={styles.waveHidden}>
                 We typically reply in a few minutes.
-              </Typography>
-              <Box
-                component="svg"
+              </Text>
+              <svg
+                className={styles.waveSvg}
                 viewBox="0 0 360 56"
                 preserveAspectRatio="none"
                 aria-hidden
-                sx={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  bottom: -1,
-                  width: '100%',
-                  height: 52,
-                  display: 'block',
-                  pointerEvents: 'none',
-                }}
               >
                 <path
                   d="M0 36 C70 52 130 8 220 12 C290 16 330 34 360 30 L360 56 L0 56 Z"
-                  fill={theme.palette.background.paper}
+                  fill={tokens.colorNeutralBackground1}
                 />
-              </Box>
-            </Box>
+              </svg>
+            </div>
           ) : null}
-        </Box>
+        </div>
 
-        <Box
-          sx={{
-            flexGrow: 1,
-            overflow: 'auto',
-            px: compact ? 1.5 : 2.5,
-            py: 2,
-            bgcolor: compact ? 'background.paper' : alpha(theme.palette.primary.main, 0.02),
-          }}
-        >
+        <div className={`${styles.messages} ${compact ? styles.messagesWidget : styles.messagesPage}`}>
           {messages.length === 0 && !messagesQuery.isLoading ? (
-            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 8 }}>
+            <Text size={300} className={styles.emptyMsg}>
               {isTeamRoom(roomId) ? 'No team messages yet. Say hello.' : `Message ${headerTitle} directly.`}
-            </Typography>
+            </Text>
           ) : null}
-          <Stack spacing={1.1}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
             {messages.map((item, index) => {
               const mine = Boolean(me) && item.senderId === me;
               const showDay = dayKey(item.createdAt) !== dayKey(messages[index - 1]?.createdAt || '');
               const bubbleColor = mine
-                ? theme.palette.primary.main
+                ? tokens.colorBrandBackground
                 : compact
                   ? '#F1F3F4'
-                  : theme.palette.background.paper;
+                  : tokens.colorNeutralBackground1;
+              const textColor = mine ? tokens.colorNeutralForegroundOnBrand : tokens.colorNeutralForeground1;
               return (
-                <Box key={item.id}>
+                <div key={item.id}>
                   {showDay && (
-                    <Typography variant="caption" color="text.disabled" sx={{ display: 'block', textAlign: 'center', my: 1.25 }}>
+                    <Text size={200} className={styles.dayLabel}>
                       {dayLabel(item.createdAt)}
-                    </Typography>
+                    </Text>
                   )}
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    justifyContent={mine ? 'flex-end' : 'flex-start'}
-                    alignItems="flex-end"
-                    sx={{ width: '100%' }}
+                  <div
+                    className={styles.bubbleRow}
+                    style={{ justifyContent: mine ? 'flex-end' : 'flex-start' }}
                   >
                     {!mine && (
                       <DoctorAvatar
@@ -470,8 +625,8 @@ export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspac
                         fallback={avatarFallbackFromRole(item.role)}
                       />
                     )}
-                    <Box
-                      sx={
+                    <div
+                      style={
                         compact
                           ? {
                               width: '75%',
@@ -488,51 +643,27 @@ export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspac
                             }
                       }
                     >
-                      <Typography
-                        variant="caption"
-                        color="text.disabled"
-                        sx={{ display: 'block', mb: 0.4, textAlign: mine ? 'right' : 'left' }}
+                      <Text
+                        size={200}
+                        className={styles.bubbleMeta}
+                        style={{ textAlign: mine ? 'right' : 'left' }}
                       >
                         {!mine && isTeamRoom(roomId) ? `${item.senderName} · ` : ''}
                         {formatClock(item.createdAt)}
-                      </Typography>
-                      <Box
-                        sx={{
-                          position: 'relative',
-                          overflow: 'visible',
-                          width: '100%',
-                          px: 1.4,
-                          py: 0.9,
+                      </Text>
+                      <div
+                        className={styles.bubble}
+                        style={{
                           borderRadius: mine ? '8px 8px 0 8px' : '8px 8px 8px 0',
                           backgroundColor: bubbleColor,
-                          color: mine ? 'primary.contrastText' : 'text.primary',
-                          boxShadow: `0 4px 14px ${alpha(theme.palette.common.black, 0.05)}`,
-                          '&::before, &::after': {
-                            content: '""',
-                            position: 'absolute',
-                            bottom: 0,
-                            width: 10,
-                            height: 10,
-                            [mine ? 'right' : 'left']: -8,
-                            backgroundColor: 'inherit',
-                            clipPath: mine
-                              ? 'polygon(0 0, 0 100%, 100% 100%)'
-                              : 'polygon(100% 0, 0 100%, 100% 100%)',
-                          },
-                          '&::before': {
-                            zIndex: 0,
-                            filter: `drop-shadow(0 3px 4px ${alpha(theme.palette.common.black, 0.12)})`,
-                          },
-                          '&::after': {
-                            zIndex: 1,
-                          },
+                          color: textColor,
                         }}
                       >
-                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        <Text size={300} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'inherit' }}>
                           {item.message}
-                        </Typography>
-                      </Box>
-                    </Box>
+                        </Text>
+                      </div>
+                    </div>
                     {mine && (
                       <DoctorAvatar
                         src={item.senderAvatar}
@@ -541,52 +672,44 @@ export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspac
                         fallback={avatarFallbackFromRole(item.role)}
                       />
                     )}
-                  </Stack>
-                </Box>
+                  </div>
+                </div>
               );
             })}
-          </Stack>
+          </div>
           <div ref={bottomRef} />
-        </Box>
+        </div>
 
-        <Box sx={{ px: compact ? 1.25 : 2, py: 1.25, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <TextField
-              fullWidth
-              size="small"
-              multiline
-              maxRows={3}
+        <div
+          className={styles.composer}
+          style={{ paddingLeft: compact ? 10 : 16, paddingRight: compact ? 10 : 16 }}
+        >
+          <div className={styles.composerRow}>
+            <Textarea
+              style={{ flex: 1, borderRadius: 10, minHeight: 40 }}
+              rows={1}
               placeholder={isTeamRoom(roomId) ? 'Message the team…' : `Message ${headerTitle}…`}
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(_, d) => setDraft(d.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   submit();
                 }
               }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', minHeight: 40 } }}
             />
-            <IconButton
-              color="primary"
+            <Button
+              appearance="primary"
               disabled={!canSend}
               onClick={() => submit()}
-              sx={{
-                width: 40,
-                height: 40,
-                flexShrink: 0,
-                bgcolor: 'primary.main',
-                color: 'primary.contrastText',
-                '&:hover': { bgcolor: 'primary.dark' },
-                '&.Mui-disabled': { bgcolor: 'action.disabledBackground' },
-              }}
-            >
-              <SendOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Stack>
-        </Box>
-      </Box>
-    </Box>
+              className={styles.sendBtn}
+              icon={<SendOutlinedIcon style={{ fontSize: 18 }} />}
+              aria-label="Send"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -613,54 +736,63 @@ function ThreadRow({
   icon?: React.ReactNode;
   onClick: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
-    <Box
+    <div
       onClick={onClick}
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1,
-        px: compact ? 1 : 1.25,
-        py: compact ? 0.85 : 1.05,
-        mb: 0.4,
-        borderRadius: '10px',
-        cursor: 'pointer',
-        bgcolor: active ? (theme) => alpha(theme.palette.primary.main, 0.12) : 'transparent',
-        '&:hover': { bgcolor: (theme) => alpha(theme.palette.primary.main, active ? 0.14 : 0.06) },
+      className={`${styles.threadRow}${active ? ` ${styles.threadActive}` : ''}`}
+      style={{
+        paddingLeft: compact ? 8 : 10,
+        paddingRight: compact ? 8 : 10,
+        paddingTop: compact ? 7 : 8,
+        paddingBottom: compact ? 7 : 8,
+      }}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onClick();
       }}
     >
       {avatar || (
-        <Box
-          sx={{
-            width: compact ? 32 : 40,
-            height: compact ? 32 : 40,
-            borderRadius: '50%',
-            bgcolor: 'primary.main',
-            color: 'primary.contrastText',
-            display: 'grid',
-            placeItems: 'center',
-            flexShrink: 0,
+        <div
+          className={styles.teamIcon}
+          style={{ width: compact ? 32 : 40, height: compact ? 32 : 40 }}
+        >
+          {icon || <ChatOutlinedIcon style={{ fontSize: 18 }} />}
+        </div>
+      )}
+      <div className={styles.threadMeta}>
+        <div className={styles.threadTitleRow}>
+          <Text
+            className={styles.truncate}
+            style={{ fontWeight: unread ? 800 : 700, fontSize: compact ? 12.5 : 13.5 }}
+          >
+            {title}
+          </Text>
+          {time && (
+            <Text
+              size={200}
+              style={{
+                flexShrink: 0,
+                color: unread ? tokens.colorBrandForeground1 : tokens.colorNeutralForeground3,
+              }}
+            >
+              {formatClock(time)}
+            </Text>
+          )}
+        </div>
+        <Text
+          size={200}
+          className={styles.truncate}
+          style={{
+            display: 'block',
+            color: unread ? tokens.colorNeutralForeground1 : tokens.colorNeutralForeground2,
           }}
         >
-          {icon || <ChatOutlinedIcon fontSize="small" />}
-        </Box>
-      )}
-      <Box sx={{ minWidth: 0, flexGrow: 1 }}>
-        <Stack direction="row" justifyContent="space-between" spacing={0.5}>
-          <Typography fontWeight={unread ? 800 : 700} noWrap fontSize={compact ? 12.5 : 13.5}>
-            {title}
-          </Typography>
-          {time && (
-            <Typography variant="caption" color={unread ? 'primary.main' : 'text.disabled'} sx={{ flexShrink: 0 }}>
-              {formatClock(time)}
-            </Typography>
-          )}
-        </Stack>
-        <Typography variant="caption" color={unread ? 'text.primary' : 'text.secondary'} noWrap sx={{ display: 'block' }}>
           {online && !compact ? 'Online · ' : ''}{subtitle}
-        </Typography>
-      </Box>
-      {unread && <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0 }} />}
-    </Box>
+        </Text>
+      </div>
+      {unread && <div className={styles.unreadDot} />}
+    </div>
   );
 }

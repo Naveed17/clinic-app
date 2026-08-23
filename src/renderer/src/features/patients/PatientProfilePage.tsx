@@ -1,30 +1,25 @@
-import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
-import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import ReceiptOutlinedIcon from '@mui/icons-material/ReceiptOutlined';
-import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
-import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
-import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
-import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined';
-import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
-import CakeOutlinedIcon from '@mui/icons-material/CakeOutlined';
-import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
-import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
-import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
-import HealthAndSafetyOutlinedIcon from '@mui/icons-material/HealthAndSafetyOutlined';
-import ContactPhoneOutlinedIcon from '@mui/icons-material/ContactPhoneOutlined';
 import {
-  Alert, Avatar, Box, Button, Chip, IconButton, Paper, Skeleton, Stack,
-  Tab, Tabs, Tooltip, Typography,
-} from '@mui/material';
-import { alpha, darken, useTheme } from '@mui/material/styles';
+  Avatar,
+  Badge,
+  Button,
+  MessageBar,
+  MessageBarBody,
+  Skeleton,
+  Tab,
+  TabList,
+  Text,
+  Title1,
+  Tooltip,
+  makeStyles,
+  tokens,
+  type BadgeProps,
+} from '@fluentui/react-components';
 import { useQuery } from '@tanstack/react-query';
 import type { Prescription } from '@/types/token';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ListCardsSkeleton, StatCardsSkeleton } from '@/components/LoadingUI';
-import { chipSx } from '@/components/TableUI';
+import { StatusBadge } from '@/components/TableUI';
 import { appointmentsService } from '@/services/appointments.service';
 import { invoicesService } from '@/services/invoices.service';
 import { patientsService } from '@/services/patients.service';
@@ -36,40 +31,366 @@ import { PatientWhatsAppButton } from './PatientWhatsAppButton';
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
 import { LabOrderHistoryCard } from '@/features/lab/LabOrderResultView';
 import type { LabOrder } from '@/types/lab';
+import { ArrowBackOutlinedIcon, BadgeOutlinedIcon, BiotechOutlinedIcon, CakeOutlinedIcon, CalendarMonthOutlinedIcon, ContactPhoneOutlinedIcon, EditOutlinedIcon, EmailOutlinedIcon, HealthAndSafetyOutlinedIcon, HomeOutlinedIcon, InsertDriveFileOutlinedIcon, MedicalServicesOutlinedIcon, PhoneOutlinedIcon, PrintOutlinedIcon, ReceiptOutlinedIcon, WarningAmberOutlinedIcon } from '@/icons/fluent';
 
 const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
 
-const apptStatusColor: Record<string, 'default' | 'primary' | 'warning' | 'success' | 'error'> = {
-  SCHEDULED: 'primary', CHECKED_IN: 'warning', COMPLETED: 'success', CANCELLED: 'default', NO_SHOW: 'error',
+type StatusColor = NonNullable<BadgeProps['color']>;
+
+const apptStatusColor: Record<string, StatusColor> = {
+  SCHEDULED: 'brand', CHECKED_IN: 'warning', COMPLETED: 'success', CANCELLED: 'subtle', NO_SHOW: 'danger',
 };
 
-const apptLeftBorder: Record<string, string> = {
-  SCHEDULED: 'primary.main', CHECKED_IN: 'warning.main', COMPLETED: 'success.main',
-  CANCELLED: 'divider', NO_SHOW: 'error.main',
+const STATUS_BORDER: Record<string, string> = {
+  SCHEDULED: tokens.colorBrandForeground1,
+  CHECKED_IN: tokens.colorPaletteDarkOrangeForeground1,
+  COMPLETED: tokens.colorPaletteGreenForeground1,
+  CANCELLED: tokens.colorNeutralStroke2,
+  NO_SHOW: tokens.colorPaletteRedForeground1,
 };
 
-const invoiceLeftBorder: Record<string, string> = {
-  PAID: 'success.main', PARTIALLY_PAID: 'warning.main', DRAFT: 'info.main', VOID: 'error.main', REFUNDED: 'error.main',
+const INVOICE_BORDER: Record<string, string> = {
+  PAID: tokens.colorPaletteGreenForeground1,
+  PARTIALLY_PAID: tokens.colorPaletteDarkOrangeForeground1,
+  DRAFT: tokens.colorPaletteBlueForeground2,
+  VOID: tokens.colorPaletteRedForeground1,
+  REFUNDED: tokens.colorPaletteRedForeground1,
 };
 
+const useStyles = makeStyles({
+  page: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+    paddingBottom: tokens.spacingVerticalL,
+  },
+  loading: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalL,
+    padding: tokens.spacingVerticalL,
+  },
+  notFound: {
+    padding: tokens.spacingVerticalXXL,
+  },
+  header: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: tokens.spacingHorizontalL,
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+  },
+  headerLeft: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: tokens.spacingHorizontalM,
+  },
+  backBtn: {
+    marginTop: '4px',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  eyebrow: {
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  title: {
+    letterSpacing: '-0.02em',
+    marginTop: '2px',
+    fontWeight: 900,
+  },
+  subtitle: {
+    color: tokens.colorNeutralForeground2,
+    marginTop: '4px',
+    display: 'block',
+  },
+  actions: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalS,
+  },
+  editBtn: {
+    borderRadius: tokens.borderRadiusMedium,
+    fontWeight: tokens.fontWeightBold,
+    paddingLeft: '18px',
+    paddingRight: '18px',
+  },
+  statsGrid: {
+    display: 'grid',
+    gap: '14px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+  },
+  softCard: {
+    borderRadius: '20px',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    boxShadow: '0 4px 18px rgba(0,0,0,0.04)',
+    backgroundColor: tokens.colorNeutralBackground1,
+  },
+  statCard: {
+    padding: '18px',
+    border: 'none',
+  },
+  statRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  statValue: {
+    fontSize: '28px',
+    fontWeight: 800,
+    lineHeight: 1,
+  },
+  statLabel: {
+    marginTop: '6px',
+    display: 'block',
+    fontWeight: tokens.fontWeightBold,
+    color: tokens.colorNeutralForeground2,
+  },
+  statIcon: {
+    width: '40px',
+    height: '40px',
+    borderRadius: tokens.borderRadiusMedium,
+    display: 'grid',
+    placeItems: 'center',
+  },
+  layout: {
+    display: 'grid',
+    gap: '20px',
+    gridTemplateColumns: 'minmax(0, 1fr) 320px',
+    alignItems: 'start',
+    '@media (max-width: 1024px)': {
+      gridTemplateColumns: '1fr',
+    },
+  },
+  mainCol: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+    minWidth: 0,
+  },
+  sideCol: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalL,
+    minWidth: 0,
+  },
+  panel: {
+    overflow: 'hidden',
+  },
+  tabBar: {
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    minHeight: '48px',
+  },
+  tabBody: {
+    minHeight: '200px',
+  },
+  list: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+    padding: tokens.spacingVerticalL,
+    maxHeight: '480px',
+    overflowY: 'auto',
+  },
+  listItem: {
+    padding: tokens.spacingVerticalM,
+    borderRadius: tokens.borderRadiusMedium,
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    backgroundColor: tokens.colorBrandBackground2,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderLeftWidth: '4px',
+    borderLeftStyle: 'solid',
+    cursor: 'pointer',
+    ':hover': {
+      filter: 'brightness(0.97)',
+    },
+  },
+  listItemInvoice: {
+    backgroundColor: tokens.colorPaletteDarkOrangeBackground2,
+  },
+  empty: {
+    paddingTop: '48px',
+    paddingBottom: '48px',
+    textAlign: 'center',
+  },
+  emptyIcon: {
+    width: '64px',
+    height: '64px',
+    borderRadius: '18px',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    marginBottom: tokens.spacingVerticalM,
+    display: 'grid',
+    placeItems: 'center',
+    backgroundColor: tokens.colorBrandBackground2,
+    color: tokens.colorBrandForeground1,
+  },
+  hero: {
+    padding: '22px',
+    borderRadius: '24px',
+    background: `linear-gradient(145deg, ${tokens.colorBrandBackgroundSelected} 0%, ${tokens.colorBrandBackground} 50%, ${tokens.colorBrandBackground2} 100%)`,
+    color: tokens.colorNeutralForegroundOnBrand,
+    boxShadow: `0 12px 28px ${tokens.colorBrandBackground2}`,
+    border: 'none',
+  },
+  heroTop: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalL,
+    alignItems: 'center',
+    marginBottom: tokens.spacingVerticalL,
+  },
+  heroAvatar: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    color: '#fff',
+    fontSize: '22px',
+    fontWeight: 900,
+    border: '2px solid rgba(255,255,255,0.35)',
+  },
+  heroBadges: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '6px',
+    flexWrap: 'wrap',
+    marginTop: '6px',
+  },
+  glassBadge: {
+    height: '22px',
+    fontWeight: tokens.fontWeightBold,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    color: '#fff',
+  },
+  heroContact: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+  },
+  heroContactRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalS,
+    alignItems: 'center',
+  },
+  sideCard: {
+    padding: '18px',
+  },
+  sideTitle: {
+    fontWeight: 800,
+    fontSize: '15px',
+    marginBottom: '14px',
+    display: 'block',
+  },
+  infoRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '10px',
+    alignItems: 'flex-start',
+  },
+  infoIcon: {
+    color: tokens.colorNeutralForeground2,
+    marginTop: '1px',
+    display: 'flex',
+  },
+  infoLabel: {
+    lineHeight: 1,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    fontSize: '10px',
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground2,
+    display: 'block',
+  },
+  alertBox: {
+    padding: tokens.spacingVerticalM,
+    borderRadius: tokens.borderRadiusMedium,
+    borderLeftWidth: '4px',
+    borderLeftStyle: 'solid',
+  },
+  alertHead: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalS,
+    alignItems: 'center',
+    marginBottom: '4px',
+  },
+  mrCard: {
+    padding: tokens.spacingVerticalL,
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    backgroundColor: tokens.colorBrandBackground2,
+  },
+  mrIcon: {
+    width: '44px',
+    height: '44px',
+    borderRadius: tokens.borderRadiusMedium,
+    display: 'grid',
+    placeItems: 'center',
+    backgroundColor: tokens.colorBrandBackground2,
+    color: tokens.colorBrandForeground1,
+  },
+  rxCard: {
+    padding: '10px',
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorBrandBackground2,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderLeftWidth: '4px',
+    borderLeftStyle: 'solid',
+    borderLeftColor: tokens.colorBrandForeground1,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    cursor: 'pointer',
+    ':hover': {
+      filter: 'brightness(0.97)',
+    },
+  },
+  thumbBox: {
+    width: '56px',
+    height: '72px',
+    flexShrink: 0,
+    borderRadius: tokens.borderRadiusMedium,
+    overflow: 'hidden',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorBrandBackground2,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumbImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    display: 'block',
+  },
+  truncate: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  overviewRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+});
 
-function EmptyState({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
-  const theme = useTheme();
+function EmptyState({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }): React.JSX.Element {
+  const styles = useStyles();
   return (
-    <Box sx={{ py: 6, textAlign: 'center' }}>
-      <Box
-        sx={{
-          width: 64, height: 64, borderRadius: '18px', mx: 'auto', mb: 1.5,
-          display: 'grid', placeItems: 'center',
-          bgcolor: alpha(theme.palette.primary.main, 0.08),
-          color: 'primary.main',
-        }}
-      >
-        {icon}
-      </Box>
-      <Typography fontWeight={700} sx={{ mb: 0.5 }}>{title}</Typography>
-      <Typography variant="body2" color="text.secondary">{subtitle}</Typography>
-    </Box>
+    <div className={styles.empty}>
+      <div className={styles.emptyIcon}>{icon}</div>
+      <Text weight="bold" style={{ display: 'block', marginBottom: 4 }}>{title}</Text>
+      <Text size={300} style={{ color: tokens.colorNeutralForeground2 }}>{subtitle}</Text>
+    </div>
   );
 }
 
@@ -77,7 +398,7 @@ function PrescriptionsTabInline({ patientId, patient }: {
   patientId: string;
   patient: { firstName: string; lastName: string; mrNumber?: string | null; phone?: string | null; dateOfBirth?: string | Date | null };
 }): React.JSX.Element {
-  const theme = useTheme();
+  const styles = useStyles();
   type PrintItem = { prescription: Prescription; doctor: { firstName: string; lastName: string } };
   const [printItem, setPrintItem] = useState<PrintItem | null>(null);
 
@@ -100,11 +421,11 @@ function PrescriptionsTabInline({ patientId, patient }: {
     },
   });
 
-  if (isLoading) return <Box sx={{ p: 1 }}><ListCardsSkeleton count={4} /></Box>;
+  if (isLoading) return <div style={{ padding: 8 }}><ListCardsSkeleton count={4} /></div>;
   if (items.length === 0) {
     return (
       <EmptyState
-        icon={<MedicalServicesOutlinedIcon sx={{ fontSize: 30 }} />}
+        icon={<MedicalServicesOutlinedIcon style={{ fontSize: 30 }} />}
         title="No prescriptions"
         subtitle="Prescriptions written for this patient will appear here."
       />
@@ -113,82 +434,58 @@ function PrescriptionsTabInline({ patientId, patient }: {
 
   return (
     <>
-      <Stack spacing={1} sx={{ p: 2, maxHeight: 520, overflowY: 'auto', pr: 0.5 }}>
+      <div className={styles.list} style={{ maxHeight: 520, paddingRight: 4 }}>
         {items.map((item) => {
           const pr = item.prescription;
           const doctorLabel = `${item.doctor?.firstName ?? ''} ${item.doctor?.lastName ?? ''}`.trim();
           const title = pr.thumbName?.trim() || pr.diagnosis || 'Prescription Entry';
           const thumbSrc = pr.thumbnail ? `data:image/png;base64,${pr.thumbnail}` : null;
           return (
-            <Box
+            <div
               key={pr.id}
+              className={styles.rxCard}
               onClick={() => setPrintItem({ prescription: pr, doctor: item.doctor ?? { firstName: '', lastName: '' } })}
-              sx={{
-                p: 1.25,
-                borderRadius: 1,
-                bgcolor: alpha(theme.palette.primary.main, 0.03),
-                border: '1px solid',
-                borderColor: 'divider',
-                borderLeft: '4px solid',
-                borderLeftColor: 'primary.main',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.25,
-                cursor: 'pointer',
-                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  setPrintItem({ prescription: pr, doctor: item.doctor ?? { firstName: '', lastName: '' } });
+                }
               }}
             >
-              <Box
-                sx={{
-                  width: 56,
-                  height: 72,
-                  flexShrink: 0,
-                  borderRadius: 1,
-                  overflow: 'hidden',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  bgcolor: alpha(theme.palette.primary.main, 0.08),
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
+              <div className={styles.thumbBox}>
                 {thumbSrc ? (
-                  <Box
-                    component="img"
-                    src={thumbSrc}
-                    alt=""
-                    sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  />
+                  <img className={styles.thumbImg} src={thumbSrc} alt="" />
                 ) : (
-                  <MedicalServicesOutlinedIcon sx={{ fontSize: 22, color: 'primary.main' }} />
+                  <MedicalServicesOutlinedIcon style={{ fontSize: 22, color: 'currentColor' }} />
                 )}
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography fontWeight={700} fontSize={14} noWrap>
-                  {title}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }} noWrap>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <Text weight="bold" size={300} className={styles.truncate}>{title}</Text>
+                <Text size={200} className={styles.truncate} style={{ display: 'block', marginTop: 2, color: tokens.colorNeutralForeground2 }}>
                   {new Date(pr.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}
                   {doctorLabel ? ` · Dr. ${doctorLabel.replace(/^dr\.?\s*/i, '')}` : ''}
-                </Typography>
-              </Box>
-              <Stack direction="row" spacing={0.5} alignItems="center" onClick={(e) => e.stopPropagation()}>
-                <Tooltip title="Print Prescription">
-                  <IconButton
+                </Text>
+              </div>
+              <div
+                style={{ display: 'flex', flexDirection: 'row', gap: 4, alignItems: 'center' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Tooltip content="Print Prescription" relationship="label">
+                  <Button
+                    appearance="subtle"
                     size="small"
+                    icon={<PrintOutlinedIcon style={{ fontSize: 18 }} />}
+                    aria-label="Print Prescription"
                     onClick={() => setPrintItem({ prescription: pr, doctor: item.doctor ?? { firstName: '', lastName: '' } })}
-                    sx={{ borderRadius: 1 }}
-                  >
-                    <PrintOutlinedIcon fontSize="small" />
-                  </IconButton>
+                  />
                 </Tooltip>
-                <Chip label="Rx" size="small" color="primary" sx={{ fontWeight: 700, borderRadius: 1, height: 22 }} />
-              </Stack>
-            </Box>
+                <Badge appearance="tint" color="brand" size="small" style={{ fontWeight: 700 }}>Rx</Badge>
+              </div>
+            </div>
           );
         })}
-      </Stack>
+      </div>
       {printItem && (
         <PrescriptionPrintPreview
           prescription={printItem.prescription}
@@ -201,22 +498,21 @@ function PrescriptionsTabInline({ patientId, patient }: {
   );
 }
 
-function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }): React.JSX.Element {
+  const styles = useStyles();
   return (
-    <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <Box sx={{ color: 'text.secondary', mt: 0.15, display: 'flex' }}>{icon}</Box>
-      <Box sx={{ minWidth: 0 }}>
-        <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" sx={{ lineHeight: 1, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: 10 }}>
-          {label}
-        </Typography>
-        <Typography fontSize={13} fontWeight={600} sx={{ wordBreak: 'break-word' }}>{value}</Typography>
-      </Box>
-    </Stack>
+    <div className={styles.infoRow}>
+      <div className={styles.infoIcon}>{icon}</div>
+      <div style={{ minWidth: 0 }}>
+        <Text className={styles.infoLabel}>{label}</Text>
+        <Text size={300} weight="semibold" style={{ wordBreak: 'break-word' }}>{value}</Text>
+      </div>
+    </div>
   );
 }
 
 export function PatientProfilePage(): React.JSX.Element {
-  const theme = useTheme();
+  const styles = useStyles();
   const { user } = useAuth();
   const { can } = useLicense();
   const isAdmin = user?.role === 'admin';
@@ -241,30 +537,29 @@ export function PatientProfilePage(): React.JSX.Element {
     enabled: showLab,
   });
 
-  const softCard = {
-    borderRadius: '20px',
-    border: '1px solid',
-    borderColor: 'divider',
-    boxShadow: `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,
-  } as const;
-
   if (patientsQuery.isLoading) {
     return (
-      <Stack spacing={2} sx={{ p: 2 }}>
-        <Skeleton variant="rounded" height={72} sx={{ borderRadius: 3 }} />
+      <div className={styles.loading}>
+        <Skeleton appearance="opaque" style={{ height: 72, borderRadius: 12 }} />
         <StatCardsSkeleton count={4} />
-        <Skeleton variant="rounded" height={320} sx={{ borderRadius: 3 }} />
-      </Stack>
+        <Skeleton appearance="opaque" style={{ height: 320, borderRadius: 12 }} />
+      </div>
     );
   }
   if (!patient) {
     return (
-      <Box sx={{ p: 4 }}>
-        <Alert severity="error" sx={{ borderRadius: 2 }}>Patient not found.</Alert>
-        <Button sx={{ mt: 2, borderRadius: 2, fontWeight: 700 }} startIcon={<ArrowBackOutlinedIcon />} onClick={() => navigate('/patients')}>
+      <div className={styles.notFound}>
+        <MessageBar intent="error">
+          <MessageBarBody>Patient not found.</MessageBarBody>
+        </MessageBar>
+        <Button
+          style={{ marginTop: 16, borderRadius: 8, fontWeight: 700 }}
+          icon={<ArrowBackOutlinedIcon />}
+          onClick={() => navigate('/patients')}
+        >
           Back to Patients
         </Button>
-      </Box>
+      </div>
     );
   }
 
@@ -278,411 +573,391 @@ export function PatientProfilePage(): React.JSX.Element {
   const pendingLab = patientLab.filter((o) => o.status !== 'COMPLETED' && o.status !== 'CANCELLED').length;
 
   const summaryCards = [
-    { label: 'Appointments', value: patientAppointments.length, icon: <CalendarMonthOutlinedIcon />, bg: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main },
-    { label: 'Completed Visits', value: completedAppts, icon: <MedicalServicesOutlinedIcon />, bg: alpha(theme.palette.success.main, 0.12), color: theme.palette.success.dark },
+    { label: 'Appointments', value: patientAppointments.length, icon: <CalendarMonthOutlinedIcon />, bg: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1 },
+    { label: 'Completed Visits', value: completedAppts, icon: <MedicalServicesOutlinedIcon />, bg: tokens.colorPaletteGreenBackground1, color: tokens.colorPaletteGreenForeground1 },
     ...(showLab
-      ? [{ label: 'Lab Orders', value: patientLab.length, icon: <BiotechOutlinedIcon />, bg: alpha(theme.palette.info.main, 0.12), color: theme.palette.info.dark }]
+      ? [{ label: 'Lab Orders', value: patientLab.length, icon: <BiotechOutlinedIcon />, bg: tokens.colorPaletteBlueBackground2, color: tokens.colorPaletteBlueForeground2 }]
       : []),
     ...(showBilling
-      ? [{ label: 'Total Billed', value: money(totalBilled), icon: <ReceiptOutlinedIcon />, bg: alpha(theme.palette.warning.main, 0.12), color: theme.palette.warning.dark }]
+      ? [{ label: 'Total Billed', value: money(totalBilled), icon: <ReceiptOutlinedIcon />, bg: tokens.colorPaletteDarkOrangeBackground1, color: tokens.colorPaletteDarkOrangeForeground1 }]
       : []),
   ];
 
   const tabs = [
-    { label: 'Appointments', count: patientAppointments.length, icon: <CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} />, value: 0 },
+    { label: 'Appointments', count: patientAppointments.length, icon: <CalendarMonthOutlinedIcon style={{ fontSize: 18 }} />, value: 0 },
     ...(showBilling
-      ? [{ label: 'Billing', count: patientInvoices.length, icon: <ReceiptOutlinedIcon sx={{ fontSize: 18 }} />, value: 1 }]
+      ? [{ label: 'Billing', count: patientInvoices.length, icon: <ReceiptOutlinedIcon style={{ fontSize: 18 }} />, value: 1 }]
       : []),
     ...(showLab
-      ? [{ label: 'Lab', count: patientLab.length, icon: <BiotechOutlinedIcon sx={{ fontSize: 18 }} />, value: 2 }]
+      ? [{ label: 'Lab', count: patientLab.length, icon: <BiotechOutlinedIcon style={{ fontSize: 18 }} />, value: 2 }]
       : []),
-    { label: 'Documents', count: null, icon: <InsertDriveFileOutlinedIcon sx={{ fontSize: 18 }} />, value: 3 },
-    { label: 'Prescriptions', count: null, icon: <MedicalServicesOutlinedIcon sx={{ fontSize: 18 }} />, value: 4 },
+    { label: 'Documents', count: null as number | null, icon: <InsertDriveFileOutlinedIcon style={{ fontSize: 18 }} />, value: 3 },
+    { label: 'Prescriptions', count: null as number | null, icon: <MedicalServicesOutlinedIcon style={{ fontSize: 18 }} />, value: 4 },
   ];
 
   return (
     <>
-      <Stack spacing={2.5} sx={{ pb: 2 }}>
-        {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: { sm: 'flex-end' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between' }}>
-          <Stack direction="row" alignItems="flex-start" spacing={1.5}>
-            <Tooltip title="Back to patients">
-              <IconButton
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <div className={styles.headerLeft}>
+            <Tooltip content="Back to patients" relationship="label">
+              <Button
+                appearance="subtle"
+                className={styles.backBtn}
+                icon={<ArrowBackOutlinedIcon style={{ fontSize: 18 }} />}
+                aria-label="Back to patients"
                 onClick={() => navigate('/patients')}
-                size="small"
-                sx={{ mt: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
-              >
-                <ArrowBackOutlinedIcon fontSize="small" />
-              </IconButton>
+              />
             </Tooltip>
-            <Box>
-              <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                Patient profile
-              </Typography>
-              <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
+            <div>
+              <Text size={300} className={styles.eyebrow}>Patient profile</Text>
+              <Title1 className={styles.title}>
                 {patient.firstName} {patient.lastName}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              </Title1>
+              <Text size={300} className={styles.subtitle}>
                 {patient.mrNumber ? `MR# ${patient.mrNumber}` : 'Medical record overview'}
                 {patient.phone ? ` · ${patient.phone}` : ''}
-              </Typography>
-            </Box>
-          </Stack>
-          <Stack direction="row" spacing={1}>
-            <PatientWhatsAppButton patient={patient} sx={{ px: 2.25, py: 1 }} />
+              </Text>
+            </div>
+          </div>
+          <div className={styles.actions}>
+            <PatientWhatsAppButton patient={patient} style={{ paddingLeft: 18, paddingRight: 18, paddingTop: 8, paddingBottom: 8 }} />
             {!isAdmin && (
               <Button
-                startIcon={<EditOutlinedIcon />}
-                variant="contained"
-                sx={{ borderRadius: 2, fontWeight: 700, px: 2.25, py: 1 }}
+                icon={<EditOutlinedIcon />}
+                appearance="primary"
+                className={styles.editBtn}
                 onClick={() => setEditOpen(true)}
               >
                 Edit Profile
               </Button>
             )}
-          </Stack>
-        </Box>
+          </div>
+        </div>
 
-        {/* Summary metrics */}
-        <Box sx={{ display: 'grid', gap: 1.75, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
+        <div className={styles.statsGrid}>
           {summaryCards.map((c) => (
-            <Paper key={c.label} elevation={0} sx={{ p: 2.25, ...softCard, bgcolor: c.bg, border: 'none' }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                <Box>
-                  <Typography sx={{ fontSize: 28, fontWeight: 800, color: c.color, lineHeight: 1 }}>{c.value}</Typography>
-                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mt: 0.75, display: 'block' }}>
-                    {c.label}
-                  </Typography>
-                </Box>
-                <Box sx={{ width: 40, height: 40, borderRadius: 2, display: 'grid', placeItems: 'center', bgcolor: alpha(c.color, 0.15), color: c.color }}>
+            <div key={c.label} className={`${styles.softCard} ${styles.statCard}`} style={{ backgroundColor: c.bg }}>
+              <div className={styles.statRow}>
+                <div>
+                  <Text className={styles.statValue} style={{ color: c.color }}>{c.value}</Text>
+                  <Text size={200} className={styles.statLabel}>{c.label}</Text>
+                </div>
+                <div className={styles.statIcon} style={{ backgroundColor: `${c.color}26`, color: c.color }}>
                   {c.icon}
-                </Box>
-              </Stack>
-            </Paper>
+                </div>
+              </div>
+            </div>
           ))}
-        </Box>
+        </div>
 
-        {/* Two-column layout */}
-        <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 320px' }, alignItems: 'start' }}>
-          {/* Main — tabs + records */}
-          <Stack spacing={2.5} sx={{ minWidth: 0 }}>
-            <Paper elevation={0} sx={{ ...softCard, overflow: 'hidden' }}>
-              <Tabs
-                value={tab}
-                onChange={(_, v) => setTab(v)}
-                variant="scrollable"
-                scrollButtons="auto"
-                sx={{
-                  px: 2,
-                  borderBottom: 1,
-                  borderColor: 'divider',
-                  minHeight: 48,
-                  '& .MuiTab-root': { minHeight: 48, fontSize: 13, fontWeight: 700, textTransform: 'none', gap: 0.75 },
-                }}
-              >
-                {tabs.map((t) => (
-                  <Tab
-                    key={t.label}
-                    icon={t.icon}
-                    iconPosition="start"
-                    label={t.count !== null ? `${t.label} (${t.count})` : t.label}
-                    value={t.value}
-                  />
-                ))}
-              </Tabs>
+        <div className={styles.layout}>
+          <div className={styles.mainCol}>
+            <div className={`${styles.softCard} ${styles.panel}`}>
+              <div className={styles.tabBar}>
+                <TabList
+                  selectedValue={tab}
+                  onTabSelect={(_, d) => setTab(Number(d.value))}
+                >
+                  {tabs.map((t) => (
+                    <Tab
+                      key={t.label}
+                      icon={t.icon}
+                      value={t.value}
+                    >
+                      {t.count !== null ? `${t.label} (${t.count})` : t.label}
+                    </Tab>
+                  ))}
+                </TabList>
+              </div>
 
-              <Box sx={{ minHeight: 200 }}>
+              <div className={styles.tabBody}>
                 {tab === 0 && (
                   patientAppointments.length === 0 ? (
                     <EmptyState
-                      icon={<CalendarMonthOutlinedIcon sx={{ fontSize: 30 }} />}
+                      icon={<CalendarMonthOutlinedIcon style={{ fontSize: 30 }} />}
                       title="No appointments"
                       subtitle="Appointment history for this patient will show here."
                     />
                   ) : (
-                    <Stack spacing={1} sx={{ p: 2, maxHeight: 480, overflowY: 'auto' }}>
+                    <div className={styles.list}>
                       {[...patientAppointments]
                         .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
                         .map((a) => (
-                          <Box
+                          <div
                             key={a.id}
+                            className={styles.listItem}
+                            style={{ borderLeftColor: STATUS_BORDER[a.status] ?? tokens.colorNeutralStroke2 }}
                             onClick={() => navigate(`/appointments/${a.id}`)}
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 1,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 1.5,
-                              cursor: 'pointer',
-                              bgcolor: alpha(theme.palette.primary.main, 0.03),
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              borderLeft: '4px solid',
-                              borderLeftColor: apptLeftBorder[a.status] ?? 'divider',
-                              '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.07) },
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') navigate(`/appointments/${a.id}`);
                             }}
                           >
-                            <Avatar sx={{ width: 40, height: 40, borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, 0.12), color: 'primary.main', fontSize: 12, fontWeight: 800 }}>
-                              <CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} />
-                            </Avatar>
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography fontWeight={700} fontSize={14} noWrap>
+                            <Avatar
+                              icon={<CalendarMonthOutlinedIcon style={{ fontSize: 18 }} />}
+                              shape="square"
+                              size={40}
+                              color="brand"
+                            />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <Text weight="bold" size={300} className={styles.truncate}>
                                 {new Date(a.startsAt).toLocaleString([], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                              </Text>
+                              <Text size={200} className={styles.truncate} style={{ display: 'block', color: tokens.colorNeutralForeground2 }}>
                                 Dr. {a.provider.firstName} {a.provider.lastName}
                                 {a.reason ? ` · ${a.reason}` : ''}
-                              </Typography>
-                            </Box>
-                            <Chip label={a.status.replace('_', ' ')} size="small" color={apptStatusColor[a.status] ?? 'default'} sx={{ ...chipSx, fontWeight: 700, borderRadius: 1 }} />
-                          </Box>
+                              </Text>
+                            </div>
+                            <StatusBadge color={apptStatusColor[a.status] ?? 'subtle'}>
+                              {a.status.replace('_', ' ')}
+                            </StatusBadge>
+                          </div>
                         ))}
-                    </Stack>
+                    </div>
                   )
                 )}
 
                 {showBilling && tab === 1 && (
                   patientInvoices.length === 0 ? (
                     <EmptyState
-                      icon={<ReceiptOutlinedIcon sx={{ fontSize: 30 }} />}
+                      icon={<ReceiptOutlinedIcon style={{ fontSize: 30 }} />}
                       title="No invoices"
                       subtitle="Billing records for this patient will appear here."
                     />
                   ) : (
-                    <Stack spacing={1} sx={{ p: 2, maxHeight: 480, overflowY: 'auto' }}>
+                    <div className={styles.list}>
                       {[...patientInvoices]
                         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                         .map((inv) => (
-                          <Box
+                          <div
                             key={inv.id}
+                            className={`${styles.listItem} ${styles.listItemInvoice}`}
+                            style={{
+                              borderLeftColor: INVOICE_BORDER[inv.status] ?? tokens.colorNeutralStroke2,
+                              cursor: user?.role === 'receptionist' ? 'pointer' : 'default',
+                            }}
                             onClick={() => {
                               if (user?.role === 'receptionist') navigate(`/billing/${inv.id}`);
                             }}
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 1,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 1.5,
-                              cursor: user?.role === 'receptionist' ? 'pointer' : 'default',
-                              bgcolor: alpha(theme.palette.warning.main, 0.03),
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              borderLeft: '4px solid',
-                              borderLeftColor: invoiceLeftBorder[inv.status] ?? 'divider',
-                              '&:hover': user?.role === 'receptionist'
-                                ? { bgcolor: alpha(theme.palette.warning.main, 0.08) }
-                                : undefined,
-                            }}
+                            role={user?.role === 'receptionist' ? 'button' : undefined}
+                            tabIndex={user?.role === 'receptionist' ? 0 : undefined}
                           >
-                            <Avatar sx={{ width: 40, height: 40, borderRadius: 1, bgcolor: alpha(theme.palette.warning.main, 0.12), color: 'warning.dark', fontSize: 11, fontWeight: 800 }}>
-                              {inv.invoiceNumber.slice(-4)}
-                            </Avatar>
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography fontWeight={700} fontSize={14} color="primary.main">{inv.invoiceNumber}</Typography>
-                              <Typography variant="caption" color="text.secondary">
+                            <Avatar
+                              name={inv.invoiceNumber}
+                              initials={inv.invoiceNumber.slice(-4)}
+                              shape="square"
+                              size={40}
+                              color="colorful"
+                              style={{
+                                backgroundColor: tokens.colorPaletteDarkOrangeBackground2,
+                                color: tokens.colorPaletteDarkOrangeForeground1,
+                                fontSize: 11,
+                                fontWeight: 800,
+                              }}
+                            />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <Text weight="bold" size={300} style={{ color: tokens.colorBrandForeground1 }}>{inv.invoiceNumber}</Text>
+                              <Text size={200} style={{ color: tokens.colorNeutralForeground2 }}>
                                 {new Date(inv.createdAt).toLocaleDateString()} · Paid {money(Number(inv.amountPaid ?? 0))}
-                              </Typography>
-                            </Box>
-                            <Box sx={{ textAlign: 'right' }}>
-                              <Typography fontWeight={800} fontSize={14}>{money(Number(inv.total))}</Typography>
-                              <Chip
-                                label={inv.status.replace('_', ' ')}
-                                size="small"
-                                color={inv.status === 'PAID' ? 'success' : inv.status === 'PARTIALLY_PAID' ? 'warning' : 'default'}
-                                sx={{ ...chipSx, fontWeight: 700, borderRadius: 1, mt: 0.25 }}
-                              />
-                            </Box>
-                          </Box>
+                              </Text>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <Text weight="bold" size={300}>{money(Number(inv.total))}</Text>
+                              <div style={{ marginTop: 2 }}>
+                                <StatusBadge
+                                  color={inv.status === 'PAID' ? 'success' : inv.status === 'PARTIALLY_PAID' ? 'warning' : 'subtle'}
+                                >
+                                  {inv.status.replace('_', ' ')}
+                                </StatusBadge>
+                              </div>
+                            </div>
+                          </div>
                         ))}
-                    </Stack>
+                    </div>
                   )
                 )}
 
                 {showLab && tab === 2 && (
                   patientLab.length === 0 ? (
                     <EmptyState
-                      icon={<BiotechOutlinedIcon sx={{ fontSize: 30 }} />}
+                      icon={<BiotechOutlinedIcon style={{ fontSize: 30 }} />}
                       title="No lab orders"
                       subtitle="Lab test orders for this patient will show here."
                     />
                   ) : (
-                    <Stack spacing={1} sx={{ p: 2, maxHeight: 480, overflowY: 'auto' }}>
+                    <div className={styles.list}>
                       {[...patientLab]
                         .sort((a, b) => new Date(b.orderedAt).getTime() - new Date(a.orderedAt).getTime())
                         .map((o) => (
-                          <Box
+                          <div
                             key={o.id}
+                            style={{
+                              cursor: user?.role === 'lab_technician' ? 'pointer' : 'default',
+                              borderRadius: 4,
+                            }}
                             onClick={() => {
                               if (user?.role === 'lab_technician') navigate(`/lab/${o.id}`);
                             }}
-                            sx={{
-                              cursor: user?.role === 'lab_technician' ? 'pointer' : 'default',
-                              borderRadius: 1,
-                              '&:hover': user?.role === 'lab_technician'
-                                ? { outline: `1px solid ${alpha(theme.palette.primary.main, 0.35)}` }
-                                : undefined,
-                            }}
+                            role={user?.role === 'lab_technician' ? 'button' : undefined}
+                            tabIndex={user?.role === 'lab_technician' ? 0 : undefined}
                           >
                             <LabOrderHistoryCard order={o} />
-                          </Box>
+                          </div>
                         ))}
-                    </Stack>
+                    </div>
                   )
                 )}
 
                 {tab === 3 && <PatientDocumentsPanel patient={patient} />}
                 {tab === 4 && <PrescriptionsTabInline patientId={patient.id} patient={patient} />}
-              </Box>
-            </Paper>
-          </Stack>
+              </div>
+            </div>
+          </div>
 
-          {/* Right sidebar */}
-          <Stack spacing={2} sx={{ minWidth: 0 }}>
-            {/* Patient hero card */}
-            <Paper
-              elevation={0}
-              sx={{
-                p: 2.75,
-                borderRadius: '24px',
-                background: `linear-gradient(145deg, ${darken(theme.palette.primary.main, 0.12)} 0%, ${theme.palette.primary.main} 50%, ${theme.palette.primary.light} 100%)`,
-                color: theme.palette.primary.contrastText,
-                boxShadow: `0 12px 28px ${alpha(theme.palette.primary.main, 0.28)}`,
-                border: 'none',
-              }}
-            >
-              <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-                <Avatar sx={{ width: 64, height: 64, bgcolor: alpha('#fff', 0.2), color: '#fff', fontSize: 22, fontWeight: 900, border: `2px solid ${alpha('#fff', 0.35)}` }}>
-                  {initials}
-                </Avatar>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography fontWeight={900} fontSize={18} noWrap>{patient.firstName} {patient.lastName}</Typography>
-                  <Stack direction="row" spacing={0.75} flexWrap="wrap" sx={{ mt: 0.75 }}>
+          <div className={styles.sideCol}>
+            <div className={styles.hero}>
+              <div className={styles.heroTop}>
+                <Avatar
+                  className={styles.heroAvatar}
+                  name={`${patient.firstName} ${patient.lastName}`}
+                  initials={initials}
+                  size={64}
+                  color="brand"
+                />
+                <div style={{ minWidth: 0 }}>
+                  <Text weight="bold" style={{ fontSize: 18, color: 'inherit' }} className={styles.truncate}>
+                    {patient.firstName} {patient.lastName}
+                  </Text>
+                  <div className={styles.heroBadges}>
                     {patient.mrNumber && (
-                      <Chip label={`MR# ${patient.mrNumber}`} size="small" sx={{ height: 22, fontWeight: 700, bgcolor: alpha('#fff', 0.18), color: '#fff', borderRadius: 1 }} />
+                      <Badge appearance="filled" size="small" className={styles.glassBadge}>
+                        MR# {patient.mrNumber}
+                      </Badge>
                     )}
                     {patient.bloodGroup && (
-                      <Chip label={patient.bloodGroup} size="small" sx={{ height: 22, fontWeight: 700, bgcolor: alpha('#fff', 0.18), color: '#fff', borderRadius: 1 }} />
+                      <Badge appearance="filled" size="small" className={styles.glassBadge}>
+                        {patient.bloodGroup}
+                      </Badge>
                     )}
-                  </Stack>
-                </Box>
-              </Stack>
-              <Stack spacing={1.25}>
+                  </div>
+                </div>
+              </div>
+              <div className={styles.heroContact}>
                 {patient.phone && (
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <PhoneOutlinedIcon sx={{ fontSize: 16, opacity: 0.85 }} />
-                    <Typography fontSize={13} fontWeight={600}>{patient.phone}</Typography>
-                  </Stack>
+                  <div className={styles.heroContactRow}>
+                    <PhoneOutlinedIcon style={{ fontSize: 16, opacity: 0.85 }} />
+                    <Text size={300} weight="semibold" style={{ color: 'inherit' }}>{patient.phone}</Text>
+                  </div>
                 )}
                 {patient.email && (
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <EmailOutlinedIcon sx={{ fontSize: 16, opacity: 0.85 }} />
-                    <Typography fontSize={13} fontWeight={600} sx={{ wordBreak: 'break-all' }}>{patient.email}</Typography>
-                  </Stack>
+                  <div className={styles.heroContactRow}>
+                    <EmailOutlinedIcon style={{ fontSize: 16, opacity: 0.85 }} />
+                    <Text size={300} weight="semibold" style={{ color: 'inherit', wordBreak: 'break-all' }}>{patient.email}</Text>
+                  </div>
                 )}
                 {patient.dateOfBirth && (
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <CakeOutlinedIcon sx={{ fontSize: 16, opacity: 0.85 }} />
-                    <Typography fontSize={13} fontWeight={600}>
+                  <div className={styles.heroContactRow}>
+                    <CakeOutlinedIcon style={{ fontSize: 16, opacity: 0.85 }} />
+                    <Text size={300} weight="semibold" style={{ color: 'inherit' }}>
                       {new Date(patient.dateOfBirth).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })}
-                    </Typography>
-                  </Stack>
+                    </Text>
+                  </div>
                 )}
-              </Stack>
-            </Paper>
+              </div>
+            </div>
 
-            {/* Contact details */}
-            <Paper elevation={0} sx={{ p: 2.25, ...softCard }}>
-              <Typography fontWeight={800} fontSize={15} sx={{ mb: 1.75 }}>Contact Details</Typography>
-              <Stack spacing={1.75}>
-                <InfoRow icon={<PhoneOutlinedIcon sx={{ fontSize: 17 }} />} label="Phone" value={patient.phone || '—'} />
-                <InfoRow icon={<EmailOutlinedIcon sx={{ fontSize: 17 }} />} label="Email" value={patient.email || '—'} />
-                <InfoRow icon={<HomeOutlinedIcon sx={{ fontSize: 17 }} />} label="Address" value={patient.address || '—'} />
+            <div className={`${styles.softCard} ${styles.sideCard}`}>
+              <Text className={styles.sideTitle}>Contact Details</Text>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <InfoRow icon={<PhoneOutlinedIcon style={{ fontSize: 17 }} />} label="Phone" value={patient.phone || '—'} />
+                <InfoRow icon={<EmailOutlinedIcon style={{ fontSize: 17 }} />} label="Email" value={patient.email || '—'} />
+                <InfoRow icon={<HomeOutlinedIcon style={{ fontSize: 17 }} />} label="Address" value={patient.address || '—'} />
                 {patient.emergencyContactName && (
                   <InfoRow
-                    icon={<ContactPhoneOutlinedIcon sx={{ fontSize: 17 }} />}
+                    icon={<ContactPhoneOutlinedIcon style={{ fontSize: 17 }} />}
                     label="Emergency"
                     value={`${patient.emergencyContactName}${patient.emergencyContactPhone ? ` (${patient.emergencyContactPhone})` : ''}`}
                   />
                 )}
-              </Stack>
-            </Paper>
+              </div>
+            </div>
 
-            {/* Quick stats */}
-            <Paper elevation={0} sx={{ p: 2.25, ...softCard }}>
-              <Typography fontWeight={800} fontSize={15} sx={{ mb: 1.75 }}>Overview</Typography>
-              <Stack spacing={1.25}>
+            <div className={`${styles.softCard} ${styles.sideCard}`}>
+              <Text className={styles.sideTitle}>Overview</Text>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {[
-                  ...(showBilling ? [{ label: 'Total Paid', value: money(totalPaid), color: 'success.main' }] : []),
-                  ...(showLab ? [{ label: 'Pending Lab', value: pendingLab, color: 'warning.main' }] : []),
-                  { label: 'Completed Visits', value: completedAppts, color: 'primary.main' },
+                  ...(showBilling ? [{ label: 'Total Paid', value: money(totalPaid), color: tokens.colorPaletteGreenForeground1 }] : []),
+                  ...(showLab ? [{ label: 'Pending Lab', value: pendingLab, color: tokens.colorPaletteDarkOrangeForeground1 }] : []),
+                  { label: 'Completed Visits', value: completedAppts, color: tokens.colorBrandForeground1 },
                 ].map((s) => (
-                  <Stack key={s.label} direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="body2" color="text.secondary" fontWeight={600}>{s.label}</Typography>
-                    <Typography fontWeight={800} fontSize={15} color={s.color}>{s.value}</Typography>
-                  </Stack>
+                  <div key={s.label} className={styles.overviewRow}>
+                    <Text size={300} weight="semibold" style={{ color: tokens.colorNeutralForeground2 }}>{s.label}</Text>
+                    <Text weight="bold" style={{ fontSize: 15, color: s.color }}>{s.value}</Text>
+                  </div>
                 ))}
-              </Stack>
-            </Paper>
+              </div>
+            </div>
 
-            {/* Medical alerts */}
             {(patient.allergies || patient.chronicConditions) && (
-              <Paper elevation={0} sx={{ p: 2.25, ...softCard }}>
-                <Typography fontWeight={800} fontSize={15} sx={{ mb: 1.75 }}>Medical Alerts</Typography>
-                <Stack spacing={1.25}>
+              <div className={`${styles.softCard} ${styles.sideCard}`}>
+                <Text className={styles.sideTitle}>Medical Alerts</Text>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {patient.allergies && (
-                    <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: alpha(theme.palette.error.main, 0.08), borderLeft: '4px solid', borderLeftColor: 'error.main' }}>
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                        <WarningAmberOutlinedIcon color="error" sx={{ fontSize: 18 }} />
-                        <Typography variant="caption" fontWeight={700} color="error.main" sx={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <div
+                      className={styles.alertBox}
+                      style={{
+                        backgroundColor: tokens.colorPaletteRedBackground1,
+                        borderLeftColor: tokens.colorPaletteRedForeground1,
+                      }}
+                    >
+                      <div className={styles.alertHead}>
+                        <WarningAmberOutlinedIcon style={{ fontSize: 18, color: tokens.colorPaletteRedForeground1 }} />
+                        <Text size={200} weight="bold" style={{ color: tokens.colorPaletteRedForeground1, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                           Allergies
-                        </Typography>
-                      </Stack>
-                      <Typography fontSize={13} fontWeight={600}>{patient.allergies}</Typography>
-                    </Box>
+                        </Text>
+                      </div>
+                      <Text size={300} weight="semibold">{patient.allergies}</Text>
+                    </div>
                   )}
                   {patient.chronicConditions && (
-                    <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: alpha(theme.palette.warning.main, 0.08), borderLeft: '4px solid', borderLeftColor: 'warning.main' }}>
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                        <HealthAndSafetyOutlinedIcon color="warning" sx={{ fontSize: 18 }} />
-                        <Typography variant="caption" fontWeight={700} color="warning.main" sx={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <div
+                      className={styles.alertBox}
+                      style={{
+                        backgroundColor: tokens.colorPaletteDarkOrangeBackground1,
+                        borderLeftColor: tokens.colorPaletteDarkOrangeForeground1,
+                      }}
+                    >
+                      <div className={styles.alertHead}>
+                        <HealthAndSafetyOutlinedIcon style={{ fontSize: 18, color: tokens.colorPaletteDarkOrangeForeground1 }} />
+                        <Text size={200} weight="bold" style={{ color: tokens.colorPaletteDarkOrangeForeground1, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                           Chronic Conditions
-                        </Typography>
-                      </Stack>
-                      <Typography fontSize={13} fontWeight={600}>{patient.chronicConditions}</Typography>
-                    </Box>
+                        </Text>
+                      </div>
+                      <Text size={300} weight="semibold">{patient.chronicConditions}</Text>
+                    </div>
                   )}
-                </Stack>
-              </Paper>
+                </div>
+              </div>
             )}
 
-            {/* MR badge card */}
             {patient.mrNumber && (
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2,
-                  ...softCard,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1.5,
-                  bgcolor: alpha(theme.palette.primary.main, 0.05),
-                }}
-              >
-                <Box sx={{ width: 44, height: 44, borderRadius: 1, display: 'grid', placeItems: 'center', bgcolor: alpha(theme.palette.primary.main, 0.12), color: 'primary.main' }}>
+              <div className={`${styles.softCard} ${styles.mrCard}`}>
+                <div className={styles.mrIcon}>
                   <BadgeOutlinedIcon />
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                </div>
+                <div>
+                  <Text size={200} weight="bold" style={{ color: tokens.colorNeutralForeground2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Medical Record
-                  </Typography>
-                  <Typography fontWeight={800} fontSize={16} color="primary.main">{patient.mrNumber}</Typography>
-                </Box>
-              </Paper>
+                  </Text>
+                  <Text weight="bold" style={{ fontSize: 16, color: tokens.colorBrandForeground1, display: 'block' }}>{patient.mrNumber}</Text>
+                </div>
+              </div>
             )}
-          </Stack>
-        </Box>
-      </Stack>
+          </div>
+        </div>
+      </div>
 
       {editOpen && patient && (
         <PatientDialog open={editOpen} patient={patient} onClose={() => setEditOpen(false)} />

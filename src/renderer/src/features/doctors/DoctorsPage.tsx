@@ -1,42 +1,52 @@
-import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
-import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  Alert,
-  Box,
   Button,
   Dialog,
   DialogActions,
+  DialogBody,
   DialogContent,
+  DialogSurface,
   Divider,
-  FormControlLabel,
-  IconButton,
-  InputAdornment,
-  Stack,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
   Switch,
-  TextField,
+  TableCellLayout,
+  Text,
+  Textarea,
   Tooltip,
-  Typography,
-} from '@mui/material';
+  createTableColumn,
+  makeStyles,
+  tokens,
+  type TableColumnDefinition,
+} from '@fluentui/react-components';
+import {
+  Add24Regular,
+  CalendarMonth24Regular,
+  Delete24Regular,
+  Edit24Regular,
+  Eye24Regular,
+  EyeOff24Regular,
+  Open24Regular,
+} from '@fluentui/react-icons';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useDeferredValue, useEffect, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { doctorsService } from '@/services/doctors.service';
-import { useAuth } from '@/features/auth/AuthContext';
 import type { Doctor, DoctorInput, DoctorUpdateInput } from '@/types/doctor';
-import { tableSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
-import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
-  ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogFormSx, dialogPaperProps, telInputDialogProps,
-} from '@/components/DialogUI';
+  actionBtnStyle,
+  TablePageShell,
+  SearchField,
+  TablePager,
+  DataGridTable,
+  StatusDot,
+} from '@/components/TableUI';
+import { TableRowsSkeleton } from '@/components/LoadingUI';
+import { ConfirmDialog, FormDialogTitle, SubmitButton } from '@/components/DialogUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { DoctorAvatar, DoctorAvatarPicker } from '@/components/DoctorAvatar';
 
@@ -94,13 +104,136 @@ function toFormValues(doctor?: Doctor): FormValues {
   };
 }
 
+const money = (value: number) =>
+  `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
+
+const useStyles = makeStyles({
+  surface: {
+    maxWidth: '520px',
+    width: '100%',
+    maxHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
+  },
+  body: {
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflowY: 'auto',
+  },
+  fields: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+  grid2: {
+    display: 'grid',
+    gap: tokens.spacingHorizontalM,
+    gridTemplateColumns: '1fr 1fr',
+  },
+  sectionLabel: {
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground2,
+  },
+  switchField: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    marginTop: tokens.spacingVerticalL,
+  },
+  actionsBar: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    gap: tokens.spacingHorizontalS,
+    flexShrink: 0,
+  },
+  personCell: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+  },
+  personMeta: {
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 0,
+  },
+  name: {
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  muted: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground2,
+  },
+  statusPill: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    paddingLeft: tokens.spacingHorizontalS,
+    paddingRight: tokens.spacingHorizontalS,
+    paddingTop: '2px',
+    paddingBottom: '2px',
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  statusActive: {
+    backgroundColor: tokens.colorPaletteGreenBackground1,
+    border: `1px solid ${tokens.colorPaletteGreenBorder1}`,
+  },
+  statusInactive: {
+    backgroundColor: tokens.colorNeutralBackground3,
+  },
+  statusTextActive: {
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorPaletteGreenForeground1,
+  },
+  statusTextInactive: {
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground2,
+  },
+  actions: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalXXS,
+    justifyContent: 'flex-end',
+  },
+  errorBar: {
+    marginLeft: tokens.spacingHorizontalL,
+    marginRight: tokens.spacingHorizontalL,
+    marginBottom: tokens.spacingVerticalS,
+  },
+  deleteError: {
+    marginTop: tokens.spacingVerticalM,
+  },
+});
+
 function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolean; onClose: () => void }): React.JSX.Element {
+  const styles = useStyles();
   const queryClient = useQueryClient();
   const isEditing = Boolean(doctor);
   const schema: z.ZodType<FormValues> = isEditing ? editSchema : createSchema;
 
   const form = useForm<FormValues, unknown, FormValues>({
-    resolver: zodResolver<FormValues, unknown, FormValues>(schema as any),
+    resolver: zodResolver<FormValues, unknown, FormValues>(schema as never),
     defaultValues: emptyValues,
   });
 
@@ -120,8 +253,10 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
       };
       if (doctor) {
         const input: DoctorUpdateInput = {
-          firstName: values.firstName, lastName: values.lastName,
-          email: values.email, isActive: values.isActive,
+          firstName: values.firstName,
+          lastName: values.lastName,
+          email: values.email,
+          isActive: values.isActive,
           ...(values.password ? { password: values.password } : {}),
           ...profile,
         };
@@ -138,9 +273,6 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
       errorToast: 'Unable to save doctor.',
     },
   });
-  const handleSubmit = (values: FormValues) => {
-    mutation.mutate(values);
-  };
 
   useEffect(() => {
     if (open) {
@@ -153,92 +285,158 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
   const { errors } = form.formState;
 
   return (
-    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps} {...telInputDialogProps}>
-      <FormDialogTitle
-        title={isEditing ? 'Edit doctor' : 'Add doctor'}
-        subtitle={isEditing ? 'Update doctor profile and account.' : 'Register a new doctor account.'}
-      />
-      <Box
-        component="form"
-        onSubmit={form.handleSubmit(handleSubmit)}
-        sx={dialogFormSx}
-      >
-        <DialogContent sx={dialogContentSx}>
-          <Stack spacing={2.25} sx={{ pt: 0.5 }}>
-            {mutation.isError && <Alert severity="error">Unable to save. Please try again.</Alert>}
-
-            <Typography variant="subtitle2" color="text.secondary">Account</Typography>
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-              <TextField autoFocus fullWidth label="First name" error={Boolean(errors.firstName)} helperText={errors.firstName?.message} {...form.register('firstName')} />
-              <TextField fullWidth label="Last name" error={Boolean(errors.lastName)} helperText={errors.lastName?.message} {...form.register('lastName')} />
-            </Box>
-            <TextField fullWidth label="Email" type="email" error={Boolean(errors.email)} helperText={errors.email?.message} {...form.register('email')} />
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-              <TextField fullWidth label={isEditing ? 'New password (leave blank to keep)' : 'Password'} type={showPw ? 'text' : 'password'} error={Boolean(errors.password)} helperText={errors.password?.message} {...form.register('password')}
-                slotProps={{ input: { endAdornment: <InputAdornment position="end"><IconButton size="small" onClick={() => setShowPw(v => !v)} edge="end">{showPw ? <VisibilityOutlinedIcon fontSize="small" /> : <VisibilityOffOutlinedIcon fontSize="small" />}</IconButton></InputAdornment> } }}
-              />
-              <Controller
-                control={form.control}
-                name="isActive"
-                render={({ field }) => (
-                  <FormControlLabel sx={{ mt: 1 }} control={<Switch checked={field.value} onChange={field.onChange} />} label="Active" />
+    <Dialog
+      open={open}
+      onOpenChange={(_, data) => {
+        if (!data.open) onClose();
+      }}
+    >
+      <DialogSurface className={styles.surface}>
+        <FormDialogTitle
+          title={isEditing ? 'Edit doctor' : 'Add doctor'}
+          subtitle={isEditing ? 'Update doctor profile and account.' : 'Register a new doctor account.'}
+        />
+        <form className={styles.form} onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+          <DialogBody>
+            <DialogContent className={styles.body}>
+              <div className={styles.fields}>
+                {mutation.isError && (
+                  <MessageBar intent="error">
+                    <MessageBarBody>Unable to save. Please try again.</MessageBarBody>
+                  </MessageBar>
                 )}
-              />
-            </Box>
 
-            <Divider />
-            <Typography variant="subtitle2" color="text.secondary">Doctor Profile</Typography>
-            <DoctorAvatarPicker value={avatar} onChange={setAvatar} />
+                <Text className={styles.sectionLabel}>Account</Text>
+                <div className={styles.grid2}>
+                  <Field
+                    label="First name"
+                    validationState={errors.firstName ? 'error' : undefined}
+                    validationMessage={errors.firstName?.message}
+                  >
+                    <Input autoFocus {...form.register('firstName')} />
+                  </Field>
+                  <Field
+                    label="Last name"
+                    validationState={errors.lastName ? 'error' : undefined}
+                    validationMessage={errors.lastName?.message}
+                  >
+                    <Input {...form.register('lastName')} />
+                  </Field>
+                </div>
 
-            <TextField fullWidth label="Specialization" error={Boolean(errors.specialization)} helperText={errors.specialization?.message} {...form.register('specialization')} />
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-              <TextField fullWidth label="Qualification (e.g. MBBS, MD)" {...form.register('qualification')} />
-              <TextField
-                fullWidth
-                label="Experience (years)"
-                type="number"
-                slotProps={{ htmlInput: { min: 0, max: 60, step: 1 } }}
-                {...form.register('experienceYears', {
-                  setValueAs: (value) => (value === '' ? 0 : Number(value)),
-                })}
-              />
-            </Box>
-            <TextField
-              fullWidth
-              label="Consultation fee"
-              type="number"
-              slotProps={{
-                htmlInput: { min: 0, step: 'any' },
-                input: { startAdornment: <InputAdornment position="start">Rs.</InputAdornment> },
-              }}
-              {...form.register('consultationFee', {
-                setValueAs: (value) => (value === '' ? 0 : Number(value)),
-              })}
-            />
-            <Controller
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <PhoneInputField label="Contact phone" value={field.value ?? ''} onChange={field.onChange} />
-              )}
-            />
-            <TextField fullWidth label="Bio" multiline minRows={2} {...form.register('bio')} />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
-          <SubmitButton type="submit" loading={mutation.isPending}>
-            {isEditing ? 'Save changes' : 'Add doctor'}
-          </SubmitButton>
-        </DialogActions>
-      </Box>
+                <Field
+                  label="Email"
+                  validationState={errors.email ? 'error' : undefined}
+                  validationMessage={errors.email?.message}
+                >
+                  <Input type="email" {...form.register('email')} />
+                </Field>
+
+                <div className={styles.grid2}>
+                  <Field
+                    label={isEditing ? 'New password (leave blank to keep)' : 'Password'}
+                    validationState={errors.password ? 'error' : undefined}
+                    validationMessage={errors.password?.message}
+                  >
+                    <Input
+                      type={showPw ? 'text' : 'password'}
+                      {...form.register('password')}
+                      contentAfter={
+                        <Button
+                          appearance="transparent"
+                          size="small"
+                          icon={showPw ? <EyeOff24Regular /> : <Eye24Regular />}
+                          onClick={() => setShowPw((v) => !v)}
+                          type="button"
+                        />
+                      }
+                    />
+                  </Field>
+                  <Controller
+                    control={form.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <div className={styles.switchField}>
+                        <Switch
+                          checked={field.value}
+                          onChange={(_, data) => field.onChange(data.checked)}
+                        />
+                        <Text>Active</Text>
+                      </div>
+                    )}
+                  />
+                </div>
+
+                <Divider />
+                <Text className={styles.sectionLabel}>Doctor Profile</Text>
+                <DoctorAvatarPicker value={avatar} onChange={setAvatar} />
+
+                <Field
+                  label="Specialization"
+                  validationState={errors.specialization ? 'error' : undefined}
+                  validationMessage={errors.specialization?.message}
+                >
+                  <Input {...form.register('specialization')} />
+                </Field>
+
+                <div className={styles.grid2}>
+                  <Field label="Qualification (e.g. MBBS, MD)">
+                    <Input {...form.register('qualification')} />
+                  </Field>
+                  <Field label="Experience (years)">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={60}
+                      {...form.register('experienceYears', {
+                        setValueAs: (value) => (value === '' ? 0 : Number(value)),
+                      })}
+                    />
+                  </Field>
+                </div>
+
+                <Field label="Consultation fee">
+                  <Input
+                    type="number"
+                    min={0}
+                    contentBefore={<Text size={200}>Rs.</Text>}
+                    {...form.register('consultationFee', {
+                      setValueAs: (value) => (value === '' ? 0 : Number(value)),
+                    })}
+                  />
+                </Field>
+
+                <Controller
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <PhoneInputField label="Contact phone" value={field.value ?? ''} onChange={field.onChange} />
+                  )}
+                />
+
+                <Field label="Bio">
+                  <Textarea rows={2} {...form.register('bio')} />
+                </Field>
+              </div>
+            </DialogContent>
+          </DialogBody>
+          <DialogActions className={styles.actionsBar}>
+            <Button appearance="secondary" onClick={onClose} disabled={mutation.isPending}>
+              Cancel
+            </Button>
+            <SubmitButton type="submit" loading={mutation.isPending}>
+              {isEditing ? 'Save changes' : 'Add doctor'}
+            </SubmitButton>
+          </DialogActions>
+        </form>
+      </DialogSurface>
     </Dialog>
   );
 }
 
 export function DoctorsPage(): React.JSX.Element {
+  const styles = useStyles();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
@@ -255,10 +453,136 @@ export function DoctorsPage(): React.JSX.Element {
   });
   const deleteMutation = useMutation({
     mutationFn: (id: string) => doctorsService.delete(id),
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['doctors'] }); setDeleteDoctor(undefined); },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['doctors'] });
+      setDeleteDoctor(undefined);
+    },
     meta: { toast: 'Doctor deleted', errorToast: 'Unable to delete this doctor.' },
   });
   const doctors = doctorsQuery.data?.data ?? [];
+
+  const columns = useMemo<TableColumnDefinition<Doctor>[]>(
+    () => [
+      createTableColumn<Doctor>({
+        columnId: 'doctor',
+        compare: (a, b) => a.lastName.localeCompare(b.lastName),
+        renderHeaderCell: () => 'Doctor',
+        renderCell: (doc) => (
+          <TableCellLayout
+            media={
+              <DoctorAvatar
+                src={doc.doctorProfile?.avatar}
+                name={`Dr. ${doc.firstName} ${doc.lastName}`}
+                size={32}
+              />
+            }
+          >
+            <div className={styles.personMeta}>
+              <Text className={styles.name}>
+                Dr. {doc.firstName} {doc.lastName}
+              </Text>
+              <Text className={styles.muted}>{doc.email}</Text>
+            </div>
+          </TableCellLayout>
+        ),
+      }),
+      createTableColumn<Doctor>({
+        columnId: 'specialization',
+        compare: (a, b) =>
+          (a.doctorProfile?.specialization ?? '').localeCompare(b.doctorProfile?.specialization ?? ''),
+        renderHeaderCell: () => 'Specialization',
+        renderCell: (doc) => <Text size={300}>{doc.doctorProfile?.specialization ?? '—'}</Text>,
+      }),
+      createTableColumn<Doctor>({
+        columnId: 'qualification',
+        compare: (a, b) =>
+          (a.doctorProfile?.qualification ?? '').localeCompare(b.doctorProfile?.qualification ?? ''),
+        renderHeaderCell: () => 'Qualification',
+        renderCell: (doc) => <Text size={300}>{doc.doctorProfile?.qualification ?? '—'}</Text>,
+      }),
+      createTableColumn<Doctor>({
+        columnId: 'experience',
+        compare: (a, b) =>
+          (a.doctorProfile?.experienceYears ?? 0) - (b.doctorProfile?.experienceYears ?? 0),
+        renderHeaderCell: () => 'Experience',
+        renderCell: (doc) => (
+          <Text size={300}>
+            {doc.doctorProfile
+              ? `${doc.doctorProfile.experienceYears} yr${doc.doctorProfile.experienceYears !== 1 ? 's' : ''}`
+              : '—'}
+          </Text>
+        ),
+      }),
+      createTableColumn<Doctor>({
+        columnId: 'fee',
+        compare: (a, b) =>
+          Number(a.doctorProfile?.consultationFee ?? 0) - Number(b.doctorProfile?.consultationFee ?? 0),
+        renderHeaderCell: () => 'Fee',
+        renderCell: (doc) => (
+          <Text size={300}>{money(Number(doc.doctorProfile?.consultationFee ?? 0))}</Text>
+        ),
+      }),
+      createTableColumn<Doctor>({
+        columnId: 'status',
+        compare: (a, b) => Number(b.isActive) - Number(a.isActive),
+        renderHeaderCell: () => 'Status',
+        renderCell: (doc) => (
+          <span
+            className={`${styles.statusPill} ${doc.isActive ? styles.statusActive : styles.statusInactive}`}
+          >
+            <StatusDot active={doc.isActive} />
+            <Text className={doc.isActive ? styles.statusTextActive : styles.statusTextInactive}>
+              {doc.isActive ? 'Active' : 'Inactive'}
+            </Text>
+          </span>
+        ),
+      }),
+      createTableColumn<Doctor>({
+        columnId: 'actions',
+        renderHeaderCell: () => 'Actions',
+        renderCell: (doc) => (
+          <div className={styles.actions} onClick={(e) => e.stopPropagation()}>
+            <Tooltip content="View details" relationship="label">
+              <Button
+                appearance="subtle"
+                icon={<Open24Regular />}
+                style={actionBtnStyle}
+                onClick={() => navigate(`/doctors/${doc.id}`)}
+              />
+            </Tooltip>
+            <Tooltip content="Edit schedule" relationship="label">
+              <Button
+                appearance="subtle"
+                icon={<CalendarMonth24Regular />}
+                style={actionBtnStyle}
+                onClick={() => navigate(`/schedule?doctorId=${doc.id}`)}
+              />
+            </Tooltip>
+            <Tooltip content="Edit" relationship="label">
+              <Button
+                appearance="subtle"
+                icon={<Edit24Regular />}
+                style={actionBtnStyle}
+                onClick={() => {
+                  setDialogDoctor(doc);
+                  setDialogOpen(true);
+                }}
+              />
+            </Tooltip>
+            <Tooltip content="Delete" relationship="label">
+              <Button
+                appearance="subtle"
+                icon={<Delete24Regular />}
+                style={actionBtnStyle}
+                onClick={() => setDeleteDoctor(doc)}
+              />
+            </Tooltip>
+          </div>
+        ),
+      }),
+    ],
+    [navigate, styles],
+  );
 
   return (
     <>
@@ -266,89 +590,72 @@ export function DoctorsPage(): React.JSX.Element {
         title="Doctors"
         subtitle="Manage doctor accounts and profiles."
         action={
-          <Button onClick={() => { setDialogDoctor(undefined); setDialogOpen(true); }} startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }}>Add doctor</Button>
+          <Button
+            appearance="primary"
+            icon={<Add24Regular />}
+            onClick={() => {
+              setDialogDoctor(undefined);
+              setDialogOpen(true);
+            }}
+          >
+            Add doctor
+          </Button>
         }
-        toolbar={<SearchField value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Search by name, email, or specialization" sx={{ flex: 1, maxWidth: 360 }} />}
+        toolbar={
+          <SearchField
+            value={search}
+            onChange={(v) => {
+              setSearch(v);
+              setPage(0);
+            }}
+            placeholder="Search by name, email, or specialization"
+          />
+        }
         pager={
           (doctorsQuery.data?.total ?? 0) > rowsPerPage ? (
-            <TablePager page={page} rowsPerPage={rowsPerPage} total={doctorsQuery.data?.total ?? 0} onPageChange={setPage} />
+            <TablePager
+              page={page}
+              rowsPerPage={rowsPerPage}
+              total={doctorsQuery.data?.total ?? 0}
+              onPageChange={setPage}
+            />
           ) : undefined
         }
-        error={doctorsQuery.isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load doctors.</Alert>}
+        error={
+          doctorsQuery.isError && (
+            <MessageBar intent="error" className={styles.errorBar}>
+              <MessageBarBody>Unable to load doctors.</MessageBarBody>
+            </MessageBar>
+          )
+        }
         fetching={doctorsQuery.isFetching && !doctorsQuery.isLoading}
       >
-        <TableHead sx={tableSx.head}>
-          <TableRow>
-            <TableCell>Doctor</TableCell>
-            <TableCell>Specialization</TableCell>
-            <TableCell>Qualification</TableCell>
-            <TableCell>Experience</TableCell>
-            <TableCell>Fee</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell align="right">Actions</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {doctorsQuery.isLoading ? (
-            <TableRowsSkeleton cols={7} />
-          ) : doctors.length === 0 ? (
-            <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No doctors found.</TableCell></TableRow>
-          ) : (
-            doctors.map((doc: Doctor) => {
-              return (
-                <TableRow key={doc.id} sx={tableSx.row}>
-                  <TableCell>
-                    <Stack direction="row" alignItems="center" spacing={1.5}>
-                      <DoctorAvatar src={doc.doctorProfile?.avatar} name={`Dr. ${doc.firstName} ${doc.lastName}`} size={32} />
-                      <Box>
-                        <Typography fontSize={13.5} fontWeight={600}>Dr. {doc.firstName} {doc.lastName}</Typography>
-                        <Typography variant="caption" color="text.secondary">{doc.email}</Typography>
-                      </Box>
-                    </Stack>
-                  </TableCell>
-                  <TableCell>{doc.doctorProfile?.specialization ?? '—'}</TableCell>
-                  <TableCell>{doc.doctorProfile?.qualification ?? '—'}</TableCell>
-                  <TableCell>{doc.doctorProfile ? `${doc.doctorProfile.experienceYears} yr${doc.doctorProfile.experienceYears !== 1 ? 's' : ''}` : '—'}</TableCell>
-                  <TableCell>
-                    {`Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(doc.doctorProfile?.consultationFee ?? 0))}`}
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 0.75,
-                      px: 1,
-                      py: 0.25,
-                      borderRadius: '6px',
-                      border: '1px solid',
-                      borderColor: doc.isActive ? 'rgba(46,125,50,0.12)' : 'rgba(0,0,0,0.06)',
-                      bgcolor: doc.isActive ? 'rgba(46,125,50,0.1)' : 'rgba(0,0,0,0.06)',
-                    }}>
-                      <Box component="span" sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: doc.isActive ? 'success.main' : 'text.disabled', flexShrink: 0 }} />
-                      <Typography fontSize={12} fontWeight={600} color={doc.isActive ? 'success.dark' : 'text.secondary'}>{doc.isActive ? 'Active' : 'Inactive'}</Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" gap={0.5} justifyContent="flex-end">
-                      <Tooltip title="View details"><IconButton sx={actionBtnSx} onClick={() => navigate(`/doctors/${doc.id}`)}><OpenInNewOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                      <Tooltip title="Edit schedule"><IconButton sx={actionBtnSx} onClick={() => navigate(`/schedule?doctorId=${doc.id}`)}><CalendarMonthOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                      <Tooltip title="Edit"><IconButton sx={actionBtnSx} onClick={() => { setDialogDoctor(doc); setDialogOpen(true); }}><EditOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                      <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => setDeleteDoctor(doc)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              );
-            })
-          )}
-        </TableBody>
+        {doctorsQuery.isLoading ? (
+          <TableRowsSkeleton cols={7} />
+        ) : (
+          <DataGridTable
+            items={doctors}
+            columns={columns}
+            getRowId={(d) => d.id}
+            emptyMessage="No doctors found."
+          />
+        )}
       </TablePageShell>
+
       <DoctorDialog open={isDialogOpen} doctor={dialogDoctor} onClose={() => setDialogOpen(false)} />
+
       <ConfirmDialog
         open={Boolean(deleteDoctor)}
         title="Delete doctor?"
         message={deleteDoctor ? `Delete Dr. ${deleteDoctor.firstName} ${deleteDoctor.lastName}?` : ''}
         loading={deleteMutation.isPending}
-        error={deleteMutation.isError ? <Alert severity="error" sx={{ mt: 2 }}>Unable to delete. This doctor may have linked appointments.</Alert> : undefined}
+        error={
+          deleteMutation.isError ? (
+            <MessageBar intent="error" className={styles.deleteError}>
+              <MessageBarBody>Unable to delete. This doctor may have linked appointments.</MessageBarBody>
+            </MessageBar>
+          ) : undefined
+        }
         onClose={() => setDeleteDoctor(undefined)}
         onConfirm={() => deleteDoctor && deleteMutation.mutate(deleteDoctor.id)}
       />

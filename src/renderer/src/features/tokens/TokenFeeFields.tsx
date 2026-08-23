@@ -1,4 +1,4 @@
-import { Alert, Box, Button, InputAdornment, Stack, TextField, Typography } from '@mui/material';
+import { Button, Field, Input, MessageBar, MessageBarActions, MessageBarBody, Text, makeStyles, tokens } from '@fluentui/react-components';
 import { tokenChargedFee } from '@shared/tokenFee';
 
 function money(v: number): string {
@@ -7,6 +7,30 @@ function money(v: number): string {
     maximumFractionDigits: 2,
   }).format(Number(v) || 0);
 }
+
+const useStyles = makeStyles({
+  stack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+  stackCompact: {
+    gap: tokens.spacingVerticalS,
+  },
+  row: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalM,
+  },
+  rowCompact: {
+    flexDirection: 'column',
+  },
+  payable: {
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground2,
+  },
+});
 
 export function TokenFeeFields({
   consultationFee,
@@ -23,6 +47,7 @@ export function TokenFeeFields({
   priorVisitsThisWeek?: number;
   compact?: boolean;
 }): React.JSX.Element {
+  const styles = useStyles();
   const fee = parseFloat(consultationFee) || 0;
   const discount = Math.min(parseFloat(feeDiscount) || 0, fee);
   const payable = tokenChargedFee(fee, discount);
@@ -33,66 +58,52 @@ export function TokenFeeFields({
   }
 
   return (
-    <Stack spacing={compact ? 1 : 1.5}>
+    <div className={`${styles.stack}${compact ? ` ${styles.stackCompact}` : ''}`}>
       {followUp ? (
-        <Alert
-          severity="info"
-          sx={{
-            alignItems: 'center',
-            '& .MuiAlert-action': { flexShrink: 0, pt: 0, pl: 1.5 },
-            '& .MuiAlert-message': { pr: 1 },
-          }}
-          action={
-            fee > 0 ? (
-              <Button
-                color="inherit"
-                size="small"
-                onClick={applyHalf}
-                sx={{ whiteSpace: 'nowrap', minWidth: 'max-content', flexShrink: 0 }}
-              >
+        <MessageBar intent="info">
+          <MessageBarBody>
+            This patient already visited this doctor this week. You can apply a follow-up discount.
+          </MessageBarBody>
+          {fee > 0 ? (
+            <MessageBarActions>
+              <Button size="small" appearance="transparent" onClick={applyHalf}>
                 Half fee
               </Button>
-            ) : undefined
-          }
-        >
-          This patient already visited this doctor this week. You can apply a follow-up discount.
-        </Alert>
+            </MessageBarActions>
+          ) : null}
+        </MessageBar>
       ) : null}
-      <Stack direction={compact ? 'column' : 'row'} spacing={1.5}>
-        <TextField
-          label="Consultation fee"
-          type="number"
-          fullWidth
-          size={compact ? 'small' : 'medium'}
-          value={consultationFee}
-          onChange={(e) => onFeeChange(e.target.value)}
-          slotProps={{
-            htmlInput: { min: 0, step: 'any' },
-            input: { startAdornment: <InputAdornment position="start">Rs.</InputAdornment> },
-          }}
-        />
-        <TextField
+      <div className={`${styles.row}${compact ? ` ${styles.rowCompact}` : ''}`}>
+        <Field label="Consultation fee" style={{ flex: 1 }}>
+          <Input
+            type="number"
+            min={0}
+            value={consultationFee}
+            onChange={(_, d) => onFeeChange(d.value)}
+            contentBefore={<Text size={200}>Rs.</Text>}
+          />
+        </Field>
+        <Field
           label="Discount"
-          type="number"
-          fullWidth
-          size={compact ? 'small' : 'medium'}
-          value={feeDiscount}
-          onChange={(e) => onDiscountChange(e.target.value)}
-          helperText={followUp ? '2nd visit this week' : 'Optional follow-up discount'}
-          slotProps={{
-            htmlInput: { min: 0, max: fee, step: 'any' },
-            input: { startAdornment: <InputAdornment position="start">Rs.</InputAdornment> },
-          }}
-        />
-      </Stack>
+          hint={followUp ? '2nd visit this week' : 'Optional follow-up discount'}
+          style={{ flex: 1 }}
+        >
+          <Input
+            type="number"
+            min={0}
+            max={fee}
+            value={feeDiscount}
+            onChange={(_, d) => onDiscountChange(d.value)}
+            contentBefore={<Text size={200}>Rs.</Text>}
+          />
+        </Field>
+      </div>
       {discount > 0 ? (
-        <Box>
-          <Typography variant="caption" color="text.secondary" fontWeight={600}>
-            Payable: Rs. {money(payable)}
-            {discount > 0 ? ` (discount Rs. ${money(discount)})` : ''}
-          </Typography>
-        </Box>
+        <Text className={styles.payable}>
+          Payable: Rs. {money(payable)}
+          {discount > 0 ? ` (discount Rs. ${money(discount)})` : ''}
+        </Text>
       ) : null}
-    </Stack>
+    </div>
   );
 }

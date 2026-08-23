@@ -1,35 +1,30 @@
-import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
-import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import {
-  Alert,
-  Box,
   Button,
   Dialog,
   DialogActions,
+  DialogBody,
   DialogContent,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+  DialogSurface,
+  Dropdown,
+  Field,
+  MessageBar,
+  MessageBarBody,
+  Option,
+  Text,
+  Textarea,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  FormDialogTitle,
-  SubmitButton,
-  dialogActionsSx,
-  dialogCancelBtnSx,
-  dialogContentSx,
-  dialogPaperProps,
-} from '@/components/DialogUI';
+import { FormDialogTitle, SubmitButton } from '@/components/DialogUI';
+import { FluentDateField, formatDateIso, parseDateIso } from '@/components/FluentDateField';
 import { doctorsService } from '@/services/doctors.service';
 import { patientsService } from '@/services/patients.service';
 import { toWhatsAppNumber } from '@shared/whatsappPhone';
 import { showAppToast } from '@/components/AppToast';
 import type { Doctor } from '@/types/doctor';
 import type { Patient } from '@/types/patient';
+import { CampaignOutlinedIcon, ImageOutlinedIcon } from '@/icons/fluent';
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -73,6 +68,59 @@ async function listAllPatients(): Promise<Patient[]> {
   return all;
 }
 
+const useStyles = makeStyles({
+  surface: {
+    maxWidth: '520px',
+    width: '100%',
+    maxHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  body: {
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflowY: 'auto',
+  },
+  fields: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+  row: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+  },
+  preview: {
+    width: '100%',
+    maxHeight: '180px',
+    objectFit: 'contain',
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground2,
+  },
+  meta: {
+    color: tokens.colorNeutralForeground2,
+    fontSize: tokens.fontSizeBase200,
+  },
+  actions: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    gap: tokens.spacingHorizontalS,
+    flexShrink: 0,
+  },
+});
+
 export function WhatsAppCampaignDialog({
   open,
   onClose,
@@ -84,6 +132,7 @@ export function WhatsAppCampaignDialog({
   clinicName: string;
   enabled: boolean;
 }): React.JSX.Element {
+  const styles = useStyles();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [doctorId, setDoctorId] = useState('');
   const [date, setDate] = useState(todayStr());
@@ -104,6 +153,10 @@ export function WhatsAppCampaignDialog({
     const d = doctors.find((x) => x.id === doctorId);
     return d ? `${d.firstName} ${d.lastName}`.trim() : '';
   }, [doctors, doctorId]);
+
+  const selectedDoctorLabel = doctorId
+    ? `Dr. ${doctorName}`
+    : '— Select doctor —';
 
   useEffect(() => {
     if (!open) return;
@@ -219,108 +272,113 @@ export function WhatsAppCampaignDialog({
   }
 
   return (
-    <Dialog open={open} onClose={sending ? undefined : onClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps}>
-      <FormDialogTitle
-        title="WhatsApp campaign"
-        subtitle="Doctor visit message — all patients with a WhatsApp number."
-      />
-      <DialogContent sx={dialogContentSx}>
-        <Stack spacing={2} sx={{ mt: 0.5 }}>
-          {!enabled && <Alert severity="warning">Enable WhatsApp and save settings before sending.</Alert>}
-          {error && <Alert severity="error">{error}</Alert>}
-          {result && (
-            <Alert severity={result.failed ? 'warning' : 'success'}>
-              Sent {result.sent}, failed {result.failed}.
-              {result.errors.length > 0 ? ` ${result.errors[0]}` : ''}
-            </Alert>
-          )}
-          <FormControl fullWidth size="small" disabled={loading || sending}>
-            <InputLabel>Doctor</InputLabel>
-            <Select
-              label="Doctor"
-              value={doctorId}
-              onChange={(e) => setDoctorId(e.target.value)}
-            >
-              <MenuItem value="">— Select doctor —</MenuItem>
-              {doctors.map((d) => (
-                <MenuItem key={d.id} value={d.id}>
-                  Dr. {d.firstName} {d.lastName}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            label="Visit date"
-            type="date"
-            size="small"
-            fullWidth
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            disabled={loading || sending}
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
-          <TextField
-            label="Message"
-            size="small"
-            fullWidth
-            multiline
-            minRows={5}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            disabled={loading || sending}
-          />
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            hidden
-            onChange={(e) => void onPickImage(e.target.files?.[0])}
-          />
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Button
-              variant="outlined"
-              startIcon={<ImageOutlinedIcon />}
-              disabled={loading || sending}
-              onClick={() => fileRef.current?.click()}
-            >
-              {imageName || 'Add image'}
-            </Button>
-            {imageName && (
-              <Button size="small" onClick={clearImage} disabled={sending}>Remove</Button>
-            )}
-          </Stack>
-          {imagePreview && (
-            <Box
-              component="img"
-              src={imagePreview}
-              alt="Campaign"
-              sx={{
-                width: '100%',
-                maxHeight: 180,
-                objectFit: 'contain',
-                borderRadius: 1,
-                border: '1px solid',
-                borderColor: 'divider',
-                bgcolor: 'background.default',
-              }}
-            />
-          )}
-          <Typography variant="body2" color="text.secondary">
-            Recipients: {loading ? '…' : phones.length} patients with WhatsApp numbers
-          </Typography>
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={dialogActionsSx}>
-        <Button onClick={onClose} disabled={sending} sx={dialogCancelBtnSx}>Close</Button>
-        <SubmitButton
-          loading={sending}
-          disabled={!enabled || loading || !text.trim() || phones.length === 0}
-          onClick={() => void handleSend()}
-          startIcon={<CampaignOutlinedIcon />}
-        >
-          Send campaign
-        </SubmitButton>
-      </DialogActions>
+    <Dialog
+      open={open}
+      onOpenChange={(_, data) => {
+        if (!data.open && !sending) onClose();
+      }}
+    >
+      <DialogSurface className={styles.surface}>
+        <FormDialogTitle
+          title="WhatsApp campaign"
+          subtitle="Doctor visit message — all patients with a WhatsApp number."
+        />
+        <DialogBody>
+          <DialogContent className={styles.body}>
+            <div className={styles.fields}>
+              {!enabled && (
+                <MessageBar intent="warning">
+                  <MessageBarBody>Enable WhatsApp and save settings before sending.</MessageBarBody>
+                </MessageBar>
+              )}
+              {error && (
+                <MessageBar intent="error">
+                  <MessageBarBody>{error}</MessageBarBody>
+                </MessageBar>
+              )}
+              {result && (
+                <MessageBar intent={result.failed ? 'warning' : 'success'}>
+                  <MessageBarBody>
+                    Sent {result.sent}, failed {result.failed}.
+                    {result.errors.length > 0 ? ` ${result.errors[0]}` : ''}
+                  </MessageBarBody>
+                </MessageBar>
+              )}
+              <Field label="Doctor">
+                <Dropdown
+                  placeholder="— Select doctor —"
+                  value={selectedDoctorLabel}
+                  selectedOptions={doctorId ? [doctorId] : ['']}
+                  disabled={loading || sending}
+                  onOptionSelect={(_, data) => setDoctorId(data.optionValue ?? '')}
+                >
+                  <Option value="" text="— Select doctor —">— Select doctor —</Option>
+                  {doctors.map((d) => (
+                    <Option key={d.id} value={d.id} text={`Dr. ${d.firstName} ${d.lastName}`}>
+                      Dr. {d.firstName} {d.lastName}
+                    </Option>
+                  ))}
+                </Dropdown>
+              </Field>
+              <FluentDateField
+                label="Visit date"
+                value={parseDateIso(date)}
+                onSelectDate={(d) => setDate(formatDateIso(d) || todayStr())}
+                disabled={loading || sending}
+              />
+              <Field label="Message">
+                <Textarea
+                  rows={5}
+                  value={text}
+                  onChange={(_, d) => setText(d.value)}
+                  disabled={loading || sending}
+                />
+              </Field>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                hidden
+                onChange={(e) => void onPickImage(e.target.files?.[0])}
+              />
+              <div className={styles.row}>
+                <Button
+                  appearance="outline"
+                  icon={<ImageOutlinedIcon />}
+                  disabled={loading || sending}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  {imageName || 'Add image'}
+                </Button>
+                {imageName && (
+                  <Button appearance="subtle" size="small" onClick={clearImage} disabled={sending}>
+                    Remove
+                  </Button>
+                )}
+              </div>
+              {imagePreview && (
+                <img className={styles.preview} src={imagePreview} alt="Campaign" />
+              )}
+              <Text className={styles.meta}>
+                Recipients: {loading ? '…' : phones.length} patients with WhatsApp numbers
+              </Text>
+            </div>
+          </DialogContent>
+        </DialogBody>
+        <DialogActions className={styles.actions}>
+          <Button appearance="secondary" onClick={onClose} disabled={sending}>
+            Close
+          </Button>
+          <SubmitButton
+            loading={sending}
+            disabled={!enabled || loading || !text.trim() || phones.length === 0}
+            onClick={() => void handleSend()}
+            icon={<CampaignOutlinedIcon />}
+          >
+            Send campaign
+          </SubmitButton>
+        </DialogActions>
+      </DialogSurface>
     </Dialog>
   );
 }

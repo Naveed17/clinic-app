@@ -1,65 +1,164 @@
-import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
-import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
-import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import ReceiptOutlinedIcon from '@mui/icons-material/ReceiptOutlined';
-import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
 import {
-  Box,
-  Chip,
-  CircularProgress,
+  Badge,
   Dialog,
-  Divider,
-  InputAdornment,
-  List,
-  ListItemButton,
-  ListItemText,
-  TextField,
-  Typography,
-} from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  Input,
+  Spinner,
+  Text,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { GlobalSearchResult } from '@/types/search';
 import { getSearchScope, searchPlaceholder } from '@shared/searchAccess';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { useAuth } from '@/features/auth/AuthContext';
+import {
+  BiotechOutlinedIcon,
+  CalendarMonthOutlinedIcon,
+  PersonOutlinedIcon,
+  ReceiptOutlinedIcon,
+  SearchOutlinedIcon,
+} from '@/icons/fluent';
 
 interface Props {
   open: boolean;
   onClose: () => void;
 }
 
-const STATUS_COLORS: Record<string, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
-  SCHEDULED: 'info',
-  CHECKED_IN: 'warning',
-  COMPLETED: 'success',
-  CANCELLED: 'error',
-  NO_SHOW: 'error',
-  DRAFT: 'default',
-  ISSUED: 'info',
-  PARTIALLY_PAID: 'warning',
-  PAID: 'success',
-  REFUNDED: 'error',
-  VOID: 'error',
-  PENDING: 'info',
-  IN_PROGRESS: 'warning',
+const STATUS_APPEARANCE: Record<string, 'filled' | 'tint' | 'outline' | 'ghost'> = {
+  SCHEDULED: 'tint',
+  CHECKED_IN: 'tint',
+  COMPLETED: 'filled',
+  CANCELLED: 'outline',
+  NO_SHOW: 'outline',
+  DRAFT: 'ghost',
+  ISSUED: 'tint',
+  PARTIALLY_PAID: 'tint',
+  PAID: 'filled',
+  REFUNDED: 'outline',
+  VOID: 'outline',
+  PENDING: 'tint',
+  IN_PROGRESS: 'tint',
 };
 
-function SectionHeader({ icon, label, count }: { icon: React.ReactNode; label: string; count: number }) {
-  const theme = useTheme();
+const useStyles = makeStyles({
+  surface: {
+    maxWidth: '560px',
+    width: '100%',
+    marginTop: '8vh',
+    overflow: 'hidden',
+  },
+  searchPad: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalS,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+  },
+  divider: {
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  empty: {
+    paddingTop: '40px',
+    paddingBottom: '40px',
+    textAlign: 'center',
+    color: tokens.colorNeutralForeground3,
+  },
+  hint: {
+    marginTop: tokens.spacingVerticalXXS,
+    display: 'block',
+    color: tokens.colorNeutralForeground3,
+  },
+  results: {
+    maxHeight: '480px',
+    overflowY: 'auto',
+  },
+  section: {
+    paddingTop: tokens.spacingVerticalXS,
+    paddingBottom: tokens.spacingVerticalXS,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    backgroundColor: tokens.colorNeutralBackground3,
+  },
+  sectionLabel: {
+    textTransform: 'uppercase',
+    letterSpacing: '0.8px',
+    fontWeight: tokens.fontWeightBold,
+    color: tokens.colorNeutralForeground2,
+    fontSize: tokens.fontSizeBase100,
+  },
+  count: {
+    marginLeft: 'auto',
+  },
+  item: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    width: '100%',
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    border: 'none',
+    background: 'transparent',
+    cursor: 'pointer',
+    textAlign: 'left',
+    font: 'inherit',
+    color: 'inherit',
+    ':hover': {
+      backgroundColor: tokens.colorNeutralBackground1Hover,
+    },
+  },
+  mr: {
+    fontWeight: tokens.fontWeightBold,
+    fontSize: tokens.fontSizeBase200,
+    flexShrink: 0,
+  },
+  meta: {
+    flex: 1,
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  primary: {
+    fontWeight: tokens.fontWeightSemibold,
+    fontSize: tokens.fontSizeBase300,
+  },
+  secondary: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground2,
+  },
+});
+
+function SectionHeader({
+  icon,
+  label,
+  count,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+}) {
+  const styles = useStyles();
   return (
-    <Box sx={{ px: 2, py: 0.75, display: 'flex', alignItems: 'center', gap: 1, bgcolor: alpha(theme.palette.text.primary, 0.03) }}>
-      <Box sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center' }}>{icon}</Box>
-      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
-        {label}
-      </Typography>
-      <Chip label={count} size="small" sx={{ height: 16, fontSize: 10, ml: 'auto' }} />
-    </Box>
+    <div className={styles.section}>
+      <span style={{ display: 'flex', color: 'var(--colorNeutralForeground2)' }}>{icon}</span>
+      <Text className={styles.sectionLabel}>{label}</Text>
+      <Badge className={styles.count} size="small" appearance="tint">
+        {count}
+      </Badge>
+    </div>
   );
 }
 
 export function GlobalSearchModal({ open, onClose }: Props) {
-  const theme = useTheme();
+  const styles = useStyles();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { modules } = useLicense();
@@ -84,17 +183,26 @@ export function GlobalSearchModal({ open, onClose }: Props) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query || query.trim().length < 2) { setResults(null); setLoading(false); return; }
+    if (!query || query.trim().length < 2) {
+      setResults(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     debounceRef.current = setTimeout(async () => {
       try {
-        const data = await window.clinic.search.global(query.trim(), user?.role) as GlobalSearchResult;
+        const data = (await window.clinic.search.global(
+          query.trim(),
+          user?.role,
+        )) as GlobalSearchResult;
         setResults(data);
       } finally {
         setLoading(false);
       }
     }, 300);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [query, user?.role]);
 
   function go(path: string) {
@@ -102,170 +210,213 @@ export function GlobalSearchModal({ open, onClose }: Props) {
     navigate(path);
   }
 
-  const hasResults = results && (
+  const hasResults =
+    results &&
     (canPatients ? results.patients.length : 0) +
-    (canAppointments ? results.appointments.length : 0) +
-    (canBilling ? results.invoices.length : 0) +
-    (canLab ? results.labOrders.length : 0) > 0
-  );
+      (canAppointments ? results.appointments.length : 0) +
+      (canBilling ? results.invoices.length : 0) +
+      (canLab ? results.labOrders.length : 0) >
+      0;
 
   return (
     <Dialog
       open={open}
-      onClose={onClose}
-      fullWidth
-      maxWidth="sm"
-      slotProps={{ paper: { sx: { borderRadius: 1, overflow: 'hidden', mt: '8vh', verticalAlign: 'top' } } }}
+      onOpenChange={(_, data) => {
+        if (!data.open) onClose();
+      }}
     >
-      <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
-        <TextField
-          inputRef={inputRef}
-          fullWidth
-          placeholder={searchPlaceholder(scope)}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          variant="standard"
-          slotProps={{
-            input: {
-              disableUnderline: true,
-              startAdornment: (
-                <InputAdornment position="start">
-                  {loading
-                    ? <CircularProgress size={18} sx={{ color: 'text.secondary' }} />
-                    : <SearchOutlinedIcon sx={{ color: 'text.secondary' }} />}
-                </InputAdornment>
-              ),
-            },
-          }}
-          sx={{ '& input': { fontSize: 16, py: 0.5 } }}
-        />
-      </Box>
-      <Divider />
+      <DialogSurface className={styles.surface}>
+        <DialogBody>
+          <DialogContent>
+            <div className={styles.searchPad}>
+              <Input
+                ref={inputRef}
+                appearance="underline"
+                placeholder={searchPlaceholder(scope)}
+                value={query}
+                onChange={(_, d) => setQuery(d.value)}
+                contentBefore={
+                  loading ? (
+                    <Spinner size="tiny" />
+                  ) : (
+                    <SearchOutlinedIcon style={{ color: 'currentColor' }} />
+                  )
+                }
+                style={{ fontSize: 16 }}
+              />
+            </div>
+            <div className={styles.divider} />
 
-      {/* Empty state */}
-      {!query && (
-        <Box sx={{ py: 5, textAlign: 'center' }}>
-          <Typography variant="body2" color="text.disabled">
-            Type to search across all records…
-          </Typography>
-          <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: 'block' }}>
-            Ctrl+K to open · Esc to close
-          </Typography>
-        </Box>
-      )}
+            {!query && (
+              <div className={styles.empty}>
+                <Text>Type to search across all records…</Text>
+                <Text className={styles.hint} size={200}>
+                  Ctrl+K to open · Esc to close
+                </Text>
+              </div>
+            )}
 
-      {/* No results */}
-      {query.trim().length >= 2 && !loading && results && !hasResults && (
-        <Box sx={{ py: 5, textAlign: 'center' }}>
-          <Typography variant="body2" color="text.disabled">No results found for "{query}"</Typography>
-        </Box>
-      )}
+            {query.trim().length >= 2 && !loading && results && !hasResults && (
+              <div className={styles.empty}>
+                <Text>No results found for &quot;{query}&quot;</Text>
+              </div>
+            )}
 
-      {/* Results */}
-      {hasResults && (
-        <Box sx={{ maxHeight: 480, overflowY: 'auto', '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 } }}>
+            {hasResults && (
+              <div className={styles.results}>
+                {canPatients && results!.patients.length > 0 && (
+                  <>
+                    <SectionHeader
+                      icon={<PersonOutlinedIcon style={{ fontSize: 18 }} />}
+                      label="Patients"
+                      count={results!.patients.length}
+                    />
+                    {results!.patients.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className={styles.item}
+                        onClick={() => go(`/patients/${p.id}`)}
+                      >
+                        <Badge appearance="tint" className={styles.mr}>
+                          {p.mrNumber}
+                        </Badge>
+                        <span className={styles.meta}>
+                          <Text className={styles.primary}>
+                            {p.firstName} {p.lastName}
+                          </Text>
+                          <Text className={styles.secondary}>
+                            {[p.phone, p.email, p.bloodGroup ? `Blood: ${p.bloodGroup}` : null]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </Text>
+                        </span>
+                      </button>
+                    ))}
+                  </>
+                )}
 
-          {/* Patients */}
-          {canPatients && results!.patients.length > 0 && (
-            <>
-              <SectionHeader icon={<PersonOutlinedIcon fontSize="small" />} label="Patients" count={results!.patients.length} />
-              <List dense disablePadding>
-                {results!.patients.map((p) => (
-                  <ListItemButton key={p.id} onClick={() => go(`/patients/${p.id}`)} sx={{ px: 2, py: 0.75 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
-                      <Chip
-                        label={p.mrNumber}
-                        size="small"
-                        sx={{ fontWeight: 700, fontSize: 11, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', flexShrink: 0 }}
-                      />
-                      <ListItemText
-                        primary={`${p.firstName} ${p.lastName}`}
-                        secondary={[p.phone, p.email, p.bloodGroup ? `Blood: ${p.bloodGroup}` : null].filter(Boolean).join(' · ')}
-                        slotProps={{ primary: { fontWeight: 600, fontSize: '0.875rem' }, secondary: { fontSize: '0.75rem' } }}
-                      />
-                    </Box>
-                  </ListItemButton>
-                ))}
-              </List>
-            </>
-          )}
+                {canAppointments && results!.appointments.length > 0 && (
+                  <>
+                    <div className={styles.divider} />
+                    <SectionHeader
+                      icon={<CalendarMonthOutlinedIcon style={{ fontSize: 18 }} />}
+                      label="Appointments"
+                      count={results!.appointments.length}
+                    />
+                    {results!.appointments.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        className={styles.item}
+                        onClick={() => go(`/appointments/${a.id}`)}
+                      >
+                        <Badge appearance="tint" className={styles.mr}>
+                          {a.patientMrNumber}
+                        </Badge>
+                        <span className={styles.meta}>
+                          <Text className={styles.primary}>{a.patientName}</Text>
+                          <Text className={styles.secondary}>
+                            {a.reason ?? 'No reason'} · Dr. {a.providerName} ·{' '}
+                            {new Date(a.startsAt).toLocaleDateString()}
+                          </Text>
+                        </span>
+                        <Badge
+                          size="small"
+                          appearance={STATUS_APPEARANCE[a.status] ?? 'outline'}
+                        >
+                          {a.status}
+                        </Badge>
+                      </button>
+                    ))}
+                  </>
+                )}
 
-          {/* Appointments */}
-          {canAppointments && results!.appointments.length > 0 && (
-            <>
-              <Divider />
-              <SectionHeader icon={<CalendarMonthOutlinedIcon fontSize="small" />} label="Appointments" count={results!.appointments.length} />
-              <List dense disablePadding>
-                {results!.appointments.map((a) => (
-                  <ListItemButton key={a.id} onClick={() => go(`/appointments/${a.id}`)} sx={{ px: 2, py: 0.75 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
-                      <Chip label={a.patientMrNumber} size="small" sx={{ fontWeight: 700, fontSize: 11, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', flexShrink: 0 }} />
-                      <ListItemText
-                        primary={a.patientName}
-                        secondary={`${a.reason ?? 'No reason'} · Dr. ${a.providerName} · ${new Date(a.startsAt).toLocaleDateString()}`}
-                        slotProps={{ primary: { fontWeight: 600, fontSize: '0.875rem' }, secondary: { fontSize: '0.75rem' } }}
-                      />
-                      <Chip label={a.status} size="small" color={STATUS_COLORS[a.status] ?? 'default'} sx={{ fontSize: 10, flexShrink: 0 }} />
-                    </Box>
-                  </ListItemButton>
-                ))}
-              </List>
-            </>
-          )}
+                {canBilling && results!.invoices.length > 0 && (
+                  <>
+                    <div className={styles.divider} />
+                    <SectionHeader
+                      icon={<ReceiptOutlinedIcon style={{ fontSize: 18 }} />}
+                      label="Invoices"
+                      count={results!.invoices.length}
+                    />
+                    {results!.invoices.map((inv) => (
+                      <button
+                        key={inv.id}
+                        type="button"
+                        className={styles.item}
+                        onClick={() => go(`/billing/${inv.id}`)}
+                      >
+                        <Badge appearance="tint" className={styles.mr}>
+                          {inv.patientMrNumber}
+                        </Badge>
+                        <span className={styles.meta}>
+                          <Text className={styles.primary}>
+                            {inv.invoiceNumber} · {inv.patientName}
+                          </Text>
+                          <Text className={styles.secondary}>
+                            Total: Rs. {inv.total.toLocaleString()} · Paid: Rs.{' '}
+                            {inv.amountPaid.toLocaleString()}
+                          </Text>
+                        </span>
+                        <Badge
+                          size="small"
+                          appearance={STATUS_APPEARANCE[inv.status] ?? 'outline'}
+                        >
+                          {inv.status}
+                        </Badge>
+                      </button>
+                    ))}
+                  </>
+                )}
 
-          {/* Invoices */}
-          {canBilling && results!.invoices.length > 0 && (
-            <>
-              <Divider />
-              <SectionHeader icon={<ReceiptOutlinedIcon fontSize="small" />} label="Invoices" count={results!.invoices.length} />
-              <List dense disablePadding>
-                {results!.invoices.map((inv) => (
-                  <ListItemButton key={inv.id} onClick={() => go(`/billing/${inv.id}`)} sx={{ px: 2, py: 0.75 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
-                      <Chip label={inv.patientMrNumber} size="small" sx={{ fontWeight: 700, fontSize: 11, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', flexShrink: 0 }} />
-                      <ListItemText
-                        primary={`${inv.invoiceNumber} · ${inv.patientName}`}
-                        secondary={`Total: Rs. ${inv.total.toLocaleString()} · Paid: Rs. ${inv.amountPaid.toLocaleString()}`}
-                        slotProps={{ primary: { fontWeight: 600, fontSize: '0.875rem' }, secondary: { fontSize: '0.75rem' } }}
-                      />
-                      <Chip label={inv.status} size="small" color={STATUS_COLORS[inv.status] ?? 'default'} sx={{ fontSize: 10, flexShrink: 0 }} />
-                    </Box>
-                  </ListItemButton>
-                ))}
-              </List>
-            </>
-          )}
-
-          {/* Lab Orders */}
-          {canLab && results!.labOrders.length > 0 && (
-            <>
-              <Divider />
-              <SectionHeader icon={<BiotechOutlinedIcon fontSize="small" />} label="Lab Orders" count={results!.labOrders.length} />
-              <List dense disablePadding>
-                {results!.labOrders.map((l) => (
-                  <ListItemButton
-                    key={l.id}
-                    onClick={() =>
-                      go(user?.role === 'lab_technician' ? `/lab/${l.id}` : `/patients/${l.patientId}`)
-                    }
-                    sx={{ px: 2, py: 0.75 }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
-                      <Chip label={l.patientMrNumber} size="small" sx={{ fontWeight: 700, fontSize: 11, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', flexShrink: 0 }} />
-                      <ListItemText
-                        primary={`${l.test} · ${l.patientName}`}
-                        secondary={new Date(l.orderedAt).toLocaleDateString()}
-                        slotProps={{ primary: { fontWeight: 600, fontSize: '0.875rem' }, secondary: { fontSize: '0.75rem' } }}
-                      />
-                      <Chip label={l.status} size="small" color={STATUS_COLORS[l.status] ?? 'default'} sx={{ fontSize: 10, flexShrink: 0 }} />
-                    </Box>
-                  </ListItemButton>
-                ))}
-              </List>
-            </>
-          )}
-        </Box>
-      )}
+                {canLab && results!.labOrders.length > 0 && (
+                  <>
+                    <div className={styles.divider} />
+                    <SectionHeader
+                      icon={<BiotechOutlinedIcon style={{ fontSize: 18 }} />}
+                      label="Lab Orders"
+                      count={results!.labOrders.length}
+                    />
+                    {results!.labOrders.map((l) => (
+                      <button
+                        key={l.id}
+                        type="button"
+                        className={styles.item}
+                        onClick={() =>
+                          go(
+                            user?.role === 'lab_technician'
+                              ? `/lab/${l.id}`
+                              : `/patients/${l.patientId}`,
+                          )
+                        }
+                      >
+                        <Badge appearance="tint" className={styles.mr}>
+                          {l.patientMrNumber}
+                        </Badge>
+                        <span className={styles.meta}>
+                          <Text className={styles.primary}>
+                            {l.test} · {l.patientName}
+                          </Text>
+                          <Text className={styles.secondary}>
+                            {new Date(l.orderedAt).toLocaleDateString()}
+                          </Text>
+                        </span>
+                        <Badge
+                          size="small"
+                          appearance={STATUS_APPEARANCE[l.status] ?? 'outline'}
+                        >
+                          {l.status}
+                        </Badge>
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </DialogBody>
+      </DialogSurface>
     </Dialog>
   );
 }

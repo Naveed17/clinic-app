@@ -1,6 +1,5 @@
-import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
-import ErrorRoundedIcon from '@mui/icons-material/ErrorRounded';
-import { Box, Fade, Typography } from '@mui/material';
+import { makeStyles, Text, tokens } from '@fluentui/react-components';
+import { CheckmarkCircle24Filled, ErrorCircle24Filled } from '@fluentui/react-icons';
 import { useEffect, useState } from 'react';
 
 export type AppToastType = 'success' | 'error';
@@ -22,7 +21,45 @@ export function showAppToast(input: ShowInput): void {
   pushToast?.(input);
 }
 
+const useStyles = makeStyles({
+  host: {
+    position: 'fixed',
+    left: '50%',
+    bottom: '28px',
+    transform: 'translateX(-50%)',
+    zIndex: 14000,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: tokens.spacingVerticalS,
+    pointerEvents: 'none',
+  },
+  toast: {
+    pointerEvents: 'auto',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalL,
+    paddingTop: '7px',
+    paddingBottom: '7px',
+    backgroundColor: '#111827',
+    color: '#fff',
+    borderRadius: '999px',
+    boxShadow: '0 10px 32px rgba(15, 23, 42, 0.35)',
+    maxWidth: 'min(92vw, 420px)',
+  },
+  message: {
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '-0.01em',
+    color: '#fff',
+    lineHeight: tokens.lineHeightBase300,
+  },
+});
+
 export function AppToastHost(): React.JSX.Element {
+  const styles = useStyles();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   useEffect(() => {
@@ -39,57 +76,17 @@ export function AppToastHost(): React.JSX.Element {
   }, []);
 
   return (
-    <Box
-      sx={{
-        position: 'fixed',
-        left: '50%',
-        bottom: 28,
-        transform: 'translateX(-50%)',
-        zIndex: 14000,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 1,
-        pointerEvents: 'none',
-      }}
-    >
+    <div className={styles.host}>
       {toasts.map((toast) => (
-        <Fade key={toast.id} in>
-          <Box
-            sx={{
-              pointerEvents: 'auto',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 1,
-              pl: 1.25,
-              pr: 2,
-              py: 0.85,
-              bgcolor: '#111827',
-              color: '#fff',
-              borderRadius: 999,
-              boxShadow: '0 10px 32px rgba(15, 23, 42, 0.35)',
-              maxWidth: 'min(92vw, 420px)',
-            }}
-          >
-            {toast.type === 'success' ? (
-              <CheckCircleRoundedIcon sx={{ fontSize: 18, color: '#4ade80' }} />
-            ) : (
-              <ErrorRoundedIcon sx={{ fontSize: 18, color: '#f87171' }} />
-            )}
-            <Typography
-              sx={{
-                fontSize: 13.5,
-                fontWeight: 600,
-                letterSpacing: '-0.01em',
-                color: '#fff',
-                lineHeight: 1.3,
-              }}
-            >
-              {toast.message}
-            </Typography>
-          </Box>
-        </Fade>
+        <div key={toast.id} className={styles.toast}>
+          {toast.type === 'success' ? (
+            <CheckmarkCircle24Filled style={{ color: '#4ade80', fontSize: 18 }} />
+          ) : (
+            <ErrorCircle24Filled style={{ color: '#f87171', fontSize: 18 }} />
+          )}
+          <Text className={styles.message}>{toast.message}</Text>
+        </div>
       ))}
-    </Box>
+    </div>
   );
 }

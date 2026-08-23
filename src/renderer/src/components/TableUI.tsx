@@ -1,120 +1,181 @@
 import {
-  Box,
+  Badge,
   Button,
-  InputAdornment,
-  LinearProgress,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
-  Typography,
-  type SxProps,
-  type Theme,
-} from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { alpha } from '@mui/material/styles';
-import type { ReactNode } from 'react';
+  DataGrid,
+  DataGridBody,
+  DataGridCell,
+  DataGridHeader,
+  DataGridHeaderCell,
+  DataGridRow,
+  Input,
+  Spinner,
+  Text,
+  Title3,
+  createTableColumn,
+  makeStyles,
+  tokens,
+  type BadgeProps,
+  type TableColumnDefinition,
+} from '@fluentui/react-components';
+import { Search24Regular, ChevronLeft24Regular, ChevronRight24Regular } from '@fluentui/react-icons';
+import type { CSSProperties, ReactNode } from 'react';
 
-export const softCardSx: SxProps<Theme> = {
-  borderRadius: '20px',
-  border: '1px solid',
-  borderColor: 'divider',
-  boxShadow: (theme) => `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,
-};
+export { createTableColumn };
+export type { TableColumnDefinition };
 
-export const tableSx = {
-  head: {
-    '& .MuiTableCell-head': {
-      fontSize: 10.5,
-      fontWeight: 800,
-      color: 'text.secondary',
-      textTransform: 'uppercase',
-      letterSpacing: '0.06em',
-      py: 1.75,
-      px: 2.25,
-      borderBottom: '1px solid',
-      borderColor: 'divider',
-      bgcolor: (theme: Theme) => alpha(theme.palette.primary.main, 0.05),
-      whiteSpace: 'nowrap',
-    },
+const useStyles = makeStyles({
+  page: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalL,
+  },
+  header: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalL,
+    flexWrap: 'wrap',
+  },
+  titles: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+  },
+  subtitle: {
+    color: tokens.colorNeutralForeground2,
+  },
+  card: {
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusXLarge,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow4,
+  },
+  fetchSpinner: {
+    position: 'absolute',
+    top: tokens.spacingVerticalS,
+    right: tokens.spacingHorizontalM,
+    zIndex: 2,
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    paddingTop: tokens.spacingVerticalXXS,
+    paddingBottom: tokens.spacingVerticalXXS,
+    paddingLeft: tokens.spacingHorizontalS,
+    paddingRight: tokens.spacingHorizontalS,
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow4,
+  },
+  toolbar: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground2,
+  },
+  gridWrap: {
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalM,
+    maxHeight: 'calc(100vh - 280px)',
+    overflowY: 'auto',
+  },
+  grid: {
+    minWidth: '100%',
+  },
+  headerCell: {
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightBold,
+    color: tokens.colorNeutralForeground2,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalM,
+  },
+  cell: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalM,
+    fontSize: tokens.fontSizeBase300,
   },
   row: {
-    cursor: 'default',
-    '& .MuiTableCell-body': {
-      fontSize: 13,
-      py: 1.35,
-      px: 2.25,
-      border: 'none',
-      color: 'text.primary',
-      bgcolor: (theme: Theme) => alpha(theme.palette.primary.main, 0.02),
-      transition: 'background 0.15s, border-color 0.15s',
-    },
-    '& .MuiTableCell-body:first-of-type': {
-      borderTopLeftRadius: 4,
-      borderBottomLeftRadius: 4,
-      borderLeft: '3px solid',
-      borderLeftColor: 'transparent',
-    },
-    '& .MuiTableCell-body:last-of-type': {
-      borderTopRightRadius: 4,
-      borderBottomRightRadius: 4,
-    },
-    '&:hover .MuiTableCell-body': {
-      bgcolor: (theme: Theme) => alpha(theme.palette.primary.main, 0.06),
-    },
-    '&:hover .MuiTableCell-body:first-of-type': {
-      borderLeftColor: 'primary.main',
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    transitionProperty: 'background-color',
+    transitionDuration: tokens.durationNormal,
+    ':hover': {
+      backgroundColor: tokens.colorNeutralBackground1Hover,
     },
   },
-} satisfies Record<string, SxProps<Theme>>;
+  pagerBar: {
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground2,
+  },
+  pager: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+  },
+  pagerMeta: {
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground2,
+  },
+  pagerTotal: {
+    marginLeft: tokens.spacingHorizontalS,
+    fontWeight: tokens.fontWeightRegular,
+    color: tokens.colorNeutralForeground3,
+  },
+  pagerActions: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalS,
+  },
+  search: {
+    minWidth: '220px',
+    maxWidth: '360px',
+    flexGrow: 1,
+  },
+  empty: {
+    paddingTop: tokens.spacingVerticalXXL,
+    paddingBottom: tokens.spacingVerticalXXL,
+    textAlign: 'center',
+    color: tokens.colorNeutralForeground2,
+    fontSize: tokens.fontSizeBase300,
+  },
+  statusDot: {
+    display: 'inline-block',
+    width: '7px',
+    height: '7px',
+    borderRadius: '50%',
+    marginRight: '6px',
+    verticalAlign: 'middle',
+    flexShrink: 0,
+  },
+});
 
-export const chipSx = {
-  borderRadius: 1,
-  fontWeight: 700,
-  fontSize: 11,
-  height: 22,
-  border: 'none',
-  '& .MuiChip-label': { px: 1 },
-};
-
-export function StatusDot({ active = true }: { active?: boolean }): React.JSX.Element {
-  return (
-    <Box
-      component="span"
-      sx={{
-        display: 'inline-block',
-        width: 7,
-        height: 7,
-        borderRadius: '50%',
-        bgcolor: active ? 'success.main' : 'text.disabled',
-        mr: 0.75,
-        verticalAlign: 'middle',
-        mb: '1px',
-        flexShrink: 0,
-      }}
-    />
-  );
-}
-
-export const actionBtnSx = {
+export const actionBtnStyle: CSSProperties = {
+  minWidth: 32,
   width: 32,
   height: 32,
-  borderRadius: 1,
-  color: 'text.secondary',
-  border: '1px solid',
-  borderColor: 'divider',
-  '&:hover': {
-    bgcolor: (theme: Theme) => alpha(theme.palette.primary.main, 0.08),
-    color: 'primary.main',
-    borderColor: (theme: Theme) => alpha(theme.palette.primary.main, 0.25),
-  },
 };
+
+/** @deprecated MUI-era alias — prefer `actionBtnStyle`. */
+export const actionBtnSx = actionBtnStyle;
 
 interface TablePageShellProps {
   title: string;
@@ -125,57 +186,43 @@ interface TablePageShellProps {
   error?: ReactNode;
   pager?: ReactNode;
   fetching?: boolean;
-  sx?: SxProps<Theme>;
+  className?: string;
 }
 
-export function TablePageShell({ title, subtitle, action, toolbar, children, error, pager, fetching, sx }: TablePageShellProps): React.JSX.Element {
+export function TablePageShell({
+  title,
+  subtitle,
+  action,
+  toolbar,
+  children,
+  error,
+  pager,
+  fetching,
+  className,
+}: TablePageShellProps): React.JSX.Element {
+  const styles = useStyles();
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, ...sx }}>
-      <Box sx={{ display: 'flex', alignItems: { sm: 'flex-end' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between' }}>
-        <Box>
-          <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em' }}>
-            {title}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {subtitle}
-          </Typography>
-        </Box>
+    <div className={`${styles.page}${className ? ` ${className}` : ''}`}>
+      <div className={styles.header}>
+        <div className={styles.titles}>
+          <Title3>{title}</Title3>
+          <Text className={styles.subtitle}>{subtitle}</Text>
+        </div>
         {action}
-      </Box>
+      </div>
 
-      <Paper elevation={0} sx={{ ...softCardSx, overflow: 'hidden', bgcolor: 'background.paper', position: 'relative' }}>
+      <div className={styles.card}>
         {fetching ? (
-          <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, zIndex: 2 }} />
+          <div className={styles.fetchSpinner} aria-live="polite">
+            <Spinner size="tiny" label="Loading…" labelPosition="after" />
+          </div>
         ) : null}
-        {toolbar && (
-          <Box sx={{
-            px: 2.5,
-            pt: 2,
-            pb: 1.75,
-            display: 'flex',
-            gap: 1.5,
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            borderBottom: '1px solid',
-            borderBottomColor: 'divider',
-            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.02),
-          }}>
-            {toolbar}
-          </Box>
-        )}
+        {toolbar ? <div className={styles.toolbar}>{toolbar}</div> : null}
         {error}
-        <TableContainer sx={{ px: 2, py: 1.5, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
-          <Table stickyHeader sx={{ borderCollapse: 'separate', borderSpacing: '0 6px', '& tbody tr:last-child td': { borderBottom: 0 } }}>
-            {children}
-          </Table>
-        </TableContainer>
-        {pager && (
-          <Box sx={{ borderTop: '1px solid', borderTopColor: 'divider', bgcolor: (theme) => alpha(theme.palette.primary.main, 0.02) }}>
-            {pager}
-          </Box>
-        )}
-      </Paper>
-    </Box>
+        <div className={styles.gridWrap}>{children}</div>
+        {pager ? <div className={styles.pagerBar}>{pager}</div> : null}
+      </div>
+    </div>
   );
 }
 
@@ -183,37 +230,26 @@ interface SearchFieldProps {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
-  sx?: SxProps<Theme>;
+  className?: string;
 }
 
-export function SearchField({ value, onChange, placeholder = 'Search...', sx }: SearchFieldProps): React.JSX.Element {
+export function SearchField({
+  value,
+  onChange,
+  placeholder = 'Search...',
+  className,
+}: SearchFieldProps): React.JSX.Element {
+  const styles = useStyles();
   return (
-    <TextField
-      size="small"
+    <Input
+      className={`${styles.search}${className ? ` ${className}` : ''}`}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(_, data) => onChange(data.value)}
       placeholder={placeholder}
-      sx={{ minWidth: 220, ...sx }}
-      slotProps={{
-        input: {
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
-            </InputAdornment>
-          ),
-          sx: {
-            borderRadius: 2,
-            fontSize: 13.5,
-            bgcolor: 'background.paper',
-            fontWeight: 500,
-          },
-        },
-      }}
+      contentBefore={<Search24Regular />}
     />
   );
 }
-
-export { Table, TableHead, TableBody, TableRow, TableCell };
 
 interface TablePagerProps {
   page: number;
@@ -223,49 +259,145 @@ interface TablePagerProps {
 }
 
 export function TablePager({ page, rowsPerPage, total, onPageChange }: TablePagerProps): React.JSX.Element {
+  const styles = useStyles();
   const totalPages = Math.max(1, Math.ceil(total / rowsPerPage));
   const currentPage = page + 1;
   if (total === 0) return <></>;
 
   return (
-    <Box
-      className="TablePager-root"
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        px: 2.5,
-        py: 1.5,
-      }}
-    >
-      <Typography fontSize={13} fontWeight={600} color="text.secondary">
+    <div className={styles.pager}>
+      <Text className={styles.pagerMeta}>
         Page {currentPage} of {totalPages}
-        <Box component="span" sx={{ ml: 1, color: 'text.disabled', fontWeight: 500 }}>
-          · {total} total
-        </Box>
-      </Typography>
-      <Box sx={{ display: 'flex', gap: 1 }}>
+        <span className={styles.pagerTotal}>- {total} total</span>
+      </Text>
+      <div className={styles.pagerActions}>
         <Button
+          appearance="secondary"
           size="small"
-          variant="outlined"
           disabled={page === 0}
+          icon={<ChevronLeft24Regular />}
           onClick={() => onPageChange(page - 1)}
-          startIcon={<ChevronLeftIcon sx={{ fontSize: 18 }} />}
-          sx={{ borderRadius: 2, fontWeight: 700, px: 1.5 }}
         >
           Previous
         </Button>
         <Button
+          appearance="secondary"
           size="small"
-          variant="outlined"
           disabled={currentPage >= totalPages}
+          icon={<ChevronRight24Regular />}
+          iconPosition="after"
           onClick={() => onPageChange(page + 1)}
-          endIcon={<ChevronRightIcon sx={{ fontSize: 18 }} />}
-          sx={{ borderRadius: 2, fontWeight: 700, px: 1.5 }}
         >
           Next
         </Button>
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 }
+
+export function StatusDot({ active = true }: { active?: boolean }): React.JSX.Element {
+  const styles = useStyles();
+  return (
+    <span
+      className={styles.statusDot}
+      style={{
+        backgroundColor: active ? tokens.colorPaletteGreenForeground1 : tokens.colorNeutralForegroundDisabled,
+      }}
+    />
+  );
+}
+
+type StatusBadgeColor = NonNullable<BadgeProps['color']>;
+
+export function StatusBadge({
+  children,
+  color = 'subtle',
+}: {
+  children: ReactNode;
+  color?: StatusBadgeColor;
+}): React.JSX.Element {
+  return (
+    <Badge appearance="tint" color={color} size="small">
+      {children}
+    </Badge>
+  );
+}
+
+interface DataGridTableProps<T> {
+  items: T[];
+  columns: TableColumnDefinition<T>[];
+  getRowId: (item: T) => string;
+  sortable?: boolean;
+  emptyMessage?: string;
+  onRowClick?: (item: T) => void;
+  className?: string;
+}
+
+export function DataGridTable<T>({
+  items,
+  columns,
+  getRowId,
+  sortable = true,
+  emptyMessage = 'No records found.',
+  onRowClick,
+  className,
+}: DataGridTableProps<T>): React.JSX.Element {
+  const styles = useStyles();
+
+  if (items.length === 0) {
+    return <div className={styles.empty}>{emptyMessage}</div>;
+  }
+
+  return (
+    <DataGrid
+      className={`${styles.grid}${className ? ` ${className}` : ''}`}
+      items={items}
+      columns={columns}
+      sortable={sortable}
+      getRowId={getRowId}
+      focusMode="composite"
+    >
+      <DataGridHeader>
+        <DataGridRow>
+          {({ renderHeaderCell }) => (
+            <DataGridHeaderCell className={styles.headerCell}>{renderHeaderCell()}</DataGridHeaderCell>
+          )}
+        </DataGridRow>
+      </DataGridHeader>
+      <DataGridBody<T>>
+        {({ item, rowId }) => (
+          <DataGridRow<T>
+            key={rowId}
+            className={styles.row}
+            onClick={onRowClick ? () => onRowClick(item) : undefined}
+            style={onRowClick ? { cursor: 'pointer' } : undefined}
+          >
+            {({ renderCell }) => <DataGridCell className={styles.cell}>{renderCell(item)}</DataGridCell>}
+          </DataGridRow>
+        )}
+      </DataGridBody>
+    </DataGrid>
+  );
+}
+
+/** Empty placeholder styles map for pages still referencing legacy `tableSx`. */
+export const tableSx = {
+  head: {},
+  row: {},
+};
+
+/** @deprecated no-op — use Fluent Badge / StatusBadge */
+export const chipSx = {};
+
+/** @deprecated no-op — use makeStyles card surface */
+export const softCardSx = {};
+
+// Fluent table primitives for pages not yet on DataGrid
+export {
+  Table,
+  TableHeader as TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableHeaderCell,
+} from '@fluentui/react-components';

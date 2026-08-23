@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { app, BrowserWindow, shell, ipcMain } from 'electron';
+import { getMaterialsCapability } from './ui/materials';
 
 // Must run before app ready — locks AppData to CareFlow (not Electron / old productName).
 app.setName('CareFlow');
@@ -55,6 +56,8 @@ ipcMain.handle('app:get-api-url', () => {
   return backendServer.url.replace(/\/\/[^:]+:/, '//127.0.0.1:');
 });
 
+ipcMain.handle('ui:get-materials', () => getMaterialsCapability());
+
 // ─── LAN-client background retry ────────────────────────────────────────────
 // Agar startup pe server nahi mila toh yeh function background mein retry
 // karta rehta hai (har 5 seconds). Jab server mil jaye toh:
@@ -105,6 +108,8 @@ function createWindow(): void {
     ? join(__dirname, '../../src/main/assets/icons/icon.png')
     : join(__dirname, '../assets/icons/icon.png');
 
+  const materials = getMaterialsCapability();
+
   const window = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -113,12 +118,26 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     icon: iconPath,
+    // Fluent Materials — Mica base on Windows 11 (wallpaper tint + focus states)
+    ...(materials.mica
+      ? {
+          backgroundMaterial: 'mica' as const,
+          backgroundColor: '#00000000',
+        }
+      : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
     },
+  });
+
+  window.on('focus', () => {
+    window.webContents.send('ui:focus-change', true);
+  });
+  window.on('blur', () => {
+    window.webContents.send('ui:focus-change', false);
   });
 
   window.on('ready-to-show', () => window.show());

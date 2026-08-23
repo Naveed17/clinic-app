@@ -1,19 +1,69 @@
-import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
-import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined';
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, Stack, TextField } from '@mui/material';
-import { useEffect, useState } from 'react';
 import {
-  FormDialogTitle,
-  SubmitButton,
-  dialogActionsSx,
-  dialogCancelBtnSx,
-  dialogContentSx,
-  dialogFormSx,
-  dialogPaperProps,
-} from '@/components/DialogUI';
+  Button,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
+import { useEffect, useState } from 'react';
+import { AutoAwesomeOutlinedIcon, OpenInNewOutlinedIcon } from '@/icons/fluent';
+import { FormDialogTitle, SubmitButton } from '@/components/DialogUI';
 
 const GROQ_KEYS_URL = 'https://console.groq.com/keys';
 const DEFAULT_MODEL = 'llama-3.1-8b-instant';
+
+const useStyles = makeStyles({
+  surface: {
+    maxWidth: '400px',
+    width: '100%',
+    maxHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
+  },
+  body: {
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflowY: 'auto',
+  },
+  fields: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+  actions: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    gap: tokens.spacingHorizontalS,
+    flexShrink: 0,
+  },
+  hint: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground3,
+  },
+});
 
 export function GroqConnectDialog({
   open,
@@ -30,6 +80,7 @@ export function GroqConnectDialog({
   onClose: () => void;
   onSubmit: (values: { apiKey: string; model: string }) => void | Promise<void>;
 }): React.JSX.Element {
+  const styles = useStyles();
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState(DEFAULT_MODEL);
   const [error, setError] = useState<string | null>(null);
@@ -55,58 +106,64 @@ export function GroqConnectDialog({
   return (
     <Dialog
       open={open}
-      onClose={connecting ? undefined : onClose}
-      fullWidth
-      maxWidth="xs"
-      PaperProps={dialogPaperProps}
+      onOpenChange={(_, data) => {
+        if (!data.open && !connecting) onClose();
+      }}
     >
-      <Box component="form" noValidate onSubmit={(e) => void handleSubmit(e)} sx={dialogFormSx}>
-        <FormDialogTitle title="Connect Groq" />
-        <DialogContent sx={dialogContentSx}>
-          <Stack spacing={1.5} sx={{ mt: 0.5 }}>
-            <Button
-              variant="outlined"
-              startIcon={<OpenInNewOutlinedIcon />}
-              disabled={connecting}
-              onClick={() => window.open(GROQ_KEYS_URL, '_blank', 'noopener,noreferrer')}
-              sx={{ alignSelf: 'flex-start' }}
-            >
-              Open Groq Console
+      <DialogSurface className={styles.surface}>
+        <form className={styles.form} noValidate onSubmit={(e) => void handleSubmit(e)}>
+          <FormDialogTitle title="Connect Groq" />
+          <DialogBody>
+            <DialogContent className={styles.body}>
+              <div className={styles.fields}>
+                <Button
+                  appearance="outline"
+                  icon={<OpenInNewOutlinedIcon />}
+                  disabled={connecting}
+                  onClick={() => window.open(GROQ_KEYS_URL, '_blank', 'noopener,noreferrer')}
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  Open Groq Console
+                </Button>
+                <Field
+                  label="Groq API key"
+                  required
+                  hint="Create a key at console.groq.com/keys, then paste it here."
+                >
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    placeholder="gsk_..."
+                    disabled={connecting}
+                    value={apiKey}
+                    onChange={(_, d) => setApiKey(d.value)}
+                  />
+                </Field>
+                <Field label="Model" hint={`Default: ${DEFAULT_MODEL}`}>
+                  <Input
+                    disabled={connecting}
+                    value={model}
+                    onChange={(_, d) => setModel(d.value)}
+                  />
+                </Field>
+                {error && (
+                  <MessageBar intent="error">
+                    <MessageBarBody>{error}</MessageBarBody>
+                  </MessageBar>
+                )}
+              </div>
+            </DialogContent>
+          </DialogBody>
+          <DialogActions className={styles.actions}>
+            <Button appearance="secondary" onClick={onClose} disabled={connecting}>
+              Cancel
             </Button>
-            <TextField
-              label="Groq API key"
-              size="small"
-              fullWidth
-              required
-              type="password"
-              autoComplete="off"
-              placeholder="gsk_..."
-              disabled={connecting}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              helperText="Create a key at console.groq.com/keys, then paste it here."
-            />
-            <TextField
-              label="Model"
-              size="small"
-              fullWidth
-              disabled={connecting}
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              helperText={`Default: ${DEFAULT_MODEL}`}
-            />
-            {error && <Alert severity="error">{error}</Alert>}
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} disabled={connecting} sx={dialogCancelBtnSx}>
-            Cancel
-          </Button>
-          <SubmitButton type="submit" loading={connecting} startIcon={<AutoAwesomeOutlinedIcon />}>
-            Connect
-          </SubmitButton>
-        </DialogActions>
-      </Box>
+            <SubmitButton type="submit" loading={connecting} icon={<AutoAwesomeOutlinedIcon />}>
+              Connect
+            </SubmitButton>
+          </DialogActions>
+        </form>
+      </DialogSurface>
     </Dialog>
   );
 }

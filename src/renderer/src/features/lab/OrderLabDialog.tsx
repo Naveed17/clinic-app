@@ -2,25 +2,50 @@ import {
   Button,
   Dialog,
   DialogActions,
+  DialogBody,
   DialogContent,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  TextField,
-} from '@mui/material';
+  DialogSurface,
+  Dropdown,
+  Field,
+  Option,
+  Textarea,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import {
-  dialogActionsSx,
-  dialogCancelBtnSx,
-  dialogContentSx,
-  dialogPaperProps,
-  FormDialogTitle,
-  SubmitButton,
-} from '@/components/DialogUI';
+import { FormDialogTitle, SubmitButton } from '@/components/DialogUI';
 import { LAB_TEST_OPTIONS } from './labTestCatalog';
+
+const useStyles = makeStyles({
+  surface: {
+    maxWidth: '400px',
+    width: '100%',
+    maxHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  body: {
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+  actions: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    gap: tokens.spacingHorizontalS,
+    flexShrink: 0,
+  },
+});
 
 export function OrderLabDialog({
   open,
@@ -37,6 +62,7 @@ export function OrderLabDialog({
   tokenId?: string | null;
   onClose: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const qc = useQueryClient();
   const [test, setTest] = useState('');
   const [notes, setNotes] = useState('');
@@ -70,42 +96,44 @@ export function OrderLabDialog({
   }
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
-      <FormDialogTitle title="Order lab test" subtitle={`${patientName} — sent to the laboratory queue.`} />
-      <DialogContent sx={dialogContentSx}>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <FormControl fullWidth>
-            <InputLabel>Test</InputLabel>
-            <Select label="Test" value={test} onChange={(e) => setTest(String(e.target.value))}>
-              {LAB_TEST_OPTIONS.map((name) => (
-                <MenuItem key={name} value={name}>
-                  {name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            fullWidth
-            label="Notes (optional)"
-            multiline
-            rows={2}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={dialogActionsSx}>
-        <Button onClick={handleClose} sx={dialogCancelBtnSx}>
-          Cancel
-        </Button>
-        <SubmitButton
-          disabled={!test}
-          loading={mutation.isPending}
-          onClick={() => mutation.mutate()}
-        >
-          Send to lab
-        </SubmitButton>
-      </DialogActions>
+    <Dialog
+      open={open}
+      onOpenChange={(_, data) => {
+        if (!data.open) handleClose();
+      }}
+    >
+      <DialogSurface className={styles.surface}>
+        <FormDialogTitle title="Order lab test" subtitle={`${patientName} — sent to the laboratory queue.`} />
+        <DialogBody>
+          <DialogContent className={styles.body}>
+            <Field label="Test" required>
+              <Dropdown
+                placeholder="Select a test"
+                value={test}
+                selectedOptions={test ? [test] : []}
+                onOptionSelect={(_, data) => setTest(data.optionValue ?? '')}
+              >
+                {LAB_TEST_OPTIONS.map((name) => (
+                  <Option key={name} value={name} text={name}>
+                    {name}
+                  </Option>
+                ))}
+              </Dropdown>
+            </Field>
+            <Field label="Notes (optional)">
+              <Textarea rows={2} value={notes} onChange={(_, d) => setNotes(d.value)} />
+            </Field>
+          </DialogContent>
+        </DialogBody>
+        <DialogActions className={styles.actions}>
+          <Button appearance="secondary" onClick={handleClose} disabled={mutation.isPending}>
+            Cancel
+          </Button>
+          <SubmitButton disabled={!test} loading={mutation.isPending} onClick={() => mutation.mutate()}>
+            Send to lab
+          </SubmitButton>
+        </DialogActions>
+      </DialogSurface>
     </Dialog>
   );
 }

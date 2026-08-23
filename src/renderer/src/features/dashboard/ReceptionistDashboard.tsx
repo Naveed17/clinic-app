@@ -1,29 +1,18 @@
-import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
-import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
-import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
-import EventOutlinedIcon from '@mui/icons-material/EventOutlined';
-import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
-import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
-import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { FluentDateField, FluentTimeField, formatDateIso, parseDateIso } from '@/components/FluentDateField';
+import { GroupsOutlinedIcon, AccessTimeOutlinedIcon, ReceiptLongOutlinedIcon, EventOutlinedIcon, CalendarMonthOutlinedIcon, PaymentsOutlinedIcon, MedicalServicesOutlinedIcon, ConfirmationNumberOutlinedIcon, PrintOutlinedIcon, ChevronLeftIcon, ChevronRightIcon } from '@/icons/fluent';
 import {
   Alert, Autocomplete, Box, Button, Dialog, DialogActions, DialogContent,
   Divider, FormControl, IconButton, InputLabel, MenuItem, Paper, Select, Skeleton,
   Step, StepLabel, Stepper, Stack, TextField, Typography, Chip, Avatar,
-} from '@mui/material';
+  alpha, useTheme,
+} from '@/compat/fluentMui';
 import {
   FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogPaperProps, telInputDialogProps,
 } from '@/components/DialogUI';
 import { ListCardsSkeleton } from '@/components/LoadingUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
-import { alpha, useTheme } from '@mui/material/styles';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, useMemo, type ReactNode } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -240,15 +229,11 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
                     )}
                   />
                   <TextField label="Address (optional)" {...form.register('address')} />
-                  <LocalizationProvider dateAdapter={AdapterDateFns}>
+                  <>
                     <Controller name="dateOfBirth" control={form.control} render={({ field }) => (
-                      <DatePicker label="Date of birth (optional)"
-                        value={field.value ? new Date(field.value) : null}
-                        onChange={(v) => field.onChange(v ? v.toISOString().slice(0, 10) : '')}
-                        slotProps={{ textField: { fullWidth: true } }}
-                      />
+                      <FluentDateField label="Date of birth (optional)" value={field.value ? new Date(field.value) : null} onSelectDate={(v) => field.onChange(v ? v.toISOString().slice(0, 10) : '')} />
                     )} />
-                  </LocalizationProvider>
+                  </>
                 </Stack>
               </Box>
             )}
@@ -283,27 +268,12 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
                   </Typography>
                 </Box>
               )}
-              renderInput={(params) => {
+              renderInput={() => {
                 const selected = doctors.find((d) => d.id === doctorId);
                 return (
                   <TextField
-                    {...params}
-                    label="Doctor"
+                    label={selected ? `Doctor — Dr. ${selected.firstName} ${selected.lastName}` : 'Doctor'}
                     fullWidth
-                    InputProps={{
-                      ...params.InputProps,
-                      startAdornment: selected ? (
-                        <>
-                          <DoctorAvatar
-                            src={selected.avatar}
-                            name={`Dr. ${selected.firstName} ${selected.lastName}`}
-                            size={24}
-                            sx={{ ml: 0.5, mr: 0.5 }}
-                          />
-                          {params.InputProps.startAdornment}
-                        </>
-                      ) : params.InputProps.startAdornment,
-                    }}
                   />
                 );
               }}
@@ -331,7 +301,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
         {step === 2 && createdToken && (
           <Stack alignItems="center" spacing={2} sx={{ py: 2 }}>
             <Box sx={{ width: 72, height: 72, borderRadius: '50%', bgcolor: 'success.light', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ConfirmationNumberOutlinedIcon sx={{ fontSize: 36, color: 'success.contrastText' }} />
+              <ConfirmationNumberOutlinedIcon style={{ fontSize: 36, color: 'success.contrastText' }} />
             </Box>
             <Typography fontWeight={800} fontSize={20}>Token Issued!</Typography>
             <Paper
@@ -574,15 +544,11 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
                     )}
                   />
                   <TextField label="Address (optional)" {...form.register('address')} />
-                  <LocalizationProvider dateAdapter={AdapterDateFns}>
+                  <>
                     <Controller name="dateOfBirth" control={form.control} render={({ field }) => (
-                      <DatePicker label="Date of birth (optional)"
-                        value={field.value ? new Date(field.value) : null}
-                        onChange={(v) => field.onChange(v ? v.toISOString().slice(0, 10) : '')}
-                        slotProps={{ textField: { fullWidth: true } }}
-                      />
+                      <FluentDateField label="Date of birth (optional)" value={field.value ? new Date(field.value) : null} onSelectDate={(v) => field.onChange(v ? v.toISOString().slice(0, 10) : '')} />
                     )} />
-                  </LocalizationProvider>
+                  </>
                 </Stack>
               </Box>
             )}
@@ -623,18 +589,6 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
                 label="Doctor"
                 value={providerId}
                 onChange={(e) => setProviderId(e.target.value)}
-                renderValue={(value) => {
-                  const d = doctors.find((doc) => doc.id === value);
-                  if (!d) return '';
-                  return (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <DoctorAvatar src={d.avatar} name={`Dr. ${d.firstName} ${d.lastName}`} size={22} />
-                      <Typography component="span" fontSize={13.5} fontWeight={600}>
-                        Dr. {d.firstName} {d.lastName}
-                      </Typography>
-                    </Box>
-                  );
-                }}
               >
                 {doctors.map((d) => (
                   <MenuItem key={d.id} value={d.id}>
@@ -651,12 +605,12 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
                 ))}
               </Select>
             </FormControl>
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
+            <>
               <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
-                <DatePicker
+                <FluentDateField
                   label="Date"
                   value={date ? new Date(`${date}T12:00:00`) : null}
-                  onChange={(v) => {
+                  onSelectDate={(v) => {
                     if (!v || !providerId) {
                       setDate(v ? v.toLocaleDateString('en-CA') : '');
                       return;
@@ -677,13 +631,15 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
                       setDate(v.toLocaleDateString('en-CA'));
                     }
                   }}
-                  slotProps={{ textField: { fullWidth: true } }}
                 />
-                <TimePicker
+                <FluentTimeField
                   label="Time"
-                  value={time ? new Date(`1970-01-01T${time}:00`) : null}
-                  onChange={(v) => {
-                    const picked = v ? v.toTimeString().slice(0, 5) : '';
+                  selectedTime={time ? new Date(`1970-01-01T${time}:00`) : null}
+                  value={time}
+                  onTimeChange={(_e, data) => {
+                    const picked = data.selectedTime
+                      ? data.selectedTime.toTimeString().slice(0, 5)
+                      : (data.selectedTimeText ?? '').slice(0, 5);
                     if (!picked || !providerId || !date) {
                       setTime(picked);
                       return;
@@ -703,12 +659,9 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
                       setTime(picked);
                     }
                   }}
-                  slotProps={{
-                    textField: { fullWidth: true },
-                  }}
                 />
               </Box>
-            </LocalizationProvider>
+            </>
             <TextField
               select fullWidth label="Duration"
               value={duration}
@@ -734,7 +687,7 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
         {done && (
           <Stack alignItems="center" spacing={2} sx={{ py: 2 }}>
             <Box sx={{ width: 72, height: 72, borderRadius: '50%', bgcolor: 'success.light', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CalendarMonthOutlinedIcon sx={{ fontSize: 36, color: 'success.contrastText' }} />
+              <CalendarMonthOutlinedIcon style={{ fontSize: 36, color: 'success.contrastText' }} />
             </Box>
             <Typography fontWeight={800} fontSize={20}>Appointment Booked!</Typography>
             <Typography variant="body2" color="text.secondary" textAlign="center">
@@ -807,7 +760,7 @@ function PrescriptionFeed(): React.JSX.Element {
       }}
     >
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
-        <MedicalServicesOutlinedIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+        <MedicalServicesOutlinedIcon style={{ fontSize: 16, color: 'currentColor' }} />
         <Typography fontWeight={700} fontSize={14}>Prescriptions</Typography>
         {feed.length > 0 && <Chip label={feed.length} size="small" color="primary" sx={{ height: 18, fontSize: 10 }} />}
       </Stack>
@@ -838,7 +791,7 @@ function PrescriptionFeed(): React.JSX.Element {
                 </Typography>
                 <Button
                   size="small"
-                  startIcon={<PrintOutlinedIcon sx={{ fontSize: 14 }} />}
+                  startIcon={<PrintOutlinedIcon style={{ fontSize: 14 }} />}
                   onClick={() => setSelectedToken(tokens.find((token) => token.id === item.tokenId) ?? null)}
                   disabled={!tokens.some((token) => token.id === item.tokenId)}
                   sx={{ px: 0, minWidth: 0, fontSize: 11 }}
@@ -998,10 +951,10 @@ function DayStrip({
         <Typography fontWeight={800} fontSize={15}>{monthLabel}</Typography>
         <Stack direction="row" spacing={0.25}>
           <IconButton size="small" onClick={() => setAnchor((prev) => { const n = new Date(prev); n.setDate(n.getDate() - 7); return n; })}>
-            <ChevronLeftIcon fontSize="small" />
+            <ChevronLeftIcon style={{ fontSize: 18 }} />
           </IconButton>
           <IconButton size="small" onClick={() => setAnchor((prev) => { const n = new Date(prev); n.setDate(n.getDate() + 7); return n; })}>
-            <ChevronRightIcon fontSize="small" />
+            <ChevronRightIcon style={{ fontSize: 18 }} />
           </IconButton>
         </Stack>
       </Stack>
@@ -1264,7 +1217,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
                 hint="waiting for doctor"
                 value={waitingNow}
                 tone="warning"
-                icon={<GroupsOutlinedIcon fontSize="small" />}
+                icon={<GroupsOutlinedIcon style={{ fontSize: 18 }} />}
                 onClick={() => navigate('/tokens')}
               />
               <AttentionStat
@@ -1272,7 +1225,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
                 hint="appointment time passed"
                 value={lateArrivals}
                 tone="error"
-                icon={<AccessTimeOutlinedIcon fontSize="small" />}
+                icon={<AccessTimeOutlinedIcon style={{ fontSize: 18 }} />}
                 onClick={() => navigate('/appointments')}
               />
               {showBilling ? (
@@ -1281,7 +1234,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
                   hint="to collect"
                   value={unpaidBills}
                   tone="info"
-                  icon={<ReceiptLongOutlinedIcon fontSize="small" />}
+                  icon={<ReceiptLongOutlinedIcon style={{ fontSize: 18 }} />}
                   onClick={() => navigate('/billing')}
                 />
               ) : (
@@ -1290,7 +1243,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
                   hint="appointments left"
                   value={upcomingToday}
                   tone="info"
-                  icon={<EventOutlinedIcon fontSize="small" />}
+                  icon={<EventOutlinedIcon style={{ fontSize: 18 }} />}
                   onClick={() => navigate('/appointments')}
                 />
               )}
@@ -1554,7 +1507,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
                       src={doc.avatar}
                       name={`Dr. ${doc.firstName} ${doc.lastName}`}
                       size={36}
-                      sx={{ borderRadius: 1 }}
+                      style={{ borderRadius: 4 }}
                     />
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography fontWeight={700} fontSize={13} noWrap>

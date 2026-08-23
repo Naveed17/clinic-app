@@ -1,0 +1,55 @@
+{
+  "date": [
+    "FluentDateField",
+    "FluentTimeField",
+    "formatDateIso",
+    "parseDateIso",
+    "DateFieldHint"
+  ],
+  "loading": [
+    "TableRowsSkeleton",
+    "StatCardsSkeleton",
+    "ListCardsSkeleton",
+    "CalendarSkeleton",
+    "PageSkeleton",
+    "FetchingBar"
+  ],
+  "tableFns": [
+    "TablePageShell",
+    "SearchField",
+    "TablePager",
+    "StatusDot",
+    "StatusBadge",
+    "DataGridTable"
+  ],
+  "tableConsts": [
+    "actionBtnStyle",
+    "actionBtnSx",
+    "tableSx",
+    "chipSx",
+    "softCardSx"
+  ],
+  "create": true,
+  "doctor": true,
+  "service": "reportsService",
+  "report": [
+    "ReportSummary",
+    "OpdInvoiceRow",
+    "OpdFeeRow",
+    "OpdDoctorFeeSummary",
+    "OpdDailyReport",
+    "OpdReportInput"
+  ],
+  "token": [
+    "TokenPerson",
+    "Token",
+    "TokenInput",
+    "PrescriptionMedicine",
+    "Prescription",
+    "PrescriptionInput",
+    "PrescriptionFeedItem",
+    "PharmacyQueueItem"
+  ],
+  "dgProps": "interface DataGridTableProps<T> {\n  items: T[];\n  columns: TableColumnDefinition<T>[];\n  getRowId: (item: T) => string;\n  sortable?: boolean;\n  emptyMessage?: string;\n  onRowClick?: (item: T) => void;\n  className?: string;\n}",
+  "reportBody": "export interface ReportSummary {\n  todaysPatients: number;\n  todaysRevenue: number;\n  monthlyRevenue: number;\n}\n\nexport interface OpdInvoiceRow {\n  id: string;\n  invoiceNumber: string;\n  patientName: string;\n  doctors: string;\n  status: string;\n  total: number;\n  amountPaid: number;\n  refunded: number;\n  outstanding: number;\n  createdAt: string;\n}\n\nexport interface OpdFeeRow {\n  id: string;\n  tokenNumber: number;\n  patientName: string;\n  mrNumber: string | null;\n  doctorId: string;\n  doctorName: string;\n  status: string;\n  consultationFee: number;\n  feeDiscount: number;\n  feeRefunded: number;\n  net: number;\n  createdAt: string;\n}\n\nexport interface OpdDoctorFeeSummary {\n  doctorId: string;\n  doctorName: string;\n  tokens: number;\n  collected: number;\n  discounted: number;\n  refunded: number;\n  net: number;\n}\n\nexport interface OpdDailyReport {\n  date: string;\n  doctorId: string | null;\n  doctorName: string | null;\n  invoices: {\n    rows: OpdInvoiceRow[];\n    count: number;\n    billed: number;\n    collected: number;\n    refunded: number;\n    outstanding: number;\n  };\n  fees: {\n    rows: OpdFeeRow[];\n    byDoctor: OpdDoctorFeeSummary[];\n    count: number;\n    collected: number;\n    discounted: number;\n    refunded: number;\n    net: number;\n  };\n}\n\nexport interface OpdReportInput {\n  date: string;\n  doctorId?: string;\n}\n"
+}

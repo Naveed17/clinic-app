@@ -1,17 +1,20 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Box, Button, Dialog, DialogActions, DialogContent, Stack, TextField } from '@mui/material';
+import {
+  Button,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  Field,
+  Input,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import {
-  FormDialogTitle,
-  SubmitButton,
-  dialogActionsSx,
-  dialogCancelBtnSx,
-  dialogContentSx,
-  dialogFormSx,
-  dialogPaperProps,
-} from '@/components/DialogUI';
+import { FormDialogTitle, SubmitButton } from '@/components/DialogUI';
 
 const connectMetaSchema = z.object({
   email: z
@@ -41,6 +44,48 @@ const defaultValues: ConnectMetaFormValues = {
   website: '',
 };
 
+const useStyles = makeStyles({
+  surface: {
+    maxWidth: '400px',
+    width: '100%',
+    maxHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
+  },
+  body: {
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflowY: 'auto',
+  },
+  fields: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+  actions: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    gap: tokens.spacingHorizontalS,
+    flexShrink: 0,
+  },
+});
+
 export function WhatsAppConnectMetaDialog({
   open,
   connecting,
@@ -52,6 +97,7 @@ export function WhatsAppConnectMetaDialog({
   onClose: () => void;
   onSubmit: (values: ConnectMetaFormValues) => void | Promise<void>;
 }): React.JSX.Element {
+  const styles = useStyles();
   const form = useForm<ConnectMetaFormValues>({
     resolver: zodResolver(connectMetaSchema),
     defaultValues,
@@ -68,53 +114,55 @@ export function WhatsAppConnectMetaDialog({
   return (
     <Dialog
       open={open}
-      onClose={connecting ? undefined : onClose}
-      fullWidth
-      maxWidth="xs"
-      PaperProps={dialogPaperProps}
+      onOpenChange={(_, data) => {
+        if (!data.open && !connecting) onClose();
+      }}
     >
-      <Box
-        component="form"
-        noValidate
-        onSubmit={handleSubmit((values) => void onSubmit(values))}
-        sx={dialogFormSx}
-      >
-        <FormDialogTitle title="Connect with Meta" />
-        <DialogContent sx={dialogContentSx}>
-          <Stack spacing={1.5} sx={{ mt: 0.5 }}>
-            <TextField
-              label="Business email"
-              type="email"
-              size="small"
-              fullWidth
-              required
-              disabled={connecting}
-              error={Boolean(errors.email)}
-              helperText={errors.email?.message || 'Meta uses this email to create the new business portfolio.'}
-              {...register('email')}
-            />
-            <TextField
-              label="Website"
-              size="small"
-              fullWidth
-              required
-              placeholder="https://yourclinic.com"
-              disabled={connecting}
-              error={Boolean(errors.website)}
-              helperText={errors.website?.message || 'Include https://. An Instagram or Facebook page URL also works.'}
-              {...register('website')}
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} disabled={connecting} sx={dialogCancelBtnSx}>
-            Cancel
-          </Button>
-          <SubmitButton type="submit" loading={connecting}>
-            Continue
-          </SubmitButton>
-        </DialogActions>
-      </Box>
+      <DialogSurface className={styles.surface}>
+        <form
+          className={styles.form}
+          noValidate
+          onSubmit={handleSubmit((values) => void onSubmit(values))}
+        >
+          <FormDialogTitle title="Connect with Meta" />
+          <DialogBody>
+            <DialogContent className={styles.body}>
+              <div className={styles.fields}>
+                <Field
+                  label="Business email"
+                  required
+                  validationState={errors.email ? 'error' : undefined}
+                  validationMessage={errors.email?.message}
+                  hint={errors.email ? undefined : 'Meta uses this email to create the new business portfolio.'}
+                >
+                  <Input type="email" disabled={connecting} {...register('email')} />
+                </Field>
+                <Field
+                  label="Website"
+                  required
+                  validationState={errors.website ? 'error' : undefined}
+                  validationMessage={errors.website?.message}
+                  hint={errors.website ? undefined : 'Include https://. An Instagram or Facebook page URL also works.'}
+                >
+                  <Input
+                    placeholder="https://yourclinic.com"
+                    disabled={connecting}
+                    {...register('website')}
+                  />
+                </Field>
+              </div>
+            </DialogContent>
+          </DialogBody>
+          <DialogActions className={styles.actions}>
+            <Button appearance="secondary" onClick={onClose} disabled={connecting}>
+              Cancel
+            </Button>
+            <SubmitButton type="submit" loading={connecting}>
+              Continue
+            </SubmitButton>
+          </DialogActions>
+        </form>
+      </DialogSurface>
     </Dialog>
   );
 }

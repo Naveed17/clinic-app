@@ -1,16 +1,25 @@
 import { useState } from 'react';
 import {
-  Alert, Box, Button, List, ListItemButton,
-  ListItemText, Paper, Stack, Step, StepLabel, Stepper,
-  TextField, Typography, useTheme,
-} from '@mui/material';
-import LaptopOutlinedIcon from '@mui/icons-material/LaptopOutlined';
-import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
-import DevicesOutlinedIcon from '@mui/icons-material/DevicesOutlined';
-import WifiTetheringOutlinedIcon from '@mui/icons-material/WifiTetheringOutlined';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+  Button,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  Spinner,
+  Text,
+  Title3,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
+import {
+  CheckCircleOutlineIcon,
+  DevicesOutlinedIcon,
+  DnsOutlinedIcon,
+  LaptopOutlinedIcon,
+  WifiTetheringOutlinedIcon,
+} from '@/icons/fluent';
 
 type Mode = 'local' | 'lan-server' | 'lan-client';
 
@@ -24,8 +33,178 @@ function normalizeServerUrl(raw: string): string {
   return `http://${trimmed}`;
 }
 
+const useStyles = makeStyles({
+  root: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: tokens.colorNeutralBackground2,
+    padding: tokens.spacingVerticalL,
+  },
+  card: {
+    padding: tokens.spacingVerticalXXL,
+    width: '100%',
+    maxWidth: '520px',
+    backgroundColor: tokens.colorNeutralBackground1,
+    borderRadius: tokens.borderRadiusXLarge,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    boxShadow: tokens.shadow8,
+  },
+  brandRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    marginBottom: tokens.spacingVerticalXXL,
+  },
+  logoBox: {
+    width: '38px',
+    height: '38px',
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: '#fff',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    padding: '3px',
+  },
+  logo: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+  },
+  brandTitle: {
+    fontWeight: tokens.fontWeightBold,
+    fontSize: '20px',
+  },
+  stepper: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalM,
+    marginBottom: tokens.spacingVerticalXXL,
+    flexWrap: 'wrap',
+  },
+  stepItem: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground3,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  stepActive: {
+    color: tokens.colorBrandForeground1,
+  },
+  stepDone: {
+    color: tokens.colorNeutralForeground2,
+  },
+  stack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalL,
+  },
+  muted: {
+    color: tokens.colorNeutralForeground2,
+    marginTop: tokens.spacingVerticalXXS,
+  },
+  roleList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+  },
+  roleBtn: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    padding: tokens.spacingVerticalM,
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: 'transparent',
+    cursor: 'pointer',
+    textAlign: 'left',
+    width: '100%',
+    font: 'inherit',
+  },
+  roleBtnSelected: {
+    border: `1px solid ${tokens.colorBrandStroke1}`,
+    backgroundColor: tokens.colorBrandBackground2,
+  },
+  roleIcon: {
+    color: tokens.colorNeutralForeground2,
+    display: 'flex',
+  },
+  roleIconSelected: {
+    color: tokens.colorBrandForeground1,
+  },
+  roleMeta: {
+    flex: 1,
+    minWidth: 0,
+  },
+  scanHeader: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  serverList: {
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusMedium,
+    overflow: 'hidden',
+  },
+  serverItem: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    padding: tokens.spacingVerticalM,
+    width: '100%',
+    border: 'none',
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: 'transparent',
+    cursor: 'pointer',
+    textAlign: 'left',
+    font: 'inherit',
+  },
+  serverItemSelected: {
+    backgroundColor: tokens.colorBrandBackground2,
+  },
+  mono: {
+    fontFamily: 'monospace',
+    fontSize: tokens.fontSizeBase100,
+    color: tokens.colorNeutralForeground2,
+  },
+  row: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalS,
+  },
+  flex1: {
+    flex: 1,
+  },
+  centerStack: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: tokens.spacingVerticalL,
+    textAlign: 'center',
+  },
+  successIcon: {
+    width: '72px',
+    height: '72px',
+    borderRadius: '50%',
+    backgroundColor: tokens.colorPaletteGreenBackground2,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: tokens.colorPaletteGreenForeground1,
+  },
+  fullWidth: {
+    width: '100%',
+  },
+});
+
 export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Element {
-  const theme = useTheme();
+  const styles = useStyles();
   const brandLogo = useClinicBrandLogo();
 
   const [step, setStep] = useState(0);
@@ -75,10 +254,11 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
     try {
       const ok = await window.clinic?.settings.testConnection(serverUrl);
       if (!ok) {
-        setError('Could not reach server. Check the URL, firewall, and that the LAN server is running.');
+        setError(
+          'Could not reach server. Check the URL, firewall, and that the LAN server is running.',
+        );
         return;
       }
-      // Prefer normalized URL going forward
       if (!selectedUrl) setManualUrl(serverUrl);
       else setSelectedUrl(serverUrl);
       setStep(2);
@@ -116,7 +296,6 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
       });
 
       onDone();
-      // Relaunch so main process applies serverMode (backend bind / client skip)
       if (window.clinic?.settings.relaunch) {
         await window.clinic.settings.relaunch();
       } else {
@@ -130,196 +309,223 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
   }
 
   const roles: { value: Mode; icon: React.ReactNode; label: string; desc: string }[] = [
-    { value: 'local', icon: <LaptopOutlinedIcon />, label: 'Standalone', desc: 'Single machine, no network sharing' },
-    { value: 'lan-server', icon: <DnsOutlinedIcon />, label: 'LAN Server', desc: 'This machine hosts the database' },
-    { value: 'lan-client', icon: <DevicesOutlinedIcon />, label: 'LAN Client', desc: 'Connect to another machine' },
+    {
+      value: 'local',
+      icon: <LaptopOutlinedIcon />,
+      label: 'Standalone',
+      desc: 'Single machine, no network sharing',
+    },
+    {
+      value: 'lan-server',
+      icon: <DnsOutlinedIcon />,
+      label: 'LAN Server',
+      desc: 'This machine hosts the database',
+    },
+    {
+      value: 'lan-client',
+      icon: <DevicesOutlinedIcon />,
+      label: 'LAN Client',
+      desc: 'Connect to another machine',
+    },
   ];
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default', p: 2 }}>
-      <Paper sx={{ p: 4, width: '100%', maxWidth: 520 }}>
+    <div className={styles.root}>
+      <div className={styles.card}>
+        <div className={styles.brandRow}>
+          <div className={styles.logoBox}>
+            <img src={brandLogo} alt="Clinic" className={styles.logo} />
+          </div>
+          <Text className={styles.brandTitle}>CareFlow Setup</Text>
+        </div>
 
-        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 3 }}>
-          <Box
-            sx={{
-              width: 38,
-              height: 38,
-              borderRadius: 2,
-              bgcolor: '#fff',
-              border: '1px solid',
-              borderColor: 'divider',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-              p: 0.4,
-            }}
-          >
-            <Box component="img" src={brandLogo} alt="Clinic" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-          </Box>
-          <Typography fontWeight={800} fontSize={20}>CareFlow Setup</Typography>
-        </Stack>
-
-        <Stepper activeStep={stepperIndex} sx={{ mb: 4 }}>
-          {steps.map((label) => (
-            <Step key={label}><StepLabel>{label}</StepLabel></Step>
+        <div className={styles.stepper}>
+          {steps.map((label, i) => (
+            <Text
+              key={label}
+              className={`${styles.stepItem} ${
+                i === stepperIndex ? styles.stepActive : i < stepperIndex ? styles.stepDone : ''
+              }`}
+            >
+              {i + 1}. {label}
+            </Text>
           ))}
-        </Stepper>
+        </div>
 
-        {/* Step 0: Welcome */}
         {step === 0 && (
-          <Stack spacing={3}>
-            <Box>
-              <Typography variant="h6">Welcome to CareFlow</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                Let's set up your clinic in a few steps.
-              </Typography>
-            </Box>
-            <TextField
-              label="Clinic Name"
-              placeholder="e.g. Care Clinic"
-              value={clinicName}
-              onChange={(e) => setClinicName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && clinicName.trim() && setStep(onlineMode ? 2 : 1)}
-              fullWidth
-              autoFocus
-            />
+          <div className={styles.stack}>
+            <div>
+              <Title3>Welcome to CareFlow</Title3>
+              <Text className={styles.muted} block>
+                Let&apos;s set up your clinic in a few steps.
+              </Text>
+            </div>
+            <Field label="Clinic Name">
+              <Input
+                placeholder="e.g. Care Clinic"
+                value={clinicName}
+                onChange={(_, d) => setClinicName(d.value)}
+                onKeyDown={(e) =>
+                  e.key === 'Enter' && clinicName.trim() && setStep(onlineMode ? 2 : 1)
+                }
+                autoFocus
+              />
+            </Field>
             <Button
-              variant="contained"
+              appearance="primary"
               disabled={!clinicName.trim()}
               onClick={() => setStep(onlineMode ? 2 : 1)}
             >
               Next
             </Button>
-          </Stack>
+          </div>
         )}
 
-        {/* Step 1: Machine Role (local / LAN only) */}
         {step === 1 && !onlineMode && (
-          <Stack spacing={3}>
-            <Box>
-              <Typography variant="h6">Machine Role</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          <div className={styles.stack}>
+            <div>
+              <Title3>Machine Role</Title3>
+              <Text className={styles.muted} block>
                 How will this machine be used?
-              </Typography>
-            </Box>
+              </Text>
+            </div>
 
-            <Stack spacing={1}>
+            <div className={styles.roleList}>
               {roles.map(({ value, icon, label, desc }) => {
                 const selected = mode === value;
                 return (
-                  <ListItemButton
+                  <button
                     key={value}
-                    selected={selected}
-                    onClick={() => { setMode(value); setSelectedUrl(''); setDiscovered([]); setError(''); }}
-                    sx={{
-                      borderRadius: `${theme.shape.borderRadius}px`,
-                      border: '1px solid',
-                      borderColor: selected ? 'primary.main' : 'divider',
-                      bgcolor: selected ? `${theme.palette.primary.main}14` : 'transparent',
-                      '&.Mui-selected': { bgcolor: `${theme.palette.primary.main}14` },
-                      '&.Mui-selected:hover': { bgcolor: `${theme.palette.primary.main}1f` },
+                    type="button"
+                    className={`${styles.roleBtn} ${selected ? styles.roleBtnSelected : ''}`}
+                    onClick={() => {
+                      setMode(value);
+                      setSelectedUrl('');
+                      setDiscovered([]);
+                      setError('');
                     }}
                   >
-                    <Box sx={{ mr: 1.5, color: selected ? 'primary.main' : 'text.secondary', display: 'flex' }}>{icon}</Box>
-                    <ListItemText
-                      primary={<Typography fontWeight={selected ? 700 : 400} variant="body2">{label}</Typography>}
-                      secondary={desc}
-                      secondaryTypographyProps={{ fontSize: 12 }}
-                    />
-                    {selected && <CheckCircleOutlineIcon color="primary" fontSize="small" />}
-                  </ListItemButton>
+                    <span className={`${styles.roleIcon} ${selected ? styles.roleIconSelected : ''}`}>
+                      {icon}
+                    </span>
+                    <span className={styles.roleMeta}>
+                      <Text weight={selected ? 'semibold' : 'regular'} block>
+                        {label}
+                      </Text>
+                      <Text size={200} className={styles.muted}>
+                        {desc}
+                      </Text>
+                    </span>
+                    {selected ? (
+                      <CheckCircleOutlineIcon
+                        style={{ fontSize: 18, color: 'var(--colorBrandForeground1)' }}
+                      />
+                    ) : null}
+                  </button>
                 );
               })}
-            </Stack>
+            </div>
 
-            {/* LAN Client: scan panel */}
             {mode === 'lan-client' && (
-              <Stack spacing={1.5}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                  <Typography variant="body2" color="text.secondary">Find server on network:</Typography>
+              <div className={styles.stack}>
+                <div className={styles.scanHeader}>
+                  <Text size={200} className={styles.muted}>
+                    Find server on network:
+                  </Text>
                   <Button
                     size="small"
-                    startIcon={<WifiTetheringOutlinedIcon />}
-                    loading={scanning}
+                    appearance="subtle"
+                    icon={
+                      scanning ? <Spinner size="tiny" /> : <WifiTetheringOutlinedIcon />
+                    }
                     disabled={testing}
                     onClick={() => void handleScan()}
                   >
                     {scanning ? 'Scanning...' : 'Scan'}
                   </Button>
-                </Stack>
+                </div>
 
                 {discovered.length > 0 && (
-                  <List disablePadding sx={{ border: '1px solid', borderColor: 'divider', borderRadius: `${theme.shape.borderRadius}px`, overflow: 'hidden' }}>
+                  <div className={styles.serverList}>
                     {discovered.map((s) => {
                       const url = `http://${s.ip}:${s.port}`;
                       const sel = selectedUrl === url;
                       return (
-                        <ListItemButton
+                        <button
                           key={s.ip}
-                          selected={sel}
-                          onClick={() => { setSelectedUrl(url); setManualUrl(''); setError(''); }}
-                          sx={{
-                            '&.Mui-selected': { bgcolor: `${theme.palette.primary.main}14` },
-                            '&.Mui-selected:hover': { bgcolor: `${theme.palette.primary.main}1f` },
+                          type="button"
+                          className={`${styles.serverItem} ${sel ? styles.serverItemSelected : ''}`}
+                          onClick={() => {
+                            setSelectedUrl(url);
+                            setManualUrl('');
+                            setError('');
                           }}
                         >
-                          <DnsOutlinedIcon sx={{ mr: 1.5, fontSize: 18, color: sel ? 'primary.main' : 'text.secondary' }} />
-                          <ListItemText
-                            primary={s.name}
-                            secondary={url}
-                            primaryTypographyProps={{ fontSize: 13, fontWeight: sel ? 700 : 400 }}
-                            secondaryTypographyProps={{ fontFamily: 'monospace', fontSize: 11 }}
-                          />
-                          {sel && <CheckCircleOutlineIcon color="primary" fontSize="small" />}
-                        </ListItemButton>
+                          <DnsOutlinedIcon style={{ fontSize: 18 }} />
+                          <span className={styles.roleMeta}>
+                            <Text weight={sel ? 'semibold' : 'regular'} size={300} block>
+                              {s.name}
+                            </Text>
+                            <Text className={styles.mono}>{url}</Text>
+                          </span>
+                          {sel ? <CheckCircleOutlineIcon style={{ fontSize: 18 }} /> : null}
+                        </button>
                       );
                     })}
-                  </List>
+                  </div>
                 )}
 
                 {discovered.length === 0 && !scanning && (
-                  <Typography variant="caption" color="text.secondary" textAlign="center">
+                  <Text size={200} className={styles.muted} style={{ textAlign: 'center' }}>
                     No servers found. Click Scan or enter URL manually.
-                  </Typography>
+                  </Text>
                 )}
 
-                <TextField
-                  label="Or enter server URL manually"
-                  placeholder="http://192.168.1.x:3333"
-                  size="small"
-                  value={manualUrl}
-                  onChange={(e) => { setManualUrl(e.target.value); setSelectedUrl(''); setError(''); }}
-                />
-              </Stack>
+                <Field label="Or enter server URL manually">
+                  <Input
+                    placeholder="http://192.168.1.x:3333"
+                    value={manualUrl}
+                    onChange={(_, d) => {
+                      setManualUrl(d.value);
+                      setSelectedUrl('');
+                      setError('');
+                    }}
+                  />
+                </Field>
+              </div>
             )}
 
-            {error && <Alert severity="error">{error}</Alert>}
+            {error ? (
+              <MessageBar intent="error">
+                <MessageBarBody>{error}</MessageBarBody>
+              </MessageBar>
+            ) : null}
 
-            <Stack direction="row" spacing={1}>
-              <Button variant="outlined" disabled={testing} onClick={() => setStep(0)}>Back</Button>
+            <div className={styles.row}>
+              <Button appearance="secondary" disabled={testing} onClick={() => setStep(0)}>
+                Back
+              </Button>
               <Button
-                variant="contained"
-                sx={{ flex: 1 }}
-                loading={testing}
-                disabled={scanning}
+                appearance="primary"
+                className={styles.flex1}
+                disabled={scanning || testing}
+                icon={testing ? <Spinner size="tiny" /> : undefined}
                 onClick={() => void handleRoleNext()}
               >
                 {mode === 'lan-client' ? 'Test & Next' : 'Next'}
               </Button>
-            </Stack>
-          </Stack>
+            </div>
+          </div>
         )}
 
-        {/* Step 2: Done */}
         {step === 2 && (
-          <Stack spacing={3} alignItems="center" textAlign="center">
-            <Box sx={{ width: 72, height: 72, borderRadius: '50%', bgcolor: `${theme.palette.success.main}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CheckCircleOutlineIcon color="success" sx={{ fontSize: 40 }} />
-            </Box>
-            <Box>
-              <Typography variant="h6">All Set!</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          <div className={styles.centerStack}>
+            <div className={styles.successIcon}>
+              <CheckCircleOutlineIcon style={{ fontSize: 40 }} />
+            </div>
+            <div>
+              <Title3>All Set!</Title3>
+              <Text className={styles.muted} block>
                 <strong>{clinicName}</strong> is configured as{' '}
                 <strong>
                   {onlineMode
@@ -329,25 +535,44 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
                       : mode === 'lan-server'
                         ? 'LAN Server'
                         : 'LAN Client'}
-                </strong>.
-              </Typography>
-              {mode === 'lan-client' && serverUrl && (
-                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', display: 'block', mt: 0.5 }}>
+                </strong>
+                .
+              </Text>
+              {mode === 'lan-client' && serverUrl ? (
+                <Text className={styles.mono} block>
                   {serverUrl}
-                </Typography>
-              )}
-            </Box>
-            {error && <Alert severity="error" sx={{ width: '100%', textAlign: 'left' }}>{error}</Alert>}
-            <Stack direction="row" spacing={1} width="100%">
-              <Button variant="outlined" disabled={saving} onClick={() => { setError(''); setStep(onlineMode ? 0 : 1); }}>Back</Button>
-              <Button variant="contained" sx={{ flex: 1 }} loading={saving} onClick={() => void handleFinish()}>
+                </Text>
+              ) : null}
+            </div>
+            {error ? (
+              <MessageBar intent="error" className={styles.fullWidth}>
+                <MessageBarBody>{error}</MessageBarBody>
+              </MessageBar>
+            ) : null}
+            <div className={`${styles.row} ${styles.fullWidth}`}>
+              <Button
+                appearance="secondary"
+                disabled={saving}
+                onClick={() => {
+                  setError('');
+                  setStep(onlineMode ? 0 : 1);
+                }}
+              >
+                Back
+              </Button>
+              <Button
+                appearance="primary"
+                className={styles.flex1}
+                disabled={saving}
+                icon={saving ? <Spinner size="tiny" /> : undefined}
+                onClick={() => void handleFinish()}
+              >
                 Finish & Launch
               </Button>
-            </Stack>
-          </Stack>
+            </div>
+          </div>
         )}
-
-      </Paper>
-    </Box>
+      </div>
+    </div>
   );
 }

@@ -45,3 +45,29 @@ body,
   font-variant-numeric: inherit;
   letter-spacing: inherit;
 }
+
+/* Align react-phone-number-input with Fluent inputs */
+.PhoneInputField {
+  width: 100%;
+  --PhoneInput-color--focus: var(--colorBrandForeground1, #0f6cbd);
+}
+
+.PhoneInputField .PhoneInputInput {
+  font: inherit;
+  border: 1px solid var(--colorNeutralStroke1, #d1d1d1);
+  border-radius: var(--borderRadiusMedium, 4px);
+  padding: 6px 10px;
+  min-height: 32px;
+  background: var(--colorNeutralBackground1, #fff);
+  color: var(--colorNeutralForeground1, #242424);
+}
+
+.PhoneInputField .PhoneInputInput:focus {
+  outline: 2px solid var(--colorBrandStroke1, #0f6cbd);
+  outline-offset: -1px;
+}
+
+.PhoneInputField .PhoneInputCountryIcon {
+  border: none;
+  box-shadow: none;
+}

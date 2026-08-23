@@ -1,19 +1,60 @@
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import { Alert, Button, Dialog, DialogActions, DialogContent, Stack, TextField, Typography } from '@mui/material';
-import { useEffect, useState } from 'react';
 import {
-  FormDialogTitle,
-  SubmitButton,
-  dialogActionsSx,
-  dialogCancelBtnSx,
-  dialogContentSx,
-  dialogPaperProps,
-} from '@/components/DialogUI';
+  Button,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  Field,
+  MessageBar,
+  MessageBarBody,
+  Text,
+  Textarea,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
+import { useEffect, useState } from 'react';
+import { FormDialogTitle, SubmitButton } from '@/components/DialogUI';
 import { toWhatsAppNumber } from '@shared/whatsappPhone';
 import { openWhatsAppWeb } from '@/utils/whatsappWeb';
 import { showAppToast } from '@/components/AppToast';
 import type { Patient } from '@/types/patient';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
+import { WhatsAppIcon } from '@/icons/fluent';
+
+const useStyles = makeStyles({
+  surface: {
+    maxWidth: '400px',
+    width: '100%',
+    maxHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  body: {
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+  actions: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    gap: tokens.spacingHorizontalS,
+    flexShrink: 0,
+  },
+  hint: {
+    color: tokens.colorNeutralForeground2,
+    fontSize: tokens.fontSizeBase200,
+  },
+});
 
 export function PatientWhatsAppSendDialog({
   open,
@@ -24,6 +65,7 @@ export function PatientWhatsAppSendDialog({
   patient: Patient;
   onClose: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const { can } = useLicense();
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -65,55 +107,75 @@ export function PatientWhatsAppSendDialog({
   }
 
   return (
-    <Dialog open={open} onClose={sending ? undefined : onClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
-      <FormDialogTitle
-        title="Send WhatsApp"
-        subtitle={`${patient.firstName} ${patient.lastName}${phone ? ` · ${phone}` : ''}`}
-      />
-      <DialogContent sx={dialogContentSx}>
-        <Stack spacing={1.5} sx={{ mt: 0.5 }}>
-          {!phone && <Alert severity="warning">Add a phone number on this patient first.</Alert>}
-          {error && <Alert severity="error">{error}</Alert>}
-          {sent && <Alert severity="success">Message sent.</Alert>}
-          <TextField
-            label="Message"
-            fullWidth
-            multiline
-            minRows={4}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            disabled={sending || sent || !phone}
-          />
-          <Typography variant="caption" color="text.secondary">
-            Cloud API se in-app send. WhatsApp Web ke liye neeche Open WhatsApp Web dabao.
-          </Typography>
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={dialogActionsSx}>
-        <Button onClick={onClose} disabled={sending} sx={dialogCancelBtnSx}>{sent ? 'Close' : 'Cancel'}</Button>
-        {phone && (
-          <Button
-            disabled={sending}
-            onClick={() => {
-              openWhatsAppWeb(phone, text);
-              onClose();
-            }}
-            sx={dialogCancelBtnSx}
-          >
-            Open WhatsApp Web
+    <Dialog
+      open={open}
+      onOpenChange={(_, data) => {
+        if (!data.open && !sending) onClose();
+      }}
+    >
+      <DialogSurface className={styles.surface}>
+        <FormDialogTitle
+          title="Send WhatsApp"
+          subtitle={`${patient.firstName} ${patient.lastName}${phone ? ` · ${phone}` : ''}`}
+        />
+        <DialogBody>
+          <DialogContent className={styles.body}>
+            {!phone && (
+              <MessageBar intent="warning">
+                <MessageBarBody>Add a phone number on this patient first.</MessageBarBody>
+              </MessageBar>
+            )}
+            {error && (
+              <MessageBar intent="error">
+                <MessageBarBody>{error}</MessageBarBody>
+              </MessageBar>
+            )}
+            {sent && (
+              <MessageBar intent="success">
+                <MessageBarBody>Message sent.</MessageBarBody>
+              </MessageBar>
+            )}
+            <Field label="Message">
+              <Textarea
+                rows={4}
+                value={text}
+                onChange={(_, d) => setText(d.value)}
+                disabled={sending || sent || !phone}
+              />
+            </Field>
+            <Text className={styles.hint}>
+              Cloud API se in-app send. WhatsApp Web ke liye neeche Open WhatsApp Web dabao.
+            </Text>
+          </DialogContent>
+        </DialogBody>
+        <DialogActions className={styles.actions}>
+          <Button appearance="secondary" onClick={onClose} disabled={sending}>
+            {sent ? 'Close' : 'Cancel'}
           </Button>
-        )}
-        {can('whatsapp') && (
-          <SubmitButton
-            loading={sending}
-            disabled={!phone || sent || !text.trim()}
-            onClick={() => void handleSend()}
-            startIcon={<WhatsAppIcon />}
-          >
-            Send
-          </SubmitButton>
-        )}
-      </DialogActions>
+          {phone && (
+            <Button
+              appearance="secondary"
+              disabled={sending}
+              onClick={() => {
+                openWhatsAppWeb(phone, text);
+                onClose();
+              }}
+            >
+              Open WhatsApp Web
+            </Button>
+          )}
+          {can('whatsapp') && (
+            <SubmitButton
+              loading={sending}
+              disabled={!phone || sent || !text.trim()}
+              icon={<WhatsAppIcon />}
+              onClick={() => void handleSend()}
+            >
+              Send
+            </SubmitButton>
+          )}
+        </DialogActions>
+      </DialogSurface>
     </Dialog>
   );
 }

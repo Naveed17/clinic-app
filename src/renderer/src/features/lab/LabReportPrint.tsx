@@ -1,4 +1,13 @@
-import { Box, Button, Dialog, DialogContent, Stack } from '@mui/material';
+import {
+  Button,
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  Spinner,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { useEffect, useMemo, useRef, useState } from 'react';
 // cspell:ignore bwipjs
 import bwipjs from 'bwip-js';
@@ -39,6 +48,46 @@ function generateQr(text: string): string | null {
   }
 }
 
+const useStyles = makeStyles({
+  surface: {
+    width: '100%',
+    maxWidth: '900px',
+    height: '92vh',
+    maxHeight: '92vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  body: {
+    padding: 0,
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflowY: 'auto',
+    backgroundColor: '#e8eaed',
+  },
+  iframe: {
+    display: 'block',
+    width: '100%',
+    minHeight: '1100px',
+    height: '100%',
+    border: 'none',
+    backgroundColor: '#e8eaed',
+  },
+  footer: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: tokens.spacingHorizontalS,
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalM,
+    flexShrink: 0,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+  },
+});
+
 export function LabReportPrint({
   order,
   onClose,
@@ -48,6 +97,7 @@ export function LabReportPrint({
   onClose: () => void;
   clinicOverride?: LabReportClinic;
 }): React.JSX.Element {
+  const styles = useStyles();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [clinic, setClinic] = useState<LabReportClinic>({
     clinicName: clinicOverride?.clinicName ?? '',
@@ -58,7 +108,6 @@ export function LabReportPrint({
   const [printing, setPrinting] = useState(false);
 
   const barcodeSrc = useMemo(() => generateBarcode(labReportNumber(order.id)), [order.id]);
-
   const qrSrc = useMemo(() => generateQr(order.id), [order.id]);
 
   useEffect(() => {
@@ -94,8 +143,6 @@ export function LabReportPrint({
   async function handlePrint(): Promise<void> {
     setPrinting(true);
     try {
-      // Same HTML as preview, printed as A4 (not POS 80mm). Silent Chromium print
-      // keeps backgrounds and skips browser header/footer URLs.
       const result = await window.clinic.print.html(html, { paper: 'A4', printDialog: false });
       if (result?.ok === false) {
         iframeRef.current?.contentWindow?.print();
@@ -110,54 +157,35 @@ export function LabReportPrint({
   return (
     <Dialog
       open
-      onClose={onClose}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{
-        sx: {
-          display: 'flex',
-          flexDirection: 'column',
-          height: '92vh',
-          maxHeight: '92vh',
-          overflow: 'hidden',
-        },
+      onOpenChange={(_, data) => {
+        if (!data.open) onClose();
       }}
     >
-      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'auto', bgcolor: '#e8eaed' }}>
-        <Box
-          component="iframe"
-          ref={iframeRef}
-          title="Laboratory report preview"
-          srcDoc={html}
-          sx={{
-            display: 'block',
-            width: '100%',
-            minHeight: 1100,
-            height: '100%',
-            border: 'none',
-            bgcolor: '#e8eaed',
-          }}
-        />
-      </DialogContent>
-      <Box
-        sx={{
-          px: 2,
-          py: 1.25,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          flexShrink: 0,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          bgcolor: '#fff',
-        }}
-      >
-        <Stack direction="row" spacing={1}>
-          <Button onClick={onClose}>Close</Button>
-          <Button variant="contained" onClick={() => void handlePrint()} loading={printing}>
+      <DialogSurface className={styles.surface}>
+        <DialogBody>
+          <DialogContent className={styles.body}>
+            <iframe
+              ref={iframeRef}
+              className={styles.iframe}
+              title="Laboratory report preview"
+              srcDoc={html}
+            />
+          </DialogContent>
+        </DialogBody>
+        <div className={styles.footer}>
+          <Button appearance="secondary" onClick={onClose}>
+            Close
+          </Button>
+          <Button
+            appearance="primary"
+            onClick={() => void handlePrint()}
+            disabled={printing}
+            icon={printing ? <Spinner size="tiny" /> : undefined}
+          >
             Print
           </Button>
-        </Stack>
-      </Box>
+        </div>
+      </DialogSurface>
     </Dialog>
   );
 }

@@ -1,15 +1,24 @@
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
-import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, Skeleton,
-  Divider, FormControlLabel, IconButton, InputAdornment,
-  Stack, Switch, TextField, Typography,
-} from '@mui/material';
-import {
-  FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogFormSx, dialogPaperProps, telInputDialogProps,
-} from '@/components/DialogUI';
+  Button,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  Divider,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  Skeleton,
+  Switch,
+  Text,
+  Textarea,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
+import { FormDialogTitle, SubmitButton } from '@/components/DialogUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { DoctorAvatarPicker } from '@/components/DoctorAvatar';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +27,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { doctorsService } from '@/services/doctors.service';
 import type { Doctor, DoctorUpdateInput } from '@/types/doctor';
+import { VisibilityOffOutlinedIcon, VisibilityOutlinedIcon } from '@/icons/fluent';
 
 const editSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.'),
@@ -51,7 +61,51 @@ function toFormValues(doctor: Doctor): FormValues {
   };
 }
 
-export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string; open: boolean; onClose: () => void }): React.JSX.Element {
+const useStyles = makeStyles({
+  surface: {
+    maxWidth: '560px',
+    width: '100%',
+    maxHeight: '90vh',
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
+  },
+  body: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalL,
+    padding: tokens.spacingHorizontalL,
+  },
+  grid2: {
+    display: 'grid',
+    gap: tokens.spacingHorizontalL,
+    gridTemplateColumns: '1fr 1fr',
+  },
+  section: {
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  actions: {
+    padding: tokens.spacingHorizontalL,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    gap: tokens.spacingHorizontalS,
+  },
+});
+
+export function DoctorEditDialog({
+  doctorId,
+  open,
+  onClose,
+}: {
+  doctorId: string;
+  open: boolean;
+  onClose: () => void;
+}): React.JSX.Element {
+  const styles = useStyles();
   const qc = useQueryClient();
   const [showPw, setShowPw] = useState(false);
 
@@ -64,18 +118,36 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
 
   const form = useForm<FormValues>({
     resolver: zodResolver(editSchema) as import('react-hook-form').Resolver<FormValues>,
-    defaultValues: { firstName: '', lastName: '', email: '', password: '', isActive: true, specialization: '', qualification: '', experienceYears: 0, consultationFee: 0, phone: '', bio: '' },
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+      isActive: true,
+      specialization: '',
+      qualification: '',
+      experienceYears: 0,
+      consultationFee: 0,
+      phone: '',
+      bio: '',
+    },
   });
 
   useEffect(() => {
-    if (open && doctor) { form.reset(toFormValues(doctor)); setShowPw(false); setAvatar(doctor.doctorProfile?.avatar ?? null); }
+    if (open && doctor) {
+      form.reset(toFormValues(doctor));
+      setShowPw(false);
+      setAvatar(doctor.doctorProfile?.avatar ?? null);
+    }
   }, [open, doctor, form]);
 
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
       const input: DoctorUpdateInput = {
-        firstName: values.firstName, lastName: values.lastName,
-        email: values.email, isActive: values.isActive,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        email: values.email,
+        isActive: values.isActive,
         specialization: values.specialization,
         qualification: values.qualification || undefined,
         experienceYears: values.experienceYears,
@@ -99,77 +171,158 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
 
   if (!doctor && open) {
     return (
-      <Dialog open={open} onClose={onClose} PaperProps={dialogPaperProps}>
-        <DialogContent sx={dialogContentSx}>
-          <Stack spacing={1.5} sx={{ py: 1 }}>
-            <Skeleton variant="rounded" height={40} />
-            <Skeleton variant="rounded" height={40} />
-            <Skeleton variant="rounded" height={40} />
-          </Stack>
-        </DialogContent>
+      <Dialog open={open} onOpenChange={(_, d) => !d.open && onClose()}>
+        <DialogSurface className={styles.surface}>
+          <DialogBody>
+            <DialogContent className={styles.body}>
+              <Skeleton style={{ height: 40 }} />
+              <Skeleton style={{ height: 40 }} />
+              <Skeleton style={{ height: 40 }} />
+            </DialogContent>
+          </DialogBody>
+        </DialogSurface>
       </Dialog>
     );
   }
 
   return (
-    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps} {...telInputDialogProps}>
-      <FormDialogTitle title="Edit Doctor" subtitle="Update account details and doctor profile." />
-      <Box
-        component="form"
-        onSubmit={form.handleSubmit((v) => mutation.mutate(v))}
-        sx={dialogFormSx}
-      >
-        <DialogContent sx={dialogContentSx}>
-          <Stack spacing={2.25} sx={{ pt: 0.5 }}>
-            {mutation.isError && <Alert severity="error">Unable to save. Please try again.</Alert>}
-            <Typography variant="subtitle2" color="text.secondary">Account</Typography>
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-              <TextField autoFocus fullWidth label="First name" error={Boolean(errors.firstName)} helperText={errors.firstName?.message} {...form.register('firstName')} />
-              <TextField fullWidth label="Last name" error={Boolean(errors.lastName)} helperText={errors.lastName?.message} {...form.register('lastName')} />
-            </Box>
-            <TextField fullWidth label="Email" type="email" error={Boolean(errors.email)} helperText={errors.email?.message} {...form.register('email')} />
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-              <TextField fullWidth label="New password (leave blank to keep)" type={showPw ? 'text' : 'password'} error={Boolean(errors.password)} helperText={errors.password?.message} {...form.register('password')}
-                slotProps={{ input: { endAdornment: <InputAdornment position="end"><IconButton size="small" onClick={() => setShowPw(v => !v)} edge="end">{showPw ? <VisibilityOutlinedIcon fontSize="small" /> : <VisibilityOffOutlinedIcon fontSize="small" />}</IconButton></InputAdornment> } }}
+    <Dialog open={open} onOpenChange={(_, d) => !d.open && onClose()}>
+      <DialogSurface className={styles.surface}>
+        <FormDialogTitle title="Edit Doctor" subtitle="Update account details and doctor profile." />
+        <form
+          className={styles.form}
+          onSubmit={form.handleSubmit((v) => mutation.mutate(v))}
+        >
+          <DialogBody>
+            <DialogContent className={styles.body}>
+              {mutation.isError ? (
+                <MessageBar intent="error">
+                  <MessageBarBody>Unable to save. Please try again.</MessageBarBody>
+                </MessageBar>
+              ) : null}
+              <Text className={styles.section}>Account</Text>
+              <div className={styles.grid2}>
+                <Field
+                  label="First name"
+                  validationMessage={errors.firstName?.message}
+                  validationState={errors.firstName ? 'error' : 'none'}
+                >
+                  <Input autoFocus {...form.register('firstName')} />
+                </Field>
+                <Field
+                  label="Last name"
+                  validationMessage={errors.lastName?.message}
+                  validationState={errors.lastName ? 'error' : 'none'}
+                >
+                  <Input {...form.register('lastName')} />
+                </Field>
+              </div>
+              <Field
+                label="Email"
+                validationMessage={errors.email?.message}
+                validationState={errors.email ? 'error' : 'none'}
+              >
+                <Input type="email" {...form.register('email')} />
+              </Field>
+              <div className={styles.grid2}>
+                <Field
+                  label="New password (leave blank to keep)"
+                  validationMessage={errors.password?.message}
+                  validationState={errors.password ? 'error' : 'none'}
+                >
+                  <Input
+                    type={showPw ? 'text' : 'password'}
+                    {...form.register('password')}
+                    contentAfter={
+                      <Button
+                        appearance="transparent"
+                        size="small"
+                        icon={
+                          showPw ? (
+                            <VisibilityOutlinedIcon style={{ fontSize: 18 }} />
+                          ) : (
+                            <VisibilityOffOutlinedIcon style={{ fontSize: 18 }} />
+                          )
+                        }
+                        onClick={() => setShowPw((v) => !v)}
+                      />
+                    }
+                  />
+                </Field>
+                <Controller
+                  control={form.control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <Switch
+                      checked={field.value}
+                      onChange={(_, d) => field.onChange(d.checked)}
+                      label="Active"
+                    />
+                  )}
+                />
+              </div>
+              <Divider />
+              <Text className={styles.section}>Doctor Profile</Text>
+              <DoctorAvatarPicker value={avatar} onChange={setAvatar} />
+              <Field
+                label="Specialization"
+                validationMessage={errors.specialization?.message}
+                validationState={errors.specialization ? 'error' : 'none'}
+              >
+                <Input {...form.register('specialization')} />
+              </Field>
+              <div className={styles.grid2}>
+                <Field label="Qualification (e.g. MBBS, MD)">
+                  <Input {...form.register('qualification')} />
+                </Field>
+                <Field label="Experience (years)">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={60}
+                    {...form.register('experienceYears', {
+                      setValueAs: (v) => (v === '' ? 0 : Number(v)),
+                    })}
+                  />
+                </Field>
+              </div>
+              <Field label="Consultation fee">
+                <Input
+                  type="number"
+                  min={0}
+                  step="any"
+                  contentBefore="Rs."
+                  {...form.register('consultationFee', {
+                    setValueAs: (v) => (v === '' ? 0 : Number(v)),
+                  })}
+                />
+              </Field>
+              <Controller
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <PhoneInputField
+                    label="Contact phone"
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                  />
+                )}
               />
-              <Controller control={form.control} name="isActive" render={({ field }) => (
-                <FormControlLabel sx={{ mt: 1 }} control={<Switch checked={field.value} onChange={field.onChange} />} label="Active" />
-              )} />
-            </Box>
-            <Divider />
-            <Typography variant="subtitle2" color="text.secondary">Doctor Profile</Typography>
-            <DoctorAvatarPicker value={avatar} onChange={setAvatar} />
-            <TextField fullWidth label="Specialization" error={Boolean(errors.specialization)} helperText={errors.specialization?.message} {...form.register('specialization')} />
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-              <TextField fullWidth label="Qualification (e.g. MBBS, MD)" {...form.register('qualification')} />
-              <TextField fullWidth label="Experience (years)" type="number" slotProps={{ htmlInput: { min: 0, max: 60, step: 1 } }}
-                {...form.register('experienceYears', { setValueAs: (v) => (v === '' ? 0 : Number(v)) })} />
-            </Box>
-            <TextField
-              fullWidth
-              label="Consultation fee"
-              type="number"
-              slotProps={{
-                htmlInput: { min: 0, step: 'any' },
-                input: { startAdornment: <InputAdornment position="start">Rs.</InputAdornment> },
-              }}
-              {...form.register('consultationFee', { setValueAs: (v) => (v === '' ? 0 : Number(v)) })}
-            />
-            <Controller
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <PhoneInputField label="Contact phone" value={field.value ?? ''} onChange={field.onChange} />
-              )}
-            />
-            <TextField fullWidth label="Bio" multiline minRows={2} {...form.register('bio')} />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
-          <SubmitButton type="submit" loading={mutation.isPending}>Save changes</SubmitButton>
-        </DialogActions>
-      </Box>
+              <Field label="Bio">
+                <Textarea rows={2} {...form.register('bio')} />
+              </Field>
+            </DialogContent>
+          </DialogBody>
+          <DialogActions className={styles.actions}>
+            <Button appearance="secondary" onClick={onClose} disabled={mutation.isPending}>
+              Cancel
+            </Button>
+            <SubmitButton type="submit" loading={mutation.isPending}>
+              Save changes
+            </SubmitButton>
+          </DialogActions>
+        </form>
+      </DialogSurface>
     </Dialog>
   );
 }

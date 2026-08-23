@@ -1,58 +1,44 @@
-import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
-import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
-import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined';
-import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
-import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
-import HourglassEmptyOutlinedIcon from '@mui/icons-material/HourglassEmptyOutlined';
-import DoneAllOutlinedIcon from '@mui/icons-material/DoneAllOutlined';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
-  Alert,
-  Autocomplete,
   Avatar,
-  Box,
+  Badge,
   Button,
-  Chip,
-  CircularProgress,
+  Combobox,
   Dialog,
   DialogActions,
+  DialogBody,
   DialogContent,
-  FormControl,
-  IconButton,
-  InputAdornment,
-  InputLabel,
-  MenuItem,
-  Paper,
-  Select,
-  Stack,
+  DialogSurface,
+  Dropdown,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  Option,
+  Spinner,
   Tab,
-  Tabs,
-  TextField,
+  TabList,
+  Text,
+  Textarea,
+  Title2,
   Tooltip,
-  Typography,
-} from '@mui/material';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
-import { alpha, darken, useTheme } from '@mui/material/styles';
+  makeStyles,
+  tokens,
+  type BadgeProps,
+} from '@fluentui/react-components';
+import { FluentDateField, formatDateIso, parseDateIso } from '@/components/FluentDateField';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useEffect, useState, useRef, useCallback } from 'react';
-import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
+import { Document, Page, Text as PdfText, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
 import { DEFAULT_CLINIC_LOGO, useClinicBrandLogo } from '@/utils/clinicBrandLogo';
-import type { Token, TokenInput, TokenPerson, TokenStatus, PrescriptionInput, PrescriptionMedicine } from '@/types/token';
+import type { Token, TokenPerson, TokenStatus, PrescriptionInput, PrescriptionMedicine } from '@/types/token';
 import { useAuth } from '@/features/auth/AuthContext';
 import { FetchingBar, ListCardsSkeleton, StatCardsSkeleton } from '@/components/LoadingUI';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { appointmentsService } from '@/services/appointments.service';
 import { doctorOfflineReason, slotSearchFrom } from '@/utils/appointmentSlot';
 import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
-import {
-  ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps,
-} from '@/components/DialogUI';
+import { ConfirmDialog, FormDialogTitle, SubmitButton } from '@/components/DialogUI';
+import { StatusBadge } from '@/components/TableUI';
 import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
 import { printTokenSlip } from '@/utils/printTokenSlip';
 import { POS_PAPER, POS_RECEIPT } from '@shared/invoicePaper';
@@ -60,15 +46,224 @@ import { labResultPreview } from '@/features/lab/labReportPayload';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { TokenFeeFields } from '@/features/tokens/TokenFeeFields';
 import { tokenNetFee } from '@shared/tokenFee';
+import { AddOutlinedIcon, CheckCircleOutlinedIcon, ChevronLeftIcon, ChevronRightIcon, CloseOutlinedIcon, ConfirmationNumberOutlinedIcon, DeleteOutlineIcon, DoneAllOutlinedIcon, HourglassEmptyOutlinedIcon, PrintOutlinedIcon, SkipNextOutlinedIcon, UndoOutlinedIcon } from '@/icons/fluent';
 
-const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
+type StatusColor = NonNullable<BadgeProps['color']>;
+
+const statusConfig: Record<TokenStatus, { label: string; color: StatusColor }> = {
   WAITING: { label: 'Waiting', color: 'warning' },
   DONE: { label: 'Done', color: 'success' },
-  SKIPPED: { label: 'Skipped', color: 'default' },
+  SKIPPED: { label: 'Skipped', color: 'subtle' },
 };
+
+const useDialogStyles = makeStyles({
+  surface: {
+    maxWidth: '400px',
+    width: '100%',
+    maxHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  surfaceMd: {
+    maxWidth: '720px',
+    width: '100%',
+    maxHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  body: {
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflowY: 'auto',
+  },
+  fields: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM },
+  actions: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    gap: tokens.spacingHorizontalS,
+    flexShrink: 0,
+  },
+  doctorOption: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS, width: '100%' },
+  doctorFee: { marginLeft: 'auto', whiteSpace: 'nowrap', color: tokens.colorNeutralForeground2, fontWeight: tokens.fontWeightBold },
+  medGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr 1fr auto',
+    gap: tokens.spacingHorizontalS,
+    padding: tokens.spacingVerticalM,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  chipRow: { display: 'flex', flexWrap: 'wrap', gap: tokens.spacingHorizontalXS, marginBottom: tokens.spacingVerticalS },
+  row: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS },
+  previewSurface: {
+    maxWidth: '400px',
+    width: '100%',
+    maxHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  previewHead: {
+    paddingLeft: tokens.spacingHorizontalXL,
+    paddingRight: tokens.spacingHorizontalXL,
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    flexShrink: 0,
+  },
+  previewBody: { padding: 0, flex: '1 1 auto', minHeight: 0, overflow: 'auto', backgroundColor: '#f1f5f9' },
+  previewFoot: {
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  previewActions: { display: 'flex', justifyContent: 'flex-end', gap: '4px' },
+  loadingBox: { height: '560px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+});
+
+const usePageStyles = makeStyles({
+  page: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXL, paddingBottom: tokens.spacingVerticalL },
+  header: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: tokens.spacingHorizontalL, flexWrap: 'wrap' },
+  subtitle: { color: tokens.colorNeutralForeground2, fontWeight: tokens.fontWeightSemibold },
+  title: { letterSpacing: '-0.02em', marginTop: tokens.spacingVerticalXXS, fontWeight: 900 },
+  headerActions: { display: 'flex', gap: tokens.spacingHorizontalM, alignItems: 'center', flexWrap: 'wrap' },
+  metrics: {
+    display: 'grid',
+    gap: tokens.spacingHorizontalM,
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    '@media (max-width: 900px)': { gridTemplateColumns: '1fr 1fr' },
+  },
+  metricCard: { padding: tokens.spacingVerticalXL, borderRadius: '20px', border: 'none' },
+  metricRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },
+  metricIcon: { width: '40px', height: '40px', borderRadius: tokens.borderRadiusMedium, display: 'grid', placeItems: 'center' },
+  layout: { display: 'grid', gap: tokens.spacingVerticalXL, alignItems: 'start' },
+  col: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalL, minWidth: 0 },
+  softCard: {
+    borderRadius: '20px',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    boxShadow: tokens.shadow4,
+    backgroundColor: tokens.colorNeutralBackground1,
+    padding: tokens.spacingVerticalXL,
+    position: 'relative',
+  },
+  doctorBar: {
+    padding: '4px',
+    paddingLeft: '16px',
+    borderRadius: '999px',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow4,
+    overflow: 'hidden',
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    minWidth: 0,
+  },
+  doctorLabel: {
+    flexShrink: 0,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightBold,
+    fontSize: tokens.fontSizeBase100,
+  },
+  queueHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: tokens.spacingVerticalL },
+  queueList: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalS, maxHeight: '520px', overflowY: 'auto', paddingRight: '4px' },
+  tokenRow: {
+    padding: tokens.spacingVerticalM,
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    borderRadius: tokens.borderRadiusMedium,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderLeftWidth: '4px',
+    borderLeftStyle: 'solid',
+  },
+  tokenBody: { flex: 1, minWidth: 0 },
+  row: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS },
+  tokenActions: { display: 'flex', gap: '2px' },
+  empty: { paddingTop: '40px', paddingBottom: '40px', textAlign: 'center' },
+  emptyIcon: {
+    width: '64px',
+    height: '64px',
+    borderRadius: '18px',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    marginBottom: tokens.spacingVerticalM,
+    display: 'grid',
+    placeItems: 'center',
+    backgroundColor: tokens.colorBrandBackground2,
+    color: tokens.colorBrandForeground1,
+  },
+  nowCard: {
+    padding: '22px',
+    borderRadius: '24px',
+    border: 'none',
+    backgroundImage: `linear-gradient(160deg, ${tokens.colorBrandBackground} 0%, ${tokens.colorBrandBackgroundSelected} 100%)`,
+    color: tokens.colorNeutralForegroundOnBrand,
+    boxShadow: tokens.shadow16,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  nowOrb1: {
+    position: 'absolute', right: '-30px', top: '-30px', width: '120px', height: '120px',
+    borderRadius: '50%', border: '2px solid rgba(255,255,255,0.12)',
+  },
+  nowOrb2: {
+    position: 'absolute', right: '20px', bottom: '-40px', width: '100px', height: '100px',
+    borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  nowActions: { display: 'flex', gap: tokens.spacingHorizontalS, marginTop: tokens.spacingVerticalXL },
+  snapshot: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalS },
+  snapshotRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  tabsWrap: { position: 'relative', flex: 1, minWidth: 0 },
+  tabsScroller: {
+    display: 'flex',
+    overflowX: 'auto',
+    scrollbarWidth: 'none',
+    borderRadius: '999px',
+    backgroundColor: tokens.colorNeutralBackground3,
+    padding: '4px',
+  },
+  scrollBtn: {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    zIndex: 2,
+    width: '28px',
+    height: '28px',
+    minWidth: '28px',
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow4,
+  },
+});
 
 function todayStr(): string {
   return new Date().toLocaleDateString('en-CA');
+}
+
+function feeLabel(fee: unknown): string {
+  return `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(fee) || 0)}`;
 }
 
 export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaultDoctorId, onSuccess }: {
@@ -78,7 +273,8 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   defaultPatientId?: string;
   defaultDoctorId?: string;
   onSuccess?: (token: Token) => void;
-}) {
+}): React.JSX.Element {
+  const styles = useDialogStyles();
   const qc = useQueryClient();
   const { can } = useLicense();
   const showLabReason = can('labDashboard');
@@ -109,24 +305,18 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
     queryFn: () => window.clinic.tokens.doctors(),
   });
 
-  const selectedPatient = useMemo(
-    () => patients.find((p) => p.id === patientId) ?? null,
-    [patients, patientId],
-  );
-  const selectedDoctor = useMemo(
-    () => doctors.find((d) => d.id === doctorId) ?? null,
-    [doctors, doctorId],
-  );
+  const selectedPatient = useMemo(() => patients.find((p) => p.id === patientId) ?? null, [patients, patientId]);
+  const selectedDoctor = useMemo(() => doctors.find((d) => d.id === doctorId) ?? null, [doctors, doctorId]);
 
   useEffect(() => {
     if (!open || !selectedDoctor) return;
     setConsultationFee(String(Number(selectedDoctor.consultationFee ?? 0)));
     setFeeDiscount('');
   }, [open, selectedDoctor]);
+
   const { data: weekVisits } = useQuery({
     queryKey: ['token-week-visits', patientId, doctorId, date],
-    queryFn: () =>
-      window.clinic.tokens.weekVisits(patientId, doctorId, date).catch(() => ({ count: 0 })),
+    queryFn: () => window.clinic.tokens.weekVisits(patientId, doctorId, date).catch(() => ({ count: 0 })),
     enabled: open && Boolean(patientId && doctorId && date),
   });
   const { data: tokenSchedule = [], isFetched: tokenScheduleFetched } = useQuery({
@@ -172,107 +362,99 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   });
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
-      <FormDialogTitle title="Issue Token" subtitle="Create a queue token for a patient visit." />
-      <DialogContent sx={dialogContentSx}>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          {mutation.isError && (
-            <Alert severity="error">
-              {(mutation.error as Error)?.message || 'Failed to issue token.'}
-            </Alert>
-          )}
-          {offlineReason && (
-            <Alert severity="warning">{offlineReason}</Alert>
-          )}
-          <Autocomplete
-            options={patients}
-            getOptionLabel={(p) => `${p.firstName} ${p.lastName}`}
-            value={selectedPatient}
-            onChange={(_, v) => setPatientId(v?.id ?? '')}
-            isOptionEqualToValue={(o, v) => o.id === v.id}
-            renderInput={(params) => <TextField {...params} label="Patient" fullWidth />}
-          />
-          <Autocomplete
-            options={doctors}
-            getOptionLabel={(d) => `Dr. ${d.firstName} ${d.lastName}`}
-            value={selectedDoctor}
-            onChange={(_, v) => setDoctorId(v?.id ?? '')}
-            isOptionEqualToValue={(o, v) => o.id === v.id}
-            renderOption={(props, option) => (
-              <Box component="li" {...props} key={option.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                <DoctorAvatar src={option.avatar} name={`Dr. ${option.firstName} ${option.lastName}`} size={32} />
-                <Typography fontSize={13.5} fontWeight={600} sx={{ flex: 1 }} noWrap>
-                  Dr. {option.firstName} {option.lastName}
-                </Typography>
-                <Typography fontSize={13} fontWeight={700} color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                  Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(option.consultationFee) || 0)}
-                </Typography>
-              </Box>
-            )}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Doctor"
-                fullWidth
-                InputProps={{
-                  ...params.InputProps,
-                  startAdornment: selectedDoctor ? (
-                    <>
-                      <DoctorAvatar
-                        src={selectedDoctor.avatar}
-                        name={`Dr. ${selectedDoctor.firstName} ${selectedDoctor.lastName}`}
-                        size={24}
-                        sx={{ ml: 0.5, mr: 0.5 }}
-                      />
-                      {params.InputProps.startAdornment}
-                    </>
-                  ) : params.InputProps.startAdornment,
-                }}
+    <Dialog open={open} onOpenChange={(_, d) => { if (!d.open) onClose(); }}>
+      <DialogSurface className={styles.surface}>
+        <FormDialogTitle title="Issue Token" subtitle="Create a queue token for a patient visit." />
+        <DialogBody>
+          <DialogContent className={styles.body}>
+            <div className={styles.fields}>
+              {mutation.isError && (
+                <MessageBar intent="error">
+                  <MessageBarBody>{(mutation.error as Error)?.message || 'Failed to issue token.'}</MessageBarBody>
+                </MessageBar>
+              )}
+              {offlineReason && (
+                <MessageBar intent="warning"><MessageBarBody>{offlineReason}</MessageBarBody></MessageBar>
+              )}
+              <Field label="Patient">
+                <Combobox
+                  placeholder="Select patient"
+                  value={selectedPatient ? `${selectedPatient.firstName} ${selectedPatient.lastName}` : ''}
+                  selectedOptions={patientId ? [patientId] : []}
+                  onOptionSelect={(_, data) => setPatientId(data.optionValue ?? '')}
+                >
+                  {patients.map((p) => (
+                    <Option key={p.id} value={p.id} text={`${p.firstName} ${p.lastName}`}>
+                      {p.firstName} {p.lastName}
+                    </Option>
+                  ))}
+                </Combobox>
+              </Field>
+              <Field label="Doctor">
+                <Combobox
+                  placeholder="Select doctor"
+                  value={selectedDoctor ? `Dr. ${selectedDoctor.firstName} ${selectedDoctor.lastName}` : ''}
+                  selectedOptions={doctorId ? [doctorId] : []}
+                  onOptionSelect={(_, data) => setDoctorId(data.optionValue ?? '')}
+                >
+                  {doctors.map((d) => (
+                    <Option key={d.id} value={d.id} text={`Dr. ${d.firstName} ${d.lastName}`}>
+                      <div className={styles.doctorOption}>
+                        <DoctorAvatar src={d.avatar} name={`Dr. ${d.firstName} ${d.lastName}`} size={28} />
+                        <Text weight="semibold" size={300} style={{ flex: 1 }}>
+                          Dr. {d.firstName} {d.lastName}
+                        </Text>
+                        <Text size={200} className={styles.doctorFee}>{feeLabel(d.consultationFee)}</Text>
+                      </div>
+                    </Option>
+                  ))}
+                </Combobox>
+              </Field>
+              <TokenFeeFields
+                consultationFee={consultationFee}
+                feeDiscount={feeDiscount}
+                onFeeChange={setConsultationFee}
+                onDiscountChange={setFeeDiscount}
+                priorVisitsThisWeek={weekVisits?.count ?? 0}
               />
-            )}
-          />
-          <TokenFeeFields
-            consultationFee={consultationFee}
-            feeDiscount={feeDiscount}
-            onFeeChange={setConsultationFee}
-            onDiscountChange={setFeeDiscount}
-            priorVisitsThisWeek={weekVisits?.count ?? 0}
-          />
-          <FormControl fullWidth>
-            <InputLabel>Reason (optional)</InputLabel>
-            <Select label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)}>
-              <MenuItem value="">— None —</MenuItem>
-              <MenuItem value="Checkup">Checkup</MenuItem>
-              <MenuItem value="Follow-up">Follow-up</MenuItem>
-              <MenuItem value="Urgent">Urgent</MenuItem>
-              <MenuItem value="Consultation">Consultation</MenuItem>
-              {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
-              <MenuItem value="Vaccination">Vaccination</MenuItem>
-            </Select>
-          </FormControl>
-          <TextField
-            label="Notes (optional)"
-            fullWidth
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={dialogActionsSx}>
-        <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
-        <SubmitButton
-          disabled={!patientId || !doctorId || Boolean(offlineReason)}
-          loading={mutation.isPending}
-          onClick={() => mutation.mutate()}
-        >
-          Issue Token
-        </SubmitButton>
-      </DialogActions>
+              <Field label="Reason (optional)">
+                <Dropdown
+                  value={reason || '— None —'}
+                  selectedOptions={[reason]}
+                  onOptionSelect={(_, data) => setReason(data.optionValue ?? '')}
+                >
+                  <Option value="" text="— None —">— None —</Option>
+                  <Option value="Checkup" text="Checkup">Checkup</Option>
+                  <Option value="Follow-up" text="Follow-up">Follow-up</Option>
+                  <Option value="Urgent" text="Urgent">Urgent</Option>
+                  <Option value="Consultation" text="Consultation">Consultation</Option>
+                  {showLabReason && <Option value="Lab Results" text="Lab Results">Lab Results</Option>}
+                  <Option value="Vaccination" text="Vaccination">Vaccination</Option>
+                </Dropdown>
+              </Field>
+              <Field label="Notes (optional)">
+                <Input value={notes} onChange={(_, d) => setNotes(d.value)} />
+              </Field>
+            </div>
+          </DialogContent>
+        </DialogBody>
+        <DialogActions className={styles.actions}>
+          <Button appearance="secondary" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
+          <SubmitButton
+            disabled={!patientId || !doctorId || Boolean(offlineReason)}
+            loading={mutation.isPending}
+            onClick={() => mutation.mutate()}
+          >
+            Issue Token
+          </SubmitButton>
+        </DialogActions>
+      </DialogSurface>
     </Dialog>
   );
 }
 
 function FeeRefundDialog({ token, onClose }: { token: Token; onClose: () => void }): React.JSX.Element {
+  const styles = useDialogStyles();
   const qc = useQueryClient();
   const remaining = tokenNetFee(token.consultationFee, token.feeDiscount, token.feeRefunded);
   const charged = tokenNetFee(token.consultationFee, token.feeDiscount, 0);
@@ -289,48 +471,47 @@ function FeeRefundDialog({ token, onClose }: { token: Token; onClose: () => void
     meta: { toast: 'Consultation fee refunded', errorToast: 'Failed to refund fee.' },
   });
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
-      <FormDialogTitle
-        title={`Refund fee — Token #${String(token.tokenNumber).padStart(3, '0')}`}
-        subtitle={`Return consultation fee for ${token.patient.firstName} ${token.patient.lastName}.`}
-      />
-      <DialogContent sx={dialogContentSx}>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          {mutation.isError && (
-            <Alert severity="error">{(mutation.error as Error)?.message || 'Failed to refund fee.'}</Alert>
-          )}
-          <Typography variant="body2" color="text.secondary">
-            Collected: <strong>Rs. {new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(charged)}</strong>
-            {Number(token.feeDiscount ?? 0) > 0
-              ? ` · Discount: Rs. ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(Number(token.feeDiscount))}`
-              : ''}
-            {Number(token.feeRefunded ?? 0) > 0
-              ? ` · Already refunded: Rs. ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(Number(token.feeRefunded))}`
-              : ''}
-          </Typography>
-          <TextField
-            label="Refund amount"
-            type="number"
-            fullWidth
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            slotProps={{
-              htmlInput: { min: 0, max: remaining, step: 'any' },
-              input: { startAdornment: <InputAdornment position="start">Rs.</InputAdornment> },
-            }}
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={dialogActionsSx}>
-        <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
-        <SubmitButton
-          loading={mutation.isPending}
-          disabled={remaining <= 0}
-          onClick={() => mutation.mutate()}
-        >
-          Refund Fee
-        </SubmitButton>
-      </DialogActions>
+    <Dialog open onOpenChange={(_, d) => { if (!d.open) onClose(); }}>
+      <DialogSurface className={styles.surface}>
+        <FormDialogTitle
+          title={`Refund fee — Token #${String(token.tokenNumber).padStart(3, '0')}`}
+          subtitle={`Return consultation fee for ${token.patient.firstName} ${token.patient.lastName}.`}
+        />
+        <DialogBody>
+          <DialogContent className={styles.body}>
+            <div className={styles.fields}>
+              {mutation.isError && (
+                <MessageBar intent="error">
+                  <MessageBarBody>{(mutation.error as Error)?.message || 'Failed to refund fee.'}</MessageBarBody>
+                </MessageBar>
+              )}
+              <Text size={300} style={{ color: tokens.colorNeutralForeground2 }}>
+                Collected: <strong>Rs. {new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(charged)}</strong>
+                {Number(token.feeDiscount ?? 0) > 0
+                  ? ` · Discount: Rs. ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(Number(token.feeDiscount))}`
+                  : ''}
+                {Number(token.feeRefunded ?? 0) > 0
+                  ? ` · Already refunded: Rs. ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 2 }).format(Number(token.feeRefunded))}`
+                  : ''}
+              </Text>
+              <Field label="Refund amount">
+                <Input
+                  type="number"
+                  value={amount}
+                  onChange={(_, d) => setAmount(d.value)}
+                  contentBefore={<Text size={200}>Rs.</Text>}
+                />
+              </Field>
+            </div>
+          </DialogContent>
+        </DialogBody>
+        <DialogActions className={styles.actions}>
+          <Button appearance="secondary" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
+          <SubmitButton loading={mutation.isPending} disabled={remaining <= 0} onClick={() => mutation.mutate()}>
+            Refund Fee
+          </SubmitButton>
+        </DialogActions>
+      </DialogSurface>
     </Dialog>
   );
 }
@@ -370,67 +551,66 @@ const ts = StyleSheet.create({
 
 export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone, logoSrc = DEFAULT_CLINIC_LOGO }: {
   token: Token; clinicName: string; clinicAddress: string; clinicPhone: string; logoSrc?: string;
-}) {
+}): React.JSX.Element {
   const date = new Date(token.createdAt).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
   const time = new Date(token.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return (
     <Document>
       <Page size={[POS_PAPER.pdfPageWidth, POS_PAPER.pdfPageHeightToken]} style={ts.page} wrap={false}>
         <Image src={logoSrc} style={ts.logo} />
-        <Text style={ts.shopName}>{clinicName || POS_RECEIPT.clinicFallback}</Text>
-        {clinicAddress ? <Text style={ts.shopSub}>{clinicAddress}</Text> : null}
-        {clinicPhone ? <Text style={ts.shopSub}>Tel: {clinicPhone}</Text> : null}
-        <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
-        <Text style={ts.title}>PATIENT TOKEN SLIP</Text>
-        <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
+        <PdfText style={ts.shopName}>{clinicName || POS_RECEIPT.clinicFallback}</PdfText>
+        {clinicAddress ? <PdfText style={ts.shopSub}>{clinicAddress}</PdfText> : null}
+        {clinicPhone ? <PdfText style={ts.shopSub}>Tel: {clinicPhone}</PdfText> : null}
+        <PdfText style={ts.stars}>{POS_RECEIPT.starLine}</PdfText>
+        <PdfText style={ts.title}>PATIENT TOKEN SLIP</PdfText>
+        <PdfText style={ts.stars}>{POS_RECEIPT.starLine}</PdfText>
         <View style={ts.tokenBox}>
-          <Text style={ts.tokenLabel}>TOKEN NO.</Text>
-          <Text style={ts.tokenNum}>{String(token.tokenNumber).padStart(3, '0')}</Text>
+          <PdfText style={ts.tokenLabel}>TOKEN NO.</PdfText>
+          <PdfText style={ts.tokenNum}>{String(token.tokenNumber).padStart(3, '0')}</PdfText>
         </View>
-        <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
-        <View style={ts.row}><Text style={ts.lbl}>Patient</Text><Text style={ts.val}>{token.patient.firstName} {token.patient.lastName}</Text></View>
-        {token.patient.mrNumber ? <View style={ts.row}><Text style={ts.lbl}>MR #</Text><Text style={ts.val}>{token.patient.mrNumber}</Text></View> : null}
-        <View style={ts.row}><Text style={ts.lbl}>Doctor</Text><Text style={ts.val}>Dr. {token.doctor.firstName} {token.doctor.lastName}</Text></View>
+        <PdfText style={ts.stars}>{POS_RECEIPT.starLine}</PdfText>
+        <View style={ts.row}><PdfText style={ts.lbl}>Patient</PdfText><PdfText style={ts.val}>{token.patient.firstName} {token.patient.lastName}</PdfText></View>
+        {token.patient.mrNumber ? <View style={ts.row}><PdfText style={ts.lbl}>MR #</PdfText><PdfText style={ts.val}>{token.patient.mrNumber}</PdfText></View> : null}
+        <View style={ts.row}><PdfText style={ts.lbl}>Doctor</PdfText><PdfText style={ts.val}>Dr. {token.doctor.firstName} {token.doctor.lastName}</PdfText></View>
         {Number(token.consultationFee ?? 0) > 0 ? (
           <>
             <View style={ts.row}>
-              <Text style={ts.lbl}>Fee</Text>
-              <Text style={ts.val}>
-                Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(token.consultationFee))}
-              </Text>
+              <PdfText style={ts.lbl}>Fee</PdfText>
+              <PdfText style={ts.val}>{feeLabel(token.consultationFee)}</PdfText>
             </View>
             {Number(token.feeDiscount ?? 0) > 0 ? (
               <View style={ts.row}>
-                <Text style={ts.lbl}>Discount</Text>
-                <Text style={ts.val}>
+                <PdfText style={ts.lbl}>Discount</PdfText>
+                <PdfText style={ts.val}>
                   - Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(token.feeDiscount))}
-                </Text>
+                </PdfText>
               </View>
             ) : null}
             {Number(token.feeDiscount ?? 0) > 0 || Number(token.feeRefunded ?? 0) > 0 ? (
               <View style={ts.row}>
-                <Text style={ts.lbl}>Payable</Text>
-                <Text style={ts.val}>
+                <PdfText style={ts.lbl}>Payable</PdfText>
+                <PdfText style={ts.val}>
                   Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(tokenNetFee(token.consultationFee, token.feeDiscount, token.feeRefunded))}
                   {Number(token.feeRefunded ?? 0) > 0 ? ' (refunded)' : ''}
-                </Text>
+                </PdfText>
               </View>
             ) : null}
           </>
         ) : null}
-        <View style={ts.row}><Text style={ts.lbl}>Date</Text><Text style={ts.val}>{date}</Text></View>
-        <View style={ts.row}><Text style={ts.lbl}>Time</Text><Text style={ts.val}>{time}</Text></View>
-        {token.notes ? <View style={ts.row}><Text style={ts.lbl}>Note</Text><Text style={ts.val}>{token.notes}</Text></View> : null}
-        {token.reason ? <View style={ts.row}><Text style={ts.lbl}>Reason</Text><Text style={ts.val}>{token.reason}</Text></View> : null}
-        <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
-        <Text style={ts.footer}>Please wait for your token to be called.{`\n`}{POS_RECEIPT.thankYou}</Text>
-        <Text style={ts.brand}>{POS_RECEIPT.poweredBy}</Text>
+        <View style={ts.row}><PdfText style={ts.lbl}>Date</PdfText><PdfText style={ts.val}>{date}</PdfText></View>
+        <View style={ts.row}><PdfText style={ts.lbl}>Time</PdfText><PdfText style={ts.val}>{time}</PdfText></View>
+        {token.notes ? <View style={ts.row}><PdfText style={ts.lbl}>Note</PdfText><PdfText style={ts.val}>{token.notes}</PdfText></View> : null}
+        {token.reason ? <View style={ts.row}><PdfText style={ts.lbl}>Reason</PdfText><PdfText style={ts.val}>{token.reason}</PdfText></View> : null}
+        <PdfText style={ts.stars}>{POS_RECEIPT.starLine}</PdfText>
+        <PdfText style={ts.footer}>Please wait for your token to be called.{`\n`}{POS_RECEIPT.thankYou}</PdfText>
+        <PdfText style={ts.brand}>{POS_RECEIPT.poweredBy}</PdfText>
       </Page>
     </Document>
   );
 }
 
-export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: () => void }) {
+export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: () => void }): React.JSX.Element {
+  const styles = useDialogStyles();
   const qc = useQueryClient();
   const { user } = useAuth();
   const { can } = useLicense();
@@ -439,7 +619,7 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
   const emptyMed = (): PrescriptionMedicine => ({ name: '', dosage: '', duration: '', instructions: '' });
   const [diagnosis, setDiagnosis] = useState(token.prescription?.diagnosis ?? '');
   const [medicines, setMedicines] = useState<PrescriptionMedicine[]>(
-    token.prescription?.medicines.length ? token.prescription.medicines : [emptyMed()]
+    token.prescription?.medicines.length ? token.prescription.medicines : [emptyMed()],
   );
   const [tests, setTests] = useState<string[]>(token.prescription?.tests ?? []);
   const [testInput, setTestInput] = useState('');
@@ -466,119 +646,148 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
   });
 
   const updateMed = (i: number, field: keyof PrescriptionMedicine, val: string) =>
-    setMedicines((prev) => prev.map((m, idx) => idx === i ? { ...m, [field]: val } : m));
+    setMedicines((prev) => prev.map((m, idx) => (idx === i ? { ...m, [field]: val } : m)));
 
   return (
-    <>
-      <Dialog open onClose={onClose} maxWidth="md" fullWidth PaperProps={dialogPaperProps}>
+    <Dialog open onOpenChange={(_, d) => { if (!d.open) onClose(); }}>
+      <DialogSurface className={styles.surfaceMd}>
         <FormDialogTitle
           title={`Prescription — Token #${String(token.tokenNumber).padStart(3, '0')}`}
           subtitle={`${token.patient.firstName} ${token.patient.lastName} · Dr. ${token.doctor.firstName} ${token.doctor.lastName}`}
         />
-        <DialogContent sx={dialogContentSx}>
-          <Stack spacing={2.5} sx={{ mt: 1 }}>
-            <TextField label="Diagnosis" fullWidth value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} />
+        <DialogBody>
+          <DialogContent className={styles.body}>
+            <div className={styles.fields}>
+              <Field label="Diagnosis">
+                <Input value={diagnosis} onChange={(_, d) => setDiagnosis(d.value)} />
+              </Field>
 
-            <Box>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Medicines</Typography>
-              <Stack spacing={1.5}>
-                {medicines.map((m, i) => (
-                  <Paper key={i} variant="outlined" sx={{ p: 1.5 }}>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: 1 }}>
-                      <MedicineAutocomplete
-                        value={m.name}
-                        onChange={(name) => updateMed(i, 'name', name)}
-                        size="small"
+              <div>
+                <Text weight="bold" size={300} style={{ display: 'block', marginBottom: 8 }}>Medicines</Text>
+                <div className={styles.fields}>
+                  {medicines.map((m, i) => (
+                    <div key={i} className={styles.medGrid}>
+                      <MedicineAutocomplete value={m.name} onChange={(name) => updateMed(i, 'name', name)} size="small" />
+                      <Field label="Dosage"><Input value={m.dosage} onChange={(_, d) => updateMed(i, 'dosage', d.value)} /></Field>
+                      <Field label="Duration"><Input value={m.duration} onChange={(_, d) => updateMed(i, 'duration', d.value)} /></Field>
+                      <Field label="Instructions"><Input value={m.instructions} onChange={(_, d) => updateMed(i, 'instructions', d.value)} /></Field>
+                      <Button
+                        appearance="subtle"
+                        icon={<DeleteOutlineIcon style={{ fontSize: 18 }} />}
+                        disabled={medicines.length === 1}
+                        onClick={() => setMedicines((p) => p.filter((_, idx) => idx !== i))}
+                        aria-label="Remove medicine"
                       />
-                      <TextField size="small" label="Dosage" value={m.dosage} onChange={(e) => updateMed(i, 'dosage', e.target.value)} />
-                      <TextField size="small" label="Duration" value={m.duration} onChange={(e) => updateMed(i, 'duration', e.target.value)} />
-                      <TextField size="small" label="Instructions" value={m.instructions} onChange={(e) => updateMed(i, 'instructions', e.target.value)} />
-                      <IconButton size="small" color="error" onClick={() => setMedicines((p) => p.filter((_, idx) => idx !== i))} disabled={medicines.length === 1}>
-                        <DeleteOutlineIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  </Paper>
-                ))}
-                <Button size="small" startIcon={<AddOutlinedIcon />} onClick={() => setMedicines((p) => [...p, emptyMed()])} sx={{ alignSelf: 'flex-start' }}>
-                  Add Medicine
-                </Button>
-              </Stack>
-            </Box>
-
-            {showLab && (
-            <Box>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Lab Orders</Typography>
-              {canOrderLab && (
-              <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
-                <TextField
-                  size="small"
-                  label="Test name"
-                  value={labTest}
-                  onChange={(e) => setLabTest(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && labTest.trim()) createLabOrderMutation.mutate(labTest.trim()); }}
-                  sx={{ flex: 1 }}
-                />
-                <Button
-                  size="small"
-                  variant="outlined"
-                  disabled={!labTest.trim()}
-                  loading={createLabOrderMutation.isPending}
-                  onClick={() => createLabOrderMutation.mutate(labTest.trim())}
-                >
-                  Order
-                </Button>
-              </Stack>
-              )}
-              {labOrders.length > 0 && (
-                <Stack spacing={0.5}>
-                  {labOrders.map((o) => (
-                    <Box key={o.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Chip
-                        label={o.test}
-                        size="small"
-                        color={o.status === 'COMPLETED' ? 'success' : o.status === 'CANCELLED' ? 'error' : 'warning'}
-                        variant="outlined"
-                      />
-                      <Typography variant="caption" color="text.secondary">{o.status.replace('_', ' ')}</Typography>
-                      {o.result && (
-                        <Typography variant="caption" color="text.secondary">
-                          — {labResultPreview(o.result)}
-                        </Typography>
-                      )}
-                    </Box>
+                    </div>
                   ))}
-                </Stack>
+                  <Button appearance="subtle" icon={<AddOutlinedIcon />} onClick={() => setMedicines((p) => [...p, emptyMed()])} style={{ alignSelf: 'flex-start' }}>
+                    Add Medicine
+                  </Button>
+                </div>
+              </div>
+
+              {showLab && (
+                <div>
+                  <Text weight="bold" size={300} style={{ display: 'block', marginBottom: 8 }}>Lab Orders</Text>
+                  {canOrderLab && (
+                    <div className={styles.row} style={{ marginBottom: 8 }}>
+                      <Field label="Test name" style={{ flex: 1 }}>
+                        <Input
+                          value={labTest}
+                          onChange={(_, d) => setLabTest(d.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' && labTest.trim()) createLabOrderMutation.mutate(labTest.trim()); }}
+                        />
+                      </Field>
+                      <Button
+                        appearance="outline"
+                        size="small"
+                        disabled={!labTest.trim() || createLabOrderMutation.isPending}
+                        icon={createLabOrderMutation.isPending ? <Spinner size="tiny" /> : undefined}
+                        onClick={() => createLabOrderMutation.mutate(labTest.trim())}
+                      >
+                        Order
+                      </Button>
+                    </div>
+                  )}
+                  {labOrders.length > 0 && (
+                    <div className={styles.fields}>
+                      {labOrders.map((o) => (
+                        <div key={o.id} className={styles.row}>
+                          <Badge
+                            appearance="outline"
+                            color={o.status === 'COMPLETED' ? 'success' : o.status === 'CANCELLED' ? 'danger' : 'warning'}
+                            size="small"
+                          >
+                            {o.test}
+                          </Badge>
+                          <Text size={200} style={{ color: tokens.colorNeutralForeground2 }}>{o.status.replace('_', ' ')}</Text>
+                          {o.result && (
+                            <Text size={200} style={{ color: tokens.colorNeutralForeground2 }}>— {labResultPreview(o.result)}</Text>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
-            </Box>
-            )}
 
-            <Box>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>Notes / Tests (text)</Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
-                {tests.map((t, i) => (
-                  <Chip key={i} label={t} onDelete={() => setTests((p) => p.filter((_, idx) => idx !== i))} size="small" />
-                ))}
-              </Stack>
-              <Stack direction="row" spacing={1}>
-                <TextField size="small" label="Add note" value={testInput} onChange={(e) => setTestInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && testInput.trim()) { setTests((p) => [...p, testInput.trim()]); setTestInput(''); } }}
-                />
-                <Button size="small" onClick={() => { if (testInput.trim()) { setTests((p) => [...p, testInput.trim()]); setTestInput(''); } }}>Add</Button>
-              </Stack>
-            </Box>
+              <div>
+                <Text weight="bold" size={300} style={{ display: 'block', marginBottom: 8 }}>Notes / Tests (text)</Text>
+                <div className={styles.chipRow}>
+                  {tests.map((t, i) => (
+                    <Badge
+                      key={i}
+                      appearance="tint"
+                      color="informative"
+                      size="small"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setTests((p) => p.filter((_, idx) => idx !== i))}
+                    >
+                      {t} ×
+                    </Badge>
+                  ))}
+                </div>
+                <div className={styles.row}>
+                  <Field label="Add note">
+                    <Input
+                      value={testInput}
+                      onChange={(_, d) => setTestInput(d.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && testInput.trim()) {
+                          setTests((p) => [...p, testInput.trim()]);
+                          setTestInput('');
+                        }
+                      }}
+                    />
+                  </Field>
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      if (testInput.trim()) {
+                        setTests((p) => [...p, testInput.trim()]);
+                        setTestInput('');
+                      }
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
 
-            <TextField label="Advice / Notes" fullWidth multiline rows={2} value={advice} onChange={(e) => setAdvice(e.target.value)} />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+              <Field label="Advice / Notes">
+                <Textarea value={advice} onChange={(_, d) => setAdvice(d.value)} rows={2} />
+              </Field>
+            </div>
+          </DialogContent>
+        </DialogBody>
+        <DialogActions className={styles.actions}>
+          <Button appearance="secondary" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
           <SubmitButton loading={mutation.isPending} onClick={() => mutation.mutate()}>Save Prescription</SubmitButton>
         </DialogActions>
-      </Dialog>
-    </>
+      </DialogSurface>
+    </Dialog>
   );
 }
-
 
 export function TokenPrintPreview({
   token,
@@ -587,9 +796,9 @@ export function TokenPrintPreview({
 }: {
   token: Token;
   onClose: () => void;
-  /** Walk-in: open preview and silently print to the POS printer */
   autoPrint?: boolean;
-}) {
+}): React.JSX.Element {
+  const styles = useDialogStyles();
   const brandLogo = useClinicBrandLogo();
   const [clinic, setClinic] = useState<{ clinicName: string; clinicAddress: string; clinicPhone: string } | null>(null);
   const [freshToken, setFreshToken] = useState<Token>(token);
@@ -603,7 +812,6 @@ export function TokenPrintPreview({
       clinicAddress: s.clinicAddress ?? '',
       clinicPhone: s.clinicPhone ?? '',
     }));
-    // Always fetch fresh token data from DB so prescription is always included
     void window.clinic?.tokens?.getById?.(token.id).then((fresh) => {
       if (fresh) setFreshToken(fresh as Token);
     });
@@ -643,94 +851,47 @@ export function TokenPrintPreview({
   }, [autoPrint]);
 
   return (
-    <Dialog
-      open
-      onClose={onClose}
-      maxWidth="xs"
-      fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: 1,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          maxHeight: '90vh',
-        },
-      }}
-    >
-      <Box
-        sx={{
-          px: 2.5,
-          py: 1.5,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          flexShrink: 0,
-        }}
-      >
-        <Typography fontWeight={700} fontSize={15}>
-          Token Slip PDF
-        </Typography>
-        <Tooltip title="Close">
-          <IconButton size="small" onClick={onClose} aria-label="Close">
-            <CloseOutlinedIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Box>
-      <DialogContent sx={{ p: 0, flex: '1 1 auto', minHeight: 0, overflow: 'auto', bgcolor: '#f1f5f9' }}>
-        {pdfDocument ? (
-          <PdfBlobPreview documentKey={documentKey} pdfDocument={pdfDocument} height={560} />
-        ) : (
-          <Box sx={{ height: 560, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Typography color="text.secondary">Loading...</Typography>
-          </Box>
-        )}
-      </DialogContent>
-      <Box sx={{ px: 2, py: 1, display: 'flex', flexDirection: 'column', gap: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-        {printError && <Alert severity="error">{printError}</Alert>}
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5 }}>
-          <Tooltip title="Close">
-            <IconButton onClick={onClose} aria-label="Close" size="small">
-              <CloseOutlinedIcon fontSize="small" />
-            </IconButton>
+    <Dialog open onOpenChange={(_, d) => { if (!d.open) onClose(); }}>
+      <DialogSurface className={styles.previewSurface}>
+        <div className={styles.previewHead}>
+          <Text weight="bold" size={400}>Token Slip PDF</Text>
+          <Tooltip content="Close" relationship="label">
+            <Button appearance="subtle" size="small" icon={<CloseOutlinedIcon style={{ fontSize: 18 }} />} onClick={onClose} aria-label="Close" />
           </Tooltip>
-          <Tooltip title={printing ? 'Printing...' : 'Print'}>
-            <span>
-              <IconButton
-                color="primary"
+        </div>
+        <div className={styles.previewBody}>
+          {pdfDocument ? (
+            <PdfBlobPreview documentKey={documentKey} pdfDocument={pdfDocument} height={560} />
+          ) : (
+            <div className={styles.loadingBox}>
+              <Text style={{ color: tokens.colorNeutralForeground2 }}>Loading...</Text>
+            </div>
+          )}
+        </div>
+        <div className={styles.previewFoot}>
+          {printError && (
+            <MessageBar intent="error"><MessageBarBody>{printError}</MessageBarBody></MessageBar>
+          )}
+          <div className={styles.previewActions}>
+            <Tooltip content="Close" relationship="label">
+              <Button appearance="subtle" size="small" icon={<CloseOutlinedIcon style={{ fontSize: 18 }} />} onClick={onClose} aria-label="Close" />
+            </Tooltip>
+            <Tooltip content={printing ? 'Printing...' : 'Print'} relationship="label">
+              <Button
+                appearance="primary"
+                size="small"
                 disabled={printing || !pdfDocument}
+                icon={printing ? <Spinner size="tiny" /> : <PrintOutlinedIcon style={{ fontSize: 18 }} />}
                 onClick={() => void handlePrint()}
                 aria-label="Print"
-                size="small"
-              >
-                {printing ? <CircularProgress size={18} /> : <PrintOutlinedIcon fontSize="small" />}
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
-      </Box>
+              />
+            </Tooltip>
+          </div>
+        </div>
+      </DialogSurface>
     </Dialog>
   );
 }
-
-const doctorTabSx = {
-  position: 'relative',
-  zIndex: 1,
-  minHeight: 0,
-  minWidth: 'max-content',
-  flexShrink: 0,
-  px: 2.2,
-  py: 0.85,
-  borderRadius: 999,
-  fontSize: 14,
-  fontWeight: 500,
-  textTransform: 'none',
-  whiteSpace: 'nowrap',
-  color: 'text.secondary',
-  '&.Mui-selected': { fontWeight: 700, color: 'text.primary' },
-} as const;
 
 function DoctorFilterTabs({
   doctors,
@@ -741,14 +902,14 @@ function DoctorFilterTabs({
   value: string;
   onChange: (id: string) => void;
 }): React.JSX.Element {
-  const theme = useTheme();
-  const tabsWrapRef = useRef<HTMLDivElement>(null);
+  const styles = usePageStyles();
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
   const [hoverEdge, setHoverEdge] = useState<'left' | 'right' | null>(null);
 
   const updateOverflow = useCallback(() => {
-    const scroller = tabsWrapRef.current?.querySelector('.MuiTabs-scroller') as HTMLElement | null;
+    const scroller = scrollerRef.current;
     if (!scroller) {
       setCanLeft(false);
       setCanRight(false);
@@ -761,7 +922,7 @@ function DoctorFilterTabs({
 
   useEffect(() => {
     updateOverflow();
-    const scroller = tabsWrapRef.current?.querySelector('.MuiTabs-scroller') as HTMLElement | null;
+    const scroller = scrollerRef.current;
     if (!scroller) return undefined;
     scroller.addEventListener('scroll', updateOverflow, { passive: true });
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => updateOverflow()) : null;
@@ -775,8 +936,7 @@ function DoctorFilterTabs({
   }, [doctors.length, updateOverflow]);
 
   function scrollByDir(dir: -1 | 1): void {
-    const scroller = tabsWrapRef.current?.querySelector('.MuiTabs-scroller') as HTMLElement | null;
-    scroller?.scrollBy({ left: dir * 180, behavior: 'smooth' });
+    scrollerRef.current?.scrollBy({ left: dir * 180, behavior: 'smooth' });
   }
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>): void {
@@ -796,104 +956,43 @@ function DoctorFilterTabs({
   const showRight = canRight && hoverEdge === 'right';
 
   return (
-    <Box
-      ref={tabsWrapRef}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={() => setHoverEdge(null)}
-      sx={{
-        position: 'relative',
-        flex: 1,
-        minWidth: 0,
-      }}
-    >
-      <Tabs
-        value={value}
-        onChange={(_e, next: string) => onChange(next)}
-        variant="scrollable"
-        scrollButtons={false}
-        sx={{
-          minHeight: 0,
-          bgcolor: alpha(theme.palette.text.primary, 0.05),
-          borderRadius: 999,
-          p: '4px',
-          '& .MuiTabs-scroller': {
-            borderRadius: 999,
-            scrollbarWidth: 'none',
-            '&::-webkit-scrollbar': { display: 'none' },
-          },
-          '& .MuiTabs-indicator': {
-            height: '100%',
-            borderRadius: 999,
-            bgcolor: 'background.paper',
-            boxShadow: theme.shadows[2],
-            zIndex: 0,
-          },
-          '& .MuiTabs-flexContainer': { flexWrap: 'nowrap' },
-        }}
-      >
-        <Tab disableRipple value="ALL" label="All Doctors" sx={doctorTabSx} />
-        {doctors.map((d) => (
-          <Tab
-            key={d.id}
-            disableRipple
-            value={d.id}
-            label={`Dr. ${d.firstName} ${d.lastName}`}
-            sx={doctorTabSx}
-          />
-        ))}
-      </Tabs>
-
-      <IconButton
+    <div className={styles.tabsWrap} onMouseMove={handleMouseMove} onMouseLeave={() => setHoverEdge(null)}>
+      <div ref={scrollerRef} className={styles.tabsScroller} style={{ scrollbarWidth: 'none' }}>
+        <TabList
+          selectedValue={value}
+          onTabSelect={(_, data) => onChange(String(data.value))}
+          size="small"
+        >
+          <Tab value="ALL">All Doctors</Tab>
+          {doctors.map((d) => (
+            <Tab key={d.id} value={d.id}>{`Dr. ${d.firstName} ${d.lastName}`}</Tab>
+          ))}
+        </TabList>
+      </div>
+      <Button
+        appearance="subtle"
         size="small"
         aria-label="Scroll doctors left"
+        icon={<ChevronLeftIcon style={{ fontSize: 18 }} />}
         onClick={() => scrollByDir(-1)}
-        sx={{
-          position: 'absolute',
-          left: 4,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          zIndex: 2,
-          width: 28,
-          height: 28,
-          bgcolor: 'background.paper',
-          boxShadow: theme.shadows[2],
-          opacity: showLeft ? 1 : 0,
-          pointerEvents: showLeft ? 'auto' : 'none',
-          transition: 'opacity 0.15s ease',
-          '&:hover': { bgcolor: 'background.paper' },
-        }}
-      >
-        <ChevronLeftIcon sx={{ fontSize: 18 }} />
-      </IconButton>
-
-      <IconButton
+        className={styles.scrollBtn}
+        style={{ left: 4, opacity: showLeft ? 1 : 0, pointerEvents: showLeft ? 'auto' : 'none' }}
+      />
+      <Button
+        appearance="subtle"
         size="small"
         aria-label="Scroll doctors right"
+        icon={<ChevronRightIcon style={{ fontSize: 18 }} />}
         onClick={() => scrollByDir(1)}
-        sx={{
-          position: 'absolute',
-          right: 4,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          zIndex: 2,
-          width: 28,
-          height: 28,
-          bgcolor: 'background.paper',
-          boxShadow: theme.shadows[2],
-          opacity: showRight ? 1 : 0,
-          pointerEvents: showRight ? 'auto' : 'none',
-          transition: 'opacity 0.15s ease',
-          '&:hover': { bgcolor: 'background.paper' },
-        }}
-      >
-        <ChevronRightIcon sx={{ fontSize: 18 }} />
-      </IconButton>
-    </Box>
+        className={styles.scrollBtn}
+        style={{ right: 4, opacity: showRight ? 1 : 0, pointerEvents: showRight ? 'auto' : 'none' }}
+      />
+    </div>
   );
 }
 
 export function TokensPage(): React.JSX.Element {
-  const theme = useTheme();
+  const styles = usePageStyles();
   const qc = useQueryClient();
   const { user } = useAuth();
   const isDoctor = user?.role === 'doctor';
@@ -905,7 +1004,7 @@ export function TokensPage(): React.JSX.Element {
   const [deleteToken, setDeleteToken] = useState<Token | null>(null);
   const [refundToken, setRefundToken] = useState<Token | null>(null);
 
-  const { data: tokens = [], isLoading, isFetching, isError } = useQuery<Token[]>({
+  const { data: tokensList = [], isLoading, isFetching, isError } = useQuery<Token[]>({
     queryKey: ['tokens', date],
     queryFn: () => window.clinic.tokens.list(date),
     refetchInterval: 10_000,
@@ -932,485 +1031,288 @@ export function TokensPage(): React.JSX.Element {
     meta: { silent: true },
   });
 
-  const roleFiltered = isDoctor ? tokens.filter((t) => t.doctorId === user?.id) : tokens;
+  const roleFiltered = isDoctor ? tokensList.filter((t) => t.doctorId === user?.id) : tokensList;
   const filtered = filterDoctor === 'ALL' ? roleFiltered : roleFiltered.filter((t) => t.doctorId === filterDoctor);
 
-  const waiting = tokens.filter((t) => t.status === 'WAITING').length;
-  const done = tokens.filter((t) => t.status === 'DONE').length;
-  const skipped = tokens.filter((t) => t.status === 'SKIPPED').length;
-
+  const waiting = tokensList.filter((t) => t.status === 'WAITING').length;
+  const done = tokensList.filter((t) => t.status === 'DONE').length;
+  const skipped = tokensList.filter((t) => t.status === 'SKIPPED').length;
   const currentToken = filtered.find((t) => t.status === 'WAITING');
 
-  const softCard = {
-    borderRadius: '20px',
-    border: '1px solid',
-    borderColor: 'divider',
-    boxShadow: `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,
-  } as const;
-
   const summaryCards = [
-    {
-      label: 'Total Tokens',
-      value: tokens.length,
-      icon: <ConfirmationNumberOutlinedIcon />,
-      bg: alpha(theme.palette.primary.main, 0.1),
-      color: theme.palette.primary.main,
-    },
-    {
-      label: 'Waiting',
-      value: waiting,
-      icon: <HourglassEmptyOutlinedIcon />,
-      bg: alpha(theme.palette.warning.main, 0.12),
-      color: theme.palette.warning.dark,
-    },
-    {
-      label: 'Completed',
-      value: done,
-      icon: <DoneAllOutlinedIcon />,
-      bg: alpha(theme.palette.success.main, 0.12),
-      color: theme.palette.success.dark,
-    },
-    {
-      label: 'Skipped',
-      value: skipped,
-      icon: <SkipNextOutlinedIcon />,
-      bg: alpha(theme.palette.grey[500], 0.12),
-      color: theme.palette.text.secondary,
-    },
+    { label: 'Total Tokens', value: tokensList.length, icon: <ConfirmationNumberOutlinedIcon />, bg: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1 },
+    { label: 'Waiting', value: waiting, icon: <HourglassEmptyOutlinedIcon />, bg: tokens.colorPaletteYellowBackground2, color: tokens.colorPaletteYellowForeground2 },
+    { label: 'Completed', value: done, icon: <DoneAllOutlinedIcon />, bg: tokens.colorPaletteGreenBackground2, color: tokens.colorPaletteGreenForeground2 },
+    { label: 'Skipped', value: skipped, icon: <SkipNextOutlinedIcon />, bg: tokens.colorNeutralBackground3, color: tokens.colorNeutralForeground2 },
   ];
+
+  const layoutCols = currentToken ? 'minmax(0, 1fr) 300px' : '1fr';
 
   return (
     <>
-      <Stack spacing={2.5} sx={{ pb: 2 }}>
-        {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: { sm: 'flex-end' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between' }}>
-          <Box>
-            <Typography variant="body2" color="text.secondary" fontWeight={600}>
-              Live OPD queue
-            </Typography>
-            <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
-              Token Queue
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <div>
+            <Text className={styles.subtitle} size={300}>Live OPD queue</Text>
+            <Title2 className={styles.title}>Token Queue</Title2>
+            <Text size={300} style={{ color: tokens.colorNeutralForeground2, marginTop: 4, display: 'block' }}>
               Issue, track, and complete patient tokens for the day.
-            </Typography>
-          </Box>
-          <Stack direction="row" gap={1.5} alignItems="center" flexWrap="wrap">
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <DatePicker
-                value={date ? new Date(date) : null}
-                onChange={(v) => setDate(v ? v.toLocaleDateString('en-CA') : todayStr())}
-                slotProps={{
-                  textField: {
-                    size: 'small',
-                    sx: { width: 168 },
-                  },
-                }}
-              />
-            </LocalizationProvider>
+            </Text>
+          </div>
+          <div className={styles.headerActions}>
+            <FluentDateField
+              label="Date"
+              value={parseDateIso(date)}
+              onSelectDate={(d) => setDate(formatDateIso(d) || todayStr())}
+            />
             {!isAdmin && (
-              <Button
-                variant="contained"
-                startIcon={<AddOutlinedIcon />}
-                sx={{ borderRadius: 2, fontWeight: 700, px: 2.25, py: 1 }}
-                onClick={() => setDialogOpen(true)}
-              >
+              <Button appearance="primary" icon={<AddOutlinedIcon />} onClick={() => setDialogOpen(true)}>
                 Issue Token
               </Button>
             )}
-          </Stack>
-        </Box>
+          </div>
+        </div>
 
-        {/* Summary metrics */}
         {isLoading ? (
           <StatCardsSkeleton count={4} />
         ) : (
-        <Box sx={{ display: 'grid', gap: 1.75, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
-          {summaryCards.map((c) => (
-            <Paper
-              key={c.label}
-              elevation={0}
-              sx={{
-                p: 2.25,
-                ...softCard,
-                bgcolor: c.bg,
-                border: 'none',
-              }}
-            >
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                <Box>
-                  <Typography sx={{ fontSize: 28, fontWeight: 800, color: c.color, lineHeight: 1 }}>{c.value}</Typography>
-                  <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mt: 0.75, display: 'block' }}>
-                    {c.label}
-                  </Typography>
-                </Box>
-                <Box
-                  sx={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 2,
-                    display: 'grid',
-                    placeItems: 'center',
-                    bgcolor: alpha(c.color, 0.15),
-                    color: c.color,
-                  }}
-                >
-                  {c.icon}
-                </Box>
-              </Stack>
-            </Paper>
-          ))}
-        </Box>
+          <div className={styles.metrics}>
+            {summaryCards.map((c) => (
+              <div key={c.label} className={styles.metricCard} style={{ backgroundColor: c.bg }}>
+                <div className={styles.metricRow}>
+                  <div>
+                    <Text style={{ fontSize: 28, fontWeight: 800, color: c.color, lineHeight: 1 }}>{c.value}</Text>
+                    <Text size={200} weight="bold" style={{ color: tokens.colorNeutralForeground2, marginTop: 6, display: 'block' }}>
+                      {c.label}
+                    </Text>
+                  </div>
+                  <div className={styles.metricIcon} style={{ backgroundColor: 'rgba(0,0,0,0.06)', color: c.color }}>
+                    {c.icon}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
 
-        {/* Now serving + queue */}
-        <Box sx={{ display: 'grid', gap: 2.5, gridTemplateColumns: { xs: '1fr', lg: currentToken ? 'minmax(0, 1fr) 300px' : '1fr' }, alignItems: 'start' }}>
-          <Stack spacing={2} sx={{ minWidth: 0 }}>
+        <div className={styles.layout} style={{ gridTemplateColumns: layoutCols }}>
+          <div className={styles.col}>
             {!isDoctor && (
-              <Paper
-                elevation={0}
-                sx={{
-                  p: '4px',
-                  pl: '16px',
-                  borderRadius: 999,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  bgcolor: 'background.paper',
-                  boxShadow: `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,
-                  overflow: 'hidden',
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    fontWeight={700}
-                    sx={{ flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}
-                  >
-                    Doctor
-                  </Typography>
-                  <DoctorFilterTabs
-                    doctors={doctors}
-                    value={filterDoctor}
-                    onChange={setFilterDoctor}
-                  />
-                </Box>
-              </Paper>
+              <div className={styles.doctorBar}>
+                <Text className={styles.doctorLabel}>Doctor</Text>
+                <DoctorFilterTabs doctors={doctors} value={filterDoctor} onChange={setFilterDoctor} />
+              </div>
             )}
 
-            {isError && <Alert severity="error">Failed to load tokens.</Alert>}
+            {isError && (
+              <MessageBar intent="error"><MessageBarBody>Failed to load tokens.</MessageBarBody></MessageBar>
+            )}
 
-            <Paper elevation={0} sx={{ p: 2.25, ...softCard, position: 'relative' }}>
+            <div className={styles.softCard}>
               <FetchingBar show={isFetching && !isLoading} />
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.75 }}>
-                <Box>
-                  <Typography fontWeight={800} fontSize={16}>Queue</Typography>
-                  <Typography variant="caption" color="text.secondary">
+              <div className={styles.queueHead}>
+                <div>
+                  <Text weight="bold" size={400}>Queue</Text>
+                  <Text size={200} style={{ color: tokens.colorNeutralForeground2, display: 'block' }}>
                     {new Date(date).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
                     {' · '}
                     {filtered.length} token{filtered.length === 1 ? '' : 's'}
-                  </Typography>
-                </Box>
-              </Stack>
+                  </Text>
+                </div>
+              </div>
 
               {isLoading && filtered.length === 0 ? (
                 <ListCardsSkeleton count={6} />
               ) : filtered.length === 0 ? (
-                <Box sx={{ py: 5, textAlign: 'center' }}>
-                  <Box
-                    sx={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: '18px',
-                      mx: 'auto',
-                      mb: 1.5,
-                      display: 'grid',
-                      placeItems: 'center',
-                      bgcolor: alpha(theme.palette.primary.main, 0.08),
-                      color: 'primary.main',
-                    }}
-                  >
-                    <ConfirmationNumberOutlinedIcon sx={{ fontSize: 30 }} />
-                  </Box>
-                  <Typography fontWeight={700} sx={{ mb: 0.5 }}>No tokens yet</Typography>
-                  <Typography variant="body2" color="text.secondary">
+                <div className={styles.empty}>
+                  <div className={styles.emptyIcon}>
+                    <ConfirmationNumberOutlinedIcon style={{ fontSize: 30 }} />
+                  </div>
+                  <Text weight="bold" style={{ display: 'block', marginBottom: 4 }}>No tokens yet</Text>
+                  <Text size={300} style={{ color: tokens.colorNeutralForeground2 }}>
                     No tokens for this date{!isAdmin ? ' — issue one to start the queue.' : '.'}
-                  </Typography>
+                  </Text>
                   {!isAdmin && (
-                    <Button
-                      variant="contained"
-                      startIcon={<AddOutlinedIcon />}
-                      sx={{ mt: 2, borderRadius: 2, fontWeight: 700 }}
-                      onClick={() => setDialogOpen(true)}
-                    >
+                    <Button appearance="primary" icon={<AddOutlinedIcon />} style={{ marginTop: 16 }} onClick={() => setDialogOpen(true)}>
                       Issue Token
                     </Button>
                   )}
-                </Box>
+                </div>
               ) : (
-                <Stack
-                  spacing={1}
-                  sx={{
-                    maxHeight: { lg: 520 },
-                    overflowY: 'auto',
-                    pr: 0.5,
-                    '&::-webkit-scrollbar': { width: 4 },
-                    '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
-                  }}
-                >
+                <div className={styles.queueList}>
                   {filtered.map((token) => {
                     const cfg = statusConfig[token.status];
                     const isDone = token.status === 'DONE' || token.status === 'SKIPPED';
                     const isCurrent = currentToken?.id === token.id;
+                    const leftColor =
+                      token.status === 'WAITING'
+                        ? tokens.colorPaletteYellowBorderActive
+                        : token.status === 'DONE'
+                          ? tokens.colorPaletteGreenBorderActive
+                          : tokens.colorNeutralStroke2;
                     return (
-                      <Box
+                      <div
                         key={token.id}
-                        sx={{
-                          p: 1.5,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1.75,
-                          borderRadius: 1,
+                        className={styles.tokenRow}
+                        style={{
                           opacity: isDone ? 0.62 : 1,
-                          bgcolor: isCurrent
-                            ? alpha(theme.palette.primary.main, 0.07)
-                            : alpha(theme.palette.primary.main, 0.03),
-                          border: '1px solid',
-                          borderColor: isCurrent
-                            ? alpha(theme.palette.primary.main, 0.28)
-                            : theme.palette.divider,
-                          borderLeft: '4px solid',
-                          borderLeftColor:
-                            token.status === 'WAITING'
-                              ? 'warning.main'
-                              : token.status === 'DONE'
-                                ? 'success.main'
-                                : 'divider',
+                          backgroundColor: isCurrent ? tokens.colorBrandBackground2 : tokens.colorNeutralBackground2,
+                          borderLeftColor: leftColor,
+                          borderColor: isCurrent ? tokens.colorBrandStroke1 : tokens.colorNeutralStroke2,
                         }}
                       >
                         <Avatar
-                          sx={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: 1,
-                            bgcolor: alpha(
-                              cfg.color === 'default' ? theme.palette.action.active : theme.palette[cfg.color].main,
-                              0.12,
-                            ),
-                            color: cfg.color === 'default' ? 'text.secondary' : `${cfg.color}.main`,
-                            fontWeight: 900,
-                            fontSize: 14,
-                          }}
-                        >
-                          {String(token.tokenNumber).padStart(3, '0')}
-                        </Avatar>
-
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Stack direction="row" alignItems="center" gap={1}>
-                            <Typography fontWeight={700} fontSize={14} noWrap>
+                          name={`${token.patient.firstName} ${token.patient.lastName}`}
+                          initials={String(token.tokenNumber).padStart(3, '0')}
+                          color="brand"
+                          style={{ borderRadius: 8, width: 44, height: 44, fontWeight: 900, fontSize: 14 }}
+                        />
+                        <div className={styles.tokenBody}>
+                          <div className={styles.row}>
+                            <Text weight="bold" size={300} truncate>
                               {token.patient.firstName} {token.patient.lastName}
-                            </Typography>
-                            {isCurrent && (
-                              <Chip
-                                label="Now"
-                                size="small"
-                                color="primary"
-                                sx={{ height: 18, fontSize: 10, fontWeight: 800, borderRadius: 1 }}
-                              />
-                            )}
-                          </Stack>
-                          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                            </Text>
+                            {isCurrent && <Badge appearance="filled" color="brand" size="small">Now</Badge>}
+                          </div>
+                          <Text size={200} truncate style={{ color: tokens.colorNeutralForeground2, display: 'block' }}>
                             Dr. {token.doctor.firstName} {token.doctor.lastName}
                             {Number(token.consultationFee ?? 0) > 0
                               ? ` · Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(tokenNetFee(token.consultationFee, token.feeDiscount, token.feeRefunded))}${Number(token.feeDiscount ?? 0) > 0 ? ' after discount' : ''}${Number(token.feeRefunded ?? 0) > 0 ? ' refunded' : ''}`
                               : ''}
                             {token.reason ? ` · ${token.reason}` : ''}
                             {token.notes ? ` · ${token.notes}` : ''}
-                          </Typography>
-                        </Box>
-
-                        <Chip
-                          label={cfg.label}
-                          color={cfg.color}
-                          size="small"
-                          sx={{ fontWeight: 700, minWidth: 78, borderRadius: 1, display: { xs: 'none', sm: 'inline-flex' } }}
-                        />
-
-                        <Stack direction="row" gap={0.25}>
-                          <Tooltip title="Print Token">
-                            <IconButton size="small" onClick={() => setPrintToken(token)} sx={{ borderRadius: 1 }}>
-                              <PrintOutlinedIcon fontSize="small" />
-                            </IconButton>
+                          </Text>
+                        </div>
+                        <StatusBadge color={cfg.color}>{cfg.label}</StatusBadge>
+                        <div className={styles.tokenActions}>
+                          <Tooltip content="Print Token" relationship="label">
+                            <Button appearance="subtle" size="small" icon={<PrintOutlinedIcon style={{ fontSize: 18 }} />} onClick={() => setPrintToken(token)} />
                           </Tooltip>
                           {!isAdmin && tokenNetFee(token.consultationFee, token.feeDiscount, token.feeRefunded) > 0 && (
-                            <Tooltip title="Refund consultation fee">
-                              <IconButton size="small" onClick={() => setRefundToken(token)} sx={{ borderRadius: 1 }}>
-                                <UndoOutlinedIcon fontSize="small" />
-                              </IconButton>
+                            <Tooltip content="Refund consultation fee" relationship="label">
+                              <Button appearance="subtle" size="small" icon={<UndoOutlinedIcon style={{ fontSize: 18 }} />} onClick={() => setRefundToken(token)} />
                             </Tooltip>
                           )}
                           {!isAdmin && token.status === 'WAITING' && (
-                            <Tooltip title="Mark Done">
-                              <IconButton
+                            <Tooltip content="Mark Done" relationship="label">
+                              <Button
+                                appearance="subtle"
                                 size="small"
-                                color="success"
                                 disabled={statusMutation.isPending}
+                                icon={<CheckCircleOutlinedIcon style={{ fontSize: 18 }} />}
                                 onClick={() => statusMutation.mutate({ id: token.id, status: 'DONE' })}
-                                sx={{ borderRadius: 1 }}
-                              >
-                                <CheckCircleOutlinedIcon fontSize="small" />
-                              </IconButton>
+                              />
                             </Tooltip>
                           )}
                           {!isAdmin && token.status === 'WAITING' && (
-                            <Tooltip title="Skip">
-                              <IconButton
+                            <Tooltip content="Skip" relationship="label">
+                              <Button
+                                appearance="subtle"
                                 size="small"
                                 disabled={statusMutation.isPending}
+                                icon={<SkipNextOutlinedIcon style={{ fontSize: 18 }} />}
                                 onClick={() => statusMutation.mutate({ id: token.id, status: 'SKIPPED' })}
-                                sx={{ borderRadius: 1 }}
-                              >
-                                <SkipNextOutlinedIcon fontSize="small" />
-                              </IconButton>
+                              />
                             </Tooltip>
                           )}
                           {!isAdmin && token.status === 'WAITING' && (
-                            <Tooltip title="Delete">
-                              <IconButton
+                            <Tooltip content="Delete" relationship="label">
+                              <Button
+                                appearance="subtle"
                                 size="small"
-                                color="error"
+                                icon={<DeleteOutlineIcon style={{ fontSize: 18 }} />}
                                 onClick={() => setDeleteToken(token)}
-                                sx={{ borderRadius: 1 }}
-                              >
-                                <DeleteOutlineIcon fontSize="small" />
-                              </IconButton>
+                              />
                             </Tooltip>
                           )}
-                        </Stack>
-                      </Box>
+                        </div>
+                      </div>
                     );
                   })}
-                </Stack>
+                </div>
               )}
-            </Paper>
-          </Stack>
+            </div>
+          </div>
 
-          {/* Now serving sidebar */}
           {currentToken && (
-            <Stack spacing={2} sx={{ minWidth: 0 }}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2.75,
-                  borderRadius: '24px',
-                  border: 'none',
-                  background: theme.palette.mode === 'dark'
-                    ? `linear-gradient(160deg, ${theme.palette.background.paper} 0%, ${alpha(theme.palette.primary.dark, 0.7)} 100%)`
-                    : `linear-gradient(160deg, ${theme.palette.primary.dark} 0%, ${darken(theme.palette.primary.main, 0.42)} 100%)`,
-                  color: theme.palette.common.white,
-                  boxShadow: `0 12px 28px ${alpha(theme.palette.primary.main, 0.28)}`,
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}
-              >
-                <Box sx={{ position: 'absolute', right: -30, top: -30, width: 120, height: 120, borderRadius: '50%', border: `2px solid ${alpha('#fff', 0.12)}` }} />
-                <Box sx={{ position: 'absolute', right: 20, bottom: -40, width: 100, height: 100, borderRadius: '50%', bgcolor: alpha('#fff', 0.08) }} />
-                <Typography variant="caption" sx={{ opacity: 0.8, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            <div className={styles.col}>
+              <div className={styles.nowCard}>
+                <div className={styles.nowOrb1} />
+                <div className={styles.nowOrb2} />
+                <Text size={200} weight="bold" style={{ opacity: 0.8, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                   Now Serving
-                </Typography>
-                <Typography sx={{ fontSize: 64, fontWeight: 900, lineHeight: 1, mt: 1, letterSpacing: '-0.03em' }}>
+                </Text>
+                <Text style={{ fontSize: 64, fontWeight: 900, lineHeight: 1, marginTop: 8, letterSpacing: '-0.03em', display: 'block' }}>
                   {String(currentToken.tokenNumber).padStart(3, '0')}
-                </Typography>
-                <Typography fontWeight={800} fontSize={18} sx={{ mt: 1.5 }}>
+                </Text>
+                <Text weight="bold" size={500} style={{ display: 'block', marginTop: 12 }}>
                   {currentToken.patient.firstName} {currentToken.patient.lastName}
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.88, mt: 0.35 }}>
+                </Text>
+                <Text size={300} style={{ opacity: 0.88, display: 'block', marginTop: 4 }}>
                   Dr. {currentToken.doctor.firstName} {currentToken.doctor.lastName}
-                </Typography>
+                </Text>
                 {(currentToken.reason || currentToken.notes) && (
-                  <Typography variant="caption" sx={{ opacity: 0.75, display: 'block', mt: 1 }}>
+                  <Text size={200} style={{ opacity: 0.75, display: 'block', marginTop: 8 }}>
                     {[currentToken.reason, currentToken.notes].filter(Boolean).join(' · ')}
-                  </Typography>
+                  </Text>
                 )}
-                <Stack direction="row" spacing={1} sx={{ mt: 2.5 }}>
-                  <Chip
-                    label={statusConfig[currentToken.status].label}
-                    size="small"
-                    sx={{
-                      fontWeight: 800,
-                      bgcolor: alpha('#fff', 0.18),
-                      color: '#fff',
-                      borderRadius: 1,
-                    }}
-                  />
-                  <Tooltip title="Print Token">
-                    <IconButton
-                      size="small"
-                      onClick={() => setPrintToken(currentToken)}
-                      sx={{ color: '#fff', bgcolor: alpha('#fff', 0.12), borderRadius: 1, '&:hover': { bgcolor: alpha('#fff', 0.22) } }}
-                    >
-                      <PrintOutlinedIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Stack>
-                {!isAdmin && (
-                  <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+                <div className={styles.row} style={{ marginTop: 20, gap: 8 }}>
+                  <Badge appearance="outline" size="small" style={{ fontWeight: 800, color: '#fff', borderColor: 'rgba(255,255,255,0.4)' }}>
+                    {statusConfig[currentToken.status].label}
+                  </Badge>
+                  <Tooltip content="Print Token" relationship="label">
                     <Button
-                      fullWidth
-                      variant="contained"
-                      startIcon={<CheckCircleOutlinedIcon />}
-                      loading={statusMutation.isPending}
+                      appearance="subtle"
+                      size="small"
+                      icon={<PrintOutlinedIcon style={{ fontSize: 18 }} />}
+                      onClick={() => setPrintToken(currentToken)}
+                      style={{ color: '#fff', backgroundColor: 'rgba(255,255,255,0.12)' }}
+                    />
+                  </Tooltip>
+                </div>
+                {!isAdmin && (
+                  <div className={styles.nowActions}>
+                    <Button
+                      appearance="primary"
+                      icon={statusMutation.isPending ? <Spinner size="tiny" /> : <CheckCircleOutlinedIcon />}
+                      disabled={statusMutation.isPending}
                       onClick={() => statusMutation.mutate({ id: currentToken.id, status: 'DONE' })}
-                      sx={{
-                        borderRadius: 2,
-                        fontWeight: 800,
-                        bgcolor: '#fff',
-                        color: theme.palette.primary.dark,
-                        boxShadow: 'none',
-                        '&:hover': { bgcolor: alpha('#fff', 0.9), boxShadow: 'none' },
-                      }}
+                      style={{ flex: 1, backgroundColor: '#fff', color: tokens.colorBrandForeground1, fontWeight: 800 }}
                     >
                       Done
                     </Button>
                     <Button
-                      fullWidth
-                      variant="outlined"
-                      startIcon={<SkipNextOutlinedIcon />}
-                      loading={statusMutation.isPending}
+                      appearance="outline"
+                      icon={statusMutation.isPending ? <Spinner size="tiny" /> : <SkipNextOutlinedIcon />}
+                      disabled={statusMutation.isPending}
                       onClick={() => statusMutation.mutate({ id: currentToken.id, status: 'SKIPPED' })}
-                      sx={{
-                        borderRadius: 2,
-                        fontWeight: 700,
-                        borderColor: alpha('#fff', 0.45),
-                        color: '#fff',
-                        '&:hover': { borderColor: '#fff', bgcolor: alpha('#fff', 0.08) },
-                      }}
+                      style={{ flex: 1, borderColor: 'rgba(255,255,255,0.45)', color: '#fff', fontWeight: 700 }}
                     >
                       Skip
                     </Button>
-                  </Stack>
+                  </div>
                 )}
-              </Paper>
+              </div>
 
-              <Paper elevation={0} sx={{ p: 2, ...softCard }}>
-                <Typography fontWeight={800} fontSize={13} sx={{ mb: 1.25 }}>Queue snapshot</Typography>
-                <Stack spacing={1}>
+              <div className={styles.softCard}>
+                <Text weight="bold" size={300} style={{ display: 'block', marginBottom: 10 }}>Queue snapshot</Text>
+                <div className={styles.snapshot}>
                   {[
                     { label: 'Waiting ahead', value: Math.max(0, waiting - (currentToken ? 1 : 0)) },
                     { label: 'Done today', value: done },
                     { label: 'Skipped', value: skipped },
                   ].map((row) => (
-                    <Stack key={row.label} direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography variant="caption" color="text.secondary" fontWeight={600}>{row.label}</Typography>
-                      <Typography fontWeight={800} fontSize={14} color="primary.main">{row.value}</Typography>
-                    </Stack>
+                    <div key={row.label} className={styles.snapshotRow}>
+                      <Text size={200} weight="semibold" style={{ color: tokens.colorNeutralForeground2 }}>{row.label}</Text>
+                      <Text weight="bold" size={300} style={{ color: tokens.colorBrandForeground1 }}>{row.value}</Text>
+                    </div>
                   ))}
-                </Stack>
-              </Paper>
-            </Stack>
+                </div>
+              </div>
+            </div>
           )}
-        </Box>
-      </Stack>
+        </div>
+      </div>
 
       <IssueTokenDialog open={dialogOpen} onClose={() => setDialogOpen(false)} date={date} />
       {printToken && <TokenPrintPreview token={printToken} onClose={() => setPrintToken(null)} />}

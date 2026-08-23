@@ -1,12 +1,9 @@
-import { Alert, Box, Button, Dialog, DialogContent, Stack, Typography } from '@mui/material';
-import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import { useEffect, useMemo, useState } from 'react';
 import type { OpdDailyReport } from '@/types/report';
 import { getClinicLogoDataUrl } from '@/utils/clinicBrandLogo';
-import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
 import { printReactPdfDocument } from '@/utils/printPdf';
 import { OpdReportDocument, type OpdPrintSection } from '@/features/reports/OpdReportPdf';
+import { PdfPreviewDialog } from '@/components/PdfPreviewDialog';
 
 export function OpdReportPrint({
   report,
@@ -66,12 +63,7 @@ export function OpdReportPrint({
 
   const pdfDocument = useMemo(
     () => (
-      <OpdReportDocument
-        report={report}
-        clinic={clinic}
-        logoSrc={logoSrc}
-        section={section}
-      />
+      <OpdReportDocument report={report} clinic={clinic} logoSrc={logoSrc} section={section} />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [documentKey],
@@ -93,94 +85,16 @@ export function OpdReportPrint({
   }
 
   return (
-    <Dialog
-      open
+    <PdfPreviewDialog
+      title={title}
       onClose={onClose}
-      maxWidth={false}
-      fullWidth
-      PaperProps={{
-        sx: {
-          display: 'flex',
-          flexDirection: 'column',
-          width: 'min(980px, 96vw)',
-          maxWidth: '980px',
-          height: '92vh',
-          maxHeight: '92vh',
-          overflow: 'hidden',
-        },
-      }}
-    >
-      <Box
-        sx={{
-          px: 2.5,
-          py: 1.5,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          flexShrink: 0,
-        }}
-      >
-        <Typography fontWeight={700} fontSize={15}>
-          {title}
-        </Typography>
-        <Button onClick={onClose} size="small" startIcon={<CloseOutlinedIcon />}>
-          Close
-        </Button>
-      </Box>
-      <DialogContent
-        sx={{
-          p: 0,
-          flex: '1 1 auto',
-          minHeight: 0,
-          overflow: 'hidden',
-          bgcolor: '#e8eaed',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {ready ? (
-          <Box sx={{ flex: 1, minHeight: 0 }}>
-            <PdfBlobPreview documentKey={documentKey} pdfDocument={pdfDocument} height="100%" />
-          </Box>
-        ) : (
-          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Typography color="text.secondary" variant="body2">
-              Preparing PDF…
-            </Typography>
-          </Box>
-        )}
-      </DialogContent>
-      <Box
-        sx={{
-          px: 2.5,
-          py: 1.5,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 1,
-          flexShrink: 0,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          bgcolor: '#fff',
-        }}
-      >
-        {printError ? <Alert severity="error">{printError}</Alert> : null}
-        <Stack direction="row" spacing={1} justifyContent="flex-end">
-          <Button onClick={onClose} variant="outlined">
-            Close
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<PrintOutlinedIcon />}
-            onClick={() => void handlePrint()}
-            loading={printing}
-            disabled={printing || !ready}
-          >
-            Print
-          </Button>
-        </Stack>
-      </Box>
-    </Dialog>
+      documentKey={documentKey}
+      pdfDocument={pdfDocument}
+      tall
+      ready={ready}
+      printing={printing}
+      printError={printError}
+      onPrint={() => void handlePrint()}
+    />
   );
 }

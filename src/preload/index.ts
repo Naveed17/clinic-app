@@ -1050,6 +1050,21 @@ const api = {
       return ipc('auth:change-password', userId, current, next);
     },
   },
+  ui: {
+    getMaterials: () =>
+      ipcRenderer.invoke('ui:get-materials') as Promise<{
+        mica: boolean;
+        acrylic: boolean;
+        os: 'win11' | 'win10' | 'other';
+      }>,
+    onFocusChange: (handler: (focused: boolean) => void) => {
+      const listener = (_: unknown, focused: boolean) => handler(Boolean(focused));
+      ipcRenderer.on('ui:focus-change', listener);
+      return () => {
+        ipcRenderer.removeListener('ui:focus-change', listener);
+      };
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld('electron', electronAPI);

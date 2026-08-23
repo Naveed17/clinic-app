@@ -1,29 +1,17 @@
-import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
-import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
-import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
-import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
-import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
-import ScienceOutlinedIcon from '@mui/icons-material/ScienceOutlined';
 import {
-  Box,
+  Badge,
   Button,
-  Chip,
   Dialog,
-  Divider,
-  IconButton,
-  List,
-  ListItem,
-  ListItemText,
-  Stack,
-  TextField,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  Input,
+  Spinner,
+  Text,
   Tooltip,
-  Typography,
-} from '@mui/material';
-import { alpha } from '@mui/material/styles';
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Editor } from '@tiptap/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -32,6 +20,18 @@ import { ConfirmDialog } from '@/components/DialogUI';
 import type { LabOrder } from '@/types/lab';
 import { LabReportPrint } from './LabReportPrint';
 import { LabTiptapEditor } from './LabTiptapEditor';
+import {
+  AddOutlinedIcon,
+  AttachFileOutlinedIcon,
+  AutoAwesomeOutlinedIcon,
+  CloseOutlinedIcon,
+  DeleteOutlineIcon,
+  DescriptionOutlinedIcon,
+  FolderOpenOutlinedIcon,
+  PrintOutlinedIcon,
+  SaveOutlinedIcon,
+  ScienceOutlinedIcon,
+} from '@/icons/fluent';
 import {
   buildReportHtml,
   calcAge,
@@ -62,12 +62,241 @@ interface LabReportBuilderDialogProps {
   onSaved: () => void;
 }
 
+const useStyles = makeStyles({
+  surface: {
+    width: '96vw',
+    height: '92vh',
+    maxWidth: '96vw',
+    maxHeight: '92vh',
+    borderRadius: tokens.borderRadiusMedium,
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: '#eef3f8',
+    padding: 0,
+  },
+  body: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    minHeight: 0,
+    padding: 0,
+    gap: 0,
+  },
+  content: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    minHeight: 0,
+    padding: 0,
+  },
+  toolbar: {
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    backgroundColor: '#fff',
+    borderBottom: '1px solid #e2e8f0',
+    flexShrink: 0,
+  },
+  toolbarTitle: {
+    fontWeight: tokens.fontWeightBold,
+    fontSize: tokens.fontSizeBase400,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  toolbarSub: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground2,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  toolbarActions: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalS,
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+  },
+  aiHint: {
+    color: tokens.colorPaletteBlueForeground2,
+    fontWeight: tokens.fontWeightBold,
+    fontSize: tokens.fontSizeBase200,
+  },
+  errorText: {
+    color: tokens.colorPaletteRedForeground1,
+    fontSize: tokens.fontSizeBase200,
+    maxWidth: '280px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  printBtn: {
+    backgroundColor: BLUE,
+    color: '#fff',
+    ':hover': {
+      backgroundColor: '#155a87',
+      color: '#fff',
+    },
+  },
+  main: {
+    flex: 1,
+    minHeight: 0,
+    display: 'grid',
+    gridTemplateColumns: 'minmax(360px, 42%) 1fr',
+    gap: tokens.spacingHorizontalM,
+    padding: tokens.spacingHorizontalM,
+  },
+  panel: {
+    backgroundColor: '#fff',
+    borderRadius: tokens.borderRadiusMedium,
+    border: '1px solid #e2e8f0',
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 0,
+    overflow: 'hidden',
+  },
+  canvasPanel: {
+    boxShadow: '0 12px 40px rgba(26, 111, 168, 0.08)',
+  },
+  panelHead: {
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    borderBottom: '1px solid #e2e8f0',
+  },
+  panelHeadRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalS,
+  },
+  panelTitle: {
+    fontWeight: tokens.fontWeightBold,
+    fontSize: '13.5px',
+  },
+  panelSub: {
+    fontSize: '11.5px',
+    color: tokens.colorNeutralForeground2,
+  },
+  chips: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '6px',
+  },
+  scroll: {
+    flex: 1,
+    minHeight: 0,
+    overflow: 'auto',
+  },
+  gridHead: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(140px, 1.4fr) 120px minmax(90px, 1fr) 88px 72px',
+    gap: 0,
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalM,
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    backgroundColor: '#f8fafc',
+    borderBottom: '1px solid #e2e8f0',
+    position: 'sticky',
+    top: 0,
+    zIndex: 1,
+  },
+  colLabel: {
+    fontSize: '11px',
+    fontWeight: tokens.fontWeightBold,
+    color: BLUE,
+    textTransform: 'uppercase',
+    letterSpacing: '0.3px',
+  },
+  rowGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(140px, 1.4fr) 120px minmax(90px, 1fr) 88px 72px',
+    gap: tokens.spacingHorizontalS,
+    alignItems: 'center',
+    paddingLeft: tokens.spacingHorizontalM,
+    paddingRight: tokens.spacingHorizontalM,
+    paddingTop: '7px',
+    paddingBottom: '7px',
+    borderBottom: '1px solid #f1f5f9',
+  },
+  rangeText: {
+    fontSize: '12.5px',
+    color: tokens.colorNeutralForeground2,
+  },
+  flagText: {
+    fontSize: '11.5px',
+    fontWeight: tokens.fontWeightBold,
+  },
+  footer: {
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    borderTop: '1px solid #e2e8f0',
+  },
+  hint: {
+    fontSize: '11px',
+    color: tokens.colorNeutralForeground2,
+    marginTop: '6px',
+  },
+  divider: {
+    marginTop: '10px',
+    marginBottom: '10px',
+    border: 'none',
+    borderTop: '1px solid #e2e8f0',
+  },
+  attachHead: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  attachList: {
+    display: 'flex',
+    flexDirection: 'column',
+    marginTop: tokens.spacingVerticalS,
+    gap: tokens.spacingVerticalXXS,
+  },
+  attachItem: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalS,
+    paddingTop: tokens.spacingVerticalXXS,
+    paddingBottom: tokens.spacingVerticalXXS,
+  },
+  attachActions: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '4px',
+  },
+  canvasHead: {
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    borderBottom: '1px solid #e2e8f0',
+    backgroundColor: '#f8fafc',
+  },
+});
+
 export function LabReportBuilderDialog({
   order,
   readOnly = false,
   onClose,
   onSaved,
 }: LabReportBuilderDialogProps): React.JSX.Element {
+  const styles = useStyles();
   const { can } = useLicense();
   const qc = useQueryClient();
   const [clinic, setClinic] = useState<LabReportClinic>({
@@ -282,338 +511,264 @@ export function LabReportBuilderDialog({
     <>
       <Dialog
         open
-        onClose={onClose}
-        maxWidth={false}
-        PaperProps={{
-          sx: {
-            width: '96vw',
-            height: '92vh',
-            maxHeight: '92vh',
-            borderRadius: 2,
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            bgcolor: '#eef3f8',
-          },
+        onOpenChange={(_, data) => {
+          if (!data.open) onClose();
         }}
       >
-        <Box
-          sx={{
-            px: 2,
-            py: 1.25,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1.5,
-            bgcolor: '#fff',
-            borderBottom: '1px solid #e2e8f0',
-            flexShrink: 0,
-          }}
-        >
-          <ScienceOutlinedIcon sx={{ color: BLUE }} />
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography fontWeight={800} fontSize={15} noWrap>
-              Test Report Builder — {order.test}
-            </Typography>
-            <Typography fontSize={12} color="text.secondary" noWrap>
-              {order.patientName}
-              {order.patientMrNumber ? ` · MR ${order.patientMrNumber}` : ''}
-              {patient.age ? ` · ${patient.age} y` : ''}
-              {' · '}
-              {labResultPreview(serializeLabResult(payload))}
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" justifyContent="flex-end">
-            {can('ai') && aiHint && (
-              <Typography variant="caption" color="info.main" fontWeight={700}>
-                AI draft — verify before signing
-              </Typography>
-            )}
-            {error && (
-              <Typography variant="caption" color="error" sx={{ maxWidth: 280 }} noWrap title={error}>
-                {error}
-              </Typography>
-            )}
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<DescriptionOutlinedIcon />}
-              onClick={handleGenerateDraft}
-              disabled={!editor}
-            >
-              Generate draft report
-            </Button>
-            {can('ai') && (
-              <Tooltip title="Draft pathologist impression with CareFlow AI (edit before save)">
-                <span>
+        <DialogSurface className={styles.surface}>
+          <DialogBody className={styles.body}>
+            <DialogContent className={styles.content}>
+              <div className={styles.toolbar}>
+                <ScienceOutlinedIcon style={{ color: BLUE }} />
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <Text className={styles.toolbarTitle} block>
+                    Test Report Builder — {order.test}
+                  </Text>
+                  <Text className={styles.toolbarSub} block>
+                    {order.patientName}
+                    {order.patientMrNumber ? ` · MR ${order.patientMrNumber}` : ''}
+                    {patient.age ? ` · ${patient.age} y` : ''}
+                    {' · '}
+                    {labResultPreview(serializeLabResult(payload))}
+                  </Text>
+                </div>
+                <div className={styles.toolbarActions}>
+                  {can('ai') && aiHint && (
+                    <Text className={styles.aiHint}>AI draft — verify before signing</Text>
+                  )}
+                  {error && (
+                    <Text className={styles.errorText} title={error}>
+                      {error}
+                    </Text>
+                  )}
                   <Button
                     size="small"
-                    variant="outlined"
-                    color="secondary"
-                    startIcon={<AutoAwesomeOutlinedIcon />}
-                    loading={aiLoading}
-                    disabled={!editor || aiLoading || readOnly}
-                    onClick={() => void handleAiImpression()}
+                    appearance="secondary"
+                    icon={<DescriptionOutlinedIcon />}
+                    onClick={handleGenerateDraft}
+                    disabled={!editor}
                   >
-                    AI Assistant
+                    Generate draft report
                   </Button>
-                </span>
-              </Tooltip>
-            )}
-            {!readOnly && (
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<SaveOutlinedIcon />}
-                loading={saveMutation.isPending}
-                onClick={() => void handleSave()}
-              >
-                Save & complete
-              </Button>
-            )}
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<PrintOutlinedIcon />}
-              loading={saveMutation.isPending}
-              onClick={() => void handleSaveAndPrint()}
-              sx={{ bgcolor: BLUE, '&:hover': { bgcolor: '#155a87' } }}
-            >
-              Print
-            </Button>
-            <IconButton size="small" onClick={onClose}>
-              <CloseOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Stack>
-        </Box>
-
-        <Box
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: 'minmax(360px, 42%) 1fr' },
-            gap: 1.5,
-            p: 1.5,
-          }}
-        >
-          <Box
-            sx={{
-              bgcolor: '#fff',
-              borderRadius: 2,
-              border: '1px solid #e2e8f0',
-              display: 'flex',
-              flexDirection: 'column',
-              minHeight: 0,
-              overflow: 'hidden',
-            }}
-          >
-            <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid #e2e8f0' }}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
-                <Box>
-                  <Typography fontWeight={800} fontSize={13.5}>
-                    Test values
-                  </Typography>
-                  <Typography fontSize={11.5} color="text.secondary">
-                    {payload.specimen || 'Specimen as collected'}
-                    {payload.method ? ` · ${payload.method}` : ''}
-                  </Typography>
-                </Box>
-                <Stack direction="row" spacing={0.75}>
-                  <Chip
-                    size="small"
-                    label={`${filledCount} entered`}
-                    sx={{ height: 24, fontWeight: 700 }}
-                  />
-                  {abnormalCount > 0 && (
-                    <Chip
-                      size="small"
-                      color="error"
-                      variant="outlined"
-                      label={`${abnormalCount} high/low`}
-                      sx={{ height: 24, fontWeight: 700 }}
-                    />
+                  {can('ai') && (
+                    <Tooltip content="Draft pathologist impression with CareFlow AI (edit before save)" relationship="label">
+                      <Button
+                        size="small"
+                        appearance="secondary"
+                        icon={aiLoading ? <Spinner size="tiny" /> : <AutoAwesomeOutlinedIcon />}
+                        disabled={!editor || aiLoading || readOnly}
+                        onClick={() => void handleAiImpression()}
+                      >
+                        AI Assistant
+                      </Button>
+                    </Tooltip>
                   )}
-                </Stack>
-              </Stack>
-            </Box>
-
-            <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(140px, 1.4fr) 120px minmax(90px, 1fr) 88px 72px',
-                  gap: 0,
-                  px: 1.5,
-                  py: 1,
-                  bgcolor: '#f8fafc',
-                  borderBottom: '1px solid #e2e8f0',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1,
-                }}
-              >
-                {['Test parameter', 'Current value', 'Normal range', 'Unit', 'Flag'].map((label) => (
-                  <Typography key={label} fontSize={11} fontWeight={800} color={BLUE} sx={{ textTransform: 'uppercase', letterSpacing: 0.3 }}>
-                    {label}
-                  </Typography>
-                ))}
-              </Box>
-              {payload.rows.map((row) => {
-                const abnormal = isAbnormal(row.flag);
-                return (
-                  <Box
-                    key={row.id}
-                    sx={{
-                      display: 'grid',
-                      gridTemplateColumns: 'minmax(140px, 1.4fr) 120px minmax(90px, 1fr) 88px 72px',
-                      gap: 1,
-                      alignItems: 'center',
-                      px: 1.5,
-                      py: 0.85,
-                      bgcolor: abnormal ? ABNORMAL_BG : 'transparent',
-                      borderBottom: '1px solid',
-                      borderColor: abnormal ? ABNORMAL_BORDER : '#f1f5f9',
-                    }}
+                  {!readOnly && (
+                    <Button
+                      size="small"
+                      appearance="secondary"
+                      icon={saveMutation.isPending ? <Spinner size="tiny" /> : <SaveOutlinedIcon />}
+                      disabled={saveMutation.isPending}
+                      onClick={() => void handleSave()}
+                    >
+                      Save & complete
+                    </Button>
+                  )}
+                  <Button
+                    size="small"
+                    appearance="primary"
+                    className={styles.printBtn}
+                    icon={saveMutation.isPending ? <Spinner size="tiny" /> : <PrintOutlinedIcon />}
+                    disabled={saveMutation.isPending}
+                    onClick={() => void handleSaveAndPrint()}
                   >
-                    <TextField
-                      size="small"
-                      variant="standard"
-                      value={row.name}
-                      disabled={readOnly}
-                      onChange={(e) => updateRow(row.id, { name: e.target.value })}
-                      InputProps={{ disableUnderline: true, sx: { fontSize: 13, fontWeight: 600 } }}
-                    />
-                    <TextField
-                      size="small"
-                      type={row.input === 'number' ? 'number' : 'text'}
-                      value={row.value}
-                      disabled={readOnly}
-                      placeholder="—"
-                      onChange={(e) => updateRow(row.id, { value: e.target.value })}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          bgcolor: '#fff',
-                          fontWeight: 700,
-                          fontSize: 13,
-                          ...(abnormal
-                            ? {
-                                bgcolor: alpha('#ef4444', 0.08),
-                                '& fieldset': { borderColor: '#ef4444' },
-                              }
-                            : {}),
-                        },
-                      }}
-                    />
-                    <Typography fontSize={12.5} color="text.secondary">
-                      {row.rangeLabel || '—'}
-                    </Typography>
-                    <TextField
-                      size="small"
-                      variant="standard"
-                      value={row.unit}
-                      disabled={readOnly}
-                      onChange={(e) => updateRow(row.id, { unit: e.target.value })}
-                      InputProps={{
-                        disableUnderline: true,
-                        sx: { fontSize: 12.5 },
-                      }}
-                    />
-                    <Typography
-                      fontSize={11.5}
-                      fontWeight={800}
-                      color={abnormal ? 'error.main' : row.flag === 'N' ? 'success.main' : 'text.disabled'}
-                    >
-                      {row.flag || '—'}
-                    </Typography>
-                  </Box>
-                );
-              })}
-            </Box>
+                    Print
+                  </Button>
+                  <Button
+                    appearance="subtle"
+                    size="small"
+                    icon={<CloseOutlinedIcon style={{ fontSize: 18 }} />}
+                    onClick={onClose}
+                  />
+                </div>
+              </div>
 
-            <Box sx={{ px: 2, py: 1.25, borderTop: '1px solid #e2e8f0' }}>
-              {!readOnly && (
-                <Button
-                  size="small"
-                  startIcon={<AddOutlinedIcon />}
-                  onClick={() => setPayload((prev) => ({ ...prev, rows: [...prev.rows, customRow()] }))}
-                >
-                  Add parameter
-                </Button>
-              )}
-              <Typography fontSize={11} color="text.secondary" sx={{ mt: 0.75 }}>
-                Rows highlight in light red when the current value is outside the reference range. Ranges are typical adult values — correlate with age, sex, and method.
-              </Typography>
-              <Divider sx={{ my: 1.25 }} />
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography variant="subtitle2">Attachments</Typography>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<AttachFileOutlinedIcon />}
-                  loading={uploadReportMutation.isPending}
-                  onClick={() => uploadReportMutation.mutate()}
-                >
-                  Attach file
-                </Button>
-              </Box>
-              {labReports.length === 0 ? (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  No attachments.
-                </Typography>
-              ) : (
-                <List dense disablePadding>
-                  {labReports.map((report) => (
-                    <ListItem
-                      key={report.id}
-                      secondaryAction={
-                        <Stack direction="row" gap={0.5}>
-                          <Tooltip title="Open">
-                            <IconButton size="small" onClick={() => window.clinic.docs.lab.open(report.id)}>
-                              <FolderOpenOutlinedIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete">
-                            <IconButton size="small" color="error" onClick={() => setDeleteReportId(report.id)}>
-                              <DeleteOutlineIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
-                      }
-                    >
-                      <ListItemText
-                        primary={report.name}
-                        secondary={new Date(report.uploadedAt).toLocaleDateString()}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              )}
-            </Box>
-          </Box>
+              <div className={styles.main}>
+                <div className={styles.panel}>
+                  <div className={styles.panelHead}>
+                    <div className={styles.panelHeadRow}>
+                      <div>
+                        <Text className={styles.panelTitle} block>
+                          Test values
+                        </Text>
+                        <Text className={styles.panelSub}>
+                          {payload.specimen || 'Specimen as collected'}
+                          {payload.method ? ` · ${payload.method}` : ''}
+                        </Text>
+                      </div>
+                      <div className={styles.chips}>
+                        <Badge appearance="tint" size="small">
+                          {filledCount} entered
+                        </Badge>
+                        {abnormalCount > 0 && (
+                          <Badge appearance="outline" color="danger" size="small">
+                            {abnormalCount} high/low
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-          <Box
-            sx={{
-              bgcolor: '#fff',
-              borderRadius: 2,
-              border: '1px solid #e2e8f0',
-              display: 'flex',
-              flexDirection: 'column',
-              minHeight: 0,
-              overflow: 'hidden',
-              boxShadow: '0 12px 40px rgba(26, 111, 168, 0.08)',
-            }}
-          >
-            <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid #e2e8f0', bgcolor: '#f8fafc' }}>
-              <Typography fontWeight={800} fontSize={13.5}>
-                Report canvas
-              </Typography>
-              <Typography fontSize={11.5} color="text.secondary">
-                Generate a formatted draft from the values, then edit notes, tables, and sign-off here.
-              </Typography>
-            </Box>
-            <LabTiptapEditor content={draftHtml} revision={draftRevision} onEditor={handleEditor} />
-          </Box>
-        </Box>
+                  <div className={styles.scroll}>
+                    <div className={styles.gridHead}>
+                      {['Test parameter', 'Current value', 'Normal range', 'Unit', 'Flag'].map((label) => (
+                        <Text key={label} className={styles.colLabel}>
+                          {label}
+                        </Text>
+                      ))}
+                    </div>
+                    {payload.rows.map((row) => {
+                      const abnormal = isAbnormal(row.flag);
+                      return (
+                        <div
+                          key={row.id}
+                          className={styles.rowGrid}
+                          style={{
+                            backgroundColor: abnormal ? ABNORMAL_BG : 'transparent',
+                            borderBottomColor: abnormal ? ABNORMAL_BORDER : '#f1f5f9',
+                          }}
+                        >
+                          <Input
+                            appearance="underline"
+                            size="small"
+                            value={row.name}
+                            disabled={readOnly}
+                            onChange={(_, data) => updateRow(row.id, { name: data.value })}
+                            style={{ fontWeight: 600, fontSize: 13 }}
+                          />
+                          <Input
+                            size="small"
+                            type={row.input === 'number' ? 'number' : 'text'}
+                            value={row.value}
+                            disabled={readOnly}
+                            placeholder="—"
+                            onChange={(_, data) => updateRow(row.id, { value: data.value })}
+                            style={{
+                              fontWeight: 700,
+                              fontSize: 13,
+                              backgroundColor: abnormal ? 'rgba(239, 68, 68, 0.08)' : '#fff',
+                              borderColor: abnormal ? '#ef4444' : undefined,
+                            }}
+                          />
+                          <Text className={styles.rangeText}>{row.rangeLabel || '—'}</Text>
+                          <Input
+                            appearance="underline"
+                            size="small"
+                            value={row.unit}
+                            disabled={readOnly}
+                            onChange={(_, data) => updateRow(row.id, { unit: data.value })}
+                            style={{ fontSize: 12.5 }}
+                          />
+                          <Text
+                            className={styles.flagText}
+                            style={{
+                              color: abnormal
+                                ? tokens.colorPaletteRedForeground1
+                                : row.flag === 'N'
+                                  ? tokens.colorPaletteGreenForeground1
+                                  : tokens.colorNeutralForegroundDisabled,
+                            }}
+                          >
+                            {row.flag || '—'}
+                          </Text>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className={styles.footer}>
+                    {!readOnly && (
+                      <Button
+                        size="small"
+                        appearance="subtle"
+                        icon={<AddOutlinedIcon />}
+                        onClick={() => setPayload((prev) => ({ ...prev, rows: [...prev.rows, customRow()] }))}
+                      >
+                        Add parameter
+                      </Button>
+                    )}
+                    <Text className={styles.hint} block>
+                      Rows highlight in light red when the current value is outside the reference range. Ranges are typical adult values — correlate with age, sex, and method.
+                    </Text>
+                    <hr className={styles.divider} />
+                    <div className={styles.attachHead}>
+                      <Text weight="semibold">Attachments</Text>
+                      <Button
+                        size="small"
+                        appearance="secondary"
+                        icon={uploadReportMutation.isPending ? <Spinner size="tiny" /> : <AttachFileOutlinedIcon />}
+                        disabled={uploadReportMutation.isPending}
+                        onClick={() => uploadReportMutation.mutate()}
+                      >
+                        Attach file
+                      </Button>
+                    </div>
+                    {labReports.length === 0 ? (
+                      <Text style={{ marginTop: 8, color: tokens.colorNeutralForeground2 }}>
+                        No attachments.
+                      </Text>
+                    ) : (
+                      <div className={styles.attachList}>
+                        {labReports.map((report) => (
+                          <div key={report.id} className={styles.attachItem}>
+                            <div style={{ minWidth: 0 }}>
+                              <Text weight="semibold" block>
+                                {report.name}
+                              </Text>
+                              <Text size={200} style={{ color: tokens.colorNeutralForeground2 }}>
+                                {new Date(report.uploadedAt).toLocaleDateString()}
+                              </Text>
+                            </div>
+                            <div className={styles.attachActions}>
+                              <Tooltip content="Open" relationship="label">
+                                <Button
+                                  appearance="subtle"
+                                  size="small"
+                                  icon={<FolderOpenOutlinedIcon style={{ fontSize: 18 }} />}
+                                  onClick={() => window.clinic.docs.lab.open(report.id)}
+                                />
+                              </Tooltip>
+                              <Tooltip content="Delete" relationship="label">
+                                <Button
+                                  appearance="subtle"
+                                  size="small"
+                                  icon={<DeleteOutlineIcon style={{ fontSize: 18, color: tokens.colorPaletteRedForeground1 }} />}
+                                  onClick={() => setDeleteReportId(report.id)}
+                                />
+                              </Tooltip>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className={`${styles.panel} ${styles.canvasPanel}`}>
+                  <div className={styles.canvasHead}>
+                    <Text className={styles.panelTitle} block>
+                      Report canvas
+                    </Text>
+                    <Text className={styles.panelSub}>
+                      Generate a formatted draft from the values, then edit notes, tables, and sign-off here.
+                    </Text>
+                  </div>
+                  <LabTiptapEditor content={draftHtml} revision={draftRevision} onEditor={handleEditor} />
+                </div>
+              </div>
+            </DialogContent>
+          </DialogBody>
+        </DialogSurface>
       </Dialog>
 
       <ConfirmDialog

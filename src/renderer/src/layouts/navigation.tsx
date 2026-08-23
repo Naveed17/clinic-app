@@ -1,22 +1,11 @@
-import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
-import MeetingRoomOutlinedIcon from '@mui/icons-material/MeetingRoomOutlined';
-import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
-import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
-import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
-import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
-import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
-import MedicationOutlinedIcon from '@mui/icons-material/MedicationOutlined';
-import BiotechOutlinedIcon from '@mui/icons-material/BiotechOutlined';
-import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
-import LocalHospitalOutlinedIcon from '@mui/icons-material/LocalHospitalOutlined';
-import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined';
-import ChatOutlinedIcon from '@mui/icons-material/ChatOutlined';
+
+
 import type { ReactNode } from 'react';
 import type { UserRole } from '@/features/auth/AuthContext';
 import type { AppRoute } from '@/app/access';
 import { canAccess, isModuleEnabled } from '@/app/access';
 import type { LicenseModules } from '@/features/auth/LicenseModulesContext';
+import { AssessmentOutlinedIcon, BarChartOutlinedIcon, BiotechOutlinedIcon, CalendarMonthOutlinedIcon, ChatOutlinedIcon, ConfirmationNumberOutlinedIcon, DashboardOutlinedIcon, EventAvailableOutlinedIcon, GroupOutlinedIcon, LocalHospitalOutlinedIcon, ManageAccountsOutlinedIcon, MedicationOutlinedIcon, MeetingRoomOutlinedIcon, PaymentsOutlinedIcon } from '@/icons/fluent';
 
 export interface NavigationItem {
   label: string;

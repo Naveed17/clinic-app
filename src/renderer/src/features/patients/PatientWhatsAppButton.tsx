@@ -1,17 +1,20 @@
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import { Button, Tooltip } from '@mui/material';
-import { useState } from 'react';
+import { Button, Tooltip } from '@fluentui/react-components';
+import { useState, type CSSProperties } from 'react';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { PatientWhatsAppSendDialog } from './PatientWhatsAppSendDialog';
 import { openWhatsAppWeb } from '@/utils/whatsappWeb';
 import type { Patient } from '@/types/patient';
+import { WhatsAppIcon } from '@/icons/fluent';
 
 export function PatientWhatsAppButton({
   patient,
-  sx,
+  style,
+  sx: _sx,
 }: {
   patient: Patient;
-  sx?: object;
+  style?: CSSProperties;
+  /** @deprecated ignored — use style */
+  sx?: unknown;
 }): React.JSX.Element {
   const { can } = useLicense();
   const [apiOpen, setApiOpen] = useState(false);
@@ -30,31 +33,29 @@ export function PatientWhatsAppButton({
   return (
     <>
       <Tooltip
-        title={
+        content={
           hasPhone
             ? useApi
               ? 'Send via WhatsApp Cloud API (add-on)'
               : 'Open WhatsApp Web'
             : 'Patient has no phone number'
         }
+        relationship="label"
       >
-        <span>
-          <Button
-            startIcon={<WhatsAppIcon />}
-            variant="contained"
-            disabled={!hasPhone}
-            onClick={handleClick}
-            sx={{
-              borderRadius: 2,
-              fontWeight: 700,
-              bgcolor: '#25D366',
-              '&:hover': { bgcolor: '#1ebe5a' },
-              ...sx,
-            }}
-          >
-            WhatsApp
-          </Button>
-        </span>
+        <Button
+          icon={<WhatsAppIcon />}
+          disabled={!hasPhone}
+          onClick={handleClick}
+          style={{
+            fontWeight: 700,
+            backgroundColor: '#25D366',
+            color: '#fff',
+            border: 'none',
+            ...style,
+          }}
+        >
+          WhatsApp
+        </Button>
       </Tooltip>
       {useApi && (
         <PatientWhatsAppSendDialog open={apiOpen} patient={patient} onClose={() => setApiOpen(false)} />

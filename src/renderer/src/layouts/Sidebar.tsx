@@ -1,12 +1,15 @@
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
-import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import {
-  Box,
+  Button,
   Drawer,
-  IconButton,
+  DrawerBody,
   Tooltip,
-} from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
+import {
+  Settings24Regular,
+  SignOut24Regular,
+} from '@fluentui/react-icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getNavItems } from './navigation';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -20,153 +23,184 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-function SidebarContents(): React.JSX.Element {
+const useStyles = makeStyles({
+  nav: {
+    width: `${drawerWidth + 16}px`,
+    flexShrink: 0,
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalM,
+    boxSizing: 'border-box',
+  },
+  hideBelowMd: {
+    display: 'none',
+    '@media (min-width: 900px)': {
+      display: 'block',
+    },
+  },
+  showBelowMd: {
+    display: 'block',
+    '@media (min-width: 900px)': {
+      display: 'none',
+    },
+  },
+  rail: {
+    width: `${drawerWidth}px`,
+    boxSizing: 'border-box',
+    border: 'none',
+    backgroundColor: 'var(--cf-commanding-fill)',
+    boxShadow: tokens.shadow4,
+    borderRadius: tokens.borderRadiusMedium,
+    overflowX: 'hidden',
+    height: 'calc(100vh - 24px)',
+    position: 'fixed',
+    top: '12px',
+    left: '12px',
+    zIndex: 1,
+  },
+  contents: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    height: '100%',
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    gap: tokens.spacingVerticalXXS,
+  },
+  logo: {
+    width: '42px',
+    height: '42px',
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: tokens.spacingVerticalL,
+    flexShrink: 0,
+    boxShadow: tokens.shadow4,
+    overflow: 'hidden',
+    padding: tokens.spacingHorizontalXXS,
+  },
+  logoImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+  },
+  navStack: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: tokens.spacingVerticalXS,
+    flex: 1,
+  },
+  bottomStack: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: tokens.spacingVerticalXS,
+  },
+  navBtn: {
+    width: '44px',
+    minWidth: '44px',
+    height: '44px',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+});
+
+function SidebarContents({ onNavigate }: { onNavigate?: () => void }): React.JSX.Element {
+  const styles = useStyles();
   const location = useLocation();
   const navigate = useNavigate();
-  const theme = useTheme();
   const { user, logout } = useAuth();
   const modules = useLicenseModules();
   const brandLogo = useClinicBrandLogo();
   const navItems = user ? getNavItems(user.role, modules) : [];
 
-  const navBtnSx = (active: boolean) => ({
-    width: 44,
-    height: 44,
-    borderRadius: '12px',
-    color: active ? '#fff' : 'text.secondary',
-    bgcolor: active ? 'primary.main' : 'transparent',
-    boxShadow: active ? '0 4px 12px rgba(22,163,74,0.35)' : 'none',
-    transition: 'all 0.18s ease',
-    '&:hover': {
-      bgcolor: active ? 'primary.main' : alpha(theme.palette.text.primary, 0.06),
-      color: active ? '#fff' : 'text.primary',
-    },
-    '& svg': { fontSize: 20 },
-  });
+  const go = (path: string) => {
+    navigate(path);
+    onNavigate?.();
+  };
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        height: '100%',
-        py: 2.5,
-        gap: 0.5,
-      }}
-    >
-      {/* Logo */}
-      <Box
-        sx={{
-          width: 42,
-          height: 42,
-          borderRadius: '14px',
-          bgcolor: '#fff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          mb: 2.5,
-          flexShrink: 0,
-          boxShadow: '0 4px 12px rgba(22,163,74,0.25)',
-          overflow: 'hidden',
-          p: 0.5,
-        }}
-      >
-        <Box
-          component="img"
-          src={brandLogo}
-          alt="Clinic"
-          sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
-        />
-      </Box>
+    <div className={styles.contents}>
+      <div className={styles.logo}>
+        <img className={styles.logoImg} src={brandLogo} alt="Clinic" />
+      </div>
 
-      {/* Nav icons */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, flex: 1 }}>
+      <div className={styles.navStack}>
         {navItems.map((item) => {
           const isActive =
             location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
           return (
-            <Tooltip key={item.path} title={item.label} placement="right">
-              <IconButton onClick={() => navigate(item.path)} sx={navBtnSx(isActive)}>
-                {item.icon}
-              </IconButton>
+            <Tooltip key={item.path} content={item.label} relationship="label" positioning="after">
+              <Button
+                appearance={isActive ? 'primary' : 'subtle'}
+                className={styles.navBtn}
+                icon={item.icon as React.JSX.Element}
+                onClick={() => go(item.path)}
+                aria-label={item.label}
+              />
             </Tooltip>
           );
         })}
-      </Box>
+      </div>
 
-      {/* Bottom icons */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75 }}>
-        <Tooltip title="Settings" placement="right">
-          <IconButton
-            onClick={() => navigate('/settings')}
-            sx={navBtnSx(
-              location.pathname === '/settings' || location.pathname.startsWith('/settings/'),
-            )}
-          >
-            <SettingsOutlinedIcon />
-          </IconButton>
+      <div className={styles.bottomStack}>
+        <Tooltip content="Settings" relationship="label" positioning="after">
+          <Button
+            appearance={
+              location.pathname === '/settings' || location.pathname.startsWith('/settings/')
+                ? 'primary'
+                : 'subtle'
+            }
+            className={styles.navBtn}
+            icon={<Settings24Regular />}
+            onClick={() => go('/settings')}
+            aria-label="Settings"
+          />
         </Tooltip>
-        <Tooltip title="Logout" placement="right">
-          <IconButton
-            onClick={() => { logout(); navigate('/login', { replace: true }); }}
-            sx={{
-              width: 44, height: 44, borderRadius: '12px',
-              color: 'text.secondary',
-              '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.1), color: 'error.main' },
-              '& svg': { fontSize: 20 },
+        <Tooltip content="Logout" relationship="label" positioning="after">
+          <Button
+            appearance="subtle"
+            className={styles.navBtn}
+            icon={<SignOut24Regular />}
+            onClick={() => {
+              logout();
+              navigate('/login', { replace: true });
+              onNavigate?.();
             }}
-          >
-            <LogoutOutlinedIcon />
-          </IconButton>
+            aria-label="Logout"
+          />
         </Tooltip>
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 }
 
 export function Sidebar({ mobileOpen, onClose }: SidebarProps): React.JSX.Element {
-  const theme = useTheme();
-  const paperSx = {
-    width: drawerWidth,
-    boxSizing: 'border-box',
-    border: 'none',
-    bgcolor: alpha(theme.palette.background.paper, 0.72),
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    boxShadow: '2px 0 12px rgba(0,0,0,0.06)',
-    borderRadius: 3,
-    overflowX: 'hidden',
-    zIndex: 1,
-  };
+  const styles = useStyles();
 
   return (
-    <Box component="nav" sx={{ width: { md: drawerWidth + 16 }, flexShrink: { md: 0 }, p: { md: 2 }, pr: { md: 0 } }}>
+    <>
+      <nav className={`${styles.nav} ${styles.hideBelowMd}`} aria-label="Main">
+        <div className={styles.rail}>
+          <SidebarContents />
+        </div>
+      </nav>
+
       <Drawer
-        variant="temporary"
+        type="overlay"
         open={mobileOpen}
-        onClose={onClose}
-        ModalProps={{ keepMounted: true }}
-        sx={{ display: { xs: 'block', md: 'none' }, '& .MuiDrawer-paper': paperSx }}
-      >
-        <SidebarContents />
-      </Drawer>
-      <Drawer
-        variant="permanent"
-        open
-        sx={{
-          display: { xs: 'none', md: 'block' },
-          '& .MuiDrawer-paper': {
-            ...paperSx,
-            top: 12,
-            left: 12,
-            bottom: 12,
-            height: 'auto',
-          },
+        onOpenChange={(_, data) => {
+          if (!data.open) onClose();
         }}
+        position="start"
+        className={styles.showBelowMd}
       >
-        <SidebarContents />
+        <DrawerBody style={{ padding: 0, width: drawerWidth + 24 }}>
+          <SidebarContents onNavigate={onClose} />
+        </DrawerBody>
       </Drawer>
-    </Box>
+    </>
   );
 }

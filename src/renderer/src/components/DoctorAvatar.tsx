@@ -1,7 +1,13 @@
-import PhotoCameraOutlinedIcon from '@mui/icons-material/PhotoCameraOutlined';
-import { Avatar, Box, Button, Stack, Typography, type SxProps, type Theme } from '@mui/material';
-import { useEffect, useRef, useState } from 'react';
+import {
+  Avatar,
+  Button,
+  Text,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { fileToAvatarDataUrl } from '@/utils/avatarImage';
+import { PhotoCameraOutlinedIcon } from '@/icons/fluent';
 
 export type AvatarFallback = 'doctor' | 'admin' | 'receptionist' | 'lab_technician' | 'initials';
 
@@ -105,17 +111,46 @@ const FALLBACK_LABEL: Record<AvatarFallback, string> = {
   initials: 'Staff',
 };
 
+const useStyles = makeStyles({
+  pickerRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalL,
+    alignItems: 'center',
+  },
+  pickerMeta: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+  },
+  caption: {
+    color: tokens.colorNeutralForeground2,
+    marginBottom: tokens.spacingVerticalXS,
+  },
+  actions: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalS,
+  },
+  error: {
+    color: tokens.colorPaletteRedForeground1,
+    marginTop: tokens.spacingVerticalXXS,
+  },
+});
+
 export function DoctorAvatar({
   src,
   name,
   size = 40,
-  sx,
+  style,
+  className,
   fallback = 'doctor',
 }: {
   src?: string | null;
   name?: string;
   size?: number;
-  sx?: SxProps<Theme>;
+  style?: CSSProperties;
+  className?: string;
   fallback?: AvatarFallback;
 }): React.JSX.Element {
   const custom = isCustomPhoto(src) ? src!.trim() : '';
@@ -127,29 +162,49 @@ export function DoctorAvatar({
     setBroken(false);
   }, [src]);
 
+  if (photo) {
+    return (
+      <Avatar
+        image={{ src: photo, onError: () => setBroken(true) }}
+        name={name || FALLBACK_LABEL[fallback]}
+        size={size as 40}
+        color="neutral"
+        style={{ width: size, height: size, flexShrink: 0, ...style }}
+        className={className}
+      />
+    );
+  }
+
+  if (illustrated) {
+    return (
+      <div
+        className={className}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: '50%',
+          overflow: 'hidden',
+          flexShrink: 0,
+          backgroundColor: '#e8f5ee',
+          ...style,
+        }}
+        role="img"
+        aria-label={name || FALLBACK_LABEL[fallback]}
+      >
+        <FallbackMark fallback={fallback} />
+      </div>
+    );
+  }
+
   return (
     <Avatar
-      src={photo}
-      alt={name || FALLBACK_LABEL[fallback]}
-      variant="circular"
-      slotProps={{ img: { onError: () => setBroken(true) } }}
-      sx={{
-        width: size,
-        height: size,
-        p: 0,
-        flexShrink: 0,
-        bgcolor: photo ? '#e8f5ee' : illustrated ? '#e8f5ee' : 'primary.main',
-        color: illustrated ? undefined : 'primary.contrastText',
-        fontSize: Math.max(11, Math.round(size * 0.36)),
-        fontWeight: 700,
-        overflow: 'hidden',
-        '& img': { objectFit: 'cover' },
-        '& > svg': { width: '100%', height: '100%', display: 'block' },
-        ...sx,
-      }}
-    >
-      {illustrated ? <FallbackMark fallback={fallback} /> : initialsFromName(name)}
-    </Avatar>
+      name={name || FALLBACK_LABEL[fallback]}
+      initials={initialsFromName(name)}
+      size={size as 40}
+      color="brand"
+      style={{ width: size, height: size, flexShrink: 0, fontWeight: 700, ...style }}
+      className={className}
+    />
   );
 }
 
@@ -164,43 +219,54 @@ export function DoctorAvatarPicker({
   fallback?: AvatarFallback;
   name?: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState('');
 
   return (
-    <Stack direction="row" spacing={1.75} alignItems="center">
-      <DoctorAvatar src={value} name={name} size={72} fallback={fallback} sx={{ border: '2px solid', borderColor: 'divider' }} />
-      <Box>
-        <Typography variant="subtitle2" fontWeight={700}>Profile photo</Typography>
-        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
+    <div className={styles.pickerRow}>
+      <DoctorAvatar
+        src={value}
+        name={name}
+        size={72}
+        fallback={fallback}
+        style={{ border: `2px solid ${tokens.colorNeutralStroke2}` }}
+      />
+      <div className={styles.pickerMeta}>
+        <Text weight="semibold">Profile photo</Text>
+        <Text size={200} className={styles.caption}>
           {fallback === 'initials'
             ? 'Optional. Initials are used if you skip this.'
             : `Optional. A default ${FALLBACK_LABEL[fallback].toLowerCase()} avatar is used if you skip this.`}
-        </Typography>
-        <Stack direction="row" spacing={1}>
+        </Text>
+        <div className={styles.actions}>
           <Button
             size="small"
-            variant="outlined"
-            startIcon={<PhotoCameraOutlinedIcon />}
+            appearance="secondary"
+            icon={<PhotoCameraOutlinedIcon />}
             onClick={() => inputRef.current?.click()}
-            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
           >
             {value ? 'Change' : 'Upload'}
           </Button>
-          {value && (
+          {value ? (
             <Button
               size="small"
-              onClick={() => { onChange(null); setError(''); }}
-              sx={{ textTransform: 'none', fontWeight: 600 }}
+              appearance="subtle"
+              onClick={() => {
+                onChange(null);
+                setError('');
+              }}
             >
               Use default
             </Button>
-          )}
-        </Stack>
-        {error && (
-          <Typography variant="caption" color="error" display="block" sx={{ mt: 0.5 }}>{error}</Typography>
-        )}
-      </Box>
+          ) : null}
+        </div>
+        {error ? (
+          <Text size={200} className={styles.error}>
+            {error}
+          </Text>
+        ) : null}
+      </div>
       <input
         ref={inputRef}
         type="file"
@@ -211,10 +277,15 @@ export function DoctorAvatarPicker({
           e.target.value = '';
           if (!file) return;
           void fileToAvatarDataUrl(file)
-            .then((dataUrl) => { setError(''); onChange(dataUrl); })
-            .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Unable to use that image.'));
+            .then((dataUrl) => {
+              setError('');
+              onChange(dataUrl);
+            })
+            .catch((err: unknown) =>
+              setError(err instanceof Error ? err.message : 'Unable to use that image.'),
+            );
         }}
       />
-    </Stack>
+    </div>
   );
 }

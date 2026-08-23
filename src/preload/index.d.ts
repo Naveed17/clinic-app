@@ -295,6 +295,14 @@ declare global {
         onError?: (handler: (err: string) => void) => () => void;
         getVersion: () => Promise<string>;
       };
+      ui: {
+        getMaterials: () => Promise<{
+          mica: boolean;
+          acrylic: boolean;
+          os: 'win11' | 'win10' | 'other';
+        }>;
+        onFocusChange: (handler: (focused: boolean) => void) => () => void;
+      };
     };
   }
 }

@@ -1,82 +1,213 @@
-import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
-import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
-import LocalHospitalOutlinedIcon from '@mui/icons-material/LocalHospitalOutlined';
-import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
-import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
-import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
 import {
-  Alert,
-  Box,
   Button,
-  Chip,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Paper,
-  Select,
-  Stack,
+  Dropdown,
+  Field,
+  MessageBar,
+  MessageBarBody,
+  Option,
   Tab,
-  Tabs,
-  Typography,
-} from '@mui/material';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
-import { alpha, useTheme } from '@mui/material/styles';
+  TabList,
+  Text,
+  Title3,
+  makeStyles,
+  tokens,
+  type BadgeProps,
+  type TableColumnDefinition,
+} from '@fluentui/react-components';
+import { FluentDateField, formatDateIso, parseDateIso } from '@/components/FluentDateField';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { FetchingBar, StatCardsSkeleton, TableRowsSkeleton } from '@/components/LoadingUI';
-import {
-  chipSx,
-  SearchField,
-  softCardSx,
-  tableSx,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-} from '@/components/TableUI';
+import { DataGridTable, SearchField, StatusBadge, createTableColumn } from '@/components/TableUI';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { reportsService } from '@/services/reports.service';
-import type { OpdDailyReport } from '@/types/report';
+import type {
+  OpdDailyReport,
+  OpdDoctorFeeSummary,
+  OpdFeeRow,
+  OpdInvoiceRow,
+} from '@/types/report';
 import type { TokenPerson } from '@/types/token';
 import { OpdReportPrint } from '@/features/reports/OpdReportPrint';
 import type { OpdPrintSection } from '@/features/reports/OpdReportPdf';
+import {
+  AccountBalanceWalletOutlinedIcon,
+  AssessmentOutlinedIcon,
+  ConfirmationNumberOutlinedIcon,
+  LocalHospitalOutlinedIcon,
+  PaymentsOutlinedIcon,
+  PrintOutlinedIcon,
+  UndoOutlinedIcon,
+} from '@/icons/fluent';
 
-const invoiceStatusConfig: Record<string, { label: string; color: 'default' | 'warning' | 'info' | 'success' | 'error' }> = {
-  DRAFT: { label: 'Draft', color: 'default' },
-  ISSUED: { label: 'Issued', color: 'info' },
+type StatusColor = NonNullable<BadgeProps['color']>;
+
+const invoiceStatusConfig: Record<string, { label: string; color: StatusColor }> = {
+  DRAFT: { label: 'Draft', color: 'subtle' },
+  ISSUED: { label: 'Issued', color: 'informative' },
   PARTIALLY_PAID: { label: 'Partial', color: 'warning' },
   PAID: { label: 'Paid', color: 'success' },
-  REFUNDED: { label: 'Refunded', color: 'error' },
-  VOID: { label: 'Void', color: 'error' },
+  REFUNDED: { label: 'Refunded', color: 'danger' },
+  VOID: { label: 'Void', color: 'danger' },
 };
 
-const feeStatusConfig: Record<string, { label: string; color: 'warning' | 'success' | 'default' | 'info' }> = {
+const feeStatusConfig: Record<string, { label: string; color: StatusColor }> = {
   WAITING: { label: 'Waiting', color: 'warning' },
-  IN_PROGRESS: { label: 'In progress', color: 'info' },
+  IN_PROGRESS: { label: 'In progress', color: 'informative' },
   DONE: { label: 'Done', color: 'success' },
-  SKIPPED: { label: 'Skipped', color: 'default' },
+  SKIPPED: { label: 'Skipped', color: 'subtle' },
 };
+
+const useStyles = makeStyles({
+  page: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXL,
+    paddingBottom: tokens.spacingVerticalL,
+  },
+  header: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalL,
+    flexWrap: 'wrap',
+  },
+  eyebrow: {
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  title: {
+    letterSpacing: '-0.02em',
+    marginTop: tokens.spacingVerticalXXS,
+    fontWeight: tokens.fontWeightBold,
+  },
+  subtitle: {
+    color: tokens.colorNeutralForeground2,
+    marginTop: tokens.spacingVerticalXXS,
+  },
+  filters: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    flexWrap: 'wrap',
+  },
+  doctorField: { minWidth: '220px' },
+  optionRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    minWidth: 0,
+  },
+  doctorCell: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    minWidth: 0,
+  },
+  doctorName: {
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  doctorsWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    flexWrap: 'wrap',
+  },
+  statsGrid: {
+    display: 'grid',
+    gap: tokens.spacingHorizontalM,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+  },
+  statCard: {
+    padding: tokens.spacingVerticalL,
+    borderRadius: tokens.borderRadiusXLarge,
+    border: 'none',
+    boxShadow: tokens.shadow4,
+  },
+  statInner: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+  },
+  statLabel: {
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightBold,
+    fontSize: tokens.fontSizeBase200,
+  },
+  statValue: {
+    fontWeight: tokens.fontWeightBold,
+    fontSize: tokens.fontSizeBase500,
+    lineHeight: tokens.lineHeightBase400,
+  },
+  card: {
+    borderRadius: tokens.borderRadiusXLarge,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow4,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  cardHeader: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalXL,
+    paddingRight: tokens.spacingHorizontalXL,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  sectionTitle: {
+    fontWeight: tokens.fontWeightBold,
+    fontSize: tokens.fontSizeBase300,
+  },
+  toolbar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    flexWrap: 'wrap',
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  search: {
+    marginLeft: 'auto',
+    maxWidth: '280px',
+  },
+  errorBar: { margin: tokens.spacingHorizontalL },
+  tableWrap: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    maxHeight: 'calc(100vh - 420px)',
+    overflowY: 'auto',
+  },
+  right: { textAlign: 'right', width: '100%' },
+  cellStrong: {
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  cellBold: { fontWeight: tokens.fontWeightBold },
+});
 
 function todayYmd(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-function parseYmd(value: string): Date {
-  const [y, m, d] = value.split('-').map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
-}
-
-function toYmd(value: Date): string {
-  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-}
-
 function money(value: number): string {
-  return `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
+  return `Rs. ${new Intl.NumberFormat('en-PK', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(Number(value) || 0)}`;
 }
 
 function doctorLabel(doctor: Pick<TokenPerson, 'firstName' | 'lastName'>): string {
@@ -92,17 +223,18 @@ function DoctorCell({
   avatar?: string | null;
   size?: number;
 }): React.JSX.Element {
+  const styles = useStyles();
   const display = name === '—' ? 'Doctor' : name;
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+    <div className={styles.doctorCell}>
       <DoctorAvatar src={avatar} name={display.startsWith('Dr.') ? display : `Dr. ${display}`} size={size} />
-      <Typography fontSize={13.5} fontWeight={600} noWrap>{name}</Typography>
-    </Box>
+      <Text className={styles.doctorName}>{name}</Text>
+    </div>
   );
 }
 
 export function OpdReportsPage(): React.JSX.Element {
-  const theme = useTheme();
+  const styles = useStyles();
   const navigate = useNavigate();
   const [date, setDate] = useState(todayYmd);
   const [doctorId, setDoctorId] = useState('');
@@ -117,7 +249,7 @@ export function OpdReportsPage(): React.JSX.Element {
     queryFn: () => window.clinic.tokens.doctors(),
   });
   const doctorList = doctors.data ?? [];
-  const doctorById = useMemo(() => new Map(doctorList.map((doctor) => [doctor.id, doctor])), [doctorList]);
+  const doctorById = useMemo(() => new Map(doctorList.map((d) => [d.id, d])), [doctorList]);
   const doctorByName = useMemo(() => {
     const map = new Map<string, TokenPerson>();
     for (const doctor of doctorList) map.set(doctorLabel(doctor), doctor);
@@ -126,11 +258,7 @@ export function OpdReportsPage(): React.JSX.Element {
 
   const report = useQuery({
     queryKey: ['reports:opd', date, doctorId],
-    queryFn: () =>
-      reportsService.opd({
-        date,
-        ...(doctorId ? { doctorId } : {}),
-      }),
+    queryFn: () => reportsService.opd({ date, ...(doctorId ? { doctorId } : {}) }),
   });
 
   const data = report.data;
@@ -150,20 +278,244 @@ export function OpdReportsPage(): React.JSX.Element {
     );
   }, [data, q]);
 
-  const summaryCards = tab === 'invoices'
-    ? [
-        { label: 'Bills', value: String(data?.invoices.count ?? 0), icon: <PaymentsOutlinedIcon />, color: theme.palette.primary.main, bg: alpha(theme.palette.primary.main, 0.1) },
-        { label: 'Billed', value: money(data?.invoices.billed ?? 0), icon: <AssessmentOutlinedIcon />, color: theme.palette.info.dark, bg: alpha(theme.palette.info.main, 0.12) },
-        { label: 'Collected', value: money(data?.invoices.collected ?? 0), icon: <AccountBalanceWalletOutlinedIcon />, color: theme.palette.success.dark, bg: alpha(theme.palette.success.main, 0.12) },
-        { label: 'Outstanding', value: money(data?.invoices.outstanding ?? 0), icon: <UndoOutlinedIcon />, color: theme.palette.warning.dark, bg: alpha(theme.palette.warning.main, 0.12) },
-      ]
-    : [
-        { label: 'Tokens', value: String(data?.fees.count ?? 0), icon: <ConfirmationNumberOutlinedIcon />, color: theme.palette.primary.main, bg: alpha(theme.palette.primary.main, 0.1) },
-        { label: 'Fees collected', value: money(data?.fees.collected ?? 0), icon: <LocalHospitalOutlinedIcon />, color: theme.palette.info.dark, bg: alpha(theme.palette.info.main, 0.12) },
-        { label: 'Discount', value: money(data?.fees.discounted ?? 0), icon: <PaymentsOutlinedIcon />, color: theme.palette.warning.dark, bg: alpha(theme.palette.warning.main, 0.12) },
-        { label: 'Refunded', value: money(data?.fees.refunded ?? 0), icon: <UndoOutlinedIcon />, color: theme.palette.error.dark, bg: alpha(theme.palette.error.main, 0.12) },
-        { label: 'Net fees', value: money(data?.fees.net ?? 0), icon: <AccountBalanceWalletOutlinedIcon />, color: theme.palette.success.dark, bg: alpha(theme.palette.success.main, 0.12) },
-      ];
+  const selectedDoctor = doctorId ? doctorById.get(doctorId) : undefined;
+
+  const summaryCards =
+    tab === 'invoices'
+      ? [
+          {
+            label: 'Bills',
+            value: String(data?.invoices.count ?? 0),
+            icon: <PaymentsOutlinedIcon />,
+            color: tokens.colorBrandForeground1,
+            bg: tokens.colorBrandBackground2,
+          },
+          {
+            label: 'Billed',
+            value: money(data?.invoices.billed ?? 0),
+            icon: <AssessmentOutlinedIcon />,
+            color: tokens.colorPaletteBlueForeground2,
+            bg: tokens.colorPaletteBlueBackground2,
+          },
+          {
+            label: 'Collected',
+            value: money(data?.invoices.collected ?? 0),
+            icon: <AccountBalanceWalletOutlinedIcon />,
+            color: tokens.colorPaletteGreenForeground2,
+            bg: tokens.colorPaletteGreenBackground2,
+          },
+          {
+            label: 'Outstanding',
+            value: money(data?.invoices.outstanding ?? 0),
+            icon: <UndoOutlinedIcon />,
+            color: tokens.colorPaletteDarkOrangeForeground2,
+            bg: tokens.colorPaletteDarkOrangeBackground2,
+          },
+        ]
+      : [
+          {
+            label: 'Tokens',
+            value: String(data?.fees.count ?? 0),
+            icon: <ConfirmationNumberOutlinedIcon />,
+            color: tokens.colorBrandForeground1,
+            bg: tokens.colorBrandBackground2,
+          },
+          {
+            label: 'Fees collected',
+            value: money(data?.fees.collected ?? 0),
+            icon: <LocalHospitalOutlinedIcon />,
+            color: tokens.colorPaletteBlueForeground2,
+            bg: tokens.colorPaletteBlueBackground2,
+          },
+          {
+            label: 'Discount',
+            value: money(data?.fees.discounted ?? 0),
+            icon: <PaymentsOutlinedIcon />,
+            color: tokens.colorPaletteDarkOrangeForeground2,
+            bg: tokens.colorPaletteDarkOrangeBackground2,
+          },
+          {
+            label: 'Refunded',
+            value: money(data?.fees.refunded ?? 0),
+            icon: <UndoOutlinedIcon />,
+            color: tokens.colorPaletteRedForeground2,
+            bg: tokens.colorPaletteRedBackground2,
+          },
+          {
+            label: 'Net fees',
+            value: money(data?.fees.net ?? 0),
+            icon: <AccountBalanceWalletOutlinedIcon />,
+            color: tokens.colorPaletteGreenForeground2,
+            bg: tokens.colorPaletteGreenBackground2,
+          },
+        ];
+
+  const byDoctorColumns = useMemo<TableColumnDefinition<OpdDoctorFeeSummary>[]>(
+    () => [
+      createTableColumn<OpdDoctorFeeSummary>({
+        columnId: 'doctor',
+        compare: (a, b) => a.doctorName.localeCompare(b.doctorName),
+        renderHeaderCell: () => 'Doctor',
+        renderCell: (row) => (
+          <DoctorCell name={row.doctorName} avatar={doctorById.get(row.doctorId)?.avatar} />
+        ),
+      }),
+      createTableColumn<OpdDoctorFeeSummary>({
+        columnId: 'tokens',
+        compare: (a, b) => a.tokens - b.tokens,
+        renderHeaderCell: () => 'Tokens',
+        renderCell: (row) => <div className={styles.right}>{row.tokens}</div>,
+      }),
+      createTableColumn<OpdDoctorFeeSummary>({
+        columnId: 'collected',
+        compare: (a, b) => a.collected - b.collected,
+        renderHeaderCell: () => 'Collected',
+        renderCell: (row) => <div className={styles.right}>{money(row.collected)}</div>,
+      }),
+      createTableColumn<OpdDoctorFeeSummary>({
+        columnId: 'refunded',
+        compare: (a, b) => a.refunded - b.refunded,
+        renderHeaderCell: () => 'Refunded',
+        renderCell: (row) => <div className={styles.right}>{money(row.refunded)}</div>,
+      }),
+      createTableColumn<OpdDoctorFeeSummary>({
+        columnId: 'net',
+        compare: (a, b) => a.net - b.net,
+        renderHeaderCell: () => 'Net',
+        renderCell: (row) => (
+          <div className={styles.right}>
+            <Text className={styles.cellBold}>{money(row.net)}</Text>
+          </div>
+        ),
+      }),
+    ],
+    [doctorById, styles.cellBold, styles.right],
+  );
+
+  const invoiceColumns = useMemo<TableColumnDefinition<OpdInvoiceRow>[]>(
+    () => [
+      createTableColumn<OpdInvoiceRow>({
+        columnId: 'invoice',
+        compare: (a, b) => a.invoiceNumber.localeCompare(b.invoiceNumber),
+        renderHeaderCell: () => 'Invoice',
+        renderCell: (row) => <Text className={styles.cellStrong}>{row.invoiceNumber}</Text>,
+      }),
+      createTableColumn<OpdInvoiceRow>({
+        columnId: 'patient',
+        compare: (a, b) => a.patientName.localeCompare(b.patientName),
+        renderHeaderCell: () => 'Patient',
+        renderCell: (row) => row.patientName,
+      }),
+      createTableColumn<OpdInvoiceRow>({
+        columnId: 'doctor',
+        compare: (a, b) => a.doctors.localeCompare(b.doctors),
+        renderHeaderCell: () => 'Doctor',
+        renderCell: (row) =>
+          row.doctors === '—' ? (
+            '—'
+          ) : (
+            <div className={styles.doctorsWrap}>
+              {row.doctors.split(', ').map((name) => (
+                <DoctorCell key={name} name={name} avatar={doctorByName.get(name)?.avatar} size={28} />
+              ))}
+            </div>
+          ),
+      }),
+      createTableColumn<OpdInvoiceRow>({
+        columnId: 'status',
+        compare: (a, b) => a.status.localeCompare(b.status),
+        renderHeaderCell: () => 'Status',
+        renderCell: (row) => {
+          const cfg = invoiceStatusConfig[row.status] ?? { label: row.status, color: 'subtle' as const };
+          return <StatusBadge color={cfg.color}>{cfg.label}</StatusBadge>;
+        },
+      }),
+      createTableColumn<OpdInvoiceRow>({
+        columnId: 'total',
+        compare: (a, b) => a.total - b.total,
+        renderHeaderCell: () => 'Total',
+        renderCell: (row) => <div className={styles.right}>{money(row.total)}</div>,
+      }),
+      createTableColumn<OpdInvoiceRow>({
+        columnId: 'paid',
+        compare: (a, b) => a.amountPaid - b.amountPaid,
+        renderHeaderCell: () => 'Paid',
+        renderCell: (row) => <div className={styles.right}>{money(row.amountPaid)}</div>,
+      }),
+      createTableColumn<OpdInvoiceRow>({
+        columnId: 'due',
+        compare: (a, b) => a.outstanding - b.outstanding,
+        renderHeaderCell: () => 'Due',
+        renderCell: (row) => <div className={styles.right}>{money(row.outstanding)}</div>,
+      }),
+    ],
+    [doctorByName, styles.cellStrong, styles.doctorsWrap, styles.right],
+  );
+
+  const feeColumns = useMemo<TableColumnDefinition<OpdFeeRow>[]>(
+    () => [
+      createTableColumn<OpdFeeRow>({
+        columnId: 'token',
+        compare: (a, b) => a.tokenNumber - b.tokenNumber,
+        renderHeaderCell: () => 'Token',
+        renderCell: (row) => (
+          <Text className={styles.cellStrong}>{String(row.tokenNumber).padStart(3, '0')}</Text>
+        ),
+      }),
+      createTableColumn<OpdFeeRow>({
+        columnId: 'patient',
+        compare: (a, b) => a.patientName.localeCompare(b.patientName),
+        renderHeaderCell: () => 'Patient',
+        renderCell: (row) => row.patientName,
+      }),
+      createTableColumn<OpdFeeRow>({
+        columnId: 'doctor',
+        compare: (a, b) => a.doctorName.localeCompare(b.doctorName),
+        renderHeaderCell: () => 'Doctor',
+        renderCell: (row) => (
+          <DoctorCell name={row.doctorName} avatar={doctorById.get(row.doctorId)?.avatar} />
+        ),
+      }),
+      createTableColumn<OpdFeeRow>({
+        columnId: 'status',
+        compare: (a, b) => a.status.localeCompare(b.status),
+        renderHeaderCell: () => 'Status',
+        renderCell: (row) => {
+          const cfg = feeStatusConfig[row.status] ?? { label: row.status, color: 'subtle' as const };
+          return <StatusBadge color={cfg.color}>{cfg.label}</StatusBadge>;
+        },
+      }),
+      createTableColumn<OpdFeeRow>({
+        columnId: 'fee',
+        compare: (a, b) => a.consultationFee - b.consultationFee,
+        renderHeaderCell: () => 'Fee',
+        renderCell: (row) => <div className={styles.right}>{money(row.consultationFee)}</div>,
+      }),
+      createTableColumn<OpdFeeRow>({
+        columnId: 'discount',
+        compare: (a, b) => a.feeDiscount - b.feeDiscount,
+        renderHeaderCell: () => 'Discount',
+        renderCell: (row) => <div className={styles.right}>{money(row.feeDiscount)}</div>,
+      }),
+      createTableColumn<OpdFeeRow>({
+        columnId: 'refunded',
+        compare: (a, b) => a.feeRefunded - b.feeRefunded,
+        renderHeaderCell: () => 'Refunded',
+        renderCell: (row) => <div className={styles.right}>{money(row.feeRefunded)}</div>,
+      }),
+      createTableColumn<OpdFeeRow>({
+        columnId: 'net',
+        compare: (a, b) => a.net - b.net,
+        renderHeaderCell: () => 'Net',
+        renderCell: (row) => (
+          <div className={styles.right}>
+            <Text className={styles.cellBold}>{money(row.net)}</Text>
+          </div>
+        ),
+      }),
+    ],
+    [doctorById, styles.cellBold, styles.cellStrong, styles.right],
+  );
 
   function handlePrint(section: OpdPrintSection): void {
     if (!data) return;
@@ -172,288 +524,151 @@ export function OpdReportsPage(): React.JSX.Element {
 
   return (
     <>
-      <Stack spacing={2.5} sx={{ pb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: { sm: 'flex-end' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between' }}>
-          <Box>
-            <Typography variant="body2" color="text.secondary" fontWeight={600}>
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <div>
+            <Text className={styles.eyebrow} size={200}>
               Daily settlement
-            </Typography>
-            <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
-              OPD Reports
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            </Text>
+            <Title3 className={styles.title}>OPD Reports</Title3>
+            <Text className={styles.subtitle} size={200}>
               Invoices and doctor consultation fees for a day. Pick a doctor if they ask for their hisaab.
-            </Typography>
-          </Box>
-          <Stack direction="row" gap={1.5} alignItems="center" flexWrap="wrap">
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <DatePicker
-                value={parseYmd(date)}
-                onChange={(value) => setDate(value ? toYmd(value) : todayYmd())}
-                slotProps={{
-                  textField: {
-                    size: 'small',
-                    sx: { width: 168 },
-                  },
-                }}
-              />
-            </LocalizationProvider>
-            <FormControl size="small" sx={{ minWidth: 220, height: 40 }}>
-              <InputLabel>Doctor</InputLabel>
-              <Select
-                label="Doctor"
-                value={doctorId}
-                onChange={(e) => setDoctorId(String(e.target.value))}
-                renderValue={(value) => {
-                  if (!value) return 'All doctors';
-                  const doctor = doctorById.get(String(value));
-                  const name = doctor ? doctorLabel(doctor) : 'Doctor';
-                  return (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, height: '100%' }}>
-                      <DoctorAvatar src={doctor?.avatar} name={`Dr. ${name}`} size={18} />
-                      <Typography component="span" fontSize={13.5} fontWeight={600} noWrap>{name}</Typography>
-                    </Box>
-                  );
-                }}
-                sx={{
-                  height: 40,
-                  borderRadius: 0.5,
-                  fontSize: 13.5,
-                  fontWeight: 500,
-                  bgcolor: 'background.paper',
-                  '& .MuiOutlinedInput-notchedOutline': { borderRadius: 0.5 },
-                  '& .MuiSelect-select': {
-                    display: 'flex',
-                    alignItems: 'center',
-                    py: 0,
-                    height: 40,
-                    boxSizing: 'border-box',
-                  },
-                }}
+            </Text>
+          </div>
+          <div className={styles.filters}>
+            <FluentDateField
+              label="Date"
+              value={parseDateIso(date)}
+              onSelectDate={(d) => setDate(formatDateIso(d) || todayYmd())}
+            />
+            <Field label="Doctor" className={styles.doctorField}>
+              <Dropdown
+                placeholder="All doctors"
+                value={selectedDoctor ? doctorLabel(selectedDoctor) : 'All doctors'}
+                selectedOptions={doctorId ? [doctorId] : ['']}
+                onOptionSelect={(_, d) => setDoctorId(String(d.optionValue ?? ''))}
               >
-                <MenuItem value="">All doctors</MenuItem>
+                <Option value="" text="All doctors">
+                  All doctors
+                </Option>
                 {doctorList.map((doctor) => (
-                  <MenuItem key={doctor.id} value={doctor.id}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                  <Option key={doctor.id} value={doctor.id} text={doctorLabel(doctor)}>
+                    <div className={styles.optionRow}>
                       <DoctorAvatar src={doctor.avatar} name={`Dr. ${doctorLabel(doctor)}`} size={28} />
                       {doctorLabel(doctor)}
-                    </Box>
-                  </MenuItem>
+                    </div>
+                  </Option>
                 ))}
-              </Select>
-            </FormControl>
+              </Dropdown>
+            </Field>
             <Button
-              variant="contained"
-              startIcon={<PrintOutlinedIcon />}
+              appearance="primary"
+              icon={<PrintOutlinedIcon />}
               disabled={!data}
               onClick={() => handlePrint('all')}
-              sx={{ borderRadius: 2, fontWeight: 700, px: 2.25, height: 40 }}
             >
               Print all
             </Button>
-          </Stack>
-        </Box>
+          </div>
+        </div>
 
         {report.isLoading ? (
           <StatCardsSkeleton count={summaryCards.length} />
         ) : (
-          <Box sx={{ display: 'grid', gap: 1.75, gridTemplateColumns: { xs: '1fr 1fr', md: `repeat(${summaryCards.length}, 1fr)` } }}>
+          <div className={styles.statsGrid}>
             {summaryCards.map((card) => (
-              <Paper
-                key={card.label}
-                elevation={0}
-                sx={{
-                  p: 2.25,
-                  ...softCardSx,
-                  bgcolor: card.bg,
-                  border: 'none',
-                }}
-              >
-                <Stack direction="row" spacing={1.25} alignItems="center">
-                  <Box sx={{ color: card.color, display: 'flex' }}>{card.icon}</Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={700}>
-                      {card.label}
-                    </Typography>
-                    <Typography fontWeight={800} fontSize={18} sx={{ lineHeight: 1.2 }}>
-                      {card.value}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Paper>
+              <div key={card.label} className={styles.statCard} style={{ backgroundColor: card.bg }}>
+                <div className={styles.statInner}>
+                  <span style={{ color: card.color, display: 'flex' }}>{card.icon}</span>
+                  <div>
+                    <Text className={styles.statLabel}>{card.label}</Text>
+                    <Text className={styles.statValue}>{card.value}</Text>
+                  </div>
+                </div>
+              </div>
             ))}
-          </Box>
+          </div>
         )}
 
         {tab === 'fees' && (data?.fees.byDoctor.length ?? 0) > 1 ? (
-          <Paper elevation={0} sx={{ ...softCardSx, overflow: 'hidden' }}>
-            <Box sx={{ px: 2.5, py: 1.75, borderBottom: '1px solid', borderColor: 'divider' }}>
-              <Typography fontWeight={800} fontSize={14}>By doctor</Typography>
-            </Box>
-            <Table sx={{ borderCollapse: 'separate', borderSpacing: '0 6px' }}>
-              <TableHead sx={tableSx.head}>
-                <TableRow>
-                  <TableCell>Doctor</TableCell>
-                  <TableCell align="right">Tokens</TableCell>
-                  <TableCell align="right">Collected</TableCell>
-                  <TableCell align="right">Refunded</TableCell>
-                  <TableCell align="right">Net</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {data?.fees.byDoctor.map((row) => (
-                  <TableRow key={row.doctorId} sx={tableSx.row}>
-                    <TableCell>
-                      <DoctorCell name={row.doctorName} avatar={doctorById.get(row.doctorId)?.avatar} />
-                    </TableCell>
-                    <TableCell align="right">{row.tokens}</TableCell>
-                    <TableCell align="right">{money(row.collected)}</TableCell>
-                    <TableCell align="right">{money(row.refunded)}</TableCell>
-                    <TableCell align="right"><Typography fontWeight={700}>{money(row.net)}</Typography></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Paper>
+          <div className={styles.card}>
+            <div className={styles.cardHeader}>
+              <Text className={styles.sectionTitle}>By doctor</Text>
+            </div>
+            <div className={styles.tableWrap}>
+              <DataGridTable
+                items={data?.fees.byDoctor ?? []}
+                columns={byDoctorColumns}
+                getRowId={(row) => row.doctorId}
+                sortable={false}
+                emptyMessage="No doctor breakdown."
+              />
+            </div>
+          </div>
         ) : null}
 
-        <Paper elevation={0} sx={{ ...softCardSx, overflow: 'hidden', position: 'relative' }}>
+        <div className={styles.card}>
           <FetchingBar show={report.isFetching && !report.isLoading} />
-          <Box sx={{ px: 2, pt: 1.25, pb: 1.25, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-            <Tabs
-              value={tab}
-              onChange={(_e, next: 'invoices' | 'fees') => { setTab(next); setSearch(''); }}
-              sx={{ minHeight: 48, '& .MuiTab-root': { minHeight: 48, fontWeight: 700, textTransform: 'none' } }}
+          <div className={styles.toolbar}>
+            <TabList
+              selectedValue={tab}
+              onTabSelect={(_, d) => {
+                setTab(d.value as 'invoices' | 'fees');
+                setSearch('');
+              }}
             >
-              <Tab value="invoices" label="Invoices" />
-              <Tab value="fees" label="Doctor fees" />
-            </Tabs>
+              <Tab value="invoices">Invoices</Tab>
+              <Tab value="fees">Doctor fees</Tab>
+            </TabList>
             <SearchField
               value={search}
               onChange={setSearch}
-              placeholder={tab === 'invoices' ? 'Search invoice or patient...' : 'Search token, patient or doctor...'}
-              sx={{ ml: 'auto', maxWidth: 280, '& .MuiOutlinedInput-root': { borderRadius: 0.5 } }}
+              placeholder={
+                tab === 'invoices' ? 'Search invoice or patient...' : 'Search token, patient or doctor...'
+              }
+              className={styles.search}
             />
             <Button
-              variant="contained"
+              appearance="primary"
               disabled={!data}
-              startIcon={<PrintOutlinedIcon />}
+              icon={<PrintOutlinedIcon />}
               onClick={() => handlePrint(tab === 'invoices' ? 'invoices' : 'fees')}
-              sx={{ borderRadius: 2, fontWeight: 700, px: 1.75, py: 1, flexShrink: 0 }}
             >
               {tab === 'invoices' ? 'Print invoices' : 'Print doctor fees'}
             </Button>
-          </Box>
-          {report.isError ? <Alert severity="error" sx={{ m: 2 }}>Unable to load OPD report.</Alert> : null}
-          <Box sx={{ px: 2, py: 1.5, maxHeight: 'calc(100vh - 420px)', overflowY: 'auto' }}>
-            {tab === 'invoices' ? (
-              <Table stickyHeader sx={{ borderCollapse: 'separate', borderSpacing: '0 6px' }}>
-                <TableHead sx={tableSx.head}>
-                  <TableRow>
-                    <TableCell>Invoice</TableCell>
-                    <TableCell>Patient</TableCell>
-                    <TableCell>Doctor</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell align="right">Total</TableCell>
-                    <TableCell align="right">Paid</TableCell>
-                    <TableCell align="right">Due</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {report.isLoading ? (
-                    <TableRowsSkeleton cols={7} />
-                  ) : invoiceRows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>
-                        No invoices for this day.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    invoiceRows.map((row) => {
-                      const cfg = invoiceStatusConfig[row.status] ?? { label: row.status, color: 'default' as const };
-                      return (
-                        <TableRow
-                          key={row.id}
-                          hover
-                          sx={{ ...tableSx.row, cursor: 'pointer' }}
-                          onClick={() => navigate(`/opd-reports/invoices/${row.id}`, { state: { from: detailFrom } })}
-                        >
-                          <TableCell><Typography fontSize={13.5} fontWeight={600}>{row.invoiceNumber}</Typography></TableCell>
-                          <TableCell>{row.patientName}</TableCell>
-                          <TableCell>
-                            {row.doctors === '—' ? (
-                              '—'
-                            ) : (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-                                {row.doctors.split(', ').map((name) => (
-                                  <DoctorCell key={name} name={name} avatar={doctorByName.get(name)?.avatar} size={28} />
-                                ))}
-                              </Box>
-                            )}
-                          </TableCell>
-                          <TableCell><Chip size="small" label={cfg.label} color={cfg.color} sx={chipSx} /></TableCell>
-                          <TableCell align="right">{money(row.total)}</TableCell>
-                          <TableCell align="right">{money(row.amountPaid)}</TableCell>
-                          <TableCell align="right">{money(row.outstanding)}</TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+          </div>
+          {report.isError ? (
+            <MessageBar intent="error" className={styles.errorBar}>
+              <MessageBarBody>Unable to load OPD report.</MessageBarBody>
+            </MessageBar>
+          ) : null}
+          <div className={styles.tableWrap}>
+            {report.isLoading ? (
+              <TableRowsSkeleton cols={tab === 'invoices' ? 7 : 8} />
+            ) : tab === 'invoices' ? (
+              <DataGridTable
+                items={invoiceRows}
+                columns={invoiceColumns}
+                getRowId={(row) => row.id}
+                emptyMessage="No invoices for this day."
+                onRowClick={(row) =>
+                  navigate(`/opd-reports/invoices/${row.id}`, { state: { from: detailFrom } })
+                }
+              />
             ) : (
-              <Table stickyHeader sx={{ borderCollapse: 'separate', borderSpacing: '0 6px' }}>
-                <TableHead sx={tableSx.head}>
-                  <TableRow>
-                    <TableCell>Token</TableCell>
-                    <TableCell>Patient</TableCell>
-                    <TableCell>Doctor</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell align="right">Fee</TableCell>
-                    <TableCell align="right">Discount</TableCell>
-                    <TableCell align="right">Refunded</TableCell>
-                    <TableCell align="right">Net</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {report.isLoading ? (
-                    <TableRowsSkeleton cols={8} />
-                  ) : feeRows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>
-                        No doctor fees for this day.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    feeRows.map((row) => {
-                      const cfg = feeStatusConfig[row.status] ?? { label: row.status, color: 'default' as const };
-                      return (
-                        <TableRow
-                          key={row.id}
-                          hover
-                          sx={{ ...tableSx.row, cursor: 'pointer' }}
-                          onClick={() => navigate(`/opd-reports/fees/${row.id}`, { state: { from: detailFrom } })}
-                        >
-                          <TableCell><Typography fontSize={13.5} fontWeight={600}>{String(row.tokenNumber).padStart(3, '0')}</Typography></TableCell>
-                          <TableCell>{row.patientName}</TableCell>
-                          <TableCell>
-                            <DoctorCell name={row.doctorName} avatar={doctorById.get(row.doctorId)?.avatar} />
-                          </TableCell>
-                          <TableCell><Chip size="small" label={cfg.label} color={cfg.color} sx={chipSx} /></TableCell>
-                          <TableCell align="right">{money(row.consultationFee)}</TableCell>
-                          <TableCell align="right">{money(row.feeDiscount)}</TableCell>
-                          <TableCell align="right">{money(row.feeRefunded)}</TableCell>
-                          <TableCell align="right"><Typography fontWeight={700}>{money(row.net)}</Typography></TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+              <DataGridTable
+                items={feeRows}
+                columns={feeColumns}
+                getRowId={(row) => row.id}
+                emptyMessage="No doctor fees for this day."
+                onRowClick={(row) =>
+                  navigate(`/opd-reports/fees/${row.id}`, { state: { from: detailFrom } })
+                }
+              />
             )}
-          </Box>
-        </Paper>
-      </Stack>
+          </div>
+        </div>
+      </div>
       {preview ? (
         <OpdReportPrint
           report={preview.report}

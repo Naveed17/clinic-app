@@ -1,12 +1,8 @@
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
-import {
-  Box, Chip, IconButton, Stack, Tooltip, Typography,
-} from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+import { Badge, Button, Text, Tooltip, makeStyles, tokens } from '@fluentui/react-components';
 import { useState } from 'react';
-import { chipSx } from '@/components/TableUI';
 import type { LabOrder } from '@/types/lab';
 import { LabReportPrint } from './LabReportPrint';
+import { PrintOutlinedIcon } from '@/icons/fluent';
 import {
   flagLabel,
   htmlToPlainText,
@@ -15,15 +11,121 @@ import {
   parseLabResult,
 } from './labReportPayload';
 
-const labLeftBorder: Record<string, string> = {
-  COMPLETED: 'success.main',
-  IN_PROGRESS: 'primary.main',
-  PENDING: 'warning.main',
-  CANCELLED: 'error.main',
+const BORDER: Record<string, string> = {
+  COMPLETED: tokens.colorPaletteGreenBorder2,
+  IN_PROGRESS: tokens.colorBrandStroke1,
+  PENDING: tokens.colorPaletteYellowBorder2,
+  CANCELLED: tokens.colorPaletteRedBorder2,
 };
 
-export function ResultBody({ result, notes }: { result: string | null; notes?: string | null }): React.JSX.Element | null {
-  const theme = useTheme();
+const useStyles = makeStyles({
+  card: {
+    padding: tokens.spacingVerticalM,
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground2,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderLeftWidth: '4px',
+    borderLeftStyle: 'solid',
+  },
+  row: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: tokens.spacingHorizontalS,
+  },
+  main: {
+    flex: 1,
+    minWidth: 0,
+  },
+  title: {
+    fontWeight: tokens.fontWeightBold,
+    fontSize: tokens.fontSizeBase300,
+  },
+  meta: {
+    color: tokens.colorNeutralForeground2,
+    fontSize: tokens.fontSizeBase200,
+  },
+  side: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXXS,
+    flexShrink: 0,
+  },
+  body: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXS,
+    marginTop: tokens.spacingVerticalXS,
+  },
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr) auto',
+    gap: '4px',
+    alignItems: 'center',
+  },
+  cell: {
+    paddingTop: '3px',
+    paddingBottom: '3px',
+    paddingLeft: '6px',
+    paddingRight: '6px',
+    fontSize: '12.5px',
+  },
+  bad: {
+    backgroundColor: tokens.colorPaletteRedBackground1,
+  },
+  name: {
+    fontWeight: tokens.fontWeightSemibold,
+    borderTopLeftRadius: '6px',
+    borderBottomLeftRadius: '6px',
+  },
+  value: {
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  valueBad: {
+    fontWeight: tokens.fontWeightBold,
+  },
+  flag: {
+    textAlign: 'right',
+    borderTopRightRadius: '6px',
+    borderBottomRightRadius: '6px',
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  flagBad: {
+    color: tokens.colorPaletteRedForeground1,
+    fontWeight: tokens.fontWeightBold,
+  },
+  line: {
+    fontSize: '13px',
+  },
+  muted: {
+    fontSize: '13px',
+    color: tokens.colorNeutralForeground2,
+  },
+  caption: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground2,
+  },
+});
+
+function statusBadgeColor(status: string): 'success' | 'brand' | 'warning' | 'danger' | 'subtle' {
+  if (status === 'COMPLETED') return 'success';
+  if (status === 'IN_PROGRESS') return 'brand';
+  if (status === 'CANCELLED') return 'danger';
+  if (status === 'PENDING') return 'warning';
+  return 'subtle';
+}
+
+export function ResultBody({
+  result,
+  notes,
+}: {
+  result: string | null;
+  notes?: string | null;
+}): React.JSX.Element | null {
+  const styles = useStyles();
   const payload = parseLabResult(result);
   const noteText = notes?.trim() || '';
 
@@ -31,18 +133,10 @@ export function ResultBody({ result, notes }: { result: string | null; notes?: s
     const plain = result?.trim() || '';
     if (!plain && !noteText) return null;
     return (
-      <Stack spacing={0.5} sx={{ mt: 0.75 }}>
-        {plain ? (
-          <Typography variant="body2" sx={{ fontSize: 13 }}>
-            Result: {plain}
-          </Typography>
-        ) : null}
-        {noteText ? (
-          <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>
-            {noteText}
-          </Typography>
-        ) : null}
-      </Stack>
+      <div className={styles.body}>
+        {plain ? <Text className={styles.line}>Result: {plain}</Text> : null}
+        {noteText ? <Text className={styles.muted}>{noteText}</Text> : null}
+      </div>
     );
   }
 
@@ -50,117 +144,80 @@ export function ResultBody({ result, notes }: { result: string | null; notes?: s
   const impression = htmlToPlainText(payload.impressionHtml);
 
   return (
-    <Stack spacing={0.75} sx={{ mt: 0.75 }}>
+    <div className={styles.body}>
       {(payload.specimen || payload.method) && (
-        <Typography variant="caption" color="text.secondary">
+        <Text className={styles.caption}>
           {[payload.specimen && `Specimen: ${payload.specimen}`, payload.method && `Method: ${payload.method}`]
             .filter(Boolean)
             .join(' · ')}
-        </Typography>
+        </Text>
       )}
       {filled.length > 0 ? (
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr) auto',
-            gap: 0.5,
-            alignItems: 'center',
-          }}
-        >
+        <div className={styles.grid}>
           {filled.map((row) => {
             const bad = isAbnormal(row.flag);
+            const badCls = bad ? ` ${styles.bad}` : '';
             return (
-              <Box
-                key={row.id}
-                sx={{
-                  display: 'contents',
-                  '& > *': {
-                    bgcolor: bad ? alpha(theme.palette.error.main, 0.08) : 'transparent',
-                    px: 0.75,
-                    py: 0.4,
-                    fontSize: 12.5,
-                  },
-                }}
-              >
-                <Typography sx={{ fontWeight: 600, borderRadius: '6px 0 0 6px' }}>{row.name}</Typography>
-                <Typography sx={{ fontWeight: bad ? 800 : 600 }}>
+              <div key={row.id} style={{ display: 'contents' }}>
+                <Text className={`${styles.cell} ${styles.name}${badCls}`}>{row.name}</Text>
+                <Text className={`${styles.cell} ${bad ? styles.valueBad : styles.value}${badCls}`}>
                   {row.value}
                   {row.unit ? ` ${row.unit}` : ''}
-                </Typography>
-                <Typography
-                  color={bad ? 'error.main' : 'text.secondary'}
-                  fontWeight={bad ? 800 : 600}
-                  sx={{ borderRadius: '0 6px 6px 0', textAlign: 'right' }}
-                >
+                </Text>
+                <Text className={`${styles.cell} ${bad ? styles.flagBad : styles.flag}${badCls}`}>
                   {flagLabel(row.flag) || '—'}
-                </Typography>
-              </Box>
+                </Text>
+              </div>
             );
           })}
-        </Box>
+        </div>
       ) : (
-        <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>
-          {labResultPreview(result)}
-        </Typography>
+        <Text className={styles.muted}>{labResultPreview(result)}</Text>
       )}
-      {impression ? (
-        <Typography variant="body2" sx={{ fontSize: 13 }}>
-          Impression: {impression}
-        </Typography>
-      ) : null}
-      {noteText ? (
-        <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13 }}>
-          {noteText}
-        </Typography>
-      ) : null}
-    </Stack>
+      {impression ? <Text className={styles.line}>Impression: {impression}</Text> : null}
+      {noteText ? <Text className={styles.muted}>{noteText}</Text> : null}
+    </div>
   );
 }
 
 export function LabOrderHistoryCard({ order }: { order: LabOrder }): React.JSX.Element {
-  const theme = useTheme();
+  const styles = useStyles();
   const [printOpen, setPrintOpen] = useState(false);
   const canPrint = order.status === 'COMPLETED' && Boolean(order.result?.trim());
 
   return (
     <>
-      <Box
-        sx={{
-          p: 1.5,
-          borderRadius: 1,
-          bgcolor: alpha(theme.palette.info.main, 0.03),
-          border: '1px solid',
-          borderColor: 'divider',
-          borderLeft: '4px solid',
-          borderLeftColor: labLeftBorder[order.status] ?? 'divider',
-        }}
+      <div
+        className={styles.card}
+        style={{ borderLeftColor: BORDER[order.status] ?? tokens.colorNeutralStroke2 }}
       >
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1}>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography fontWeight={700} fontSize={14}>{order.test}</Typography>
-            <Typography variant="caption" color="text.secondary">
+        <div className={styles.row}>
+          <div className={styles.main}>
+            <Text className={styles.title}>{order.test}</Text>
+            <Text className={styles.meta}>
               Ordered {new Date(order.orderedAt).toLocaleDateString()}
               {order.orderedByName ? ` · ${order.orderedByName}` : ''}
-            </Typography>
+            </Text>
             <ResultBody result={order.result} notes={order.notes} />
-          </Box>
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
+          </div>
+          <div className={styles.side}>
             {canPrint && (
-              <Tooltip title="Print report">
-                <IconButton size="small" onClick={() => setPrintOpen(true)}>
-                  <PrintOutlinedIcon sx={{ fontSize: 18 }} />
-                </IconButton>
+              <Tooltip content="Print report" relationship="label">
+                <Button
+                  appearance="subtle"
+                  size="small"
+                  icon={<PrintOutlinedIcon />}
+                  onClick={() => setPrintOpen(true)}
+                  aria-label="Print report"
+                />
               </Tooltip>
             )}
-            <Chip
-              label={order.status.replace('_', ' ')}
-              size="small"
-              color={order.status === 'COMPLETED' ? 'success' : order.status === 'IN_PROGRESS' ? 'primary' : order.status === 'CANCELLED' ? 'error' : 'warning'}
-              sx={{ ...chipSx, fontWeight: 700, borderRadius: 1 }}
-            />
-          </Stack>
-        </Stack>
-      </Box>
+            <Badge appearance="tint" color={statusBadgeColor(order.status)} size="small">
+              {order.status.replace('_', ' ')}
+            </Badge>
+          </div>
+        </div>
+      </div>
       {printOpen && <LabReportPrint order={order} onClose={() => setPrintOpen(false)} />}
     </>
   );

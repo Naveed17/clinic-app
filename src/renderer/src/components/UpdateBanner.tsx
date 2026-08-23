@@ -1,10 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { Snackbar, Button, Alert, IconButton } from '@mui/material';
-import SystemUpdateAltIcon from '@mui/icons-material/SystemUpdateAlt';
-import CloseIcon from '@mui/icons-material/Close';
+import { useEffect, useState } from 'react';
+import {
+  Button,
+  MessageBar,
+  MessageBarActions,
+  MessageBarBody,
+  MessageBarTitle,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { useUpdate } from '@/context/updateProvider';
+import { CloseIcon, SystemUpdateAltIcon } from '@/icons/fluent';
+
+const useStyles = makeStyles({
+  wrap: {
+    position: 'fixed',
+    bottom: tokens.spacingVerticalXXL,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: 99999,
+    maxWidth: '520px',
+    width: 'calc(100% - 32px)',
+  },
+});
 
 export function UpdateBanner(): React.JSX.Element | null {
+  const styles = useStyles();
   const { isReady, isDownloading, installUpdate } = useUpdate();
   const [dismissed, setDismissed] = useState(false);
 
@@ -17,49 +37,32 @@ export function UpdateBanner(): React.JSX.Element | null {
   if (dismissed || (!isReady && !isDownloading)) return null;
 
   return (
-    <Snackbar
-      open={!dismissed && (isReady || isDownloading)}
-      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      sx={{ zIndex: 99999 }}
-    >
-      <Alert
-        severity={isReady ? 'success' : 'info'}
-        variant="filled"
-        icon={<SystemUpdateAltIcon fontSize="inherit" />}
-        action={
-          <>
-            {isReady && (
-              <Button
-                color="inherit"
-                size="small"
-                onClick={installUpdate}
-                sx={{
-                  fontWeight: 'bold',
-                  textTransform: 'none',
-                  mr: 1,
-                  bgcolor: 'rgba(255,255,255,0.2)',
-                  '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' }
-                }}
-              >
-                Restart & Update
-              </Button>
-            )}
-            <IconButton
-              size="small"
+    <div className={styles.wrap}>
+      <MessageBar intent={isReady ? 'success' : 'info'} icon={<SystemUpdateAltIcon />}>
+        <MessageBarBody>
+          <MessageBarTitle>
+            {isReady
+              ? 'A new software update is ready to install!'
+              : 'Downloading update…'}
+          </MessageBarTitle>
+        </MessageBarBody>
+        <MessageBarActions
+          containerAction={
+            <Button
+              appearance="transparent"
+              icon={<CloseIcon />}
               aria-label="close"
-              color="inherit"
               onClick={() => setDismissed(true)}
-            >
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </>
-        }
-        sx={{ alignItems: 'center' }}
-      >
-        {isReady
-          ? 'A new software update is ready to install!'
-          : 'Downloading update…'}
-      </Alert>
-    </Snackbar>
+            />
+          }
+        >
+          {isReady ? (
+            <Button appearance="primary" size="small" onClick={installUpdate}>
+              Restart & Update
+            </Button>
+          ) : null}
+        </MessageBarActions>
+      </MessageBar>
+    </div>
   );
 }

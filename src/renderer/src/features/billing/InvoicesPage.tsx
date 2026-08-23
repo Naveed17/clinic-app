@@ -1,59 +1,70 @@
-import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
-import PaymentOutlinedIcon from '@mui/icons-material/PaymentOutlined';
-import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
-import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
-import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  Alert,
   Avatar,
-  Box,
+  Badge,
   Button,
-  Chip,
   Dialog,
   DialogActions,
+  DialogBody,
   DialogContent,
+  DialogSurface,
   Divider,
-  FormControl,
-  IconButton,
-  InputLabel,
-  MenuItem,
-  Paper,
+  Dropdown,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  Option,
   Skeleton,
-  Stack,
-  TextField,
+  Spinner,
+  TableCellLayout,
+  Text,
   Tooltip,
-  Typography,
-  Snackbar,
-  Select,
-} from '@mui/material';
+  createTableColumn,
+  makeStyles,
+  tokens,
+  type BadgeProps,
+  type TableColumnDefinition,
+} from '@fluentui/react-components';
 import {
-  ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogFormSx, dialogPaperProps,
-} from '@/components/DialogUI';
-import { useFieldArray, useForm } from 'react-hook-form';
+  Add24Regular,
+  ArrowUndo24Regular,
+  Delete24Regular,
+  Eye24Regular,
+  History24Regular,
+  Payment24Regular,
+  Print24Regular,
+  Prohibited24Regular,
+} from '@fluentui/react-icons';
+import { useFieldArray, useForm, Controller } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { invoicesService } from '@/services/invoices.service';
 import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
 import type { Invoice, InvoiceInput, InvoicePerson, Payment } from '@/types/invoice';
 import { printInvoiceReceipt } from '@/utils/printInvoiceReceipt';
-import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
+import {
+  actionBtnStyle,
+  TablePageShell,
+  SearchField,
+  TablePager,
+  DataGridTable,
+} from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
+import { ConfirmDialog, FormDialogTitle, SubmitButton } from '@/components/DialogUI';
 import { useAuth } from '@/features/auth/AuthContext';
 
-const statusConfig: Record<string, { label: string; color: 'default' | 'warning' | 'info' | 'success' | 'error' }> = {
-  DRAFT:          { label: 'Draft',    color: 'default' },
-  ISSUED:         { label: 'Issued',   color: 'info' },
-  PARTIALLY_PAID: { label: 'Partial',  color: 'warning' },
-  PAID:           { label: 'Paid',     color: 'success' },
-  REFUNDED:       { label: 'Refunded', color: 'error' },
-  VOID:           { label: 'Void',     color: 'error' },
+type StatusColor = NonNullable<BadgeProps['color']>;
+
+const statusConfig: Record<string, { label: string; color: StatusColor }> = {
+  DRAFT: { label: 'Draft', color: 'subtle' },
+  ISSUED: { label: 'Issued', color: 'informative' },
+  PARTIALLY_PAID: { label: 'Partial', color: 'warning' },
+  PAID: { label: 'Paid', color: 'success' },
+  REFUNDED: { label: 'Refunded', color: 'danger' },
+  VOID: { label: 'Void', color: 'danger' },
 };
 
 const PAYMENT_METHODS = ['CASH', 'CARD', 'BANK_TRANSFER', 'MOBILE_WALLET', 'OTHER'];
@@ -62,69 +73,246 @@ const money = (value: number) =>
   `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
 const personLabel = (person: InvoicePerson) => `${person.firstName} ${person.lastName}`;
 
+const useStyles = makeStyles({
+  surface: {
+    maxWidth: '400px',
+    width: '100%',
+    maxHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  surfaceMd: {
+    maxWidth: '720px',
+    width: '100%',
+    maxHeight: '90vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
+  },
+  body: {
+    paddingTop: tokens.spacingVerticalL,
+    paddingBottom: tokens.spacingVerticalL,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    flex: '1 1 auto',
+    minHeight: 0,
+    overflowY: 'auto',
+  },
+  fields: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+  actionsBar: {
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    gap: tokens.spacingHorizontalS,
+    flexShrink: 0,
+  },
+  summaryBar: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalL,
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+    backgroundColor: tokens.colorNeutralBackground2,
+  },
+  paymentRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalM,
+    paddingLeft: tokens.spacingHorizontalL,
+    paddingRight: tokens.spacingHorizontalL,
+  },
+  personMeta: {
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 0,
+  },
+  name: {
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  muted: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground2,
+  },
+  actions: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: tokens.spacingHorizontalXXS,
+    justifyContent: 'flex-end',
+  },
+  toolbar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalM,
+    flex: 1,
+    minWidth: 0,
+  },
+  statusFilter: {
+    minWidth: '150px',
+    flexShrink: 0,
+  },
+  errorBar: {
+    marginLeft: tokens.spacingHorizontalL,
+    marginRight: tokens.spacingHorizontalL,
+    marginBottom: tokens.spacingVerticalS,
+  },
+  deleteError: {
+    marginTop: tokens.spacingVerticalM,
+  },
+  sectionLabel: {
+    fontWeight: tokens.fontWeightSemibold,
+    fontSize: tokens.fontSizeBase300,
+  },
+  itemRow: {
+    display: 'grid',
+    gap: tokens.spacingHorizontalS,
+    gridTemplateColumns: 'minmax(0, 1fr) 90px 120px 40px',
+    alignItems: 'end',
+  },
+  grid2: {
+    display: 'grid',
+    gap: tokens.spacingHorizontalM,
+    gridTemplateColumns: '1fr 1fr',
+  },
+  totals: {
+    padding: tokens.spacingVerticalM,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusMedium,
+    textAlign: 'right',
+  },
+  printError: {
+    position: 'fixed',
+    bottom: tokens.spacingVerticalXXL,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: 1000,
+    maxWidth: '420px',
+  },
+  skeletonStack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+    padding: tokens.spacingVerticalL,
+  },
+  emptyPad: {
+    padding: tokens.spacingVerticalXXL,
+    color: tokens.colorNeutralForeground2,
+  },
+});
+
 /* ── Payment History Dialog ── */
 function PaymentHistoryDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
+  const styles = useStyles();
   const { data: payments = [], isLoading, isError } = useQuery<Payment[]>({
     queryKey: ['invoice-payments', invoice.id],
     queryFn: () => window.clinic.invoices.payments(invoice.id),
   });
   return (
-    <Dialog open fullWidth maxWidth="xs" onClose={onClose} PaperProps={dialogPaperProps}>
-      <FormDialogTitle title={`Payment History — ${invoice.invoiceNumber}`} subtitle="All payments recorded for this invoice." />
-      <DialogContent sx={{ ...dialogContentSx, p: 0, px: 0, py: 0 }}>
-        <Box sx={{ px: 3, py: 1.5, bgcolor: 'background.default', display: 'flex', gap: 3 }}>
-          <Typography variant="body2" color="text.secondary">Total: <strong>{money(invoice.total)}</strong></Typography>
-          <Typography variant="body2" color="text.secondary">Paid: <strong>{money(Number(invoice.amountPaid))}</strong></Typography>
-          <Typography variant="body2" color="text.secondary">Remaining: <strong>{money(invoice.total - Number(invoice.amountPaid))}</strong></Typography>
-        </Box>
-        <Divider />
-        {isLoading ? (
-          <Stack spacing={1.2} sx={{ p: 2 }}>
-            {Array.from({ length: 4 }, (_, i) => (
-              <Skeleton key={i} variant="rounded" height={48} />
-            ))}
-          </Stack>
-        ) : isError ? (
-          <Alert severity="error" sx={{ m: 2 }}>Unable to load payment history.</Alert>
-        ) : payments.length === 0 ? (
-          <Typography sx={{ p: 3 }} color="text.secondary">No payments recorded.</Typography>
-        ) : (
-          <Stack divider={<Divider />}>
-            {payments.map((p) => (
-              <Box key={p.id} sx={{ px: 3, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                  <Typography fontWeight={700} fontSize={14} color={Number(p.amount) < 0 ? 'error.main' : undefined}>
-                    {money(Number(p.amount))}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {p.method.replace('_', ' ')} · {new Date(p.paidAt).toLocaleString()}
-                  </Typography>
-                  {(p.reference || p.notes) && (
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                      {p.notes || `Ref: ${p.reference}`}
-                    </Typography>
-                  )}
-                </Box>
-                <Chip
-                  label={Number(p.amount) < 0 ? 'Refund' : p.method.replace('_', ' ')}
-                  size="small"
-                  color={Number(p.amount) < 0 ? 'error' : 'default'}
-                  sx={{ fontSize: 11 }}
-                />
-              </Box>
-            ))}
-          </Stack>
-        )}
-      </DialogContent>
-      <DialogActions sx={dialogActionsSx}>
-        <Button onClick={onClose} sx={dialogCancelBtnSx}>Close</Button>
-      </DialogActions>
+    <Dialog open onOpenChange={(_, data) => { if (!data.open) onClose(); }}>
+      <DialogSurface className={styles.surface}>
+        <FormDialogTitle
+          title={`Payment History — ${invoice.invoiceNumber}`}
+          subtitle="All payments recorded for this invoice."
+        />
+        <div className={styles.form}>
+          <DialogBody>
+            <DialogContent className={styles.body} style={{ padding: 0 }}>
+              <div className={styles.summaryBar}>
+                <Text size={200}>
+                  Total: <strong>{money(invoice.total)}</strong>
+                </Text>
+                <Text size={200}>
+                  Paid: <strong>{money(Number(invoice.amountPaid))}</strong>
+                </Text>
+                <Text size={200}>
+                  Remaining: <strong>{money(invoice.total - Number(invoice.amountPaid))}</strong>
+                </Text>
+              </div>
+              <Divider />
+              {isLoading ? (
+                <div className={styles.skeletonStack}>
+                  {Array.from({ length: 4 }, (_, i) => (
+                    <Skeleton key={i} appearance="opaque" style={{ height: 48 }} />
+                  ))}
+                </div>
+              ) : isError ? (
+                <MessageBar intent="error" style={{ margin: tokens.spacingHorizontalL }}>
+                  <MessageBarBody>Unable to load payment history.</MessageBarBody>
+                </MessageBar>
+              ) : payments.length === 0 ? (
+                <Text className={styles.emptyPad}>No payments recorded.</Text>
+              ) : (
+                payments.map((p, idx) => (
+                  <div key={p.id}>
+                    {idx > 0 ? <Divider /> : null}
+                    <div className={styles.paymentRow}>
+                      <div>
+                        <Text
+                          weight="bold"
+                          size={300}
+                          style={
+                            Number(p.amount) < 0
+                              ? { color: tokens.colorPaletteRedForeground1 }
+                              : undefined
+                          }
+                        >
+                          {money(Number(p.amount))}
+                        </Text>
+                        <Text className={styles.muted} style={{ display: 'block' }}>
+                          {p.method.replace('_', ' ')} · {new Date(p.paidAt).toLocaleString()}
+                        </Text>
+                        {(p.reference || p.notes) && (
+                          <Text className={styles.muted} style={{ display: 'block' }}>
+                            {p.notes || `Ref: ${p.reference}`}
+                          </Text>
+                        )}
+                      </div>
+                      <Badge
+                        appearance="tint"
+                        color={Number(p.amount) < 0 ? 'danger' : 'subtle'}
+                        size="small"
+                      >
+                        {Number(p.amount) < 0 ? 'Refund' : p.method.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                  </div>
+                ))
+              )}
+            </DialogContent>
+          </DialogBody>
+          <DialogActions className={styles.actionsBar}>
+            <Button appearance="secondary" onClick={onClose}>
+              Close
+            </Button>
+          </DialogActions>
+        </div>
+      </DialogSurface>
     </Dialog>
   );
 }
 
 /* ── Void Confirm Dialog ── */
 export function VoidDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
+  const styles = useStyles();
   const qc = useQueryClient();
   const mutation = useMutation({
     mutationFn: () => invoicesService.void(invoice.id),
@@ -139,10 +327,20 @@ export function VoidDialog({ invoice, onClose }: { invoice: Invoice; onClose: ()
     <ConfirmDialog
       open
       title="Void invoice?"
-      message={<>Void <strong>{invoice.invoiceNumber}</strong>?</>}
+      message={
+        <>
+          Void <strong>{invoice.invoiceNumber}</strong>?
+        </>
+      }
       confirmLabel="Void Invoice"
       loading={mutation.isPending}
-      error={mutation.isError ? <Alert severity="error" sx={{ mt: 2 }}>Failed to void invoice.</Alert> : undefined}
+      error={
+        mutation.isError ? (
+          <MessageBar intent="error" className={styles.deleteError}>
+            <MessageBarBody>Failed to void invoice.</MessageBarBody>
+          </MessageBar>
+        ) : undefined
+      }
       onConfirm={() => mutation.mutate()}
       onClose={onClose}
     />
@@ -159,6 +357,7 @@ export function DeleteInvoiceDialog({
   onClose: () => void;
   onDeleted?: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const qc = useQueryClient();
   const mutation = useMutation({
     mutationFn: () => invoicesService.delete(invoice.id),
@@ -176,12 +375,19 @@ export function DeleteInvoiceDialog({
       message={
         <>
           Permanently delete <strong>{invoice.invoiceNumber}</strong> for{' '}
-          <strong>{personLabel(invoice.patient)}</strong>? Payments recorded on this invoice will also be removed. This cannot be undone.
+          <strong>{personLabel(invoice.patient)}</strong>? Payments recorded on this invoice will also be
+          removed. This cannot be undone.
         </>
       }
       confirmLabel="Delete"
       loading={mutation.isPending}
-      error={mutation.isError ? <Alert severity="error" sx={{ mt: 2 }}>Failed to delete invoice.</Alert> : undefined}
+      error={
+        mutation.isError ? (
+          <MessageBar intent="error" className={styles.deleteError}>
+            <MessageBarBody>Failed to delete invoice.</MessageBarBody>
+          </MessageBar>
+        ) : undefined
+      }
       onConfirm={() => mutation.mutate()}
       onClose={onClose}
     />
@@ -190,6 +396,7 @@ export function DeleteInvoiceDialog({
 
 /* ── Payment Dialog ── */
 export function PaymentDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
+  const styles = useStyles();
   const queryClient = useQueryClient();
   const remaining = Number(invoice.total) - Number(invoice.amountPaid ?? 0);
   const form = useForm({ defaultValues: { amount: remaining, method: 'CASH', reference: '' } });
@@ -205,42 +412,81 @@ export function PaymentDialog({ invoice, onClose }: { invoice: Invoice; onClose:
     meta: { toast: 'Payment recorded', errorToast: 'Failed to record payment.' },
   });
   return (
-    <Dialog open fullWidth maxWidth="xs" onClose={onClose} PaperProps={dialogPaperProps}>
-      <FormDialogTitle title={`Record Payment — ${invoice.invoiceNumber}`} subtitle="Add a payment against this invoice." />
-      <Box component="form" onSubmit={form.handleSubmit((v) => mutation.mutate(v))} sx={dialogFormSx}>
-        <DialogContent sx={dialogContentSx}>
-          <Stack spacing={2}>
-            {mutation.isError && <Alert severity="error">Failed to record payment.</Alert>}
-            <Typography variant="body2" color="text.secondary">
-              Total: <strong>{money(Number(invoice.total))}</strong> &nbsp;|&nbsp;
-              Paid: <strong>{money(Number(invoice.amountPaid ?? 0))}</strong> &nbsp;|&nbsp;
-              Remaining: <strong>{money(remaining)}</strong>
-            </Typography>
-            <TextField label="Amount" type="number" fullWidth
-              slotProps={{ htmlInput: { min: 0, step: 'any' } }}
-              {...form.register('amount', { valueAsNumber: true })} />
-            <TextField select label="Payment Method" fullWidth defaultValue="CASH"
-              {...form.register('method')}>
-              {PAYMENT_METHODS.map((m) => (
-                <MenuItem key={m} value={m}>{m.replace('_', ' ')}</MenuItem>
-              ))}
-            </TextField>
-            <TextField label="Reference (optional)" fullWidth {...form.register('reference')} />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
-          <SubmitButton type="submit" loading={mutation.isPending}>
-            Record Payment
-          </SubmitButton>
-        </DialogActions>
-      </Box>
+    <Dialog open onOpenChange={(_, data) => { if (!data.open) onClose(); }}>
+      <DialogSurface className={styles.surface}>
+        <FormDialogTitle
+          title={`Record Payment — ${invoice.invoiceNumber}`}
+          subtitle="Add a payment against this invoice."
+        />
+        <form
+          className={styles.form}
+          onSubmit={form.handleSubmit((v) => mutation.mutate(v))}
+        >
+          <DialogBody>
+            <DialogContent className={styles.body}>
+              <div className={styles.fields}>
+                {mutation.isError && (
+                  <MessageBar intent="error">
+                    <MessageBarBody>Failed to record payment.</MessageBarBody>
+                  </MessageBar>
+                )}
+                <Text size={200} className={styles.muted}>
+                  Total: <strong>{money(Number(invoice.total))}</strong> | Paid:{' '}
+                  <strong>{money(Number(invoice.amountPaid ?? 0))}</strong> | Remaining:{' '}
+                  <strong>{money(remaining)}</strong>
+                </Text>
+                <Field label="Amount">
+                  <Input
+                    type="number"
+                    min={0}
+                    step="any"
+                    {...form.register('amount', { valueAsNumber: true })}
+                  />
+                </Field>
+                <Field label="Payment Method">
+                  <Controller
+                    control={form.control}
+                    name="method"
+                    render={({ field }) => (
+                      <Dropdown
+                        value={field.value.replace('_', ' ')}
+                        selectedOptions={[field.value]}
+                        onOptionSelect={(_, data) => {
+                          if (data.optionValue) field.onChange(data.optionValue);
+                        }}
+                      >
+                        {PAYMENT_METHODS.map((m) => (
+                          <Option key={m} value={m} text={m.replace('_', ' ')}>
+                            {m.replace('_', ' ')}
+                          </Option>
+                        ))}
+                      </Dropdown>
+                    )}
+                  />
+                </Field>
+                <Field label="Reference (optional)">
+                  <Input {...form.register('reference')} />
+                </Field>
+              </div>
+            </DialogContent>
+          </DialogBody>
+          <DialogActions className={styles.actionsBar}>
+            <Button appearance="secondary" onClick={onClose} disabled={mutation.isPending} type="button">
+              Cancel
+            </Button>
+            <SubmitButton type="submit" loading={mutation.isPending}>
+              Record Payment
+            </SubmitButton>
+          </DialogActions>
+        </form>
+      </DialogSurface>
     </Dialog>
   );
 }
 
 /* ── Refund Dialog ── */
 export function RefundDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
+  const styles = useStyles();
   const queryClient = useQueryClient();
   const maxRefund = Math.max(0, Number(invoice.amountPaid ?? 0));
   const form = useForm({ defaultValues: { amount: maxRefund, method: 'CASH', reason: '' } });
@@ -256,36 +502,75 @@ export function RefundDialog({ invoice, onClose }: { invoice: Invoice; onClose: 
     meta: { toast: 'Refund recorded', errorToast: 'Failed to record refund.' },
   });
   return (
-    <Dialog open fullWidth maxWidth="xs" onClose={onClose} PaperProps={dialogPaperProps}>
-      <FormDialogTitle title={`Refund — ${invoice.invoiceNumber}`} subtitle="Return money already collected on this invoice." />
-      <Box component="form" onSubmit={form.handleSubmit((v) => mutation.mutate(v))} sx={dialogFormSx}>
-        <DialogContent sx={dialogContentSx}>
-          <Stack spacing={2}>
-            {mutation.isError && (
-              <Alert severity="error">{(mutation.error as Error)?.message || 'Failed to record refund.'}</Alert>
-            )}
-            <Typography variant="body2" color="text.secondary">
-              Paid: <strong>{money(maxRefund)}</strong> — refund cannot exceed this amount.
-            </Typography>
-            <TextField label="Refund amount" type="number" fullWidth
-              slotProps={{ htmlInput: { min: 0, max: maxRefund, step: 'any' } }}
-              {...form.register('amount', { valueAsNumber: true })} />
-            <TextField select label="Refund method" fullWidth defaultValue="CASH"
-              {...form.register('method')}>
-              {PAYMENT_METHODS.map((m) => (
-                <MenuItem key={m} value={m}>{m.replace('_', ' ')}</MenuItem>
-              ))}
-            </TextField>
-            <TextField label="Reason (optional)" fullWidth {...form.register('reason')} />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
-          <SubmitButton type="submit" loading={mutation.isPending}>
-            Record Refund
-          </SubmitButton>
-        </DialogActions>
-      </Box>
+    <Dialog open onOpenChange={(_, data) => { if (!data.open) onClose(); }}>
+      <DialogSurface className={styles.surface}>
+        <FormDialogTitle
+          title={`Refund — ${invoice.invoiceNumber}`}
+          subtitle="Return money already collected on this invoice."
+        />
+        <form
+          className={styles.form}
+          onSubmit={form.handleSubmit((v) => mutation.mutate(v))}
+        >
+          <DialogBody>
+            <DialogContent className={styles.body}>
+              <div className={styles.fields}>
+                {mutation.isError && (
+                  <MessageBar intent="error">
+                    <MessageBarBody>
+                      {(mutation.error as Error)?.message || 'Failed to record refund.'}
+                    </MessageBarBody>
+                  </MessageBar>
+                )}
+                <Text size={200} className={styles.muted}>
+                  Paid: <strong>{money(maxRefund)}</strong> — refund cannot exceed this amount.
+                </Text>
+                <Field label="Refund amount">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={maxRefund}
+                    step="any"
+                    {...form.register('amount', { valueAsNumber: true })}
+                  />
+                </Field>
+                <Field label="Refund method">
+                  <Controller
+                    control={form.control}
+                    name="method"
+                    render={({ field }) => (
+                      <Dropdown
+                        value={field.value.replace('_', ' ')}
+                        selectedOptions={[field.value]}
+                        onOptionSelect={(_, data) => {
+                          if (data.optionValue) field.onChange(data.optionValue);
+                        }}
+                      >
+                        {PAYMENT_METHODS.map((m) => (
+                          <Option key={m} value={m} text={m.replace('_', ' ')}>
+                            {m.replace('_', ' ')}
+                          </Option>
+                        ))}
+                      </Dropdown>
+                    )}
+                  />
+                </Field>
+                <Field label="Reason (optional)">
+                  <Input {...form.register('reason')} />
+                </Field>
+              </div>
+            </DialogContent>
+          </DialogBody>
+          <DialogActions className={styles.actionsBar}>
+            <Button appearance="secondary" onClick={onClose} disabled={mutation.isPending} type="button">
+              Cancel
+            </Button>
+            <SubmitButton type="submit" loading={mutation.isPending}>
+              Record Refund
+            </SubmitButton>
+          </DialogActions>
+        </form>
+      </DialogSurface>
     </Dialog>
   );
 }
@@ -303,7 +588,12 @@ const schema = z.object({
   items: z.array(itemSchema).min(1, 'Add at least one item.'),
 });
 type FormValues = z.infer<typeof schema>;
-const defaults: FormValues = { patientId: '', discount: 0, notes: '', items: [{ description: '', quantity: 1, unitPrice: 0 }] };
+const defaults: FormValues = {
+  patientId: '',
+  discount: 0,
+  notes: '',
+  items: [{ description: '', quantity: 1, unitPrice: 0 }],
+};
 
 export function InvoiceDialog({
   open,
@@ -319,6 +609,7 @@ export function InvoiceDialog({
   /** When set, invoice create links & dispenses the pharmacy Rx. */
   tokenId?: string | null;
 }): React.JSX.Element {
+  const styles = useStyles();
   const client = useQueryClient();
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: defaults });
   const fields = useFieldArray({ control: form.control, name: 'items' });
@@ -342,74 +633,151 @@ export function InvoiceDialog({
       ...defaults,
       ...initialValues,
       items:
-        initialValues?.items && initialValues.items.length > 0
-          ? initialValues.items
-          : defaults.items,
+        initialValues?.items && initialValues.items.length > 0 ? initialValues.items : defaults.items,
     });
   }, [form, open, initialValues]);
   const items = form.watch('items');
   const discount = form.watch('discount');
-  const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
+  const patientId = form.watch('patientId');
+  const subtotal = items.reduce(
+    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+    0,
+  );
   const total = Math.max(0, subtotal - (Number(discount) || 0));
   const errors = form.formState.errors;
+  const patientOptions = patients.data ?? [];
+  const selectedPatient = patientOptions.find((p) => p.id === patientId);
 
   return (
-    <>
-    <Dialog fullWidth maxWidth="md" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
-      <FormDialogTitle title="Create Invoice" subtitle="Bill a patient for medicines and services." />
-      <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))} sx={dialogFormSx}>
-        <DialogContent sx={dialogContentSx}>
-          <Stack spacing={2.5}>
-            {mutation.isError && <Alert severity="error">{mutation.error instanceof Error ? mutation.error.message : 'Unable to create the invoice.'}</Alert>}
-            <TextField select fullWidth label="Patient" error={Boolean(errors.patientId)} helperText={errors.patientId?.message} {...form.register('patientId')}>
-              {(patients.data ?? []).map((patient) => (
-                <MenuItem key={patient.id} value={patient.id}>{personLabel(patient)}</MenuItem>
-              ))}
-            </TextField>
-            <Typography fontWeight={700} variant="subtitle2">Items</Typography>
-            {fields.fields.map((field, index) => (
-              <Box key={field.id} sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) 90px 120px 40px' } }}>
-                <MedicineAutocomplete
-                  label="Description / Medicine"
-                  value={form.watch(`items.${index}.description`)}
-                  onChange={(name, price) => {
-                    form.setValue(`items.${index}.description`, name);
-                    form.setValue(`items.${index}.unitPrice`, price);
-                  }}
-                />
-                <TextField label="Qty" type="number" slotProps={{ htmlInput: { min: 1, step: 1 } }} {...form.register(`items.${index}.quantity`, { valueAsNumber: true })} />
-                <TextField label="Unit price" type="number" slotProps={{ htmlInput: { min: 0, step: 'any' } }} {...form.register(`items.${index}.unitPrice`, { valueAsNumber: true })} />
-                <IconButton aria-label="Remove item" disabled={fields.fields.length === 1} onClick={() => fields.remove(index)}>
-                  <DeleteOutlineIcon />
-                </IconButton>
-              </Box>
-            ))}
-            <Button onClick={() => fields.append({ description: '', quantity: 1, unitPrice: 0 })} startIcon={<AddOutlinedIcon />} sx={{ alignSelf: 'flex-start' }}>
-              Add item
+    <Dialog open={open} onOpenChange={(_, data) => { if (!data.open) onClose(); }}>
+      <DialogSurface className={styles.surfaceMd}>
+        <FormDialogTitle title="Create Invoice" subtitle="Bill a patient for medicines and services." />
+        <form
+          className={styles.form}
+          onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
+        >
+          <DialogBody>
+            <DialogContent className={styles.body}>
+              <div className={styles.fields}>
+                {mutation.isError && (
+                  <MessageBar intent="error">
+                    <MessageBarBody>
+                      {mutation.error instanceof Error
+                        ? mutation.error.message
+                        : 'Unable to create the invoice.'}
+                    </MessageBarBody>
+                  </MessageBar>
+                )}
+                <Field
+                  label="Patient"
+                  validationState={errors.patientId ? 'error' : undefined}
+                  validationMessage={errors.patientId?.message}
+                >
+                  <Dropdown
+                    placeholder="Select patient"
+                    value={selectedPatient ? personLabel(selectedPatient) : ''}
+                    selectedOptions={patientId ? [patientId] : []}
+                    onOptionSelect={(_, data) => {
+                      if (data.optionValue) form.setValue('patientId', data.optionValue, { shouldValidate: true });
+                    }}
+                  >
+                    {patientOptions.map((patient) => (
+                      <Option key={patient.id} value={patient.id} text={personLabel(patient)}>
+                        {personLabel(patient)}
+                      </Option>
+                    ))}
+                  </Dropdown>
+                </Field>
+                <Text className={styles.sectionLabel}>Items</Text>
+                {fields.fields.map((field, index) => (
+                  <div key={field.id} className={styles.itemRow}>
+                    <MedicineAutocomplete
+                      label="Description / Medicine"
+                      value={form.watch(`items.${index}.description`)}
+                      onChange={(name, price) => {
+                        form.setValue(`items.${index}.description`, name);
+                        form.setValue(`items.${index}.unitPrice`, price);
+                      }}
+                    />
+                    <Field label="Qty">
+                      <Input
+                        type="number"
+                        min={1}
+                        step={1}
+                        {...form.register(`items.${index}.quantity`, { valueAsNumber: true })}
+                      />
+                    </Field>
+                    <Field label="Unit price">
+                      <Input
+                        type="number"
+                        min={0}
+                        step="any"
+                        {...form.register(`items.${index}.unitPrice`, { valueAsNumber: true })}
+                      />
+                    </Field>
+                    <Button
+                      appearance="subtle"
+                      icon={<Delete24Regular />}
+                      disabled={fields.fields.length === 1}
+                      aria-label="Remove item"
+                      onClick={() => fields.remove(index)}
+                      type="button"
+                    />
+                  </div>
+                ))}
+                <Button
+                  appearance="secondary"
+                  icon={<Add24Regular />}
+                  onClick={() => fields.append({ description: '', quantity: 1, unitPrice: 0 })}
+                  type="button"
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  Add item
+                </Button>
+                <div className={styles.grid2}>
+                  <Field label="Discount">
+                    <Input
+                      type="number"
+                      min={0}
+                      step="any"
+                      {...form.register('discount', { valueAsNumber: true })}
+                    />
+                  </Field>
+                  <Field label="Notes">
+                    <Input {...form.register('notes')} />
+                  </Field>
+                </div>
+                <div className={styles.totals}>
+                  <Text size={200} className={styles.muted}>
+                    Subtotal (medicines): {money(subtotal)}
+                  </Text>
+                  <Text size={200} className={styles.muted} style={{ display: 'block' }}>
+                    Discount: {money(Number(discount) || 0)}
+                  </Text>
+                  <Text weight="bold" style={{ display: 'block', marginTop: 4 }}>
+                    Total: {money(total)}
+                  </Text>
+                </div>
+              </div>
+            </DialogContent>
+          </DialogBody>
+          <DialogActions className={styles.actionsBar}>
+            <Button appearance="secondary" onClick={onClose} disabled={mutation.isPending} type="button">
+              Cancel
             </Button>
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-              <TextField label="Discount" type="number" slotProps={{ htmlInput: { min: 0, step: 'any' } }} {...form.register('discount', { valueAsNumber: true })} />
-              <TextField label="Notes" {...form.register('notes')} />
-            </Box>
-            <Paper variant="outlined" sx={{ p: 2, textAlign: 'right' }}>
-              <Typography color="text.secondary" variant="body2">Subtotal (medicines): {money(subtotal)}</Typography>
-              <Typography color="text.secondary" variant="body2">Discount: {money(Number(discount) || 0)}</Typography>
-              <Typography fontWeight={700} sx={{ mt: 0.5 }}>Total: {money(total)}</Typography>
-            </Paper>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
-          <SubmitButton type="submit" loading={mutation.isPending}>Create invoice</SubmitButton>
-        </DialogActions>
-      </Box>
+            <SubmitButton type="submit" loading={mutation.isPending}>
+              Create invoice
+            </SubmitButton>
+          </DialogActions>
+        </form>
+      </DialogSurface>
     </Dialog>
-    </>
   );
 }
 
 /* ── Invoices Page ── */
 export function InvoicesPage(): React.JSX.Element {
+  const styles = useStyles();
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -450,156 +818,237 @@ export function InvoicesPage(): React.JSX.Element {
   });
   const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
+  const statusFilterLabel =
+    statusFilter === 'ALL'
+      ? 'All statuses'
+      : (statusConfig[statusFilter]?.label ?? statusFilter);
+
+  const columns = useMemo<TableColumnDefinition<Invoice>[]>(
+    () => [
+      createTableColumn<Invoice>({
+        columnId: 'invoice',
+        compare: (a, b) => a.invoiceNumber.localeCompare(b.invoiceNumber),
+        renderHeaderCell: () => 'Invoice',
+        renderCell: (invoice) => (
+          <Text weight="semibold" size={300}>
+            {invoice.invoiceNumber}
+          </Text>
+        ),
+      }),
+      createTableColumn<Invoice>({
+        columnId: 'patient',
+        compare: (a, b) =>
+          personLabel(a.patient).localeCompare(personLabel(b.patient)),
+        renderHeaderCell: () => 'Patient',
+        renderCell: (invoice) => (
+          <TableCellLayout
+            media={
+              <Avatar
+                name={personLabel(invoice.patient)}
+                color="brand"
+                size={32}
+              />
+            }
+          >
+            <div className={styles.personMeta}>
+              <Text className={styles.name}>{personLabel(invoice.patient)}</Text>
+              <Text className={styles.muted}>{invoice.patient.phone?.trim() || '—'}</Text>
+            </div>
+          </TableCellLayout>
+        ),
+      }),
+      createTableColumn<Invoice>({
+        columnId: 'created',
+        compare: (a, b) => a.createdAt.localeCompare(b.createdAt),
+        renderHeaderCell: () => 'Created',
+        renderCell: (invoice) => (
+          <Text size={300} style={{ whiteSpace: 'nowrap' }}>
+            {new Date(invoice.createdAt).toLocaleDateString()}
+          </Text>
+        ),
+      }),
+      createTableColumn<Invoice>({
+        columnId: 'status',
+        compare: (a, b) => a.status.localeCompare(b.status),
+        renderHeaderCell: () => 'Status',
+        renderCell: (invoice) => {
+          const cfg = statusConfig[invoice.status] ?? { label: invoice.status, color: 'subtle' as const };
+          return (
+            <Badge appearance="tint" color={cfg.color} size="small">
+              {cfg.label}
+            </Badge>
+          );
+        },
+      }),
+      createTableColumn<Invoice>({
+        columnId: 'total',
+        compare: (a, b) => a.total - b.total,
+        renderHeaderCell: () => 'Total',
+        renderCell: (invoice) => (
+          <Text weight="bold" size={300}>
+            {money(invoice.total)}
+          </Text>
+        ),
+      }),
+      createTableColumn<Invoice>({
+        columnId: 'paid',
+        compare: (a, b) => Number(a.amountPaid ?? 0) - Number(b.amountPaid ?? 0),
+        renderHeaderCell: () => 'Paid',
+        renderCell: (invoice) => <Text size={300}>{money(Number(invoice.amountPaid ?? 0))}</Text>,
+      }),
+      createTableColumn<Invoice>({
+        columnId: 'actions',
+        renderHeaderCell: () => 'Actions',
+        renderCell: (invoice) => {
+          const isVoid = invoice.status === 'VOID';
+          const canPay = !isAdmin && !isVoid && invoice.status !== 'PAID' && invoice.status !== 'REFUNDED';
+          const canRefund = !isAdmin && !isVoid && Number(invoice.amountPaid ?? 0) > 0;
+          return (
+            <div className={styles.actions} onClick={(e) => e.stopPropagation()}>
+              <Tooltip content="View details" relationship="label">
+                <Button
+                  appearance="subtle"
+                  icon={<Eye24Regular />}
+                  style={actionBtnStyle}
+                  onClick={() => navigate(`/billing/${invoice.id}`)}
+                />
+              </Tooltip>
+              {!isAdmin && canPay && (
+                <Tooltip content="Record Payment" relationship="label">
+                  <Button
+                    appearance="subtle"
+                    icon={<Payment24Regular />}
+                    style={actionBtnStyle}
+                    onClick={() => setPaymentInvoice(invoice)}
+                  />
+                </Tooltip>
+              )}
+              {canRefund && (
+                <Tooltip content="Refund" relationship="label">
+                  <Button
+                    appearance="subtle"
+                    icon={<ArrowUndo24Regular />}
+                    style={actionBtnStyle}
+                    onClick={() => setRefundInvoice(invoice)}
+                  />
+                </Tooltip>
+              )}
+              <Tooltip content="Payment History" relationship="label">
+                <Button
+                  appearance="subtle"
+                  icon={<History24Regular />}
+                  style={actionBtnStyle}
+                  onClick={() => setHistoryInvoice(invoice)}
+                />
+              </Tooltip>
+              <Tooltip content="Print invoice" relationship="label">
+                <Button
+                  appearance="subtle"
+                  icon={printingId === invoice.id ? <Spinner size="tiny" /> : <Print24Regular />}
+                  style={actionBtnStyle}
+                  disabled={printingId === invoice.id}
+                  onClick={() => void handlePrintInvoice(invoice)}
+                />
+              </Tooltip>
+              {!isAdmin &&
+                invoice.status !== 'VOID' &&
+                invoice.status !== 'PAID' &&
+                invoice.status !== 'REFUNDED' && (
+                  <Tooltip content="Void Invoice" relationship="label">
+                    <Button
+                      appearance="subtle"
+                      icon={<Prohibited24Regular />}
+                      style={actionBtnStyle}
+                      onClick={() => setVoidInvoice(invoice)}
+                    />
+                  </Tooltip>
+                )}
+              {!isAdmin && (
+                <Tooltip content="Delete invoice" relationship="label">
+                  <Button
+                    appearance="subtle"
+                    icon={<Delete24Regular />}
+                    style={actionBtnStyle}
+                    onClick={() => setDeleteInvoice(invoice)}
+                  />
+                </Tooltip>
+              )}
+            </div>
+          );
+        },
+      }),
+    ],
+    [isAdmin, navigate, printingId, styles],
+  );
+
   return (
     <>
       <TablePageShell
         title="Invoices"
         subtitle="Create itemized invoices and track payments."
         action={
-          !isAdmin && <Button onClick={() => setOpen(true)} startIcon={<AddOutlinedIcon />} variant="contained" sx={{ borderRadius: 2, fontWeight: 600 }}>Create invoice</Button>
+          !isAdmin ? (
+            <Button appearance="primary" icon={<Add24Regular />} onClick={() => setOpen(true)}>
+              Create invoice
+            </Button>
+          ) : undefined
         }
         toolbar={
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1, minWidth: 0 }}>
+          <div className={styles.toolbar}>
             <SearchField
               value={search}
-              onChange={(v) => { setSearch(v); setPage(0); }}
+              onChange={(v) => {
+                setSearch(v);
+                setPage(0);
+              }}
               placeholder="Search invoice or patient..."
-              sx={{ flex: 1, maxWidth: 360, '& .MuiOutlinedInput-root': { borderRadius: 0.5 } }}
             />
-            <FormControl size="small" sx={{ minWidth: 160, flexShrink: 0 }}>
-              <InputLabel>Status</InputLabel>
-              <Select
-                label="Status"
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
-                sx={{
-                  borderRadius: 0.5,
-                  fontSize: 13.5,
-                  fontWeight: 500,
-                  bgcolor: 'background.paper',
-                  '& .MuiOutlinedInput-notchedOutline': { borderRadius: 0.5 },
-                }}
-              >
-                <MenuItem value="ALL">All statuses</MenuItem>
-                <MenuItem value="DRAFT">Draft</MenuItem>
-                <MenuItem value="ISSUED">Issued</MenuItem>
-                <MenuItem value="PARTIALLY_PAID">Partial</MenuItem>
-                <MenuItem value="PAID">Paid</MenuItem>
-                <MenuItem value="REFUNDED">Refunded</MenuItem>
-                <MenuItem value="VOID">Void</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
+            <Dropdown
+              className={styles.statusFilter}
+              value={statusFilterLabel}
+              selectedOptions={[statusFilter]}
+              onOptionSelect={(_, data) => {
+                if (data.optionValue) {
+                  setStatusFilter(data.optionValue);
+                  setPage(0);
+                }
+              }}
+            >
+              <Option value="ALL" text="All statuses">All statuses</Option>
+              <Option value="DRAFT" text="Draft">Draft</Option>
+              <Option value="ISSUED" text="Issued">Issued</Option>
+              <Option value="PARTIALLY_PAID" text="Partial">Partial</Option>
+              <Option value="PAID" text="Paid">Paid</Option>
+              <Option value="REFUNDED" text="Refunded">Refunded</Option>
+              <Option value="VOID" text="Void">Void</Option>
+            </Dropdown>
+          </div>
         }
         pager={
           filtered.length > rowsPerPage ? (
             <TablePager page={page} rowsPerPage={rowsPerPage} total={filtered.length} onPageChange={setPage} />
           ) : undefined
         }
-        error={invoices.isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load invoices.</Alert>}
+        error={
+          invoices.isError && (
+            <MessageBar intent="error" className={styles.errorBar}>
+              <MessageBarBody>Unable to load invoices.</MessageBarBody>
+            </MessageBar>
+          )
+        }
         fetching={invoices.isFetching && !invoices.isLoading}
       >
-        <TableHead sx={tableSx.head}>
-          <TableRow>
-            <TableCell>Invoice</TableCell>
-            <TableCell>Patient</TableCell>
-            <TableCell>Created</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell align="right">Total</TableCell>
-            <TableCell align="right">Paid</TableCell>
-            <TableCell align="right">Actions</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {invoices.isLoading ? (
-            <TableRowsSkeleton cols={7} />
-          ) : filtered.length === 0 ? (
-            <TableRow><TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No invoices created.</TableCell></TableRow>
-          ) : (
-            paginated.map((invoice) => {
-              const cfg = statusConfig[invoice.status] ?? { label: invoice.status, color: 'default' as const };
-              const isVoid = invoice.status === 'VOID';
-              const canPay = !isAdmin && !isVoid && invoice.status !== 'PAID' && invoice.status !== 'REFUNDED';
-              const canRefund = !isAdmin && !isVoid && Number(invoice.amountPaid ?? 0) > 0;
-              return (
-                <TableRow
-                  key={invoice.id}
-                  sx={{ ...tableSx.row, cursor: 'pointer' }}
-                  onClick={() => navigate(`/billing/${invoice.id}`)}
-                >
-                  <TableCell><Typography fontSize={13.5} fontWeight={600}>{invoice.invoiceNumber}</Typography></TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                      <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'primary.main' }}>
-                        {invoice.patient.firstName[0]}{invoice.patient.lastName[0]}
-                      </Avatar>
-                      <Box>
-                        <Typography fontSize={13.5} fontWeight={600}>{personLabel(invoice.patient)}</Typography>
-                        <Typography fontSize={11.5} color="text.secondary">
-                          {invoice.patient.phone?.trim() || '—'}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell><Chip label={cfg.label} color={cfg.color} size="small" sx={chipSx} /></TableCell>
-                  <TableCell align="right"><Typography fontSize={13.5} fontWeight={700}>{money(invoice.total)}</Typography></TableCell>
-                  <TableCell align="right">{money(Number(invoice.amountPaid ?? 0))}</TableCell>
-                  <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                    <Stack direction="row" gap={0.5} justifyContent="flex-end">
-                      <Tooltip title="View details">
-                        <IconButton sx={actionBtnSx} onClick={() => navigate(`/billing/${invoice.id}`)}>
-                          <VisibilityOutlinedIcon sx={{ fontSize: 17 }} />
-                        </IconButton>
-                      </Tooltip>
-                      {!isAdmin && canPay && (
-                        <Tooltip title="Record Payment">
-                          <IconButton sx={actionBtnSx} onClick={() => setPaymentInvoice(invoice)}><PaymentOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
-                        </Tooltip>
-                      )}
-                      {canRefund && (
-                        <Tooltip title="Refund">
-                          <IconButton sx={actionBtnSx} onClick={() => setRefundInvoice(invoice)}>
-                            <UndoOutlinedIcon sx={{ fontSize: 17 }} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      <Tooltip title="Payment History">
-                        <IconButton sx={actionBtnSx} onClick={() => setHistoryInvoice(invoice)}>
-                          <HistoryOutlinedIcon sx={{ fontSize: 17 }} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Print invoice">
-                        <span>
-                          <IconButton
-                            sx={actionBtnSx}
-                            loading={printingId === invoice.id}
-                            disabled={printingId === invoice.id}
-                            onClick={() => void handlePrintInvoice(invoice)}
-                          >
-                            <PrintOutlinedIcon sx={{ fontSize: 17 }} />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                      {!isAdmin && invoice.status !== 'VOID' && invoice.status !== 'PAID' && invoice.status !== 'REFUNDED' && (
-                        <Tooltip title="Void Invoice">
-                          <IconButton sx={actionBtnSx} onClick={() => setVoidInvoice(invoice)}><BlockOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
-                        </Tooltip>
-                      )}
-                      {!isAdmin && (
-                        <Tooltip title="Delete invoice">
-                          <IconButton sx={actionBtnSx} color="error" onClick={() => setDeleteInvoice(invoice)}>
-                            <DeleteOutlineIcon sx={{ fontSize: 17 }} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              );
-            })
-          )}
-        </TableBody>
+        {invoices.isLoading ? (
+          <TableRowsSkeleton cols={7} />
+        ) : (
+          <DataGridTable
+            items={paginated}
+            columns={columns}
+            getRowId={(inv) => inv.id}
+            emptyMessage="No invoices created."
+            onRowClick={(invoice) => navigate(`/billing/${invoice.id}`)}
+          />
+        )}
       </TablePageShell>
       <InvoiceDialog
         open={open}
@@ -610,19 +1059,21 @@ export function InvoicesPage(): React.JSX.Element {
       />
       {paymentInvoice && <PaymentDialog invoice={paymentInvoice} onClose={() => setPaymentInvoice(undefined)} />}
       {refundInvoice && <RefundDialog invoice={refundInvoice} onClose={() => setRefundInvoice(undefined)} />}
-      {historyInvoice && <PaymentHistoryDialog invoice={historyInvoice} onClose={() => setHistoryInvoice(undefined)} />}
+      {historyInvoice && (
+        <PaymentHistoryDialog invoice={historyInvoice} onClose={() => setHistoryInvoice(undefined)} />
+      )}
       {voidInvoice && <VoidDialog invoice={voidInvoice} onClose={() => setVoidInvoice(undefined)} />}
-      {deleteInvoice && <DeleteInvoiceDialog invoice={deleteInvoice} onClose={() => setDeleteInvoice(undefined)} />}
-      <Snackbar
-        open={Boolean(printError)}
-        autoHideDuration={5000}
-        onClose={() => setPrintError(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert severity="error" onClose={() => setPrintError(null)} variant="filled">
-          {printError}
-        </Alert>
-      </Snackbar>
+      {deleteInvoice && (
+        <DeleteInvoiceDialog invoice={deleteInvoice} onClose={() => setDeleteInvoice(undefined)} />
+      )}
+      {printError && (
+        <MessageBar intent="error" className={styles.printError}>
+          <MessageBarBody>{printError}</MessageBarBody>
+          <Button appearance="transparent" size="small" onClick={() => setPrintError(null)}>
+            Dismiss
+          </Button>
+        </MessageBar>
+      )}
     </>
   );
 }

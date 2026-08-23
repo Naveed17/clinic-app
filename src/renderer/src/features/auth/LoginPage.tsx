@@ -1,32 +1,31 @@
-import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined';
-import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
-import LaptopOutlinedIcon from '@mui/icons-material/LaptopOutlined';
-import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
-import WifiTetheringIcon from '@mui/icons-material/WifiTethering';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import {
-  Alert,
-  Autocomplete,
-  Box,
   Button,
-  Collapse,
-  Divider,
-  IconButton,
-  InputAdornment,
-  List,
-  ListItemButton,
-  ListItemText,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+  Combobox,
+  Field,
+  Input,
+  MessageBar,
+  MessageBarBody,
+  Option,
+  Spinner,
+  Text,
+  makeStyles,
+  shorthands,
+} from '@fluentui/react-components';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 import { DoctorAvatar, avatarFallbackFromRole } from '@/components/DoctorAvatar';
+import {
+  CheckCircleOutlineIcon,
+  DnsOutlinedIcon,
+  LaptopOutlinedIcon,
+  PersonOutlineOutlinedIcon,
+  VisibilityOffOutlinedIcon,
+  VisibilityOutlinedIcon,
+  WifiTetheringIcon,
+} from '@/icons/fluent';
 
 /* ── Animated galaxy canvas ── */
 function GalaxyCanvas(): React.JSX.Element {
@@ -99,7 +98,6 @@ function GalaxyCanvas(): React.JSX.Element {
   );
 }
 
-/* ── Login Page ── */
 type LoginDirectoryUser = {
   id: string;
   name: string;
@@ -116,7 +114,190 @@ function roleLabel(role: string): string {
     .replace(/\b\w/g, (ch) => ch.toUpperCase());
 }
 
+const useStyles = makeStyles({
+  root: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  card: {
+    position: 'relative',
+    zIndex: 1,
+    width: '100%',
+    maxWidth: '420px',
+    marginLeft: '16px',
+    marginRight: '16px',
+    borderRadius: '8px',
+    border: '1px solid rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(10,20,40,0.55)',
+    backdropFilter: 'blur(28px)',
+    WebkitBackdropFilter: 'blur(28px)',
+    boxShadow: '0 8px 64px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.12)',
+    ...shorthands.padding('36px'),
+  },
+  badgeRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: '12px',
+  },
+  badge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+    ...shorthands.padding('3px', '10px'),
+    borderRadius: '8px',
+    fontSize: '11px',
+    fontWeight: 700,
+  },
+  brandRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: '24px',
+  },
+  logoBox: {
+    width: '42px',
+    height: '42px',
+    borderRadius: '10px',
+    backgroundColor: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 0 20px rgba(22,163,74,0.45)',
+    overflow: 'hidden',
+    ...shorthands.padding('4px'),
+  },
+  logo: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+  },
+  brandName: {
+    fontWeight: 800,
+    fontSize: '22px',
+    color: '#fff',
+    lineHeight: 1.1,
+  },
+  brandSub: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: '12px',
+  },
+  title: {
+    fontWeight: 800,
+    fontSize: '28px',
+    color: '#fff',
+    marginBottom: '4px',
+  },
+  subtitle: {
+    color: 'rgba(255,255,255,0.55)',
+    marginBottom: '24px',
+    fontSize: '14px',
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+  },
+  glassField: {
+    '& input, & .fui-Input, & .fui-Combobox': {
+      color: '#fff',
+    },
+  },
+  optionRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    width: '100%',
+  },
+  optionMeta: {
+    flex: 1,
+    minWidth: 0,
+  },
+  optionName: {
+    fontSize: '14px',
+    fontWeight: 700,
+    color: '#fff',
+  },
+  optionEmail: {
+    fontSize: '12px',
+    color: 'rgba(255,255,255,0.55)',
+  },
+  optionRole: {
+    fontSize: '11px',
+    fontWeight: 700,
+    color: 'rgba(255,255,255,0.4)',
+    whiteSpace: 'nowrap',
+  },
+  loginBtn: {
+    width: '100%',
+    borderRadius: '12px',
+    paddingTop: '12px',
+    paddingBottom: '12px',
+    fontWeight: 700,
+    fontSize: '16px',
+    backgroundImage: 'linear-gradient(90deg, #0f766e 0%, #16a34a 100%)',
+    boxShadow: '0 4px 24px rgba(15,118,110,0.45)',
+    border: 'none',
+    color: '#fff',
+  },
+  lanBox: {
+    marginTop: '24px',
+  },
+  divider: {
+    borderBottom: '1px solid rgba(255,255,255,0.08)',
+    marginBottom: '16px',
+  },
+  connectedRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  serverList: {
+    borderRadius: '8px',
+    overflow: 'hidden',
+    border: '1px solid rgba(255,255,255,0.12)',
+  },
+  serverItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    width: '100%',
+    ...shorthands.padding('8px', '12px'),
+    border: 'none',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    color: '#fff',
+    cursor: 'pointer',
+    textAlign: 'left',
+    font: 'inherit',
+  },
+  serverItemSelected: {
+    backgroundColor: 'rgba(15,118,110,0.25)',
+  },
+  panel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginTop: '16px',
+  },
+  scanRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  muted: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: '12px',
+  },
+  fieldLabel: {
+    color: 'rgba(255,255,255,0.7)',
+  },
+});
+
 export function LoginPage(): React.JSX.Element {
+  const styles = useStyles();
   const { login } = useAuth();
   const navigate = useNavigate();
   const brandLogo = useClinicBrandLogo();
@@ -133,7 +314,6 @@ export function LoginPage(): React.JSX.Element {
   });
   const [loading, setLoading] = useState(false);
 
-  // Server discovery
   const [serverPanelOpen, setServerPanelOpen] = useState(false);
   const [discovered, setDiscovered] = useState<{ ip: string; port: number; name: string }[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -145,7 +325,8 @@ export function LoginPage(): React.JSX.Element {
   const { isOnline } = useDatabaseMode();
 
   useEffect(() => {
-    void window.clinic?.auth.directory?.()
+    void window.clinic?.auth
+      .directory?.()
       .then((list) => {
         if (Array.isArray(list)) setUsers(list);
       })
@@ -160,7 +341,7 @@ export function LoginPage(): React.JSX.Element {
       if (s.serverMode === 'lan-client' && s.clientApiUrl) setConnected(true);
     });
     const unsub = window.clinic?.settings.onServerFound((server) => {
-      setDiscovered((prev) => prev.find((s) => s.ip === server.ip) ? prev : [...prev, server]);
+      setDiscovered((prev) => (prev.find((s) => s.ip === server.ip) ? prev : [...prev, server]));
     });
     return () => unsub?.();
   }, []);
@@ -180,7 +361,6 @@ export function LoginPage(): React.JSX.Element {
     setConnectError('');
     try {
       await window.clinic?.settings.save({ serverMode: 'lan-client', clientApiUrl: selectedUrl });
-      // Full relaunch so main process skips local DB and points at LAN server
       await window.clinic?.settings.relaunch?.();
     } catch {
       setConnectError('Could not save settings.');
@@ -207,382 +387,330 @@ export function LoginPage(): React.JSX.Element {
     }
   };
 
-  const glassField = {
-    '& .MuiOutlinedInput-root': {
-      borderRadius: '8px',
-      bgcolor: 'rgba(255,255,255,0.07)',
-      backdropFilter: 'blur(8px)',
-      color: '#fff',
-      overflow: 'hidden',
-      '& fieldset': { borderRadius: '8px', borderColor: 'rgba(255,255,255,0.22)' },
-      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.45)' },
-      '&.Mui-focused fieldset': { borderRadius: '8px', borderColor: 'rgba(255,255,255,0.7)' },
-      '& input': { borderRadius: 0 },
-      '& input:-webkit-autofill': {
-        borderRadius: '0 !important',
-        WebkitBoxShadow: '0 0 0 1000px rgba(255,255,255,0.07) inset !important',
-        WebkitTextFillColor: '#fff !important',
-        caretColor: '#fff',
-        transition: 'background-color 5000s ease-in-out 0s !important',
-      },
-    },
-    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.55)' },
-    '& .MuiInputLabel-root.Mui-focused': { color: 'rgba(255,255,255,0.9)' },
-    input: { color: '#fff', '&::placeholder': { color: 'rgba(255,255,255,0.4)' } },
-  };
+  const selected = users.find((user) => user.email.toLowerCase() === email.trim().toLowerCase());
+  const filteredUsers = (() => {
+    const query = email.trim().toLowerCase();
+    if (!query) return [];
+    return users.filter(
+      (user) =>
+        user.email.toLowerCase().includes(query) ||
+        user.name.toLowerCase().includes(query) ||
+        roleLabel(user.role).toLowerCase().includes(query),
+    );
+  })();
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+    <div className={styles.root}>
       <GalaxyCanvas />
 
-      <Box
-        sx={{
-          position: 'relative',
-          zIndex: 1,
-          width: '100%',
-          maxWidth: 420,
-          mx: 2,
-          borderRadius: 1,
-          border: '1px solid rgba(255,255,255,0.18)',
-          bgcolor: 'rgba(10,20,40,0.55)',
-          backdropFilter: 'blur(28px)',
-          WebkitBackdropFilter: 'blur(28px)',
-          boxShadow: '0 8px 64px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.12)',
-          p: { xs: 3.5, sm: 4.5 },
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            inset: 0,
-            borderRadius: 1,
-            padding: '1px',
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.04) 50%, rgba(100,200,255,0.15) 100%)',
-            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-            WebkitMaskComposite: 'xor',
-            maskComposite: 'exclude',
-            pointerEvents: 'none',
-          },
-        }}
-      >
-        {/* Machine Role Badge */}
+      <div className={styles.card}>
         {serverMode && (
-          <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1.5 }}>
+          <div className={styles.badgeRow}>
             {isOnline && (
-              <Stack direction="row" alignItems="center" spacing={0.6}
-                sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(14,165,233,0.2)', border: '1px solid rgba(56,189,248,0.45)' }}>
-                <WifiTetheringIcon sx={{ fontSize: 13, color: '#38bdf8' }} />
-                <Typography variant="caption" sx={{ color: '#7dd3fc', fontWeight: 700, fontSize: 11 }}>Online database</Typography>
-              </Stack>
+              <span
+                className={styles.badge}
+                style={{
+                  backgroundColor: 'rgba(14,165,233,0.2)',
+                  border: '1px solid rgba(56,189,248,0.45)',
+                  color: '#7dd3fc',
+                }}
+              >
+                <WifiTetheringIcon style={{ fontSize: 13, color: '#38bdf8' }} />
+                Online database
+              </span>
             )}
             {!isOnline && serverMode === 'lan-server' && (
-              <Stack direction="row" alignItems="center" spacing={0.6}
-                sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(15,118,110,0.25)', border: '1px solid rgba(15,118,110,0.5)' }}>
-                <DnsOutlinedIcon sx={{ fontSize: 13, color: '#4ade80' }} />
-                <Typography variant="caption" sx={{ color: '#4ade80', fontWeight: 700, fontSize: 11 }}>LAN Server</Typography>
-              </Stack>
+              <span
+                className={styles.badge}
+                style={{
+                  backgroundColor: 'rgba(15,118,110,0.25)',
+                  border: '1px solid rgba(15,118,110,0.5)',
+                  color: '#4ade80',
+                }}
+              >
+                <DnsOutlinedIcon style={{ fontSize: 13, color: '#4ade80' }} />
+                LAN Server
+              </span>
             )}
             {!isOnline && serverMode === 'local' && (
-              <Stack direction="row" alignItems="center" spacing={0.6}
-                sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)' }}>
-                <LaptopOutlinedIcon sx={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }} />
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, fontSize: 11 }}>Standalone</Typography>
-              </Stack>
+              <span
+                className={styles.badge}
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.07)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: 'rgba(255,255,255,0.5)',
+                }}
+              >
+                <LaptopOutlinedIcon style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }} />
+                Standalone
+              </span>
             )}
             {!isOnline && serverMode === 'lan-client' && connected && (
-              <Stack direction="row" alignItems="center" spacing={0.6}
-                sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.4)' }}>
-                <CheckCircleOutlineIcon sx={{ fontSize: 13, color: '#60a5fa' }} />
-                <Typography variant="caption" sx={{ color: '#60a5fa', fontWeight: 700, fontSize: 11 }}>LAN Client — Connected</Typography>
-              </Stack>
+              <span
+                className={styles.badge}
+                style={{
+                  backgroundColor: 'rgba(59,130,246,0.2)',
+                  border: '1px solid rgba(59,130,246,0.4)',
+                  color: '#60a5fa',
+                }}
+              >
+                <CheckCircleOutlineIcon style={{ fontSize: 13, color: '#60a5fa' }} />
+                LAN Client — Connected
+              </span>
             )}
             {!isOnline && serverMode === 'lan-client' && !connected && (
-              <Stack direction="row" alignItems="center" spacing={0.6}
-                sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)' }}>
-                <WifiTetheringIcon sx={{ fontSize: 13, color: '#f87171' }} />
-                <Typography variant="caption" sx={{ color: '#f87171', fontWeight: 700, fontSize: 11 }}>LAN Client — Not Connected</Typography>
-              </Stack>
+              <span
+                className={styles.badge}
+                style={{
+                  backgroundColor: 'rgba(239,68,68,0.15)',
+                  border: '1px solid rgba(239,68,68,0.35)',
+                  color: '#f87171',
+                }}
+              >
+                <WifiTetheringIcon style={{ fontSize: 13, color: '#f87171' }} />
+                LAN Client — Not Connected
+              </span>
             )}
-          </Stack>
+          </div>
         )}
 
-        {/* Logo */}
-        <Stack direction="row" alignItems="center" gap={1.5} sx={{ mb: 3 }}>
-          <Box
-            sx={{
-              width: 42,
-              height: 42,
-              borderRadius: 2.5,
-              bgcolor: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 0 20px rgba(22,163,74,0.45)',
-              overflow: 'hidden',
-              p: 0.5,
-            }}
-          >
-            <Box
-              component="img"
-              src={brandLogo}
-              alt="Clinic"
-              sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            />
-          </Box>
-          <Box>
-            <Typography fontWeight={800} fontSize={22} color="#fff" lineHeight={1.1}>CareFlow</Typography>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>Clinic Management</Typography>
-          </Box>
-        </Stack>
+        <div className={styles.brandRow}>
+          <div className={styles.logoBox}>
+            <img src={brandLogo} alt="Clinic" className={styles.logo} />
+          </div>
+          <div>
+            <div className={styles.brandName}>CareFlow</div>
+            <div className={styles.brandSub}>Clinic Management</div>
+          </div>
+        </div>
 
-        <Typography variant="h4" fontWeight={800} color="#fff" sx={{ mb: 0.5 }}>Login</Typography>
-        <Typography sx={{ color: 'rgba(255,255,255,0.55)', mb: 3, fontSize: 14 }}>
-          Welcome back, please login to your account
-        </Typography>
+        <div className={styles.title}>Login</div>
+        <div className={styles.subtitle}>Welcome back, please login to your account</div>
 
-        <Stack spacing={2}>
-          {error && (
-            <Alert severity="error" sx={{ bgcolor: 'rgba(211,47,47,0.2)', color: '#ff8a80', border: '1px solid rgba(211,47,47,0.35)', '& .MuiAlert-icon': { color: '#ff8a80' } }}>
-              {error}
-            </Alert>
-          )}
+        <div className={styles.form}>
+          {error ? (
+            <MessageBar intent="error">
+              <MessageBarBody>{error}</MessageBarBody>
+            </MessageBar>
+          ) : null}
 
-          <Autocomplete
-            freeSolo
-            autoHighlight
-            openOnFocus={false}
-            options={users}
-            inputValue={email}
-            onInputChange={(_, value) => setEmail(value)}
-            onChange={(_, value) => {
-              if (value && typeof value !== 'string') {
-                setEmail(value.email);
-                window.setTimeout(() => passwordRef.current?.focus(), 0);
-              }
-            }}
-            getOptionLabel={(option) => (typeof option === 'string' ? option : option.email)}
-            isOptionEqualToValue={(option, value) => option.id === value.id}
-            filterOptions={(options, state) => {
-              const query = state.inputValue.trim().toLowerCase();
-              if (!query) return [];
-              return options.filter((user) =>
-                user.email.toLowerCase().includes(query)
-                || user.name.toLowerCase().includes(query)
-                || roleLabel(user.role).toLowerCase().includes(query),
-              );
-            }}
-            noOptionsText={email.trim() ? 'No matching users' : 'Type to search users'}
-            sx={{
-              '& .MuiAutocomplete-popupIndicator, & .MuiAutocomplete-clearIndicator': {
-                color: 'rgba(255,255,255,0.45)',
-              },
-            }}
-            slotProps={{
-              paper: {
-                sx: {
-                  mt: 0.5,
-                  bgcolor: 'rgba(10,20,40,0.94)',
-                  backdropFilter: 'blur(18px)',
-                  border: '1px solid rgba(255,255,255,0.16)',
-                  color: '#fff',
-                  '& .MuiAutocomplete-noOptions': { color: 'rgba(255,255,255,0.45)' },
-                },
-              },
-              listbox: {
-                sx: {
-                  py: 0.5,
-                  '& .MuiAutocomplete-option': {
-                    px: 1.25,
-                    py: 1,
-                    gap: 1.25,
-                    minHeight: 56,
-                    '&[aria-selected="true"]': { bgcolor: 'rgba(15,118,110,0.28)' },
-                    '&.Mui-focused': { bgcolor: 'rgba(255,255,255,0.08)' },
-                  },
-                },
-              },
-            }}
-            renderOption={(props, option) => {
-              const { key, ...optionProps } = props as typeof props & { key: string };
-              return (
-                <Box component="li" key={key} {...optionProps}>
-                  <DoctorAvatar
-                    src={option.avatar}
-                    name={option.name}
-                    size={36}
-                    fallback={avatarFallbackFromRole(option.role)}
-                  />
-                  <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Typography fontSize={14} fontWeight={700} color="#fff" noWrap>
-                      {option.name}
-                    </Typography>
-                    <Typography fontSize={12} sx={{ color: 'rgba(255,255,255,0.55)' }} noWrap>
-                      {option.email}
-                    </Typography>
-                  </Box>
-                  <Typography fontSize={11} fontWeight={700} sx={{ color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>
-                    {roleLabel(option.role)}
-                  </Typography>
-                </Box>
-              );
-            }}
-            renderInput={(params) => {
-              const selected = users.find((user) => user.email.toLowerCase() === email.trim().toLowerCase());
-              return (
-                <TextField
-                  {...params}
-                  label="Email"
-                  type="email"
-                  autoComplete="username"
-                  fullWidth
-                  sx={glassField}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      passwordRef.current?.focus();
-                    }
-                  }}
-                  InputProps={{
-                    ...params.InputProps,
-                    startAdornment: (
-                      <>
-                        {selected ? (
-                          <DoctorAvatar
-                            src={selected.avatar}
-                            name={selected.name}
-                            size={28}
-                            fallback={avatarFallbackFromRole(selected.role)}
-                            sx={{ ml: 0.5, mr: 0.75 }}
-                          />
-                        ) : (
-                          <InputAdornment position="start">
-                            <PersonOutlineOutlinedIcon sx={{ color: 'rgba(255,255,255,0.4)', fontSize: 20 }} />
-                          </InputAdornment>
-                        )}
-                        {params.InputProps.startAdornment}
-                      </>
-                    ),
-                  }}
+          <Field label={<span className={styles.fieldLabel}>Email</span>} className={styles.glassField}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {selected ? (
+                <DoctorAvatar
+                  src={selected.avatar}
+                  name={selected.name}
+                  size={28}
+                  fallback={avatarFallbackFromRole(selected.role)}
                 />
-              );
-            }}
-          />
+              ) : (
+                <PersonOutlineOutlinedIcon
+                  style={{ color: 'rgba(255,255,255,0.4)', fontSize: 20, flexShrink: 0 }}
+                />
+              )}
+              <Combobox
+                freeform
+                style={{ flex: 1 }}
+                value={email}
+                placeholder="Email"
+                onChange={(e) => setEmail((e.target as HTMLInputElement).value)}
+                onOptionSelect={(_, data) => {
+                  if (data.optionValue) {
+                    setEmail(data.optionValue);
+                    window.setTimeout(() => passwordRef.current?.focus(), 0);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    passwordRef.current?.focus();
+                  }
+                }}
+              >
+                {filteredUsers.map((option) => (
+                  <Option key={option.id} value={option.email} text={option.email}>
+                    <div className={styles.optionRow}>
+                      <DoctorAvatar
+                        src={option.avatar}
+                        name={option.name}
+                        size={36}
+                        fallback={avatarFallbackFromRole(option.role)}
+                      />
+                      <div className={styles.optionMeta}>
+                        <div className={styles.optionName}>{option.name}</div>
+                        <div className={styles.optionEmail}>{option.email}</div>
+                      </div>
+                      <div className={styles.optionRole}>{roleLabel(option.role)}</div>
+                    </div>
+                  </Option>
+                ))}
+              </Combobox>
+            </div>
+          </Field>
 
-          <TextField
-            label="Password"
-            type={showPw ? 'text' : 'password'}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void handleLogin()}
-            fullWidth
-            inputRef={passwordRef}
-            autoComplete="current-password"
-            sx={glassField}
-            slotProps={{
-              input: {
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton onClick={() => setShowPw((v) => !v)} edge="end" sx={{ color: 'rgba(255,255,255,0.4)', '&:hover': { color: '#fff' } }}>
-                      {showPw ? <VisibilityOutlinedIcon fontSize="small" /> : <VisibilityOffOutlinedIcon fontSize="small" />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
+          <Field
+            label={<span className={styles.fieldLabel}>Password</span>}
+            className={styles.glassField}
+          >
+            <Input
+              type={showPw ? 'text' : 'password'}
+              value={password}
+              onChange={(_, d) => setPassword(d.value)}
+              onKeyDown={(e) => e.key === 'Enter' && void handleLogin()}
+              ref={passwordRef}
+              autoComplete="current-password"
+              contentAfter={
+                <Button
+                  appearance="transparent"
+                  size="small"
+                  icon={
+                    showPw ? (
+                      <VisibilityOutlinedIcon style={{ fontSize: 18 }} />
+                    ) : (
+                      <VisibilityOffOutlinedIcon style={{ fontSize: 18 }} />
+                    )
+                  }
+                  onClick={() => setShowPw((v) => !v)}
+                  aria-label={showPw ? 'Hide password' : 'Show password'}
+                />
+              }
+            />
+          </Field>
 
           <Button
-            fullWidth
-            variant="contained"
+            className={styles.loginBtn}
             size="large"
-            loading={loading}
+            disabled={loading}
+            icon={loading ? <Spinner size="tiny" /> : undefined}
             onClick={() => void handleLogin()}
-            sx={{
-              borderRadius: 3,
-              py: 1.5,
-              fontWeight: 700,
-              fontSize: 16,
-              background: 'linear-gradient(90deg, #0f766e 0%, #16a34a 100%)',
-              boxShadow: '0 4px 24px rgba(15,118,110,0.45)',
-              '&:hover': { background: 'linear-gradient(90deg, #0d6460 0%, #15803d 100%)', transform: 'translateY(-1px)' },
-              '&:active': { transform: 'translateY(0)' },
-            }}
           >
             Login
           </Button>
-        </Stack>
+        </div>
 
-        {/* Connect to LAN Server — only shown on lan-client machines */}
         {serverMode === 'lan-client' && (
-          <Box sx={{ mt: 3 }}>
-            <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', mb: 2 }} />
+          <div className={styles.lanBox}>
+            <div className={styles.divider} />
             {connected ? (
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <CheckCircleOutlineIcon sx={{ color: '#4ade80', fontSize: 18 }} />
-                <Typography variant="caption" sx={{ color: '#4ade80' }}>Connected to clinic server</Typography>
-                <Button size="small" sx={{ ml: 'auto !important', color: 'rgba(255,255,255,0.4)', fontSize: 11 }} onClick={() => { setConnected(false); setServerPanelOpen(true); }}>
+              <div className={styles.connectedRow}>
+                <CheckCircleOutlineIcon style={{ color: '#4ade80', fontSize: 18 }} />
+                <Text size={200} style={{ color: '#4ade80' }}>
+                  Connected to clinic server
+                </Text>
+                <Button
+                  size="small"
+                  appearance="transparent"
+                  style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.4)', fontSize: 11 }}
+                  onClick={() => {
+                    setConnected(false);
+                    setServerPanelOpen(true);
+                  }}
+                >
                   Change
                 </Button>
-              </Stack>
+              </div>
             ) : (
               <Button
-                fullWidth
-                variant="outlined"
-                size="small"
-                startIcon={<WifiTetheringIcon />}
+                appearance="outline"
+                style={{
+                  width: '100%',
+                  borderColor: 'rgba(255,255,255,0.2)',
+                  color: 'rgba(255,255,255,0.6)',
+                }}
+                icon={<WifiTetheringIcon />}
                 onClick={() => setServerPanelOpen((v) => !v)}
-                sx={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.6)', borderRadius: 2, '&:hover': { borderColor: 'rgba(255,255,255,0.4)', bgcolor: 'rgba(255,255,255,0.05)' } }}
               >
                 Connect to Clinic Server (LAN)
               </Button>
             )}
 
-            <Collapse in={serverPanelOpen}>
-              <Stack spacing={1.5} sx={{ mt: 2 }}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>Available servers on network:</Typography>
-                  <Button size="small" startIcon={<WifiTetheringIcon />} loading={scanning} onClick={handleScan} sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
+            {serverPanelOpen && (
+              <div className={styles.panel}>
+                <div className={styles.scanRow}>
+                  <Text className={styles.muted}>Available servers on network:</Text>
+                  <Button
+                    size="small"
+                    appearance="transparent"
+                    icon={scanning ? <Spinner size="tiny" /> : <WifiTetheringIcon />}
+                    onClick={handleScan}
+                    style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}
+                  >
                     {scanning ? 'Scanning...' : 'Scan'}
                   </Button>
-                </Stack>
+                </div>
 
                 {discovered.length > 0 ? (
-                  <List disablePadding sx={{ borderRadius: 2, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.12)' }}>
+                  <div className={styles.serverList}>
                     {discovered.map((server) => {
                       const url = `http://${server.ip}:${server.port}`;
                       const sel = selectedUrl === url;
                       return (
-                        <ListItemButton key={server.ip} selected={sel} onClick={() => setSelectedUrl(url)} sx={{ py: 1, bgcolor: sel ? 'rgba(15,118,110,0.25)' : 'rgba(255,255,255,0.04)', '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' }, '&.Mui-selected': { bgcolor: 'rgba(15,118,110,0.25)' } }}>
-                          <DnsOutlinedIcon sx={{ color: sel ? '#4ade80' : 'rgba(255,255,255,0.3)', fontSize: 18, mr: 1.5 }} />
-                          <ListItemText
-                            primary={server.name}
-                            secondary={url}
-                            primaryTypographyProps={{ color: '#fff', fontSize: 13, fontWeight: sel ? 700 : 400 }}
-                            secondaryTypographyProps={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: 'monospace' }}
+                        <button
+                          key={server.ip}
+                          type="button"
+                          className={`${styles.serverItem} ${sel ? styles.serverItemSelected : ''}`}
+                          onClick={() => setSelectedUrl(url)}
+                        >
+                          <DnsOutlinedIcon
+                            style={{
+                              color: sel ? '#4ade80' : 'rgba(255,255,255,0.3)',
+                              fontSize: 18,
+                            }}
                           />
-                          {sel && <CheckCircleOutlineIcon sx={{ color: '#4ade80', fontSize: 18 }} />}
-                        </ListItemButton>
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: sel ? 700 : 400 }}>
+                              {server.name}
+                            </div>
+                            <div
+                              style={{
+                                color: 'rgba(255,255,255,0.4)',
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                              }}
+                            >
+                              {url}
+                            </div>
+                          </span>
+                          {sel ? (
+                            <CheckCircleOutlineIcon style={{ color: '#4ade80', fontSize: 18 }} />
+                          ) : null}
+                        </button>
                       );
                     })}
-                  </List>
+                  </div>
                 ) : (
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.35)', textAlign: 'center', display: 'block', py: 1 }}>
+                  <Text
+                    className={styles.muted}
+                    style={{ textAlign: 'center', display: 'block', padding: '8px 0' }}
+                  >
                     {scanning ? 'Looking for servers...' : 'No servers found. Click Scan.'}
-                  </Typography>
+                  </Text>
                 )}
 
-                {connectError && (
-                  <Alert severity="error" sx={{ bgcolor: 'rgba(211,47,47,0.2)', color: '#ff8a80', border: '1px solid rgba(211,47,47,0.35)', '& .MuiAlert-icon': { color: '#ff8a80' }, py: 0.5 }}>
-                    {connectError}
-                  </Alert>
-                )}
+                {connectError ? (
+                  <MessageBar intent="error">
+                    <MessageBarBody>{connectError}</MessageBarBody>
+                  </MessageBar>
+                ) : null}
 
-                <Button fullWidth variant="contained" size="small" disabled={!selectedUrl} loading={connecting} onClick={() => void handleConnect()} sx={{ borderRadius: 2, background: 'linear-gradient(90deg,#0f766e,#16a34a)', fontWeight: 700 }}>
+                <Button
+                  appearance="primary"
+                  disabled={!selectedUrl || connecting}
+                  icon={connecting ? <Spinner size="tiny" /> : undefined}
+                  onClick={() => void handleConnect()}
+                  style={{
+                    width: '100%',
+                    backgroundImage: 'linear-gradient(90deg,#0f766e,#16a34a)',
+                    fontWeight: 700,
+                  }}
+                >
                   Connect & Save
                 </Button>
-              </Stack>
-            </Collapse>
-          </Box>
+              </div>
+            )}
+          </div>
         )}
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 }
