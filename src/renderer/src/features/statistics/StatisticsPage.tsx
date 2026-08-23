@@ -24,13 +24,10 @@ import {
   Skeleton,
   Stack,
   Typography,
-} from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
-import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
-import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
-import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
-import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
+  alpha,
+  useTheme,
+} from '@/compat/fluentMui';
+
 import { useQuery } from '@tanstack/react-query';
 import { StatCardsSkeleton } from '@/components/LoadingUI';
 import { appointmentsService } from '@/services/appointments.service';
@@ -38,6 +35,7 @@ import { invoicesService } from '@/services/invoices.service';
 import { patientsService } from '@/services/patients.service';
 import type { Appointment } from '@/types/appointment';
 import type { Invoice } from '@/types/invoice';
+import { CalendarMonthOutlinedIcon, GroupOutlinedIcon, KeyboardArrowDownRoundedIcon, PaymentsOutlinedIcon, TrendingUpOutlinedIcon } from '@/icons/fluent';
 
 type OverviewRange = 'weekly' | 'monthly' | 'yearly';
 
@@ -533,28 +531,28 @@ export function StatisticsPage(): React.JSX.Element {
           value={appointments.length}
           note="All time"
           color={theme.palette.primary.main}
-          icon={<CalendarMonthOutlinedIcon fontSize="small" />}
+          icon={<CalendarMonthOutlinedIcon style={{ fontSize: 18 }} />}
         />
         <StatCard
           label="Completed"
           value={completedAppts}
           note={`${appointments.length ? Math.round((completedAppts / appointments.length) * 100) : 0}% completion rate`}
           color={theme.palette.success.main}
-          icon={<TrendingUpOutlinedIcon fontSize="small" />}
+          icon={<TrendingUpOutlinedIcon style={{ fontSize: 18 }} />}
         />
         <StatCard
           label="Total Revenue"
           value={money(totalRevenue)}
           note="From all invoices"
           color={theme.palette.secondary.main}
-          icon={<PaymentsOutlinedIcon fontSize="small" />}
+          icon={<PaymentsOutlinedIcon style={{ fontSize: 18 }} />}
         />
         <StatCard
           label="Total Patients"
           value={patientsData?.total ?? 0}
           note="Registered patients"
           color={theme.palette.warning.main}
-          icon={<GroupOutlinedIcon fontSize="small" />}
+          icon={<GroupOutlinedIcon style={{ fontSize: 18 }} />}
         />
       </Box>
 
@@ -631,7 +629,7 @@ export function StatisticsPage(): React.JSX.Element {
 
             <Button
               size="small"
-              endIcon={<KeyboardArrowDownRoundedIcon sx={{ fontSize: 18 }} />}
+              endIcon={<KeyboardArrowDownRoundedIcon style={{ fontSize: 18 }} />}
               onClick={(e) => setRangeMenuEl(e.currentTarget)}
               sx={{
                 textTransform: 'none',
@@ -1137,7 +1135,7 @@ export function StatisticsPage(): React.JSX.Element {
             <Stack direction="row" alignItems="center" spacing={1.5}>
               <Button
                 size="small"
-                endIcon={<KeyboardArrowDownRoundedIcon sx={{ fontSize: 18 }} />}
+                endIcon={<KeyboardArrowDownRoundedIcon style={{ fontSize: 18 }} />}
                 onClick={(e) => setReasonYearMenuEl(e.currentTarget)}
                 sx={{
                   textTransform: 'none',

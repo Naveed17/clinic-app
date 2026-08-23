@@ -46,7 +46,7 @@ export default defineConfig({
         '@fullcalendar/timegrid',
         '@fullcalendar/interaction',
         '@fullcalendar/core',
-        'mui-tel-input',
+        'react-phone-number-input',
       ],
       esbuildOptions: { target: 'es2020' },
     },

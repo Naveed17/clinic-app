@@ -19,25 +19,8 @@ import {
   alpha,
   LinearProgress,
   Snackbar,
-} from '@mui/material';
-import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
-import LaptopOutlinedIcon from '@mui/icons-material/LaptopOutlined';
-import DevicesOutlinedIcon from '@mui/icons-material/DevicesOutlined';
-import BackupOutlinedIcon from '@mui/icons-material/BackupOutlined';
-import RestoreOutlinedIcon from '@mui/icons-material/RestoreOutlined';
-import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
-import CloudDownloadOutlinedIcon from '@mui/icons-material/CloudDownloadOutlined';
-import CloudOutlinedIcon from '@mui/icons-material/CloudOutlined';
-import SystemUpdateAltOutlinedIcon from '@mui/icons-material/SystemUpdateAltOutlined';
-import WifiTetheringOutlinedIcon from '@mui/icons-material/WifiTetheringOutlined';
-import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
-import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
-import SupportAgentOutlinedIcon from '@mui/icons-material/SupportAgentOutlined';
-import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
-import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
-import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
+} from '@/compat/fluentMui';
+
 import { useUpdate } from '@/context/updateProvider';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -49,6 +32,7 @@ import { fileToClinicLogoDataUrl } from '@/utils/avatarImage';
 import { invalidateClinicLogoCache, notifyClinicBrandChanged, resolveClinicLogoSrc } from '@/utils/clinicBrandLogo';
 import { CAREFLOW_BRAND, supportWhatsAppHref } from '@shared/careflowSupport';
 import { copySupportPhone, openSupportEmail, openSupportWhatsApp } from '@/utils/careflowSupportActions';
+import { AutoAwesomeOutlinedIcon, BackupOutlinedIcon, CampaignOutlinedIcon, CloudDownloadOutlinedIcon, CloudOutlinedIcon, CloudUploadOutlinedIcon, DevicesOutlinedIcon, DnsOutlinedIcon, EmailOutlinedIcon, ImageOutlinedIcon, LaptopOutlinedIcon, LocalPhoneOutlinedIcon, RestoreOutlinedIcon, SupportAgentOutlinedIcon, SystemUpdateAltOutlinedIcon, TuneOutlinedIcon, WhatsAppIcon, WifiTetheringOutlinedIcon } from '@/icons/fluent';
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
 
@@ -638,14 +622,14 @@ export function SettingsPage(): React.JSX.Element {
           >
             <Tab
               value="general"
-              icon={<TuneOutlinedIcon sx={{ fontSize: 18 }} />}
+              icon={<TuneOutlinedIcon style={{ fontSize: 18 }} />}
               iconPosition="start"
               label="General"
             />
             {can('ai') && (
               <Tab
                 value="ai"
-                icon={<AutoAwesomeOutlinedIcon sx={{ fontSize: 18 }} />}
+                icon={<AutoAwesomeOutlinedIcon style={{ fontSize: 18 }} />}
                 iconPosition="start"
                 label="AI"
               />
@@ -653,20 +637,20 @@ export function SettingsPage(): React.JSX.Element {
             {can('whatsapp') && (
               <Tab
                 value="whatsapp"
-                icon={<WhatsAppIcon sx={{ fontSize: 18 }} />}
+                icon={<WhatsAppIcon style={{ fontSize: 18 }} />}
                 iconPosition="start"
                 label="WhatsApp"
               />
             )}
             <Tab
               value="backup"
-              icon={<BackupOutlinedIcon sx={{ fontSize: 18 }} />}
+              icon={<BackupOutlinedIcon style={{ fontSize: 18 }} />}
               iconPosition="start"
               label="Backup & Restore"
             />
             <Tab
               value="support"
-              icon={<SupportAgentOutlinedIcon sx={{ fontSize: 18 }} />}
+              icon={<SupportAgentOutlinedIcon style={{ fontSize: 18 }} />}
               iconPosition="start"
               label="Support"
             />
@@ -1021,7 +1005,7 @@ export function SettingsPage(): React.JSX.Element {
           {settingsTab === 'ai' && can('ai') && (
             <Box sx={{ maxWidth: 520 }}>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-                <AutoAwesomeOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                <AutoAwesomeOutlinedIcon style={{ fontSize: 20, color: 'currentColor' }} />
                 <Typography variant="h6" fontWeight={700}>AI Assist (add-on)</Typography>
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
@@ -1053,7 +1037,7 @@ export function SettingsPage(): React.JSX.Element {
           {settingsTab === 'whatsapp' && can('whatsapp') && (
             <Box>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-                <WhatsAppIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                <WhatsAppIcon style={{ fontSize: 20, color: 'currentColor' }} />
                 <Typography variant="h6" fontWeight={700}>WhatsApp Cloud API (add-on)</Typography>
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
@@ -1101,7 +1085,7 @@ export function SettingsPage(): React.JSX.Element {
           {settingsTab === 'backup' && (
             <Box sx={{ maxWidth: 560 }}>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-                <BackupOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                <BackupOutlinedIcon style={{ fontSize: 20, color: 'currentColor' }} />
                 <Typography variant="h6" fontWeight={700}>Backup & Restore</Typography>
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
@@ -1182,7 +1166,7 @@ export function SettingsPage(): React.JSX.Element {
                   <Divider />
 
                   <Stack direction="row" alignItems="center" spacing={1}>
-                    <CloudOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                    <CloudOutlinedIcon style={{ fontSize: 20, color: 'currentColor' }} />
                     <Typography variant="subtitle1" fontWeight={800}>Google Drive</Typography>
                   </Stack>
                   <Typography variant="body2" color="text.secondary">
@@ -1257,7 +1241,7 @@ export function SettingsPage(): React.JSX.Element {
           {settingsTab === 'support' && (
             <Box sx={{ maxWidth: 520 }}>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-                <SupportAgentOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                <SupportAgentOutlinedIcon style={{ fontSize: 20, color: 'currentColor' }} />
                 <Typography variant="h6" fontWeight={700}>Customer Support</Typography>
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
@@ -1283,7 +1267,7 @@ export function SettingsPage(): React.JSX.Element {
                   <Stack spacing={1.5}>
                     {supportPhone && (
                       <Stack direction="row" spacing={1.25} alignItems="center">
-                        <LocalPhoneOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                        <LocalPhoneOutlinedIcon style={{ fontSize: 20, color: 'currentColor' }} />
                         <Link
                           component="button"
                           type="button"
@@ -1301,7 +1285,7 @@ export function SettingsPage(): React.JSX.Element {
                     )}
                     {supportEmail && (
                       <Stack direction="row" spacing={1.25} alignItems="center">
-                        <EmailOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                        <EmailOutlinedIcon style={{ fontSize: 20, color: 'currentColor' }} />
                         <Link
                           component="button"
                           type="button"
