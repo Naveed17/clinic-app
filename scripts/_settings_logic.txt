@@ -1,0 +1,439 @@
+type ServerMode = 'local' | 'lan-server' | 'lan-client';
+
+type DriveSchedule = 'off' | 'daily' | 'weekly' | 'monthly';
+
+type GoogleDriveStatus = {
+  connected: boolean;
+  email: string;
+  schedule: DriveSchedule;
+  lastBackupAt: string | null;
+  configured: boolean;
+};
+
+interface Settings {
+  serverMode: ServerMode;
+  clientApiUrl: string;
+  lanPort: number;
+  clinicName: string;
+  clinicAddress: string;
+  clinicPhone: string;
+  clinicLogo?: string;
+  databaseMode?: 'local' | 'online';
+  clinicalApiUrl?: string;
+  schemaId?: string;
+  aiEnabled?: boolean;
+  groqApiKey?: string;
+  groqModel?: string;
+  whatsappEnabled?: boolean;
+  whatsappToken?: string;
+  whatsappPhoneNumberId?: string;
+  whatsappDisplayNumber?: string;
+}
+
+export function SettingsPage(): React.JSX.Element {
+  const theme = useTheme();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const { can } = useLicense();
+  const refreshLicenseModules = useRefreshLicenseModules();
+  const { isOnline, schemaId, ready: databaseModeReady, refresh: refreshDatabaseMode } = useDatabaseMode();
+
+  // Context Hook Integration for Global Auto-Updater State
+  const {
+    progress: downloadProgress,
+    progressInfo,
+    isChecking,
+    isDownloading,
+    isReady: isUpdateReady,
+    error: updateError,
+    checkForUpdates,
+    installUpdate
+  } = useUpdate();
+
+  const downloadIndeterminate =
+    isDownloading && (progressInfo.phase === 'starting' || downloadProgress <= 0);
+  const downloadStatusText =
+    downloadIndeterminate
+      ? 'Preparing download…'
+      : progressInfo.label
+        ? `Downloading ${progressInfo.label}`
+        : 'Downloading update...';
+
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [lanIp, setLanIp] = useState<string>('...');
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  const [migrateLoading, setMigrateLoading] = useState(false);
+  const [migrateProgress, setMigrateProgress] = useState<{ percent: number; label: string }>({
+    percent: 0,
+    label: 'Starting…',
+  });
+  const [saving, setSaving] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoError, setLogoError] = useState('');
+
+  // Update States & Notifications
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'latest' | 'error'>('idle');
+  const [currentVersion, setCurrentVersion] = useState<string>('1.0.0');
+  const [toastMessage, setToastMessage] = useState<{ msg: string; severity: 'info' | 'success' | 'error' | 'warning' } | null>(null);
+
+  useEffect(() => {
+    void window.clinic?.update?.getVersion?.().then((ver: string) => {
+      if (ver) setCurrentVersion(ver);
+    });
+  }, []);
+
+  useEffect(() => {
+    const unsub = window.clinic?.backup?.onMigrateProgress?.((progress) => {
+      setMigrateProgress({
+        percent: Math.min(100, Math.max(0, Math.round(progress.percent))),
+        label: progress.label || 'Transferring…',
+      });
+    });
+    return () => {
+      unsub?.();
+    };
+  }, []);
+
+  // Listen to Context downloading & error state changes dynamically
+  useEffect(() => {
+    if (isUpdateReady) {
+      setToastMessage({
+        msg: 'Update downloaded successfully! Click "Restart & Install Update".',
+        severity: 'success',
+      });
+    }
+  }, [isUpdateReady]);
+
+  useEffect(() => {
+    if (updateError) {
+      setToastMessage({
+        msg: `Update Error: ${updateError}`,
+        severity: 'error',
+      });
+      setUpdateStatus('error');
+    }
+  }, [updateError]);
+
+  const [settingsTab, setSettingsTab] = useState<'general' | 'ai' | 'whatsapp' | 'backup' | 'support'>('general');
+  const [supportContact, setSupportContact] = useState<{ phone: string; email: string } | null>(null);
+  const [supportLoading, setSupportLoading] = useState(false);
+  const [waTesting, setWaTesting] = useState(false);
+  const [waTest, setWaTest] = useState<{ ok: boolean; name?: string; phone?: string; error?: string } | null>(null);
+  const [waCampaignOpen, setWaCampaignOpen] = useState(false);
+  const [aiTesting, setAiTesting] = useState(false);
+  const [aiTest, setAiTest] = useState<{ ok: boolean; error?: string } | null>(null);
+  const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
+  const [prevMode, setPrevMode] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [discovered, setDiscovered] = useState<{ ip: string; port: number; name: string }[]>([]);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<boolean | null>(null);
+  const [drive, setDrive] = useState<GoogleDriveStatus | null>(null);
+  const [driveConnecting, setDriveConnecting] = useState(false);
+  const [driveUploading, setDriveUploading] = useState(false);
+
+  useEffect(() => {
+    if (settingsTab !== 'backup' || isOnline) return;
+    void window.clinic?.backup.googleStatus().then(setDrive);
+  }, [settingsTab, isOnline]);
+
+  useEffect(() => {
+    if (settingsTab !== 'support') return;
+    setSupportLoading(true);
+    void window.clinic?.license
+      .support()
+      .then((contact) => {
+        setSupportContact({
+          phone: String(contact?.phone || '').trim(),
+          email: String(contact?.email || '').trim(),
+        });
+      })
+      .catch(() => {
+        setSupportContact({ phone: '', email: '' });
+      })
+      .finally(() => setSupportLoading(false));
+  }, [settingsTab]);
+
+  async function handleGoogleConnect(): Promise<void> {
+    setDriveConnecting(true);
+    const result = await window.clinic?.backup.googleConnect();
+    setDriveConnecting(false);
+    if (result?.canceled) return;
+    if (result?.ok) {
+      const status = await window.clinic?.backup.googleStatus();
+      if (status) setDrive(status);
+      showAppToast({ type: 'success', message: `Connected ${result.email || 'Google Drive'}` });
+    } else {
+      showAppToast({ type: 'error', message: result?.error ?? 'Could not connect Google Drive.' });
+    }
+  }
+
+  async function handleGoogleDisconnect(): Promise<void> {
+    const status = await window.clinic?.backup.googleDisconnect();
+    if (status) setDrive(status);
+    showAppToast({ type: 'success', message: 'Google Drive disconnected.' });
+  }
+
+  async function handleGoogleSchedule(schedule: DriveSchedule): Promise<void> {
+    const status = await window.clinic?.backup.googleSchedule(schedule);
+    if (status) setDrive(status);
+  }
+
+  async function handleGoogleBackupNow(): Promise<void> {
+    setDriveUploading(true);
+    const result = await window.clinic?.backup.googleBackupNow();
+    setDriveUploading(false);
+    const status = await window.clinic?.backup.googleStatus();
+    if (status) setDrive(status);
+    if (result?.ok) {
+      showAppToast({ type: 'success', message: `Uploaded ${result.name || 'backup'} to Google Drive.` });
+    } else {
+      showAppToast({ type: 'error', message: result?.error ?? 'Google Drive backup failed.' });
+    }
+  }
+
+  async function handleBackup() {
+    setBackupLoading(true);
+    const result = await window.clinic?.backup.create() as { ok?: boolean; canceled?: boolean; path?: string; mode?: string; error?: string } | undefined;
+    setBackupLoading(false);
+    if (result?.canceled) return;
+    if (result?.ok) {
+      const extra = result.mode === 'full' ? ' (database + documents)' : result.mode === 'db' ? ' (database only)' : '';
+      showAppToast({ type: 'success', message: `Backup saved${extra}` });
+    } else {
+      showAppToast({ type: 'error', message: result?.error ?? 'Backup failed.' });
+    }
+  }
+
+  async function handleRestore() {
+    setRestoreLoading(true);
+    const result = await window.clinic?.backup.restore() as { ok?: boolean; canceled?: boolean; mode?: string; error?: string } | undefined;
+    setRestoreLoading(false);
+    if (result?.canceled) return;
+    if (result?.ok) {
+      showAppToast({ type: 'success', message: 'Restore successful. Please restart the app.' });
+    } else {
+      showAppToast({ type: 'error', message: result?.error ?? 'Restore failed.' });
+    }
+  }
+
+  async function handleMigrateToCloud() {
+    if (!isAdmin) {
+      showAppToast({ type: 'error', message: 'Only an admin can migrate local data.' });
+      return;
+    }
+    const confirmed = window.confirm(
+      'Copy this PC’s offline clinic (patients, visits, invoices, lab, documents and images) into Online DB?\n\nCloud clinic must be empty. Local SQLite stays on this PC as a backup.',
+    );
+    if (!confirmed) return;
+    setMigrateProgress({ percent: 0, label: 'Starting…' });
+    setMigrateLoading(true);
+    try {
+      const result = await window.clinic?.backup.migrateToCloud();
+      if (result?.ok) {
+        const files = result.files;
+        const extra = files
+          ? ` Documents: ${files.uploaded} uploaded, ${files.skipped} skipped, ${files.failed} failed.`
+          : '';
+        showAppToast({ type: 'success', message: `Local clinic copied to Online DB.${extra}` });
+      } else {
+        showAppToast({ type: 'error', message: result?.error ?? 'Migration failed.' });
+      }
+    } catch (err) {
+      showAppToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Migration failed.',
+      });
+    } finally {
+      setMigrateLoading(false);
+    }
+  }
+
+  async function handleMigrateFromCloud() {
+    if (!isAdmin) {
+      showAppToast({ type: 'error', message: 'Only an admin can copy Online data to this PC.' });
+      return;
+    }
+    const confirmed = window.confirm(
+      'Replace this PC’s local clinic.db with the current Online DB (patients, visits, invoices, lab, documents and images)?\n\nThis overwrites local data. After it finishes, switch the license to Local mode and this copy will open.',
+    );
+    if (!confirmed) return;
+    setMigrateProgress({ percent: 0, label: 'Starting…' });
+    setMigrateLoading(true);
+    try {
+      const result = await window.clinic?.backup.migrateFromCloud();
+      if (result?.ok) {
+        const files = result.files;
+        const extra = files
+          ? ` Documents: ${files.uploaded} downloaded, ${files.skipped} skipped, ${files.failed} failed.`
+          : '';
+        showAppToast({
+          type: 'success',
+          message: `Online clinic copied to this PC.${extra} Switch the license to Local to use it.`,
+        });
+      } else {
+        showAppToast({ type: 'error', message: result?.error ?? 'Download from Online DB failed.' });
+      }
+    } catch (err) {
+      showAppToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Download from Online DB failed.',
+      });
+    } finally {
+      setMigrateLoading(false);
+    }
+  }
+
+  // Update Check & Download Handlers
+  async function handleCheckUpdate() {
+    try {
+      setUpdateStatus('checking');
+      setToastMessage({ msg: 'Checking for updates...', severity: 'info' });
+
+      const res = await checkForUpdates();
+
+      if (res === 'available' || (typeof res === 'object' && res?.updateInfo)) {
+        setUpdateStatus('available');
+        setToastMessage({ msg: 'New update found! Downloading in background...', severity: 'info' });
+      } else if (res === 'latest') {
+        setUpdateStatus('latest');
+        setToastMessage({ msg: `You are on the latest version (v${currentVersion}).`, severity: 'success' });
+      } else if (typeof res === 'object' && res?.error) {
+        setUpdateStatus('error');
+        setToastMessage({ msg: `Update check failed: ${res.error}`, severity: 'error' });
+      } else {
+        setUpdateStatus('latest');
+        setToastMessage({ msg: `App is up to date (v${currentVersion}).`, severity: 'info' });
+      }
+    } catch (err: any) {
+      console.error('Failed to check or download update:', err);
+      setUpdateStatus('error');
+      setToastMessage({
+        msg: err?.message || 'Error occurred while checking update.',
+        severity: 'error'
+      });
+    } finally {
+      setTimeout(() => {
+        setUpdateStatus((current) => (current === 'checking' ? 'idle' : current));
+      }, 4000);
+    }
+  }
+
+  useEffect(() => {
+    if (!databaseModeReady) return;
+    void window.clinic?.settings.get().then((s) => {
+      setSettings(s);
+      setPrevMode(s.serverMode);
+      if (!isOnline && s.serverMode === 'lan-client' && s.clientApiUrl) {
+        void window.clinic?.settings.testConnection(s.clientApiUrl).then((ok) => setConnectionOk(ok ?? false));
+      }
+    }).catch(() => {
+      setSettings({
+        serverMode: 'local',
+        clientApiUrl: '',
+        lanPort: 3333,
+        clinicName: '',
+        clinicAddress: '',
+        clinicPhone: '',
+        clinicLogo: '',
+        databaseMode: 'local',
+        aiEnabled: false,
+        groqApiKey: '',
+        groqModel: 'llama-3.1-8b-instant',
+        whatsappEnabled: false,
+        whatsappToken: '',
+        whatsappPhoneNumberId: '',
+        whatsappDisplayNumber: '',
+      });
+    });
+    void window.clinic?.settings.lanIp().then((ip) => setLanIp(ip));
+  }, [databaseModeReady, isOnline]);
+
+  async function handleScan() {
+    setScanning(true); setDiscovered([]); setTestResult(null);
+    const servers = await window.clinic?.settings.scan();
+    setDiscovered(servers ?? []);
+    setScanning(false);
+  }
+
+  async function handleTestConnection() {
+    if (!settings?.clientApiUrl) return;
+    setTesting(true); setTestResult(null);
+    const ok = await window.clinic?.settings.testConnection(settings.clientApiUrl);
+    setTestResult(ok ?? false);
+    setTesting(false);
+  }
+
+  async function handleSave() {
+    if (!settings) return;
+    setSaving(true);
+    try {
+      const prev = await window.clinic?.settings.get();
+      const needsRelaunch =
+        (prevMode !== null && prevMode !== settings.serverMode) ||
+        (prev?.lanPort !== settings.lanPort) ||
+        (settings.serverMode === 'lan-client' && prev?.clientApiUrl !== settings.clientApiUrl);
+
+      await window.clinic?.settings.save(settings);
+      invalidateClinicLogoCache();
+      notifyClinicBrandChanged();
+      await refreshDatabaseMode();
+      setPrevMode(settings.serverMode);
+
+      if (needsRelaunch) {
+        showAppToast({ type: 'success', message: 'Settings saved — restarting…' });
+        setTimeout(() => {
+          void window.clinic?.settings.relaunch?.();
+        }, 900);
+      } else {
+        showAppToast({ type: 'success', message: 'Settings saved' });
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleTestWhatsApp(): Promise<void> {
+    if (!settings) return;
+    setWaTesting(true);
+    setWaTest(null);
+    try {
+      await window.clinic.settings.save(settings);
+      const result = await window.clinic.whatsapp.test();
+      setWaTest(result);
+    } catch (err) {
+      setWaTest({ ok: false, error: err instanceof Error ? err.message : 'Test failed.' });
+    } finally {
+      setWaTesting(false);
+    }
+  }
+
+  async function handleTestAi(): Promise<void> {
+    if (!settings) return;
+    setAiTesting(true);
+    setAiTest(null);
+    try {
+      await window.clinic.settings.save(settings);
+      const result = await window.clinic.ai.test();
+      setAiTest(result);
+    } catch (err) {
+      setAiTest({ ok: false, error: err instanceof Error ? err.message : 'Test failed.' });
+    } finally {
+      setAiTesting(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshLicenseModules();
+  }, [refreshLicenseModules]);
+
+  useEffect(() => {
+    if (settingsTab === 'ai' && !can('ai')) setSettingsTab('general');
+    if (settingsTab === 'whatsapp' && !can('whatsapp')) setSettingsTab('general');
+  }, [can, settingsTab]);
+
+  const supportPhone = supportContact?.phone || '';
+  const supportEmail = supportContact?.email || '';
+  const supportWhatsApp = supportWhatsAppHref(supportPhone);
+  const hasSupportContact = Boolean(supportPhone || supportEmail);
