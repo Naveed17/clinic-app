@@ -140,11 +140,15 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
   });
   useEffect(() => {
     const doctor = doctors.find((d) => d.id === providerId);
-    if (doctor) {
-      setConsultationFee(String(Number(doctor.consultationFee ?? 0)));
+    if (!doctor) return;
+    if (reason === 'Free') {
+      setConsultationFee('0');
       setFeeDiscount('');
+      return;
     }
-  }, [providerId, doctors]);
+    setConsultationFee(String(Number(doctor.consultationFee ?? 0)));
+    setFeeDiscount('');
+  }, [providerId, doctors, reason]);
   const { data: weekVisits } = useQuery({
     queryKey: ['token-week-visits', patientId, providerId, date],
     queryFn: () =>
@@ -184,7 +188,18 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
       <Stack direction="row" spacing={1}>
         <TextField
           select size="small" label="Reason (optional)" value={reason}
-          onChange={(e) => setReason(e.target.value)} sx={{ flex: 1 }}
+          onChange={(e) => {
+            const next = e.target.value;
+            setReason(next);
+            if (next === 'Free') {
+              setConsultationFee('0');
+              setFeeDiscount('');
+            } else {
+              const doctor = doctors.find((d) => d.id === providerId);
+              if (doctor) setConsultationFee(String(Number(doctor.consultationFee ?? 0)));
+            }
+          }}
+          sx={{ flex: 1 }}
         >
           <MenuItem value="">— None —</MenuItem>
           <MenuItem value="Checkup">Checkup</MenuItem>
@@ -193,6 +208,7 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
           <MenuItem value="Consultation">Consultation</MenuItem>
           {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
           <MenuItem value="Vaccination">Vaccination</MenuItem>
+          <MenuItem value="Free">Free</MenuItem>
         </TextField>
         <Button
           variant="contained" color="warning" size="small"
@@ -598,6 +614,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
                   <MenuItem value="Consultation">Consultation</MenuItem>
                   {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
                   <MenuItem value="Vaccination">Vaccination</MenuItem>
+                  <MenuItem value="Free">Free</MenuItem>
                 </TextField>
               )}
             />

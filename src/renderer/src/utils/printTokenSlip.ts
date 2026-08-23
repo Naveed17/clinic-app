@@ -66,6 +66,12 @@ export function buildTokenSlipHtml(
   const mr = token.patient.mrNumber
     ? `<div class="row"><div class="lbl">MR #</div><div class="val">${escapeHtml(token.patient.mrNumber)}</div></div>`
     : '';
+  const age = token.patient.age != null
+    ? `<div class="row"><div class="lbl">Age</div><div class="val">${escapeHtml(String(token.patient.age))}</div></div>`
+    : '';
+  const gender = token.patient.gender
+    ? `<div class="row"><div class="lbl">Gender</div><div class="val">${escapeHtml(token.patient.gender)}</div></div>`
+    : '';
 
   return `<!DOCTYPE html>
 <html data-paper="pos80">
@@ -148,8 +154,10 @@ export function buildTokenSlipHtml(
     <div class="box-num">${escapeHtml(num)}</div>
   </div>
   <div class="stars">${stars}</div>
-  <div class="row"><div class="lbl">Patient</div><div class="val">${escapeHtml(`${token.patient.firstName} ${token.patient.lastName}`.trim())}</div></div>
   ${mr}
+  <div class="row"><div class="lbl">Patient</div><div class="val">${escapeHtml(`${token.patient.firstName} ${token.patient.lastName}`.trim())}</div></div>
+  ${age}
+  ${gender}
   <div class="row"><div class="lbl">Doctor</div><div class="val">${escapeHtml(`Dr. ${token.doctor.firstName} ${token.doctor.lastName}`.trim())}</div></div>
   ${fee}
   <div class="row"><div class="lbl">Date</div><div class="val">${escapeHtml(date)}</div></div>

@@ -4,6 +4,7 @@ export const invoicesService = {
   get: (id: string) => window.clinic.invoices.get(id),
   patients: () => window.clinic.invoices.patients(),
   create: (input: InvoiceInput) => window.clinic.invoices.create(input),
+  update: (id: string, input: import('@/types/invoice').InvoiceUpdateInput) => window.clinic.invoices.update(id, input),
   addPayment: (invoiceId: string, amount: number, method: string, reference?: string) =>
     window.clinic.invoices.addPayment(invoiceId, amount, method, reference),
   refund: (invoiceId: string, amount: number, method: string, reason?: string) =>

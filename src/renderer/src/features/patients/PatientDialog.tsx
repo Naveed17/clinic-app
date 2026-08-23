@@ -7,21 +7,22 @@ import {
   FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogFormSx, dialogPaperProps, telInputDialogProps,
 } from '@/components/DialogUI';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { useAuth } from '@/features/auth/AuthContext';
 import { PhoneInputField } from '@/components/PhoneInputField';
+import { GenderRadioGroup } from '@/components/GenderRadioGroup';
 import { patientsService } from '@/services/patients.service';
+import { dateOfBirthToAge } from '@shared/patientAge';
 import type { Patient, PatientInput } from '@/types/patient';
 
 const patientSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.'),
   lastName: z.string().trim().min(1, 'Last name is required.'),
-  dateOfBirth: z.string(),
+  age: z.string(),
+  gender: z.string(),
   phone: z.string().trim(),
   email: z.string().trim().refine(
     (value) => !value || z.email().safeParse(value).success,
@@ -38,17 +39,19 @@ const patientSchema = z.object({
 export type PatientFormValues = z.infer<typeof patientSchema>;
 
 const emptyFormValues: PatientFormValues = {
-  firstName: '', lastName: '', dateOfBirth: '', phone: '',
+  firstName: '', lastName: '', age: '', gender: '', phone: '',
   email: '', address: '', emergencyContactName: '', emergencyContactPhone: '',
   bloodGroup: '', allergies: '', chronicConditions: '',
 };
 
 function toFormValues(patient?: Patient): PatientFormValues {
   if (!patient) return emptyFormValues;
+  const age = dateOfBirthToAge(patient.dateOfBirth);
   return {
     firstName: patient.firstName,
     lastName: patient.lastName,
-    dateOfBirth: patient.dateOfBirth ? new Date(patient.dateOfBirth).toISOString().slice(0, 10) : '',
+    age: age != null ? String(age) : '',
+    gender: patient.gender ?? '',
     phone: patient.phone ?? '',
     email: patient.email ?? '',
     address: patient.address ?? '',
@@ -61,9 +64,12 @@ function toFormValues(patient?: Patient): PatientFormValues {
 }
 
 function toPatientInput(values: PatientFormValues, primaryDoctorId?: string | null): PatientInput {
+  const ageNum = values.age.trim() ? parseInt(values.age, 10) : null;
   return {
     ...values,
-    dateOfBirth: values.dateOfBirth || null,
+    age: Number.isFinite(ageNum) ? ageNum : null,
+    dateOfBirth: null,
+    gender: values.gender || null,
     phone: values.phone || null,
     email: values.email || null,
     address: values.address || null,
@@ -124,25 +130,25 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
         <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.25} sx={{ pt: 0.5 }}>
             {mutation.isError && <Alert severity="error">Unable to save the patient. Please try again.</Alert>}
+            <Controller
+              name="gender"
+              control={form.control}
+              render={({ field }) => (
+                <GenderRadioGroup value={field.value} onChange={field.onChange} />
+              )}
+            />
             <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-              <TextField autoFocus fullWidth label="First name" error={Boolean(errors.firstName)} helperText={errors.firstName?.message} {...form.register('firstName')} />
+              <TextField fullWidth label="First name" error={Boolean(errors.firstName)} helperText={errors.firstName?.message} {...form.register('firstName')} />
               <TextField fullWidth label="Last name" error={Boolean(errors.lastName)} helperText={errors.lastName?.message} {...form.register('lastName')} />
             </Box>
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-              <LocalizationProvider dateAdapter={AdapterDateFns}>
-                <Controller
-                  name="dateOfBirth"
-                  control={form.control}
-                  render={({ field }) => (
-                    <DatePicker
-                      label="Date of birth"
-                      value={field.value ? new Date(field.value) : null}
-                      onChange={(value) => field.onChange(value ? value.toISOString().slice(0, 10) : '')}
-                      slotProps={{ textField: { fullWidth: true } }}
-                    />
-                  )}
-                />
-              </LocalizationProvider>
+            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '110px minmax(0, 1fr)' }, alignItems: 'start' }}>
+              <TextField
+                fullWidth
+                label="Age"
+                type="number"
+                slotProps={{ htmlInput: { min: 0, max: 150, step: 1 } }}
+                {...form.register('age')}
+              />
               <Controller
                 name="phone"
                 control={form.control}

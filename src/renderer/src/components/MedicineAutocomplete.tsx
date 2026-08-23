@@ -1,10 +1,11 @@
 import MedicationOutlinedIcon from '@mui/icons-material/MedicationOutlined';
 import { Autocomplete, Box, IconButton, TextField, Tooltip, Typography } from '@mui/material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Medicine } from '@/types/medicine';
 import { MedicinePickerDialog } from './MedicinePickerDialog';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
+import { formatMedicineDisplayName } from '@shared/medicineCatalog';
 
 interface Props {
   value: string;
@@ -13,9 +14,13 @@ interface Props {
   size?: 'small' | 'medium';
 }
 
+const money = (value: number) =>
+  `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
+
 export function MedicineAutocomplete({ value, onChange, label = 'Medicine', size = 'medium' }: Props) {
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(value);
   const catalogOn = useLicense().can('manageMedicines');
 
   const { data: medicines = [] } = useQuery<Medicine[]>({
@@ -23,6 +28,24 @@ export function MedicineAutocomplete({ value, onChange, label = 'Medicine', size
     queryFn: () => window.clinic.medicines.search(''),
     enabled: catalogOn,
   });
+
+  const selected = useMemo(
+    () => medicines.find((m) => formatMedicineDisplayName(m.name, m.mg) === value) ?? null,
+    [medicines, value],
+  );
+
+  const filtered = useMemo(() => {
+    const q = inputValue.trim().toLowerCase();
+    if (!q) return medicines.slice(0, 50);
+    return medicines.filter((m) => {
+      const labelText = formatMedicineDisplayName(m.name, m.mg).toLowerCase();
+      return labelText.includes(q) || m.name.toLowerCase().includes(q);
+    }).slice(0, 50);
+  }, [medicines, inputValue]);
+
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
 
   if (!catalogOn) {
     return (
@@ -35,25 +58,43 @@ export function MedicineAutocomplete({ value, onChange, label = 'Medicine', size
     );
   }
 
-  const selected = medicines.find((m) => m.name === value) ?? null;
-
   return (
     <>
       <Autocomplete
-        options={medicines}
-        getOptionLabel={(m) => m.name}
+        freeSolo
+        options={filtered}
+        getOptionLabel={(m) => (typeof m === 'string' ? m : formatMedicineDisplayName(m.name, m.mg))}
         value={selected}
-        onChange={(_, med) => {
-          if (med) onChange(med.name, Number(med.price));
-          else onChange('', 0);
+        inputValue={inputValue}
+        onInputChange={(_, next, reason) => {
+          if (reason === 'reset') return;
+          setInputValue(next);
+          if (reason === 'input') {
+            const match = medicines.find((m) => formatMedicineDisplayName(m.name, m.mg).toLowerCase() === next.trim().toLowerCase());
+            onChange(next, match ? Number(match.price) : 0);
+          }
         }}
+        onChange={(_, med) => {
+          if (typeof med === 'string') {
+            onChange(med, 0);
+            setInputValue(med);
+          } else if (med) {
+            const labelText = formatMedicineDisplayName(med.name, med.mg);
+            onChange(labelText, Number(med.price));
+            setInputValue(labelText);
+          } else {
+            onChange('', 0);
+            setInputValue('');
+          }
+        }}
+        filterOptions={(x) => x}
         isOptionEqualToValue={(o, v) => o.id === v.id}
         renderOption={(props, m) => (
           <Box component="li" {...props} key={m.id}>
             <Box sx={{ flex: 1 }}>
-              <Typography fontSize={13.5}>{m.name}</Typography>
+              <Typography fontSize={13.5}>{formatMedicineDisplayName(m.name, m.mg)}</Typography>
               <Typography fontSize={11.5} color="text.secondary">
-                Rs. {Number(m.price).toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                {m.type}{m.mg != null ? ` · ${m.mg}mg` : ''} · {money(m.price)}
               </Typography>
             </Box>
           </Box>
@@ -84,7 +125,9 @@ export function MedicineAutocomplete({ value, onChange, label = 'Medicine', size
         onClose={() => setAddOpen(false)}
         onAdded={(med) => {
           void qc.invalidateQueries({ queryKey: ['medicines'] });
-          onChange(med.name, Number(med.price));
+          const labelText = formatMedicineDisplayName(med.name, med.mg);
+          setInputValue(labelText);
+          onChange(labelText, Number(med.price));
         }}
       />
     </>

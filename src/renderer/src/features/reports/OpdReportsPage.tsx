@@ -21,7 +21,8 @@ import {
   Typography,
 } from '@mui/material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { DateRangePickerField } from '@/components/DateRangePickerField';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -66,15 +67,6 @@ function todayYmd(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-function parseYmd(value: string): Date {
-  const [y, m, d] = value.split('-').map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
-}
-
-function toYmd(value: Date): string {
-  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-}
-
 function money(value: number): string {
   return `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
 }
@@ -101,10 +93,20 @@ function DoctorCell({
   );
 }
 
+function formatShortYmd(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1).toLocaleDateString([], { day: 'numeric', month: 'short' });
+}
+
+function formatInvoiceWhen(iso: string): string {
+  return new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' });
+}
+
 export function OpdReportsPage(): React.JSX.Element {
   const theme = useTheme();
   const navigate = useNavigate();
-  const [date, setDate] = useState(todayYmd);
+  const [dateFrom, setDateFrom] = useState(todayYmd);
+  const [dateTo, setDateTo] = useState(todayYmd);
   const [doctorId, setDoctorId] = useState('');
   const [tab, setTab] = useState<'invoices' | 'fees'>('invoices');
   const [search, setSearch] = useState('');
@@ -124,11 +126,14 @@ export function OpdReportsPage(): React.JSX.Element {
     return map;
   }, [doctorList]);
 
+  const isRange = dateFrom !== dateTo;
+
   const report = useQuery({
-    queryKey: ['reports:opd', date, doctorId],
+    queryKey: ['reports:opd', dateFrom, dateTo, doctorId],
     queryFn: () =>
       reportsService.opd({
-        date,
+        dateFrom,
+        dateTo,
         ...(doctorId ? { doctorId } : {}),
       }),
   });
@@ -182,19 +187,17 @@ export function OpdReportsPage(): React.JSX.Element {
               OPD Reports
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Invoices and doctor consultation fees for a day. Pick a doctor if they ask for their hisaab.
+              Invoices and doctor consultation fees for a day or date range. Pick a doctor if they ask for their hisaab.
             </Typography>
           </Box>
           <Stack direction="row" gap={1.5} alignItems="center" flexWrap="wrap">
             <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <DatePicker
-                value={parseYmd(date)}
-                onChange={(value) => setDate(value ? toYmd(value) : todayYmd())}
-                slotProps={{
-                  textField: {
-                    size: 'small',
-                    sx: { width: 168 },
-                  },
+              <DateRangePickerField
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                onChange={(from, to) => {
+                  setDateFrom(from);
+                  setDateTo(to);
                 }}
               />
             </LocalizationProvider>
@@ -350,6 +353,7 @@ export function OpdReportsPage(): React.JSX.Element {
               <Table stickyHeader sx={{ borderCollapse: 'separate', borderSpacing: '0 6px' }}>
                 <TableHead sx={tableSx.head}>
                   <TableRow>
+                    {isRange ? <TableCell>Date</TableCell> : null}
                     <TableCell>Invoice</TableCell>
                     <TableCell>Patient</TableCell>
                     <TableCell>Doctor</TableCell>
@@ -361,11 +365,11 @@ export function OpdReportsPage(): React.JSX.Element {
                 </TableHead>
                 <TableBody>
                   {report.isLoading ? (
-                    <TableRowsSkeleton cols={7} />
+                    <TableRowsSkeleton cols={isRange ? 8 : 7} />
                   ) : invoiceRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>
-                        No invoices for this day.
+                      <TableCell colSpan={isRange ? 8 : 7} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>
+                        No invoices for this period.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -378,6 +382,7 @@ export function OpdReportsPage(): React.JSX.Element {
                           sx={{ ...tableSx.row, cursor: 'pointer' }}
                           onClick={() => navigate(`/opd-reports/invoices/${row.id}`, { state: { from: detailFrom } })}
                         >
+                          {isRange ? <TableCell>{formatInvoiceWhen(row.createdAt)}</TableCell> : null}
                           <TableCell><Typography fontSize={13.5} fontWeight={600}>{row.invoiceNumber}</Typography></TableCell>
                           <TableCell>{row.patientName}</TableCell>
                           <TableCell>
@@ -405,6 +410,7 @@ export function OpdReportsPage(): React.JSX.Element {
               <Table stickyHeader sx={{ borderCollapse: 'separate', borderSpacing: '0 6px' }}>
                 <TableHead sx={tableSx.head}>
                   <TableRow>
+                    {isRange ? <TableCell>Date</TableCell> : null}
                     <TableCell>Token</TableCell>
                     <TableCell>Patient</TableCell>
                     <TableCell>Doctor</TableCell>
@@ -417,11 +423,11 @@ export function OpdReportsPage(): React.JSX.Element {
                 </TableHead>
                 <TableBody>
                   {report.isLoading ? (
-                    <TableRowsSkeleton cols={8} />
+                    <TableRowsSkeleton cols={isRange ? 9 : 8} />
                   ) : feeRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>
-                        No doctor fees for this day.
+                      <TableCell colSpan={isRange ? 9 : 8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>
+                        No doctor fees for this period.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -434,6 +440,7 @@ export function OpdReportsPage(): React.JSX.Element {
                           sx={{ ...tableSx.row, cursor: 'pointer' }}
                           onClick={() => navigate(`/opd-reports/fees/${row.id}`, { state: { from: detailFrom } })}
                         >
+                          {isRange ? <TableCell>{formatShortYmd(row.date)}</TableCell> : null}
                           <TableCell><Typography fontSize={13.5} fontWeight={600}>{String(row.tokenNumber).padStart(3, '0')}</Typography></TableCell>
                           <TableCell>{row.patientName}</TableCell>
                           <TableCell>

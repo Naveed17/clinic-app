@@ -20,6 +20,7 @@ import {
 } from '@/components/DialogUI';
 import { ListCardsSkeleton } from '@/components/LoadingUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
+import { GenderRadioGroup } from '@/components/GenderRadioGroup';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
 import { alpha, useTheme } from '@mui/material/styles';
@@ -69,11 +70,32 @@ const patientSchema = z.object({
   firstName: z.string().trim().min(1, 'Required'),
   lastName: z.string().trim().min(1, 'Required'),
   phone: z.string().trim(),
-  dateOfBirth: z.string(),
+  age: z.string(),
+  gender: z.string(),
   address: z.string().trim(),
 });
 type PatientForm = z.infer<typeof patientSchema>;
-const patientDefaults: PatientForm = { firstName: '', lastName: '', phone: '', dateOfBirth: '', address: '' };
+const patientDefaults: PatientForm = { firstName: '', lastName: '', phone: '', age: '', gender: '', address: '' };
+
+const VISIT_REASONS = ['Checkup', 'Follow-up', 'Urgent', 'Consultation', 'Vaccination', 'Free'] as const;
+
+function walkInPatientInput(values: PatientForm): PatientInput {
+  const ageNum = values.age.trim() ? parseInt(values.age, 10) : null;
+  return {
+    firstName: values.firstName,
+    lastName: values.lastName,
+    phone: values.phone || null,
+    age: Number.isFinite(ageNum) ? ageNum : null,
+    gender: values.gender || null,
+    email: null,
+    address: values.address || null,
+    emergencyContactName: null,
+    emergencyContactPhone: null,
+    bloodGroup: null,
+    allergies: null,
+    chronicConditions: null,
+  };
+}
 
 /* ── Merged Walk-in Modal ── */
 const STEPS = ['Register Patient', 'Issue Token', 'Print Token'];
@@ -125,9 +147,14 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
 
   useEffect(() => {
     if (!open || !selectedDoctor) return;
+    if (reason === 'Free') {
+      setConsultationFee('0');
+      setFeeDiscount('');
+      return;
+    }
     setConsultationFee(String(Number(selectedDoctor.consultationFee ?? 0)));
     setFeeDiscount('');
-  }, [open, selectedDoctor]);
+  }, [open, selectedDoctor, reason]);
   const { data: weekVisits } = useQuery({
     queryKey: ['token-week-visits', patientId, doctorId, todayStr],
     queryFn: () =>
@@ -136,12 +163,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   });
 
   const createPatientMutation = useMutation({
-    mutationFn: (values: PatientForm) => patientsService.create({
-      firstName: values.firstName, lastName: values.lastName,
-      phone: values.phone || null, dateOfBirth: values.dateOfBirth || null,
-      email: null, address: values.address || null, emergencyContactName: null,
-      emergencyContactPhone: null, bloodGroup: null, allergies: null, chronicConditions: null,
-    } as PatientInput),
+    mutationFn: (values: PatientForm) => patientsService.create(walkInPatientInput(values)),
     onSuccess: async (patient) => {
       await qc.invalidateQueries({ queryKey: ['patients'] });
       await qc.invalidateQueries({ queryKey: ['token-patients'] });
@@ -228,27 +250,28 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             ) : (
               <Box component="form" id="patient-form" onSubmit={form.handleSubmit((v) => createPatientMutation.mutate(v))}>
                 <Stack spacing={2}>
-                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
-                    <TextField label="First name" autoFocus error={!!form.formState.errors.firstName} helperText={form.formState.errors.firstName?.message} {...form.register('firstName')} />
-                    <TextField label="Last name" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
-                  </Box>
                   <Controller
-                    name="phone"
+                    name="gender"
                     control={form.control}
                     render={({ field }) => (
-                      <PhoneInputField label="Phone (optional)" value={field.value ?? ''} onChange={field.onChange} />
+                      <GenderRadioGroup value={field.value} onChange={field.onChange} optional />
                     )}
                   />
+                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
+                    <TextField label="First name" error={!!form.formState.errors.firstName} helperText={form.formState.errors.firstName?.message} {...form.register('firstName')} />
+                    <TextField label="Last name" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
+                  </Box>
+                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '110px minmax(0, 1fr)' }, alignItems: 'start' }}>
+                    <TextField label="Age (optional)" type="number" slotProps={{ htmlInput: { min: 0, max: 150 } }} {...form.register('age')} />
+                    <Controller
+                      name="phone"
+                      control={form.control}
+                      render={({ field }) => (
+                        <PhoneInputField label="Phone (optional)" value={field.value ?? ''} onChange={field.onChange} />
+                      )}
+                    />
+                  </Box>
                   <TextField label="Address (optional)" {...form.register('address')} />
-                  <LocalizationProvider dateAdapter={AdapterDateFns}>
-                    <Controller name="dateOfBirth" control={form.control} render={({ field }) => (
-                      <DatePicker label="Date of birth (optional)"
-                        value={field.value ? new Date(field.value) : null}
-                        onChange={(v) => field.onChange(v ? v.toISOString().slice(0, 10) : '')}
-                        slotProps={{ textField: { fullWidth: true } }}
-                      />
-                    )} />
-                  </LocalizationProvider>
                 </Stack>
               </Box>
             )}
@@ -317,11 +340,25 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             />
             <FormControl fullWidth>
               <InputLabel>Reason (optional)</InputLabel>
-              <Select label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)}>
+              <Select
+                label="Reason (optional)"
+                value={reason}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setReason(next);
+                  if (next === 'Free') {
+                    setConsultationFee('0');
+                    setFeeDiscount('');
+                  } else if (selectedDoctor) {
+                    setConsultationFee(String(Number(selectedDoctor.consultationFee ?? 0)));
+                  }
+                }}
+              >
                 <MenuItem value="">— None —</MenuItem>
-                {['Checkup', 'Follow-up', 'Urgent', 'Consultation', ...(showLabReason ? ['Lab Results'] : []), 'Vaccination'].map((r) => (
+                {VISIT_REASONS.map((r) => (
                   <MenuItem key={r} value={r}>{r}</MenuItem>
                 ))}
+                {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
               </Select>
             </FormControl>
           </Stack>
@@ -482,12 +519,7 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
   }, [open, providerId, duration, schedule, doctorAppts]);
 
   const createPatientMutation = useMutation({
-    mutationFn: (values: PatientForm) => patientsService.create({
-      firstName: values.firstName, lastName: values.lastName,
-      phone: values.phone || null, dateOfBirth: values.dateOfBirth || null,
-      email: null, address: values.address || null, emergencyContactName: null,
-      emergencyContactPhone: null, bloodGroup: null, allergies: null, chronicConditions: null,
-    } as PatientInput),
+    mutationFn: (values: PatientForm) => patientsService.create(walkInPatientInput(values)),
     onSuccess: async (patient) => {
       await qc.invalidateQueries({ queryKey: ['patients'] });
       await qc.invalidateQueries({ queryKey: ['token-patients'] });
@@ -562,27 +594,28 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
             ) : (
               <Box component="form" id="book-patient-form" onSubmit={form.handleSubmit((v) => createPatientMutation.mutate(v))}>
                 <Stack spacing={2}>
-                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
-                    <TextField label="First name" autoFocus error={!!form.formState.errors.firstName} helperText={form.formState.errors.firstName?.message} {...form.register('firstName')} />
-                    <TextField label="Last name" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
-                  </Box>
                   <Controller
-                    name="phone"
+                    name="gender"
                     control={form.control}
                     render={({ field }) => (
-                      <PhoneInputField label="Phone (optional)" value={field.value ?? ''} onChange={field.onChange} />
+                      <GenderRadioGroup value={field.value} onChange={field.onChange} optional />
                     )}
                   />
+                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
+                    <TextField label="First name" error={!!form.formState.errors.firstName} helperText={form.formState.errors.firstName?.message} {...form.register('firstName')} />
+                    <TextField label="Last name" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
+                  </Box>
+                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '110px minmax(0, 1fr)' }, alignItems: 'start' }}>
+                    <TextField label="Age (optional)" type="number" slotProps={{ htmlInput: { min: 0, max: 150 } }} {...form.register('age')} />
+                    <Controller
+                      name="phone"
+                      control={form.control}
+                      render={({ field }) => (
+                        <PhoneInputField label="Phone (optional)" value={field.value ?? ''} onChange={field.onChange} />
+                      )}
+                    />
+                  </Box>
                   <TextField label="Address (optional)" {...form.register('address')} />
-                  <LocalizationProvider dateAdapter={AdapterDateFns}>
-                    <Controller name="dateOfBirth" control={form.control} render={({ field }) => (
-                      <DatePicker label="Date of birth (optional)"
-                        value={field.value ? new Date(field.value) : null}
-                        onChange={(v) => field.onChange(v ? v.toISOString().slice(0, 10) : '')}
-                        slotProps={{ textField: { fullWidth: true } }}
-                      />
-                    )} />
-                  </LocalizationProvider>
                 </Stack>
               </Box>
             )}
@@ -722,9 +755,10 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
               <InputLabel>Reason (optional)</InputLabel>
               <Select label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)}>
                 <MenuItem value="">— None —</MenuItem>
-                {['Checkup', 'Follow-up', 'Urgent', 'Consultation', ...(showLabReason ? ['Lab Results'] : []), 'Vaccination'].map((r) => (
+                {VISIT_REASONS.map((r) => (
                   <MenuItem key={r} value={r}>{r}</MenuItem>
                 ))}
+                {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
               </Select>
             </FormControl>
             <TextField label="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} fullWidth multiline minRows={2} />

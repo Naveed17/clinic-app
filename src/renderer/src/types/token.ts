@@ -5,6 +5,8 @@ export interface TokenPerson {
   mrNumber?: string;
   firstName: string;
   lastName: string;
+  gender?: string | null;
+  age?: number | null;
   consultationFee?: number;
   avatar?: string | null;
 }

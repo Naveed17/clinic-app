@@ -9,6 +9,7 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
+  Autocomplete,
   Avatar,
   Box,
   Button,
@@ -29,6 +30,7 @@ import {
   Typography,
   Snackbar,
   Select,
+  createFilterOptions,
 } from '@mui/material';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
@@ -40,20 +42,22 @@ import { z } from 'zod';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { invoicesService } from '@/services/invoices.service';
+import { patientsService } from '@/services/patients.service';
 import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
-import type { Invoice, InvoiceInput, InvoicePerson, Payment } from '@/types/invoice';
+import { GenderRadioGroup } from '@/components/GenderRadioGroup';
+import type { Invoice, InvoiceInput, InvoicePerson, InvoiceUpdateInput, Payment } from '@/types/invoice';
 import { printInvoiceReceipt } from '@/utils/printInvoiceReceipt';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
 import { useAuth } from '@/features/auth/AuthContext';
 
 const statusConfig: Record<string, { label: string; color: 'default' | 'warning' | 'info' | 'success' | 'error' }> = {
-  DRAFT:          { label: 'Draft',    color: 'default' },
-  ISSUED:         { label: 'Issued',   color: 'info' },
-  PARTIALLY_PAID: { label: 'Partial',  color: 'warning' },
-  PAID:           { label: 'Paid',     color: 'success' },
-  REFUNDED:       { label: 'Refunded', color: 'error' },
-  VOID:           { label: 'Void',     color: 'error' },
+  DRAFT: { label: 'Draft', color: 'default' },
+  ISSUED: { label: 'Issued', color: 'info' },
+  PARTIALLY_PAID: { label: 'Partial', color: 'warning' },
+  PAID: { label: 'Paid', color: 'success' },
+  REFUNDED: { label: 'Refunded', color: 'error' },
+  VOID: { label: 'Void', color: 'error' },
 };
 
 const PAYMENT_METHODS = ['CASH', 'CARD', 'BANK_TRANSFER', 'MOBILE_WALLET', 'OTHER'];
@@ -243,7 +247,7 @@ export function PaymentDialog({ invoice, onClose }: { invoice: Invoice; onClose:
 export function RefundDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
   const queryClient = useQueryClient();
   const maxRefund = Math.max(0, Number(invoice.amountPaid ?? 0));
-  const form = useForm({ defaultValues: { amount: maxRefund, method: 'CASH', reason: '' } });
+  const form = useForm({ defaultValues: { amount: 0, method: 'CASH', reason: '' } });
   const mutation = useMutation({
     mutationFn: (v: { amount: number; method: string; reason: string }) =>
       invoicesService.refund(invoice.id, v.amount, v.method, v.reason || undefined),
@@ -265,11 +269,11 @@ export function RefundDialog({ invoice, onClose }: { invoice: Invoice; onClose: 
               <Alert severity="error">{(mutation.error as Error)?.message || 'Failed to record refund.'}</Alert>
             )}
             <Typography variant="body2" color="text.secondary">
-              Paid: <strong>{money(maxRefund)}</strong> — refund cannot exceed this amount.
+              Paid: <strong>{money(maxRefund)}</strong> — enter any amount up to this (partial refunds allowed).
             </Typography>
             <TextField label="Refund amount" type="number" fullWidth
-              slotProps={{ htmlInput: { min: 0, max: maxRefund, step: 'any' } }}
-              {...form.register('amount', { valueAsNumber: true })} />
+              slotProps={{ htmlInput: { min: 0.01, max: maxRefund, step: 'any' } }}
+              {...form.register('amount', { valueAsNumber: true, min: 0.01, max: maxRefund })} />
             <TextField select label="Refund method" fullWidth defaultValue="CASH"
               {...form.register('method')}>
               {PAYMENT_METHODS.map((m) => (
@@ -305,39 +309,147 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 const defaults: FormValues = { patientId: '', discount: 0, notes: '', items: [{ description: '', quantity: 1, unitPrice: 0 }] };
 
+type InvoicePatientOption = InvoicePerson & { mrNumber?: string; inputLabel?: string };
+
+const filterPatients = createFilterOptions<InvoicePatientOption>({
+  stringify: (p) => `${p.firstName} ${p.lastName} ${p.mrNumber ?? ''} ${p.phone ?? ''}`,
+});
+
+const ADD_NEW = '__add_new__';
+const WALK_IN = '__walk_in__';
+
 export function InvoiceDialog({
   open,
   onClose,
   onCreated,
+  onUpdated,
   initialValues,
   tokenId,
+  invoice,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated?: (invoice: Invoice) => void;
+  onUpdated?: (invoice: Invoice) => void;
   initialValues?: Partial<FormValues>;
   /** When set, invoice create links & dispenses the pharmacy Rx. */
   tokenId?: string | null;
+  /** When set, edit an existing invoice instead of creating. */
+  invoice?: Invoice | null;
 }): React.JSX.Element {
+  const isEdit = Boolean(invoice);
   const client = useQueryClient();
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: defaults });
   const fields = useFieldArray({ control: form.control, name: 'items' });
   const patients = useQuery({ queryKey: ['invoice-patients'], queryFn: invoicesService.patients });
-  const mutation = useMutation({
+  const [patientInput, setPatientInput] = useState('');
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickFirst, setQuickFirst] = useState('');
+  const [quickLast, setQuickLast] = useState('');
+  const [quickAge, setQuickAge] = useState('');
+  const [quickGender, setQuickGender] = useState('');
+  const [quickError, setQuickError] = useState('');
+
+  const createMutation = useMutation({
     mutationFn: (values: FormValues) =>
       invoicesService.create({
         ...values,
         tokenId: tokenId || undefined,
       } as InvoiceInput),
-    onSuccess: async (invoice) => {
+    onSuccess: async (created) => {
       await client.invalidateQueries({ queryKey: ['invoices'] });
       onClose();
-      onCreated?.(invoice as Invoice);
+      onCreated?.(created as Invoice);
     },
     meta: { toast: 'Invoice created', errorToast: 'Unable to create the invoice.' },
   });
+
+  const updateMutation = useMutation({
+    mutationFn: (values: FormValues) =>
+      invoicesService.update(invoice!.id, {
+        discount: values.discount,
+        notes: values.notes || null,
+        items: values.items,
+      } as InvoiceUpdateInput),
+    onSuccess: async (updated) => {
+      await client.invalidateQueries({ queryKey: ['invoices'] });
+      await client.invalidateQueries({ queryKey: ['invoice', invoice!.id] });
+      onClose();
+      onUpdated?.(updated as Invoice);
+    },
+    meta: { toast: 'Invoice updated', errorToast: 'Unable to update the invoice.' },
+  });
+
+  const quickPatientMutation = useMutation({
+    mutationFn: (input: { firstName: string; lastName: string; age?: string; gender?: string }) =>
+      patientsService.create({
+        firstName: input.firstName,
+        lastName: input.lastName,
+        age: input.age?.trim() ? parseInt(input.age, 10) : null,
+        gender: input.gender || null,
+        phone: null,
+        email: null,
+        address: null,
+        emergencyContactName: null,
+        emergencyContactPhone: null,
+        bloodGroup: null,
+        allergies: null,
+        chronicConditions: null,
+      }),
+    onSuccess: async (patient) => {
+      await client.invalidateQueries({ queryKey: ['invoice-patients'] });
+      await client.invalidateQueries({ queryKey: ['patients'] });
+      form.setValue('patientId', patient.id);
+      setQuickAddOpen(false);
+      setQuickFirst('');
+      setQuickLast('');
+      setQuickAge('');
+      setQuickGender('');
+      setQuickError('');
+    },
+    onError: (err) => setQuickError(err instanceof Error ? err.message : 'Could not add patient.'),
+  });
+
+  const walkInMutation = useMutation({
+    mutationFn: () => {
+      const suffix = String(Math.floor(Math.random() * 900) + 100);
+      return patientsService.create({
+        firstName: 'Walk-in',
+        lastName: `Patient ${suffix}`,
+        phone: null,
+        email: null,
+        address: null,
+        emergencyContactName: null,
+        emergencyContactPhone: null,
+        bloodGroup: null,
+        allergies: null,
+        chronicConditions: null,
+      });
+    },
+    onSuccess: async (patient) => {
+      await client.invalidateQueries({ queryKey: ['invoice-patients'] });
+      form.setValue('patientId', patient.id);
+    },
+    meta: { toast: 'Walk-in patient added', errorToast: 'Could not add walk-in patient.' },
+  });
+
   useEffect(() => {
     if (!open) return;
+    if (invoice) {
+      form.reset({
+        patientId: invoice.patient.id,
+        discount: Number(invoice.discount) || 0,
+        notes: invoice.notes ?? '',
+        items: invoice.items.length > 0
+          ? invoice.items.map((item) => ({
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: Number(item.unitPrice),
+          }))
+          : defaults.items,
+      });
+      return;
+    }
     form.reset({
       ...defaults,
       ...initialValues,
@@ -346,64 +458,175 @@ export function InvoiceDialog({
           ? initialValues.items
           : defaults.items,
     });
-  }, [form, open, initialValues]);
+  }, [form, open, initialValues, invoice]);
+
+  const patientOptions = (patients.data ?? []) as InvoicePatientOption[];
+  const selectedPatientId = form.watch('patientId');
+  const selectedPatient = patientOptions.find((p) => p.id === selectedPatientId) ?? null;
   const items = form.watch('items');
   const discount = form.watch('discount');
   const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
   const total = Math.max(0, subtotal - (Number(discount) || 0));
   const errors = form.formState.errors;
+  const mutation = isEdit ? updateMutation : createMutation;
+
+  const autocompleteOptions: InvoicePatientOption[] = [
+    { id: WALK_IN, firstName: '+ Quick walk-in patient', lastName: '', inputLabel: '+ Quick walk-in patient' },
+    { id: ADD_NEW, firstName: '+ Add new patient…', lastName: '', inputLabel: '+ Add new patient…' },
+    ...patientOptions,
+  ];
 
   return (
     <>
-    <Dialog fullWidth maxWidth="md" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
-      <FormDialogTitle title="Create Invoice" subtitle="Bill a patient for medicines and services." />
-      <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))} sx={dialogFormSx}>
-        <DialogContent sx={dialogContentSx}>
-          <Stack spacing={2.5}>
-            {mutation.isError && <Alert severity="error">{mutation.error instanceof Error ? mutation.error.message : 'Unable to create the invoice.'}</Alert>}
-            <TextField select fullWidth label="Patient" error={Boolean(errors.patientId)} helperText={errors.patientId?.message} {...form.register('patientId')}>
-              {(patients.data ?? []).map((patient) => (
-                <MenuItem key={patient.id} value={patient.id}>{personLabel(patient)}</MenuItem>
-              ))}
-            </TextField>
-            <Typography fontWeight={700} variant="subtitle2">Items</Typography>
-            {fields.fields.map((field, index) => (
-              <Box key={field.id} sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) 90px 120px 40px' } }}>
-                <MedicineAutocomplete
-                  label="Description / Medicine"
-                  value={form.watch(`items.${index}.description`)}
-                  onChange={(name, price) => {
-                    form.setValue(`items.${index}.description`, name);
-                    form.setValue(`items.${index}.unitPrice`, price);
-                  }}
+      <Dialog fullWidth maxWidth="md" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
+        <FormDialogTitle
+          title={isEdit ? `Edit Invoice — ${invoice?.invoiceNumber ?? ''}` : 'Create Invoice'}
+          subtitle={isEdit ? 'Update medicines and adjust the bill total.' : 'Bill a patient for medicines and services.'}
+        />
+        <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))} sx={dialogFormSx}>
+          <DialogContent sx={dialogContentSx}>
+            <Stack spacing={2.5}>
+              {mutation.isError && <Alert severity="error">{mutation.error instanceof Error ? mutation.error.message : `Unable to ${isEdit ? 'update' : 'create'} the invoice.`}</Alert>}
+              {isEdit ? (
+                <TextField
+                  fullWidth
+                  label="Patient"
+                  value={personLabel(invoice!.patient)}
+                  disabled
                 />
-                <TextField label="Qty" type="number" slotProps={{ htmlInput: { min: 1, step: 1 } }} {...form.register(`items.${index}.quantity`, { valueAsNumber: true })} />
-                <TextField label="Unit price" type="number" slotProps={{ htmlInput: { min: 0, step: 'any' } }} {...form.register(`items.${index}.unitPrice`, { valueAsNumber: true })} />
-                <IconButton aria-label="Remove item" disabled={fields.fields.length === 1} onClick={() => fields.remove(index)}>
-                  <DeleteOutlineIcon />
-                </IconButton>
+              ) : (
+                <Autocomplete
+                  options={autocompleteOptions}
+                  filterOptions={(opts, state) => {
+                    const filtered = filterPatients(opts.filter((o) => o.id !== ADD_NEW && o.id !== WALK_IN), state);
+                    return [
+                      opts.find((o) => o.id === WALK_IN)!,
+                      opts.find((o) => o.id === ADD_NEW)!,
+                      ...filtered,
+                    ];
+                  }}
+                  getOptionLabel={(p) => p.inputLabel ?? personLabel(p)}
+                  value={selectedPatient}
+                  inputValue={patientInput}
+                  onInputChange={(_, value, reason) => {
+                    if (reason === 'input') setPatientInput(value);
+                  }}
+                  onChange={(_, option) => {
+                    if (!option) {
+                      form.setValue('patientId', '');
+                      return;
+                    }
+                    if (option.id === ADD_NEW) {
+                      const parts = patientInput.trim().split(/\s+/);
+                      setQuickFirst(parts[0] ?? '');
+                      setQuickLast(parts.slice(1).join(' ') || 'Patient');
+                      setQuickAddOpen(true);
+                      return;
+                    }
+                    if (option.id === WALK_IN) {
+                      walkInMutation.mutate();
+                      return;
+                    }
+                    form.setValue('patientId', option.id);
+                    setPatientInput(personLabel(option));
+                  }}
+                  isOptionEqualToValue={(o, v) => o.id === v.id}
+                  renderOption={(props, option) => (
+                    <Box component="li" {...props} key={option.id}>
+                      {option.id === ADD_NEW || option.id === WALK_IN ? (
+                        <Typography fontSize={13.5} fontWeight={700} color="primary.main">{option.inputLabel}</Typography>
+                      ) : (
+                        <Box>
+                          <Typography fontSize={13.5} fontWeight={600}>{personLabel(option)}</Typography>
+                          <Typography fontSize={11.5} color="text.secondary">
+                            {[option.mrNumber, option.phone].filter(Boolean).join(' · ') || '—'}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Patient"
+                      error={Boolean(errors.patientId)}
+                      helperText={errors.patientId?.message ?? 'Type to search, or add a walk-in patient'}
+                    />
+                  )}
+                />
+              )}
+              <Typography fontWeight={700} variant="subtitle2">Items</Typography>
+              {fields.fields.map((field, index) => {
+                const qty = Number(form.watch(`items.${index}.quantity`)) || 0;
+                const price = Number(form.watch(`items.${index}.unitPrice`)) || 0;
+                const lineTotal = qty * price;
+                return (
+                  <Box key={field.id} sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) 80px 95px 70px 40px' }, alignItems: 'center' }}>
+                    <MedicineAutocomplete
+                      label="Description / Medicine"
+                      value={form.watch(`items.${index}.description`)}
+                      onChange={(name, medPrice) => {
+                        form.setValue(`items.${index}.description`, name);
+                        form.setValue(`items.${index}.unitPrice`, medPrice);
+                      }}
+                    />
+                    <TextField label="Qty" type="number" slotProps={{ htmlInput: { min: 1, step: 1 } }} {...form.register(`items.${index}.quantity`, { valueAsNumber: true })} />
+                    <TextField label="Unit price" type="number" slotProps={{ htmlInput: { min: 0, step: 'any' } }} {...form.register(`items.${index}.unitPrice`, { valueAsNumber: true })} />
+                    <Typography variant='subtitle1' fontWeight={700} textAlign="center" color="text.secondary">
+                      {money(lineTotal)}
+                    </Typography>
+                    <IconButton aria-label="Remove item" disabled={fields.fields.length === 1} onClick={() => fields.remove(index)}>
+                      <DeleteOutlineIcon />
+                    </IconButton>
+                  </Box>
+                );
+              })}
+              <Button onClick={() => fields.append({ description: '', quantity: 1, unitPrice: 0 })} startIcon={<AddOutlinedIcon />} sx={{ alignSelf: 'flex-start' }}>
+                Add item
+              </Button>
+              <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+                <TextField label="Discount" type="number" slotProps={{ htmlInput: { min: 0, step: 'any' } }} {...form.register('discount', { valueAsNumber: true })} />
+                <TextField label="Notes" {...form.register('notes')} />
               </Box>
-            ))}
-            <Button onClick={() => fields.append({ description: '', quantity: 1, unitPrice: 0 })} startIcon={<AddOutlinedIcon />} sx={{ alignSelf: 'flex-start' }}>
-              Add item
-            </Button>
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-              <TextField label="Discount" type="number" slotProps={{ htmlInput: { min: 0, step: 'any' } }} {...form.register('discount', { valueAsNumber: true })} />
-              <TextField label="Notes" {...form.register('notes')} />
+              <Paper variant="outlined" sx={{ p: 2, textAlign: 'right' }}>
+                <Typography color="text.secondary" variant="body2">Subtotal (medicines): {money(subtotal)}</Typography>
+                <Typography color="text.secondary" variant="body2">Discount: {money(Number(discount) || 0)}</Typography>
+                <Typography fontWeight={700} sx={{ mt: 0.5 }}>Total: {money(total)}</Typography>
+              </Paper>
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={dialogActionsSx}>
+            <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
+            <SubmitButton type="submit" loading={mutation.isPending}>
+              {isEdit ? 'Save changes' : 'Create invoice'}
+            </SubmitButton>
+          </DialogActions>
+        </Box>
+      </Dialog>
+      <Dialog open={quickAddOpen} onClose={() => setQuickAddOpen(false)} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
+        <FormDialogTitle title="Add patient" subtitle="Quick-register a patient for this invoice." />
+        <DialogContent sx={dialogContentSx}>
+          <Stack spacing={2}>
+            {quickError && <Alert severity="error">{quickError}</Alert>}
+            <GenderRadioGroup value={quickGender} onChange={setQuickGender} optional />
+            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
+              <TextField label="First name" fullWidth value={quickFirst} onChange={(e) => setQuickFirst(e.target.value)} />
+              <TextField label="Last name" fullWidth value={quickLast} onChange={(e) => setQuickLast(e.target.value)} />
             </Box>
-            <Paper variant="outlined" sx={{ p: 2, textAlign: 'right' }}>
-              <Typography color="text.secondary" variant="body2">Subtotal (medicines): {money(subtotal)}</Typography>
-              <Typography color="text.secondary" variant="body2">Discount: {money(Number(discount) || 0)}</Typography>
-              <Typography fontWeight={700} sx={{ mt: 0.5 }}>Total: {money(total)}</Typography>
-            </Paper>
+            <TextField label="Age" type="number" value={quickAge} onChange={(e) => setQuickAge(e.target.value)} slotProps={{ htmlInput: { min: 0, max: 150 } }} sx={{ maxWidth: 110 }} />
           </Stack>
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
-          <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
-          <SubmitButton type="submit" loading={mutation.isPending}>Create invoice</SubmitButton>
+          <Button onClick={() => setQuickAddOpen(false)} sx={dialogCancelBtnSx}>Cancel</Button>
+          <SubmitButton
+            loading={quickPatientMutation.isPending}
+            disabled={!quickFirst.trim() || !quickLast.trim()}
+            onClick={() => quickPatientMutation.mutate({ firstName: quickFirst.trim(), lastName: quickLast.trim(), age: quickAge, gender: quickGender })}
+          >
+            Add patient
+          </SubmitButton>
         </DialogActions>
-      </Box>
-    </Dialog>
+      </Dialog>
     </>
   );
 }
@@ -519,8 +742,11 @@ export function InvoicesPage(): React.JSX.Element {
             paginated.map((invoice) => {
               const cfg = statusConfig[invoice.status] ?? { label: invoice.status, color: 'default' as const };
               const isVoid = invoice.status === 'VOID';
-              const canPay = !isAdmin && !isVoid && invoice.status !== 'PAID' && invoice.status !== 'REFUNDED';
-              const canRefund = !isAdmin && !isVoid && Number(invoice.amountPaid ?? 0) > 0;
+              const paid = Number(invoice.amountPaid ?? 0);
+              const total = Number(invoice.total);
+              const balance = Math.max(0, total - paid);
+              const canPay = !isAdmin && !isVoid && invoice.status !== 'PAID' && invoice.status !== 'REFUNDED' && balance > 0;
+              const canRefund = !isAdmin && !isVoid && paid > 0;
               return (
                 <TableRow
                   key={invoice.id}

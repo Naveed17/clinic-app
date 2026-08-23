@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Server as SocketIOServer } from 'socket.io';
-import { createInvoice, invoicePatients, listInvoices, getInvoice, addPayment, refundPayment, voidInvoice, deleteInvoice, getPayments } from '../../invoices/invoice.service';
-import type { InvoiceInput } from '../../invoices/invoice.service';
+import { createInvoice, invoicePatients, listInvoices, getInvoice, addPayment, refundPayment, voidInvoice, deleteInvoice, getPayments, updateInvoice } from '../../invoices/invoice.service';
+import type { InvoiceInput, InvoiceUpdateInput } from '../../invoices/invoice.service';
 import { asyncHandler } from '../utils/async-handler';
 import { requireRole } from '../middleware/auth';
 import { emitNotification, emitDataChange } from '../realtime';
@@ -51,6 +51,22 @@ export function createInvoicesRouter(io: SocketIOServer): Router {
       });
       emitDataChange(io, 'invoice', 'created');
       res.status(201).json(invoice);
+    }),
+  );
+
+  router.put(
+    '/:id',
+    requireRole(['admin', 'receptionist', 'pharmacist']),
+    asyncHandler(async (req, res) => {
+      const invoice = await updateInvoice(String(req.params.id), req.body as InvoiceUpdateInput);
+      emitNotification(io, {
+        kind: 'success',
+        title: 'Invoice updated',
+        message: `Invoice ${invoice.invoiceNumber} was updated.`,
+        payload: { entity: 'invoice', id: invoice.id },
+      });
+      emitDataChange(io, 'invoice', 'updated');
+      res.json(invoice);
     }),
   );
 

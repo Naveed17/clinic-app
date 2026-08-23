@@ -13,6 +13,7 @@ export interface InvoicePerson {
   firstName: string;
   lastName: string;
   phone?: string | null;
+  mrNumber?: string | null;
 }
 export interface InvoiceItem {
   id: string;
@@ -40,4 +41,9 @@ export interface InvoiceInput {
   notes?: string | null;
   items: Array<{ description: string; quantity: number; unitPrice: number }>;
   tokenId?: string | null;
+}
+export interface InvoiceUpdateInput {
+  discount: number;
+  notes?: string | null;
+  items: Array<{ description: string; quantity: number; unitPrice: number }>;
 }

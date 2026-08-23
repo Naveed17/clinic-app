@@ -11,9 +11,7 @@ import {
   DialogActions,
   DialogContent,
   IconButton,
-  InputAdornment,
   Stack,
-  TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -43,6 +41,9 @@ import {
 } from '@/components/TableUI';
 import { medicinesService } from '@/services/medicines.service';
 import type { Medicine } from '@/types/medicine';
+import { MedicineCatalogFormFields, medicineCatalogLabel } from '@/components/MedicineCatalogFormFields';
+import { medicineTypeUsesMg } from '@shared/medicineTypes';
+import { findCatalogDuplicate } from '@shared/medicineCatalog';
 
 const money = (value: number) =>
   `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
@@ -67,11 +68,14 @@ export function MedicinesPage(): React.JSX.Element {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return medicines;
-    return medicines.filter((m) => m.name.toLowerCase().includes(q));
+    return medicines.filter((m) => {
+      const label = medicineCatalogLabel(m).toLowerCase();
+      return label.includes(q) || m.name.toLowerCase().includes(q) || m.type.toLowerCase().includes(q);
+    });
   }, [medicines, search]);
 
   const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-  const cols = canManage ? 4 : 3;
+  const cols = canManage ? 6 : 5;
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => medicinesService.delete(id),
@@ -122,6 +126,8 @@ export function MedicinesPage(): React.JSX.Element {
         <TableHead sx={tableSx.head}>
           <TableRow>
             <TableCell>Medicine</TableCell>
+            <TableCell>Type</TableCell>
+            <TableCell>Strength</TableCell>
             <TableCell>Price</TableCell>
             <TableCell>Updated</TableCell>
             {canManage && <TableCell align="right">Actions</TableCell>}
@@ -144,8 +150,14 @@ export function MedicinesPage(): React.JSX.Element {
                     <Avatar sx={{ width: 34, height: 34, bgcolor: 'primary.main', fontSize: 16 }}>
                       <MedicationOutlinedIcon fontSize="small" />
                     </Avatar>
-                    <Typography fontSize={13.5} fontWeight={600}>{med.name}</Typography>
+                    <Typography fontSize={13.5} fontWeight={600}>{medicineCatalogLabel(med)}</Typography>
                   </Box>
+                </TableCell>
+                <TableCell>
+                  <Typography fontSize={13} fontWeight={600}>{med.type || 'Tab'}</Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography fontSize={13} fontWeight={600}>{med.mg != null ? `${med.mg} mg` : '—'}</Typography>
                 </TableCell>
                 <TableCell>
                   <Typography fontSize={13.5} fontWeight={600}>{money(med.price)}</Typography>
@@ -191,7 +203,7 @@ export function MedicinesPage(): React.JSX.Element {
       <ConfirmDialog
         open={Boolean(deleteMed)}
         title="Delete medicine?"
-        message={deleteMed ? `Delete ${deleteMed.name} from the catalog? Existing invoices keep their billed items.` : ''}
+        message={deleteMed ? `Delete ${medicineCatalogLabel(deleteMed)} from the catalog? Existing invoices keep their billed items.` : ''}
         loading={deleteMutation.isPending}
         error={deleteMutation.isError ? <Alert severity="error" sx={{ mt: 2 }}>Unable to delete this medicine.</Alert> : undefined}
         onClose={() => setDeleteMed(undefined)}
@@ -212,13 +224,23 @@ function MedicineFormDialog({
   const isEdit = Boolean(medicine);
   const [name, setName] = useState(medicine?.name ?? '');
   const [price, setPrice] = useState(medicine ? String(medicine.price) : '');
+  const [type, setType] = useState(medicine?.type ?? 'Tab');
+  const [mg, setMg] = useState(medicine?.mg != null ? String(medicine.mg) : '');
   const [error, setError] = useState('');
+
+  const { data: medicines = [] } = useQuery<Medicine[]>({
+    queryKey: ['medicines'],
+    queryFn: () => medicinesService.list(),
+  });
+
+  const mgNum = medicineTypeUsesMg(type) && mg.trim() ? parseInt(mg, 10) : null;
+  const duplicate = findCatalogDuplicate(medicines, name, mgNum, medicine?.id);
 
   const mutation = useMutation({
     mutationFn: () =>
       isEdit && medicine
-        ? medicinesService.update(medicine.id, name.trim(), parseFloat(price) || 0)
-        : medicinesService.create(name.trim(), parseFloat(price) || 0),
+        ? medicinesService.update(medicine.id, name.trim(), parseFloat(price) || 0, type, mgNum)
+        : medicinesService.create(name.trim(), parseFloat(price) || 0, type, mgNum),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['medicines'] });
       onClose();
@@ -234,36 +256,30 @@ function MedicineFormDialog({
     <Dialog open onClose={onClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
       <FormDialogTitle
         title={isEdit ? 'Edit Medicine' : 'Add New Medicine'}
-        subtitle={isEdit ? 'Update the name or sale price.' : 'Add a medicine to the catalog used on invoices.'}
+        subtitle={isEdit ? 'Update name, strength, type, or sale price.' : 'Search existing medicines or add a new one to the catalog.'}
       />
       <DialogContent sx={dialogContentSx}>
-        <Stack spacing={2} sx={{ mt: 0.5 }}>
-          {error && <Alert severity="error">{error}</Alert>}
-          <TextField
-            label="Medicine name"
-            fullWidth
-            size="small"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
+        <Box sx={{ mt: 0.5 }}>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          <MedicineCatalogFormFields
+            name={name}
+            type={type}
+            mg={mg}
+            price={price}
+            medicines={medicines}
+            excludeId={medicine?.id}
+            onNameChange={setName}
+            onTypeChange={setType}
+            onMgChange={setMg}
+            onPriceChange={setPrice}
           />
-          <TextField
-            label="Price"
-            size="small"
-            type="number"
-            fullWidth
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            InputProps={{ startAdornment: <InputAdornment position="start">Rs.</InputAdornment> }}
-            slotProps={{ htmlInput: { min: 0, step: 'any' } }}
-          />
-        </Stack>
+        </Box>
       </DialogContent>
       <DialogActions sx={dialogActionsSx}>
         <Button onClick={onClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
         <SubmitButton
           startIcon={isEdit ? <EditOutlinedIcon /> : <AddOutlinedIcon />}
-          disabled={!name.trim()}
+          disabled={!name.trim() || Boolean(duplicate)}
           loading={mutation.isPending}
           onClick={() => mutation.mutate()}
         >

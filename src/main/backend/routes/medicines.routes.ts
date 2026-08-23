@@ -31,12 +31,17 @@ export function createMedicinesRouter(io: SocketIOServer): Router {
     '/',
     writers,
     asyncHandler(async (req, res) => {
-      const { name, price } = req.body as { name?: string; price?: number };
+      const { name, price, type, mg } = req.body as {
+        name?: string;
+        price?: number;
+        type?: string;
+        mg?: number | null;
+      };
       if (!name?.trim()) {
         res.status(400).json({ error: 'name is required' });
         return;
       }
-      const medicine = await createCatalogMedicine(name, Number(price) || 0);
+      const medicine = await createCatalogMedicine(name, Number(price) || 0, type, mg);
       emitDataChange(io, 'medicine', 'created');
       emitNotification(io, {
         kind: 'success',
@@ -63,7 +68,12 @@ export function createMedicinesRouter(io: SocketIOServer): Router {
     '/:id',
     editors,
     asyncHandler(async (req, res) => {
-      const { name, price } = req.body as { name?: string; price?: number };
+      const { name, price, type, mg } = req.body as {
+        name?: string;
+        price?: number;
+        type?: string;
+        mg?: number | null;
+      };
       if (!name?.trim()) {
         res.status(400).json({ error: 'name is required' });
         return;
@@ -72,6 +82,8 @@ export function createMedicinesRouter(io: SocketIOServer): Router {
         req.params['id'] as string,
         name,
         Number(price) || 0,
+        type,
+        mg,
       );
       emitDataChange(io, 'medicine', 'updated');
       emitNotification(io, {

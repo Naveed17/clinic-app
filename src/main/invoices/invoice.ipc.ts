@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { createInvoice, invoicePatients, listInvoices, getInvoice, addPayment, refundPayment, voidInvoice, deleteInvoice, getPayments } from './invoice.service';
+import { createInvoice, invoicePatients, listInvoices, getInvoice, addPayment, refundPayment, voidInvoice, deleteInvoice, getPayments, updateInvoice } from './invoice.service';
 
 export function registerInvoiceIpc(): void {
   ipcMain.handle('invoices:list', () => listInvoices());
@@ -8,6 +8,10 @@ export function registerInvoiceIpc(): void {
   ipcMain.handle('invoices:create', async (_, input) => {
     try { return await createInvoice(input); }
     catch (error) { throw new Error(error instanceof Error ? error.message : 'Unable to create the invoice.'); }
+  });
+  ipcMain.handle('invoices:update', async (_, id: string, input) => {
+    try { return await updateInvoice(id, input); }
+    catch (error) { throw new Error(error instanceof Error ? error.message : 'Unable to update the invoice.'); }
   });
   ipcMain.handle('invoices:add-payment', async (_, invoiceId, amount, method, reference) =>
     addPayment(invoiceId, amount, method, reference),

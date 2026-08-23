@@ -237,6 +237,11 @@ function formatDateLabel(ymd: string): string {
   });
 }
 
+function formatDateRangeLabel(dateFrom: string, dateTo: string): string {
+  if (dateFrom === dateTo) return formatDateLabel(dateFrom);
+  return `${formatDateLabel(dateFrom)} — ${formatDateLabel(dateTo)}`;
+}
+
 function statusLabel(status: string): string {
   const map: Record<string, string> = {
     PARTIALLY_PAID: 'Partial',
@@ -293,7 +298,7 @@ export function OpdReportDocument({
 }): React.JSX.Element {
   const clinicName = (clinic.clinicName || 'Clinic').trim().toUpperCase();
   const doctorLabel = report.doctorName || 'All doctors';
-  const dateLabel = formatDateLabel(report.date);
+  const dateLabel = formatDateRangeLabel(report.dateFrom, report.dateTo);
   const phone = clinic.clinicPhone?.trim() || '';
   const address = clinic.clinicAddress?.trim() || '';
   const copy = reportCopy(section);

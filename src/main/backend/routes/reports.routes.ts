@@ -31,6 +31,8 @@ export function createReportsRouter(): Router {
       res.json(
         await getOpdDailyReport({
           date: String(req.query.date ?? ''),
+          dateFrom: String(req.query.dateFrom ?? ''),
+          dateTo: String(req.query.dateTo ?? ''),
           doctorId: String(req.query.doctorId ?? '').trim() || null,
         }),
       );

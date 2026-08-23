@@ -7,16 +7,18 @@ import {
   DialogActions,
   DialogContent,
   InputAdornment,
-  Stack,
   TextField,
 } from '@mui/material';
 import {
   FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogPaperProps,
 } from '@/components/DialogUI';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { Medicine } from '@/types/medicine';
+import { MedicineCatalogFormFields } from '@/components/MedicineCatalogFormFields';
+import { findCatalogDuplicate } from '@shared/medicineCatalog';
+import { medicineTypeUsesMg } from '@shared/medicineTypes';
 
 interface Props {
   open: boolean;
@@ -28,13 +30,24 @@ export function MedicinePickerDialog({ open, onClose, onAdded }: Props) {
   const qc = useQueryClient();
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
+  const [type, setType] = useState('Tab');
+  const [mg, setMg] = useState('');
   const [error, setError] = useState('');
 
+  const { data: medicines = [] } = useQuery<Medicine[]>({
+    queryKey: ['medicines'],
+    queryFn: () => window.clinic.medicines.search(''),
+    enabled: open,
+  });
+
+  const mgNum = medicineTypeUsesMg(type) && mg.trim() ? parseInt(mg, 10) : null;
+  const existingMatch = findCatalogDuplicate(medicines, name, mgNum);
+
   const mutation = useMutation({
-    mutationFn: () => window.clinic.medicines.create(name.trim(), parseFloat(price) || 0),
+    mutationFn: () => window.clinic.medicines.create(name.trim(), parseFloat(price) || 0, type, mgNum),
     onSuccess: async (med: Medicine) => {
       await qc.invalidateQueries({ queryKey: ['medicines'] });
-      setName(''); setPrice(''); setError('');
+      setName(''); setPrice(''); setType('Tab'); setMg(''); setError('');
       onAdded(med);
       onClose();
     },
@@ -43,41 +56,34 @@ export function MedicinePickerDialog({ open, onClose, onAdded }: Props) {
   });
 
   function handleClose() {
-    setName(''); setPrice(''); setError('');
+    setName(''); setPrice(''); setType('Tab'); setMg(''); setError('');
     onClose();
   }
 
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
-      <FormDialogTitle title="Add New Medicine" subtitle="Quick-add a medicine to the catalog." />
+      <FormDialogTitle title="Add New Medicine" subtitle="Search existing medicines or add a new one." />
       <DialogContent sx={dialogContentSx}>
-        <Stack spacing={2} sx={{ mt: 0.5 }}>
-          {error && <Alert severity="error">{error}</Alert>}
-          <TextField
-            label="Medicine name"
-            fullWidth
-            size="small"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
+        <Box sx={{ mt: 0.5 }}>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          <MedicineCatalogFormFields
+            name={name}
+            type={type}
+            mg={mg}
+            price={price}
+            medicines={medicines}
+            onNameChange={setName}
+            onTypeChange={setType}
+            onMgChange={setMg}
+            onPriceChange={setPrice}
           />
-          <TextField
-            label="Price"
-            size="small"
-            type="number"
-            fullWidth
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            InputProps={{ startAdornment: <InputAdornment position="start">Rs.</InputAdornment> }}
-            slotProps={{ htmlInput: { min: 0, step: 'any' } }}
-          />
-        </Stack>
+        </Box>
       </DialogContent>
       <DialogActions sx={dialogActionsSx}>
         <Button onClick={handleClose} disabled={mutation.isPending} sx={dialogCancelBtnSx}>Cancel</Button>
         <SubmitButton
           startIcon={<AddOutlinedIcon />}
-          disabled={!name.trim()}
+          disabled={!name.trim() || Boolean(existingMatch)}
           loading={mutation.isPending}
           onClick={() => mutation.mutate()}
         >

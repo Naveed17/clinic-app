@@ -120,9 +120,14 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
 
   useEffect(() => {
     if (!open || !selectedDoctor) return;
+    if (reason === 'Free') {
+      setConsultationFee('0');
+      setFeeDiscount('');
+      return;
+    }
     setConsultationFee(String(Number(selectedDoctor.consultationFee ?? 0)));
     setFeeDiscount('');
-  }, [open, selectedDoctor]);
+  }, [open, selectedDoctor, reason]);
   const { data: weekVisits } = useQuery({
     queryKey: ['token-week-visits', patientId, doctorId, date],
     queryFn: () =>
@@ -186,11 +191,18 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
           )}
           <Autocomplete
             options={patients}
-            getOptionLabel={(p) => `${p.firstName} ${p.lastName}`}
+            getOptionLabel={(p) => `${p.firstName} ${p.lastName}${p.mrNumber ? ` (${p.mrNumber})` : ''}`}
             value={selectedPatient}
             onChange={(_, v) => setPatientId(v?.id ?? '')}
             isOptionEqualToValue={(o, v) => o.id === v.id}
-            renderInput={(params) => <TextField {...params} label="Patient" fullWidth />}
+            filterOptions={(opts, state) => {
+              const q = state.inputValue.trim().toLowerCase();
+              if (!q) return opts;
+              return opts.filter((p) =>
+                `${p.firstName} ${p.lastName} ${p.mrNumber ?? ''}`.toLowerCase().includes(q),
+              );
+            }}
+            renderInput={(params) => <TextField {...params} label="Patient" fullWidth helperText="Type to search patient" />}
           />
           <Autocomplete
             options={doctors}
@@ -240,7 +252,20 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
           />
           <FormControl fullWidth>
             <InputLabel>Reason (optional)</InputLabel>
-            <Select label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)}>
+            <Select
+              label="Reason (optional)"
+              value={reason}
+              onChange={(e) => {
+                const next = e.target.value;
+                setReason(next);
+                if (next === 'Free') {
+                  setConsultationFee('0');
+                  setFeeDiscount('');
+                } else if (selectedDoctor) {
+                  setConsultationFee(String(Number(selectedDoctor.consultationFee ?? 0)));
+                }
+              }}
+            >
               <MenuItem value="">— None —</MenuItem>
               <MenuItem value="Checkup">Checkup</MenuItem>
               <MenuItem value="Follow-up">Follow-up</MenuItem>
@@ -248,6 +273,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
               <MenuItem value="Consultation">Consultation</MenuItem>
               {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
               <MenuItem value="Vaccination">Vaccination</MenuItem>
+              <MenuItem value="Free">Free</MenuItem>
             </Select>
           </FormControl>
           <TextField
@@ -388,8 +414,10 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
           <Text style={ts.tokenNum}>{String(token.tokenNumber).padStart(3, '0')}</Text>
         </View>
         <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
-        <View style={ts.row}><Text style={ts.lbl}>Patient</Text><Text style={ts.val}>{token.patient.firstName} {token.patient.lastName}</Text></View>
         {token.patient.mrNumber ? <View style={ts.row}><Text style={ts.lbl}>MR #</Text><Text style={ts.val}>{token.patient.mrNumber}</Text></View> : null}
+        <View style={ts.row}><Text style={ts.lbl}>Patient</Text><Text style={ts.val}>{token.patient.firstName} {token.patient.lastName}</Text></View>
+        {token.patient.age != null ? <View style={ts.row}><Text style={ts.lbl}>Age</Text><Text style={ts.val}>{String(token.patient.age)}</Text></View> : null}
+        {token.patient.gender ? <View style={ts.row}><Text style={ts.lbl}>Gender</Text><Text style={ts.val}>{token.patient.gender}</Text></View> : null}
         <View style={ts.row}><Text style={ts.lbl}>Doctor</Text><Text style={ts.val}>Dr. {token.doctor.firstName} {token.doctor.lastName}</Text></View>
         {Number(token.consultationFee ?? 0) > 0 ? (
           <>
@@ -612,6 +640,8 @@ export function TokenPrintPreview({
   const documentKey = [
     freshToken.id,
     freshToken.tokenNumber,
+    freshToken.patient.age ?? '',
+    freshToken.patient.gender ?? '',
     clinic?.clinicName ?? '',
     clinic?.clinicAddress ?? '',
     clinic?.clinicPhone ?? '',

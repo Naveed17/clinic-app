@@ -4,6 +4,7 @@ import PaymentOutlinedIcon from '@mui/icons-material/PaymentOutlined';
 import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
 import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import ReceiptOutlinedIcon from '@mui/icons-material/ReceiptOutlined';
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
 import {
@@ -27,6 +28,7 @@ import { StatCardsSkeleton, TableRowsSkeleton } from '@/components/LoadingUI';
 import { chipSx, tableSx, Table, TableBody, TableCell, TableHead, TableRow } from '@/components/TableUI';
 import {
   DeleteInvoiceDialog,
+  InvoiceDialog,
   PaymentDialog,
   RefundDialog,
   VoidDialog,
@@ -56,6 +58,7 @@ export function InvoiceDetailPage(): React.JSX.Element {
   const [refundOpen, setRefundOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
 
@@ -141,8 +144,8 @@ export function InvoiceDetailPage(): React.JSX.Element {
   const total = Number(invoice.total);
   const balance = Math.max(0, total - paid);
   const isVoid = invoice.status === 'VOID';
-  const canPay = !isVoid && invoice.status !== 'PAID' && invoice.status !== 'REFUNDED';
-  const canRefund = !isVoid && paid > 0 && invoice.status !== 'REFUNDED';
+  const canPay = !isVoid && invoice.status !== 'PAID' && invoice.status !== 'REFUNDED' && balance > 0;
+  const canRefund = !isVoid && paid > 0;
   const patientLabel = `${invoice.patient.firstName} ${invoice.patient.lastName}`.trim();
   const payments = paymentsQuery.data ?? [];
 
@@ -180,15 +183,7 @@ export function InvoiceDetailPage(): React.JSX.Element {
   return (
     <>
       <Stack spacing={2.5} sx={{ pb: 2 }}>
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: { sm: 'flex-end' },
-            flexDirection: { xs: 'column', sm: 'row' },
-            gap: 2,
-            justifyContent: 'space-between',
-          }}
-        >
+        <Stack spacing={2}>
           <Stack direction="row" alignItems="flex-start" spacing={1.5}>
             <Tooltip title="Back">
               <IconButton
@@ -216,7 +211,7 @@ export function InvoiceDetailPage(): React.JSX.Element {
             </Box>
           </Stack>
 
-          <Stack direction="row" gap={1} flexWrap="wrap">
+          <Stack direction="row" gap={1} justifyContent="flex-end" flexWrap="wrap">
             <Button
               variant="outlined"
               sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
@@ -232,6 +227,16 @@ export function InvoiceDetailPage(): React.JSX.Element {
                 onClick={() => setPaymentOpen(true)}
               >
                 Record payment
+              </Button>
+            )}
+            {!isVoid && (
+              <Button
+                startIcon={<EditOutlinedIcon />}
+                variant="outlined"
+                sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                onClick={() => setEditOpen(true)}
+              >
+                Edit invoice
               </Button>
             )}
             {canRefund && (
@@ -274,7 +279,7 @@ export function InvoiceDetailPage(): React.JSX.Element {
               Delete
             </Button>
           </Stack>
-        </Box>
+        </Stack>
 
         {printError && (
           <Alert severity="error" onClose={() => setPrintError(null)}>
@@ -449,6 +454,17 @@ export function InvoiceDetailPage(): React.JSX.Element {
       </Stack>
 
       {paymentOpen && <PaymentDialog invoice={invoice} onClose={() => setPaymentOpen(false)} />}
+      {editOpen && (
+        <InvoiceDialog
+          open
+          invoice={invoice}
+          onClose={() => setEditOpen(false)}
+          onUpdated={() => {
+            setEditOpen(false);
+            void query.refetch();
+          }}
+        />
+      )}
       {refundOpen && <RefundDialog invoice={invoice} onClose={() => setRefundOpen(false)} />}
       {voidOpen && <VoidDialog invoice={invoice} onClose={() => setVoidOpen(false)} />}
       {deleteOpen && (
