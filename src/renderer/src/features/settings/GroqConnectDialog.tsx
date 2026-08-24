@@ -12,8 +12,8 @@ import {
   dialogPaperProps,
 } from '@/components/DialogUI';
 
-const GROQ_KEYS_URL = 'https://console.groq.com/keys';
-const DEFAULT_MODEL = 'llama-3.1-8b-instant';
+const GEMINI_KEYS_URL = 'https://aistudio.google.com/app/apikey';
+const DEFAULT_MODEL = 'gemini-3.6-flash';
 
 export function GroqConnectDialog({
   open,
@@ -45,7 +45,7 @@ export function GroqConnectDialog({
     e.preventDefault();
     const key = apiKey.trim();
     if (!key) {
-      setError('Paste your Groq API key.');
+      setError('Paste your Gemini API key.');
       return;
     }
     setError(null);
@@ -61,30 +61,31 @@ export function GroqConnectDialog({
       PaperProps={dialogPaperProps}
     >
       <Box component="form" noValidate onSubmit={(e) => void handleSubmit(e)} sx={dialogFormSx}>
-        <FormDialogTitle title="Connect Groq" />
+        <FormDialogTitle title="Connect Gemini AI" />
         <DialogContent sx={dialogContentSx}>
           <Stack spacing={1.5} sx={{ mt: 0.5 }}>
             <Button
               variant="outlined"
+              size="small"
               startIcon={<OpenInNewOutlinedIcon />}
               disabled={connecting}
-              onClick={() => window.open(GROQ_KEYS_URL, '_blank', 'noopener,noreferrer')}
+              onClick={() => window.open(GEMINI_KEYS_URL, '_blank', 'noopener,noreferrer')}
               sx={{ alignSelf: 'flex-start' }}
             >
-              Open Groq Console
+              Open Google AI Studio
             </Button>
             <TextField
-              label="Groq API key"
+              label="Gemini API key"
               size="small"
               fullWidth
               required
               type="password"
               autoComplete="off"
-              placeholder="gsk_..."
+              placeholder="AIzaSy..."
               disabled={connecting}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              helperText="Create a key at console.groq.com/keys, then paste it here."
+              helperText="Create an API key at aistudio.google.com, then paste it here."
             />
             <TextField
               label="Model"

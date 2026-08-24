@@ -38,6 +38,7 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import { alpha } from '@mui/material/styles';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -176,8 +177,25 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
     meta: { silent: true },
   });
   return (
-    <Box sx={{ mt: 1.5, p: 1.5, border: '1px dashed', borderColor: 'warning.main', borderRadius: 2, bgcolor: 'warning.50' }}>
-      <Typography variant="caption" color="warning.dark" fontWeight={600} sx={{ mb: 1, display: 'block' }}>
+    <Box
+      sx={{
+        mt: 1.5,
+        p: 1.5,
+        border: '1px dashed',
+        borderColor: (theme) => (theme.palette.mode === 'dark' ? alpha(theme.palette.warning.main, 0.4) : 'warning.main'),
+        borderRadius: 1,
+        bgcolor: (theme) => (theme.palette.mode === 'dark' ? alpha(theme.palette.warning.main, 0.12) : 'warning.50'),
+      }}
+    >
+      <Typography
+        variant="caption"
+        fontWeight={600}
+        sx={{
+          mb: 1,
+          display: 'block',
+          color: (theme) => (theme.palette.mode === 'dark' ? 'warning.light' : 'warning.dark'),
+        }}
+      >
         No token found — issue one now
       </Typography>
       <TokenFeeFields
@@ -451,49 +469,49 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
               render={({ field }) => {
                 const selected = doctorOptions.find((p) => p.id === field.value) ?? null;
                 return (
-                <Autocomplete
-                  options={doctorOptions}
-                  loading={doctors.isLoading}
-                  value={selected}
-                  isOptionEqualToValue={(option, value) => option.id === value.id}
-                  getOptionLabel={(option) => personLabel(option)}
-                  onChange={(_, value) => field.onChange(value?.id ?? '')}
-                  renderOption={(props, option) => (
-                    <Box component="li" {...props} key={option.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                      <DoctorAvatar src={option.avatar} name={`Dr. ${personLabel(option)}`} size={32} />
-                      <Typography fontSize={13.5} fontWeight={600} sx={{ flex: 1 }} noWrap>
-                        {personLabel(option)}
-                      </Typography>
-                      <Typography fontSize={13} fontWeight={700} color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                        {feeLabel(option.consultationFee)}
-                      </Typography>
-                    </Box>
-                  )}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      fullWidth
-                      label="Doctor"
-                      error={Boolean(errors.providerId)}
-                      helperText={errors.providerId?.message}
-                      onBlur={field.onBlur}
-                      InputProps={{
-                        ...params.InputProps,
-                        startAdornment: selected ? (
-                          <>
-                            <DoctorAvatar
-                              src={selected.avatar}
-                              name={`Dr. ${personLabel(selected)}`}
-                              size={24}
-                              sx={{ ml: 0.5, mr: 0.5 }}
-                            />
-                            {params.InputProps.startAdornment}
-                          </>
-                        ) : params.InputProps.startAdornment,
-                      }}
-                    />
-                  )}
-                />
+                  <Autocomplete
+                    options={doctorOptions}
+                    loading={doctors.isLoading}
+                    value={selected}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    getOptionLabel={(option) => personLabel(option)}
+                    onChange={(_, value) => field.onChange(value?.id ?? '')}
+                    renderOption={(props, option) => (
+                      <Box component="li" {...props} key={option.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                        <DoctorAvatar src={option.avatar} name={`Dr. ${personLabel(option)}`} size={32} />
+                        <Typography fontSize={13.5} fontWeight={600} sx={{ flex: 1 }} noWrap>
+                          {personLabel(option)}
+                        </Typography>
+                        <Typography fontSize={13} fontWeight={700} color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                          {feeLabel(option.consultationFee)}
+                        </Typography>
+                      </Box>
+                    )}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        fullWidth
+                        label="Doctor"
+                        error={Boolean(errors.providerId)}
+                        helperText={errors.providerId?.message}
+                        onBlur={field.onBlur}
+                        InputProps={{
+                          ...params.InputProps,
+                          startAdornment: selected ? (
+                            <>
+                              <DoctorAvatar
+                                src={selected.avatar}
+                                name={`Dr. ${personLabel(selected)}`}
+                                size={24}
+                                sx={{ ml: 0.5, mr: 0.5 }}
+                              />
+                              {params.InputProps.startAdornment}
+                            </>
+                          ) : params.InputProps.startAdornment,
+                        }}
+                      />
+                    )}
+                  />
                 );
               }}
             />

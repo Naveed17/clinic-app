@@ -158,12 +158,14 @@ export async function suggestPrescription(
 ): Promise<{ ok: true; html: string } | { ok: false; error: string }> {
   const system = `You are a clinical drafting assistant for a doctor in Pakistan.
 Return ONLY simple HTML using <p>, <ul>, <ol>, <li>, <strong> — no markdown fences, no scripts.
-Draft a short prescription body: medication bullets (name + simple dose/duration if reasonable) and 1-3 advice lines.
+Draft a prescription body with medication bullets and 1-3 advice lines.
+CRITICAL RULES:
+1. Include EVERY single medicine mentioned or provided in the input (e.g. Panadol, Citanew, Alp, Synflex). Never omit or drop any medicine.
+2. EVERY medicine MUST have complete adult dosing, frequency, and timing (e.g. "1 tablet once daily in the morning after breakfast"). If the input provides only a medicine name like "Citanew", automatically supply standard, safe adult clinical dosing for it.
 This is a DRAFT for the doctor to edit — never claim it is a final order.
 If diagnosis is vague, keep suggestions conservative and generic.
 Prefer English medical terms; brief Urdu advice line is OK if helpful.
-Never include patient name, age, sex, MR number, or any demographics in the output — only medicines and advice.
-Do not add titles or headings such as "Prescription Draft", "Draft:", or similar — start directly with the medication list.`;
+Never include patient name, age, sex, MR number, or any demographics in the output — start directly with the medication list.`;
 
   const contextBits = [
     input.age ? `age ${input.age}` : '',

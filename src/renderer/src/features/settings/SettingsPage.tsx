@@ -392,7 +392,7 @@ export function SettingsPage(): React.JSX.Element {
         databaseMode: 'local',
         aiEnabled: false,
         groqApiKey: '',
-        groqModel: 'llama-3.1-8b-instant',
+        groqModel: 'gemini-3.6-flash',
         whatsappEnabled: false,
         whatsappToken: '',
         whatsappPhoneNumberId: '',
