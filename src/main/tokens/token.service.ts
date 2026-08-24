@@ -79,13 +79,14 @@ const tokenInclude = {
   doctor:  { select: { id: true, firstName: true, lastName: true } },
 } as unknown as Prisma.TokenInclude;
 
-function mapPatientPerson(p: { id: string; firstName: string; lastName: string; mrNumber?: string | null; gender?: string | null; dateOfBirth?: Date | null }) {
+function mapPatientPerson(p: { id: string; firstName: string; lastName: string; mrNumber?: string | null; gender?: string | null; dateOfBirth?: Date | null; phone?: string | null }) {
   return {
     id: p.id,
     firstName: p.firstName,
     lastName: p.lastName,
     mrNumber: p.mrNumber ?? undefined,
     gender: p.gender ?? null,
+    phone: p.phone ?? null,
     age: dateOfBirthToAge(p.dateOfBirth),
   };
 }
@@ -280,7 +281,7 @@ export async function listTokenDoctors() {
 
 export async function listTokenPatients() {
   const rows = await getPrisma().patient.findMany({
-    select: { id: true, firstName: true, lastName: true, mrNumber: true, gender: true, dateOfBirth: true },
+    select: { id: true, firstName: true, lastName: true, mrNumber: true, gender: true, dateOfBirth: true, phone: true },
     orderBy: { createdAt: 'desc' },
   } as unknown as Prisma.PatientFindManyArgs);
   return rows.map((row) => mapPatientPerson(row as Parameters<typeof mapPatientPerson>[0]));
@@ -573,8 +574,10 @@ export async function linkPrescriptionInvoice(tokenId: string, invoiceId: string
   );
 }
 
-export async function getTokenForPatient(patientId: string, date: string) {
+export async function getTokenForPatient(patientId: string, date: string, doctorId?: string) {
   const db = getPrisma();
+  const doctorFilter = doctorId ? 'AND t.doctorId = ?' : '';
+  const params = doctorId ? [patientId, date, doctorId] : [patientId, date];
   const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(`
     SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber, p.gender as patientGender, p.dateOfBirth as patientDob,
            u.id as doctorObjId, u.firstName as doctorFirstName, u.lastName as doctorLastName,
@@ -586,9 +589,10 @@ export async function getTokenForPatient(patientId: string, date: string) {
     JOIN "Patient" p ON p.id = t.patientId
     JOIN "User" u ON u.id = t.doctorId
     LEFT JOIN "Prescription" pr ON pr.tokenId = t.id
-    WHERE t.patientId = ? AND t.date = ?
+    WHERE t.patientId = ? AND t.date = ? ${doctorFilter}
+    ORDER BY t.tokenNumber DESC
     LIMIT 1
-  `, patientId, date);
+  `, ...params);
   if (!rows[0]) return null;
   return mapJoinToken(rows[0]);
 }

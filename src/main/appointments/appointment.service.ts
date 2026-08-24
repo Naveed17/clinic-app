@@ -51,9 +51,15 @@ export async function listAppointments() {
       prov.id as provId, prov.firstName as provFirst, prov.lastName as provLast, prov.role as provRole,
       dp.avatar as provAvatar,
       (
+        SELECT t.id FROM "Token" t
+        WHERE t.patientId = a.patientId AND t.doctorId = a.providerId
+          AND t.date = date(a.startsAt, 'localtime')
+        ORDER BY t.tokenNumber DESC LIMIT 1
+      ) as tokenId,
+      (
         SELECT t.tokenNumber FROM "Token" t
         WHERE t.patientId = a.patientId AND t.doctorId = a.providerId
-          AND t.date = strftime('%Y-%m-%d', a.startsAt)
+          AND t.date = date(a.startsAt, 'localtime')
         ORDER BY t.tokenNumber DESC LIMIT 1
       ) as tokenNumber
     FROM "Appointment" a
@@ -66,6 +72,7 @@ export async function listAppointments() {
     id: r.id, patientId: r.patientId, providerId: r.providerId,
     startsAt: r.startsAt, endsAt: r.endsAt, status: r.status,
     reason: r.reason, notes: r.notes, recurrenceRule: r.recurrenceRule, parentId: r.parentId,
+    tokenId: r.tokenId ? String(r.tokenId) : null,
     tokenNumber: r.tokenNumber != null ? Number(r.tokenNumber) : null,
     patient: { id: r.patId, firstName: r.patFirst, lastName: r.patLast, role: '', phone: r.patPhone ?? null },
     provider: { id: r.provId, firstName: r.provFirst, lastName: r.provLast, role: r.provRole, avatar: r.provAvatar ?? null },
@@ -109,9 +116,15 @@ async function getAppointmentById(id: string) {
       prov.id as provId, prov.firstName as provFirst, prov.lastName as provLast, prov.role as provRole,
       dp.avatar as provAvatar,
       (
+        SELECT t.id FROM "Token" t
+        WHERE t.patientId = a.patientId AND t.doctorId = a.providerId
+          AND t.date = date(a.startsAt, 'localtime')
+        ORDER BY t.tokenNumber DESC LIMIT 1
+      ) as tokenId,
+      (
         SELECT t.tokenNumber FROM "Token" t
         WHERE t.patientId = a.patientId AND t.doctorId = a.providerId
-          AND t.date = strftime('%Y-%m-%d', a.startsAt)
+          AND t.date = date(a.startsAt, 'localtime')
         ORDER BY t.tokenNumber DESC LIMIT 1
       ) as tokenNumber
     FROM "Appointment" a
@@ -127,6 +140,7 @@ async function getAppointmentById(id: string) {
     id: r.id, patientId: r.patientId, providerId: r.providerId,
     startsAt: r.startsAt, endsAt: r.endsAt, status: r.status,
     reason: r.reason, notes: r.notes, recurrenceRule: r.recurrenceRule, parentId: r.parentId,
+    tokenId: r.tokenId ? String(r.tokenId) : null,
     tokenNumber: r.tokenNumber != null ? Number(r.tokenNumber) : null,
     patient: { id: r.patId, firstName: r.patFirst, lastName: r.patLast, role: '', phone: r.patPhone ?? null },
     provider: { id: r.provId, firstName: r.provFirst, lastName: r.provLast, role: r.provRole, avatar: r.provAvatar ?? null },

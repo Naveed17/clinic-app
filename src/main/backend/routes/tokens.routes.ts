@@ -32,8 +32,8 @@ export function createTokensRouter(io: SocketIOServer): Router {
     res.json(await listPrescriptionFeed(date));
   }));
   router.get('/for-patient', asyncHandler(async (req, res) => {
-    const { patientId, date } = req.query as { patientId: string; date: string };
-    res.json(await getTokenForPatient(patientId, date));
+    const { patientId, date, doctorId } = req.query as { patientId: string; date: string; doctorId?: string };
+    res.json(await getTokenForPatient(patientId, date, doctorId || undefined));
   }));
   router.get('/week-visits', asyncHandler(async (req, res) => {
     const { patientId, doctorId, date } = req.query as { patientId?: string; doctorId?: string; date?: string };

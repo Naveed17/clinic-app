@@ -53,7 +53,7 @@ declare global {
         delete: (id: string) => Promise<unknown>;
       };
       tokens: {
-        getForPatient: (patientId: string, date: string) => Promise<unknown>;
+        getForPatient: (patientId: string, date: string, doctorId?: string) => Promise<unknown>;
         getById: (tokenId: string) => Promise<unknown>;
         list: (date: string) => Promise<unknown>;
         listPrescriptions: (date: string) => Promise<unknown>;

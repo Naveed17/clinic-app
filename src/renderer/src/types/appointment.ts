@@ -19,6 +19,7 @@ export interface Appointment {
   notes: string | null;
   recurrenceRule: string | null;
   parentId: string | null;
+  tokenId: string | null;
   tokenNumber: number | null;
   patient: AppointmentPerson;
   provider: AppointmentPerson;

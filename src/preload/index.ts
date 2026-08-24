@@ -568,10 +568,10 @@ const api = {
     },
   },
   tokens: {
-    getForPatient: (patientId: string, date: string) =>
+    getForPatient: (patientId: string, date: string, doctorId?: string) =>
       call(
-        () => request(`/api/tokens/for-patient?patientId=${patientId}&date=${date}`),
-        'tokens:get-for-patient', patientId, date,
+        () => request(`/api/tokens/for-patient?patientId=${patientId}&date=${date}${doctorId ? `&doctorId=${encodeURIComponent(doctorId)}` : ''}`),
+        'tokens:get-for-patient', patientId, date, doctorId,
       ),
     list: (date: string) =>
       call(

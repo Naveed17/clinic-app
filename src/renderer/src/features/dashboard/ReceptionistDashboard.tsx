@@ -241,11 +241,107 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             {useExisting ? (
               <Autocomplete
                 options={patients}
-                getOptionLabel={(p) => `${p.firstName} ${p.lastName}`}
+                getOptionLabel={(p) => `${p.firstName} ${p.lastName}${p.phone ? ` (${p.phone})` : ''}`}
+                filterOptions={(options, state) => {
+                  const q = state.inputValue.trim().toLowerCase();
+                  if (!q) return options;
+                  return options.filter((p) => {
+                    const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+                    const phone = (p.phone || '').toLowerCase();
+                    const mr = (p.mrNumber || '').toLowerCase();
+                    return name.includes(q) || phone.includes(q) || mr.includes(q);
+                  });
+                }}
                 value={selectedPatient}
                 onChange={(_, v) => setPatientId(v?.id ?? '')}
                 isOptionEqualToValue={(o, v) => o.id === v.id}
-                renderInput={(params) => <TextField {...params} label="Search patient" fullWidth />}
+                renderOption={(props, option) => {
+                  const initials = `${option.firstName?.[0] || ''}${option.lastName?.[0] || ''}`.toUpperCase() || 'P';
+                  return (
+                    <Box
+                      component="li"
+                      {...props}
+                      key={option.id}
+                      sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1, px: 1.5 }}
+                    >
+                      <Avatar
+                        src={option.avatar || undefined}
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          fontSize: 13,
+                          fontWeight: 700,
+                          bgcolor: 'primary.main',
+                          color: 'primary.contrastText',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {initials}
+                      </Avatar>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                          <Typography fontSize={14} fontWeight={600} noWrap>
+                            {option.firstName} {option.lastName}
+                          </Typography>
+                          <Typography fontSize={12.5} color="primary.main" fontWeight={700} noWrap sx={{ ml: 1 }}>
+                            {option.phone ? `📞 ${option.phone}` : 'No Phone'}
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                          {option.mrNumber && (
+                            <Typography fontSize={11.5} color="text.secondary" fontWeight={600} noWrap>
+                              {option.mrNumber}
+                            </Typography>
+                          )}
+                          {option.gender && (
+                            <Typography fontSize={11.5} color="text.secondary" noWrap>
+                              • {option.gender}
+                            </Typography>
+                          )}
+                          {option.age != null && (
+                            <Typography fontSize={11.5} color="text.secondary" noWrap>
+                              • {option.age} yrs
+                            </Typography>
+                          )}
+                        </Stack>
+                      </Box>
+                    </Box>
+                  );
+                }}
+                renderInput={(params) => {
+                  const selected = selectedPatient;
+                  const initials = selected ? `${selected.firstName?.[0] || ''}${selected.lastName?.[0] || ''}`.toUpperCase() : '';
+                  return (
+                    <TextField
+                      {...params}
+                      label="Search patient"
+                      fullWidth
+                      InputProps={{
+                        ...params.InputProps,
+                        startAdornment: selected ? (
+                          <>
+                            <Avatar
+                              src={selected.avatar || undefined}
+                              sx={{
+                                width: 26,
+                                height: 26,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                bgcolor: 'primary.main',
+                                color: 'primary.contrastText',
+                                ml: 0.5,
+                                mr: 0.5,
+                              }}
+                            >
+                              {initials}
+                            </Avatar>
+                            {params.InputProps.startAdornment}
+                          </>
+                        ) : params.InputProps.startAdornment,
+                      }}
+                    />
+                  );
+                }}
               />
             ) : (
               <Box component="form" id="patient-form" onSubmit={form.handleSubmit((v) => createPatientMutation.mutate(v))}>
@@ -582,14 +678,110 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
             {useExisting ? (
               <Autocomplete
                 options={patients}
-                getOptionLabel={(p) => `${p.firstName} ${p.lastName}`}
+                getOptionLabel={(p) => `${p.firstName} ${p.lastName}${p.phone ? ` (${p.phone})` : ''}`}
+                filterOptions={(options, state) => {
+                  const q = state.inputValue.trim().toLowerCase();
+                  if (!q) return options;
+                  return options.filter((p) => {
+                    const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+                    const phone = (p.phone || '').toLowerCase();
+                    const mr = (p.mrNumber || '').toLowerCase();
+                    return name.includes(q) || phone.includes(q) || mr.includes(q);
+                  });
+                }}
                 value={selectedPatient}
                 onChange={(_, v) => {
                   setPatientId(v?.id ?? '');
                   setPatientName(v ? `${v.firstName} ${v.lastName}` : '');
                 }}
                 isOptionEqualToValue={(o, v) => o.id === v.id}
-                renderInput={(params) => <TextField {...params} label="Search patient" fullWidth />}
+                renderOption={(props, option) => {
+                  const initials = `${option.firstName?.[0] || ''}${option.lastName?.[0] || ''}`.toUpperCase() || 'P';
+                  return (
+                    <Box
+                      component="li"
+                      {...props}
+                      key={option.id}
+                      sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1, px: 1.5 }}
+                    >
+                      <Avatar
+                        src={option.avatar || undefined}
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          fontSize: 13,
+                          fontWeight: 700,
+                          bgcolor: 'primary.main',
+                          color: 'primary.contrastText',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {initials}
+                      </Avatar>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                          <Typography fontSize={14} fontWeight={600} noWrap>
+                            {option.firstName} {option.lastName}
+                          </Typography>
+                          <Typography fontSize={12.5} color="primary.main" fontWeight={700} noWrap sx={{ ml: 1 }}>
+                            {option.phone ? `📞 ${option.phone}` : 'No Phone'}
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                          {option.mrNumber && (
+                            <Typography fontSize={11.5} color="text.secondary" fontWeight={600} noWrap>
+                              {option.mrNumber}
+                            </Typography>
+                          )}
+                          {option.gender && (
+                            <Typography fontSize={11.5} color="text.secondary" noWrap>
+                              • {option.gender}
+                            </Typography>
+                          )}
+                          {option.age != null && (
+                            <Typography fontSize={11.5} color="text.secondary" noWrap>
+                              • {option.age} yrs
+                            </Typography>
+                          )}
+                        </Stack>
+                      </Box>
+                    </Box>
+                  );
+                }}
+                renderInput={(params) => {
+                  const selected = selectedPatient;
+                  const initials = selected ? `${selected.firstName?.[0] || ''}${selected.lastName?.[0] || ''}`.toUpperCase() : '';
+                  return (
+                    <TextField
+                      {...params}
+                      label="Search patient"
+                      fullWidth
+                      InputProps={{
+                        ...params.InputProps,
+                        startAdornment: selected ? (
+                          <>
+                            <Avatar
+                              src={selected.avatar || undefined}
+                              sx={{
+                                width: 26,
+                                height: 26,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                bgcolor: 'primary.main',
+                                color: 'primary.contrastText',
+                                ml: 0.5,
+                                mr: 0.5,
+                              }}
+                            >
+                              {initials}
+                            </Avatar>
+                            {params.InputProps.startAdornment}
+                          </>
+                        ) : params.InputProps.startAdornment,
+                      }}
+                    />
+                  );
+                }}
               />
             ) : (
               <Box component="form" id="book-patient-form" onSubmit={form.handleSubmit((v) => createPatientMutation.mutate(v))}>

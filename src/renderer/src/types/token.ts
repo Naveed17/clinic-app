@@ -7,6 +7,7 @@ export interface TokenPerson {
   lastName: string;
   gender?: string | null;
   age?: number | null;
+  phone?: string | null;
   consultationFee?: number;
   avatar?: string | null;
 }

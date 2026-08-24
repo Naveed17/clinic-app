@@ -35,18 +35,12 @@ import { PatientDocumentsPanel } from './PatientDocumentsPanel';
 import { PatientWhatsAppButton } from './PatientWhatsAppButton';
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
 import { LabOrderHistoryCard } from '@/features/lab/LabOrderResultView';
+import { AppointmentVisitList } from '@/features/appointments/AppointmentVisitList';
+import { usePrintAppointmentToken } from '@/features/appointments/printAppointmentToken';
+import { TokenPrintPreview } from '@/features/tokens/TokensPage';
 import type { LabOrder } from '@/types/lab';
 
 const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
-
-const apptStatusColor: Record<string, 'default' | 'primary' | 'warning' | 'success' | 'error'> = {
-  SCHEDULED: 'primary', CHECKED_IN: 'warning', COMPLETED: 'success', CANCELLED: 'default', NO_SHOW: 'error',
-};
-
-const apptLeftBorder: Record<string, string> = {
-  SCHEDULED: 'primary.main', CHECKED_IN: 'warning.main', COMPLETED: 'success.main',
-  CANCELLED: 'divider', NO_SHOW: 'error.main',
-};
 
 const invoiceLeftBorder: Record<string, string> = {
   PAID: 'success.main', PARTIALLY_PAID: 'warning.main', DRAFT: 'info.main', VOID: 'error.main', REFUNDED: 'error.main',
@@ -226,6 +220,7 @@ export function PatientProfilePage(): React.JSX.Element {
   const navigate = useNavigate();
   const [tab, setTab] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
+  const tokenPrint = usePrintAppointmentToken();
 
   const patientsQuery = useQuery({
     queryKey: ['patients', { page: 1, pageSize: 1, id }],
@@ -400,44 +395,15 @@ export function PatientProfilePage(): React.JSX.Element {
                       subtitle="Appointment history for this patient will show here."
                     />
                   ) : (
-                    <Stack spacing={1} sx={{ p: 2, maxHeight: 480, overflowY: 'auto' }}>
-                      {[...patientAppointments]
-                        .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
-                        .map((a) => (
-                          <Box
-                            key={a.id}
-                            onClick={() => navigate(`/appointments/${a.id}`)}
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 1,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 1.5,
-                              cursor: 'pointer',
-                              bgcolor: alpha(theme.palette.primary.main, 0.03),
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              borderLeft: '4px solid',
-                              borderLeftColor: apptLeftBorder[a.status] ?? 'divider',
-                              '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.07) },
-                            }}
-                          >
-                            <Avatar sx={{ width: 40, height: 40, borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, 0.12), color: 'primary.main', fontSize: 12, fontWeight: 800 }}>
-                              <CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} />
-                            </Avatar>
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography fontWeight={700} fontSize={14} noWrap>
-                                {new Date(a.startsAt).toLocaleString([], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                                Dr. {a.provider.firstName} {a.provider.lastName}
-                                {a.reason ? ` · ${a.reason}` : ''}
-                              </Typography>
-                            </Box>
-                            <Chip label={a.status.replace('_', ' ')} size="small" color={apptStatusColor[a.status] ?? 'default'} sx={{ ...chipSx, fontWeight: 700, borderRadius: 1 }} />
-                          </Box>
-                        ))}
-                    </Stack>
+                    <AppointmentVisitList
+                      appointments={[...patientAppointments].sort(
+                        (a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime(),
+                      )}
+                      onOpen={(a) => navigate(`/appointments/${a.id}`)}
+                      onPrint={tokenPrint.printFor}
+                      printingId={tokenPrint.printingId}
+                      maxHeight={480}
+                    />
                   )
                 )}
 
@@ -686,6 +652,9 @@ export function PatientProfilePage(): React.JSX.Element {
 
       {editOpen && patient && (
         <PatientDialog open={editOpen} patient={patient} onClose={() => setEditOpen(false)} />
+      )}
+      {tokenPrint.printToken && (
+        <TokenPrintPreview token={tokenPrint.printToken} onClose={tokenPrint.closePrint} />
       )}
     </>
   );

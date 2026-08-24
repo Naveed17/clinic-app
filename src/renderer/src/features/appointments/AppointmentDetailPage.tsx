@@ -12,6 +12,7 @@ import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
 import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined';
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
 import RepeatOutlinedIcon from '@mui/icons-material/RepeatOutlined';
+import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import {
   Alert,
   Box,
@@ -34,6 +35,9 @@ import { ConfirmDialog } from '@/components/DialogUI';
 import { chipSx } from '@/components/TableUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { AppointmentDialog } from '@/features/appointments/AppointmentsPage';
+import { AppointmentVisitList } from '@/features/appointments/AppointmentVisitList';
+import { usePrintAppointmentToken } from '@/features/appointments/printAppointmentToken';
+import { TokenPrintPreview } from '@/features/tokens/TokensPage';
 import { appointmentsService } from '@/services/appointments.service';
 import type { Appointment } from '@/types/appointment';
 
@@ -58,6 +62,11 @@ export function AppointmentDetailPage(): React.JSX.Element {
   const qc = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const tokenPrint = usePrintAppointmentToken();
+  const visitsQuery = useQuery({
+    queryKey: ['appointments'],
+    queryFn: appointmentsService.list,
+  });
 
   const softCard = {
     borderRadius: '20px',
@@ -147,6 +156,10 @@ export function AppointmentDetailPage(): React.JSX.Element {
   const status = statusConfig[appointment.status] ?? { label: appointment.status, color: 'default' as const };
   const closed = ['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(appointment.status);
   const patientLabel = personName(appointment.patient.firstName, appointment.patient.lastName);
+  const patientVisits = (visitsQuery.data ?? [])
+    .filter((a) => a.patientId === appointment.patientId)
+    .filter((a) => user?.role !== 'doctor' || a.providerId === user.id)
+    .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
   const doctorLabel = `Dr. ${personName(appointment.provider.firstName, appointment.provider.lastName)}`;
   const dateLabel = new Date(appointment.startsAt).toLocaleDateString([], {
     weekday: 'long',
@@ -177,7 +190,7 @@ export function AppointmentDetailPage(): React.JSX.Element {
     {
       label: 'Token',
       value: tokenLabel,
-      note: 'Same-day queue',
+      note: 'Queue number',
       icon: <ConfirmationNumberOutlinedIcon fontSize="small" />,
       color: theme.palette.warning.main,
     },
@@ -266,6 +279,15 @@ export function AppointmentDetailPage(): React.JSX.Element {
           </Stack>
 
           <Stack direction="row" gap={1} flexWrap="wrap">
+            <Button
+              startIcon={<PrintOutlinedIcon />}
+              variant="outlined"
+              loading={tokenPrint.printingId === appointment.id}
+              sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+              onClick={() => tokenPrint.printFor(appointment)}
+            >
+              Print token
+            </Button>
             {(user?.role === 'receptionist' || user?.role === 'doctor' || user?.role === 'lab_technician') && (
               <Button
                 variant="outlined"
@@ -431,6 +453,27 @@ export function AppointmentDetailPage(): React.JSX.Element {
             ))}
           </Stack>
         </Paper>
+
+        {patientVisits.length > 1 && (
+          <Paper elevation={0} sx={{ ...softCard, overflow: 'hidden' }}>
+            <Box sx={{ px: 2.5, pt: 2.25, pb: 0.5 }}>
+              <Typography fontWeight={800}>All visits</Typography>
+              <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                Token details and reprint for every appointment
+              </Typography>
+            </Box>
+            <AppointmentVisitList
+              appointments={patientVisits}
+              currentId={appointment.id}
+              onOpen={(a) => {
+                if (a.id !== appointment.id) navigate(`/appointments/${a.id}`);
+              }}
+              onPrint={tokenPrint.printFor}
+              printingId={tokenPrint.printingId}
+              showNotes
+            />
+          </Paper>
+        )}
       </Stack>
 
       <AppointmentDialog
@@ -450,6 +493,10 @@ export function AppointmentDetailPage(): React.JSX.Element {
         onConfirm={() => deleteMutation.mutate()}
         onClose={() => setDeleteOpen(false)}
       />
+
+      {tokenPrint.printToken && (
+        <TokenPrintPreview token={tokenPrint.printToken} onClose={tokenPrint.closePrint} />
+      )}
     </>
   );
 }

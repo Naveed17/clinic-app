@@ -8,6 +8,7 @@ import PersonOffOutlinedIcon from '@mui/icons-material/PersonOffOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import TableRowsOutlinedIcon from '@mui/icons-material/TableRowsOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import RepeatOutlinedIcon from '@mui/icons-material/RepeatOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -47,6 +48,8 @@ import { patientsService } from '@/services/patients.service';
 import type { Appointment, AppointmentInput, AppointmentPerson } from '@/types/appointment';
 import type { Token, TokenPerson } from '@/types/token';
 import { TokenFeeFields } from '@/features/tokens/TokenFeeFields';
+import { TokenPrintPreview } from '@/features/tokens/TokensPage';
+import { usePrintAppointmentToken } from '@/features/appointments/printAppointmentToken';
 import { nextFreeSlot, doctorOfflineReason, slotSearchFrom, type SlotAdjustReason } from '@/utils/appointmentSlot';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
@@ -667,6 +670,7 @@ export function AppointmentsPage(): React.JSX.Element {
   const queryClient = useQueryClient();
   const [active, setActive] = useState<Appointment | undefined>();
   const [open, setOpen] = useState(false);
+  const tokenPrint = usePrintAppointmentToken();
   const [defaultDate, setDefaultDate] = useState<string | undefined>();
   const view: 'table' | 'calendar' = searchParams.get('view') === 'calendar' ? 'calendar' : 'table';
   const setView = (next: 'table' | 'calendar') => {
@@ -966,6 +970,15 @@ export function AppointmentsPage(): React.JSX.Element {
                             <VisibilityOutlinedIcon sx={{ fontSize: 17 }} />
                           </IconButton>
                         </Tooltip>
+                        <Tooltip title="Print token"><span>
+                          <IconButton
+                            sx={actionBtnSx}
+                            loading={tokenPrint.printingId === a.id}
+                            onClick={() => tokenPrint.printFor(a)}
+                          >
+                            <PrintOutlinedIcon sx={{ fontSize: 17 }} />
+                          </IconButton>
+                        </span></Tooltip>
                         <Tooltip title="Edit"><span>
                           <IconButton sx={actionBtnSx} disabled={['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status)} onClick={() => { setActive(a); setOpen(true); }}>
                             <EditOutlinedIcon sx={{ fontSize: 17 }} />
@@ -1002,6 +1015,9 @@ export function AppointmentsPage(): React.JSX.Element {
         onClose={() => setDeleteTarget(undefined)}
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
       />
+      {tokenPrint.printToken && (
+        <TokenPrintPreview token={tokenPrint.printToken} onClose={tokenPrint.closePrint} />
+      )}
     </Box>
   );
 }

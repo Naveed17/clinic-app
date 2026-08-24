@@ -25,11 +25,10 @@ import { PatientDocumentsPanel } from './PatientDocumentsPanel';
 import { PatientWhatsAppButton } from './PatientWhatsAppButton';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { LabOrderHistoryCard } from '@/features/lab/LabOrderResultView';
+import { AppointmentVisitList } from '@/features/appointments/AppointmentVisitList';
+import { usePrintAppointmentToken } from '@/features/appointments/printAppointmentToken';
+import { TokenPrintPreview } from '@/features/tokens/TokensPage';
 import type { LabOrder } from '@/types/lab';
-
-const apptStatusColor: Record<string, 'default' | 'primary' | 'warning' | 'success' | 'error'> = {
-  SCHEDULED: 'primary', CHECKED_IN: 'warning', COMPLETED: 'success', CANCELLED: 'default', NO_SHOW: 'error',
-};
 
 function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }): React.JSX.Element {
   const theme = useTheme();
@@ -268,6 +267,7 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
   const theme = useTheme();
   const { can } = useLicense();
   const [tab, setTab] = useState(0);
+  const tokenPrint = usePrintAppointmentToken();
   const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
   const showLab = can('labDashboard');
 
@@ -400,59 +400,14 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
         {tab === 0 && (
           patientAppointments.length === 0
             ? <EmptyState icon={<CalendarMonthOutlinedIcon sx={{ fontSize: 40 }} />} text="No appointments found." />
-            : <Stack spacing={1} sx={{ p: 2 }}>
-                {[...patientAppointments]
-                  .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
-                  .map((a) => (
-                    <Box
-                      key={a.id}
-                      sx={{
-                        p: 1.5,
-                        borderRadius: 1,
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: 1.5,
-                        bgcolor: alpha(theme.palette.primary.main, 0.03),
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        borderLeft: '4px solid',
-                        borderLeftColor:
-                          a.status === 'SCHEDULED'
-                            ? 'primary.main'
-                            : a.status === 'CHECKED_IN'
-                              ? 'warning.main'
-                              : a.status === 'COMPLETED'
-                                ? 'success.main'
-                                : a.status === 'NO_SHOW'
-                                  ? 'error.main'
-                                  : 'divider',
-                      }}
-                    >
-                      <Avatar sx={{ width: 40, height: 40, borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, 0.12), color: 'primary.main' }}>
-                        <CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} />
-                      </Avatar>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1}>
-                          <Box>
-                            <Typography fontWeight={700} fontSize={14}>
-                              {new Date(a.startsAt).toLocaleString([], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.15 }}>
-                              Dr. {a.provider.firstName} {a.provider.lastName}
-                              {a.reason ? ` · ${a.reason}` : ''}
-                            </Typography>
-                          </Box>
-                          <Chip label={a.status.replace('_', ' ')} size="small" color={apptStatusColor[a.status] ?? 'default'} sx={{ ...chipSx, borderRadius: 1, fontWeight: 700 }} />
-                        </Stack>
-                        {a.notes && (
-                          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, fontSize: 13 }}>
-                            {a.notes}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Box>
-                  ))}
-              </Stack>
+            : <AppointmentVisitList
+                appointments={[...patientAppointments].sort(
+                  (a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime(),
+                )}
+                onPrint={tokenPrint.printFor}
+                printingId={tokenPrint.printingId}
+                showNotes
+              />
         )}
 
         {tab === 1 && (
@@ -544,6 +499,9 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
         <PatientWhatsAppButton patient={patient} />
         <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 2, fontWeight: 700 }}>Close</Button>
       </DialogActions>
+      {tokenPrint.printToken && (
+        <TokenPrintPreview token={tokenPrint.printToken} onClose={tokenPrint.closePrint} />
+      )}
     </Dialog>
   );
 }
