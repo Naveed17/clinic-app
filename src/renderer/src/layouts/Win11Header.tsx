@@ -1,5 +1,4 @@
 import {
-  Button,
   Input,
   Text,
   makeStyles,
@@ -15,6 +14,7 @@ import {
 } from '@fluentui/react-icons';
 import { SearchOutlinedIcon } from '@/icons/fluent';
 import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
+import { Button } from '@fluentui/react-components';
 
 const useStyles = makeStyles({
   header: {
@@ -23,11 +23,10 @@ const useStyles = makeStyles({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingLeft: tokens.spacingHorizontalS,
-    paddingRight: tokens.spacingHorizontalNone,
+    paddingRight: tokens.spacingHorizontalM,
     backgroundColor: 'var(--cf-glass-header)',
     backdropFilter: 'blur(30px)',
     borderBottom: '1px solid var(--cf-glass-border)',
-    WebkitAppRegion: 'drag',
     userSelect: 'none',
     boxSizing: 'border-box',
     gap: tokens.spacingHorizontalS,
@@ -36,7 +35,6 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalXS,
-    WebkitAppRegion: 'drag',
   },
   appTab: {
     height: '32px',
@@ -78,7 +76,6 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     gap: '2px',
-    WebkitAppRegion: 'no-drag',
   },
   iconBtn: {
     minWidth: '28px',
@@ -98,15 +95,13 @@ const useStyles = makeStyles({
     backgroundColor: 'rgba(255, 255, 255, 0.4)',
     borderRadius: tokens.borderRadiusMedium,
     border: '1px solid rgba(255, 255, 255, 0.5)',
-    WebkitAppRegion: 'no-drag',
   },
   breadcrumbActive: {
     color: tokens.colorNeutralForeground1,
     fontWeight: tokens.fontWeightSemibold,
   },
   centerSearch: {
-    flex: '0 1 320px',
-    WebkitAppRegion: 'no-drag',
+    flex: '0 1 340px',
   },
   searchPill: {
     width: '100%',
@@ -121,34 +116,6 @@ const useStyles = makeStyles({
       backgroundColor: 'rgba(255, 255, 255, 0.85)',
     },
   },
-  rightSection: {
-    display: 'flex',
-    alignItems: 'center',
-    WebkitAppRegion: 'no-drag',
-  },
-  winBtn: {
-    width: '46px',
-    height: '42px',
-    borderRadius: 0,
-    border: 'none',
-    backgroundColor: 'transparent',
-    color: tokens.colorNeutralForeground2,
-    fontSize: '12px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'background-color 100ms ease',
-    '&:hover': {
-      backgroundColor: 'rgba(0, 0, 0, 0.06)',
-    },
-  },
-  closeBtn: {
-    '&:hover': {
-      backgroundColor: '#c42b1c !important',
-      color: '#ffffff !important',
-    },
-  },
 });
 
 export function Win11Header(): React.JSX.Element {
@@ -159,19 +126,10 @@ export function Win11Header(): React.JSX.Element {
   const [searchOpen, setSearchOpen] = useState(false);
 
   const pathParts = location.pathname.split('/').filter(Boolean);
-  const breadcrumbActive = pathParts.length === 0 ? 'Home' : pathParts[pathParts.length - 1].replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-
-  const handleMinimize = () => {
-    if (window.electron?.ipcRenderer) window.electron.ipcRenderer.send('window:minimize');
-  };
-
-  const handleMaximize = () => {
-    if (window.electron?.ipcRenderer) window.electron.ipcRenderer.send('window:toggle-maximize');
-  };
-
-  const handleClose = () => {
-    if (window.electron?.ipcRenderer) window.electron.ipcRenderer.send('window:close');
-  };
+  const breadcrumbActive =
+    pathParts.length === 0
+      ? 'Home'
+      : pathParts[pathParts.length - 1].replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
   return (
     <>
@@ -230,18 +188,6 @@ export function Win11Header(): React.JSX.Element {
             onClick={() => setSearchOpen(true)}
             className={styles.searchPill}
           />
-        </div>
-
-        <div className={styles.rightSection}>
-          <button type="button" className={styles.winBtn} onClick={handleMinimize} title="Minimize">
-            &#8722;
-          </button>
-          <button type="button" className={styles.winBtn} onClick={handleMaximize} title="Maximize">
-            &#9633;
-          </button>
-          <button type="button" className={`${styles.winBtn} ${styles.closeBtn}`} onClick={handleClose} title="Close">
-            &#10005;
-          </button>
         </div>
       </header>
 

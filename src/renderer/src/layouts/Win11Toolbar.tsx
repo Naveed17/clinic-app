@@ -31,7 +31,7 @@ import {
 
 const useStyles = makeStyles({
   toolbar: {
-    height: '40px',
+    height: '38px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -41,7 +41,7 @@ const useStyles = makeStyles({
     backdropFilter: 'blur(20px)',
     borderBottom: '1px solid var(--cf-glass-border)',
     borderRadius: tokens.borderRadiusMedium,
-    marginBottom: tokens.spacingVerticalS,
+    marginBottom: tokens.spacingVerticalXS,
     boxSizing: 'border-box',
   },
   leftGroup: {
@@ -59,20 +59,6 @@ const useStyles = makeStyles({
     '&:hover': {
       backgroundColor: tokens.colorBrandBackgroundHover,
     },
-  },
-  toolDivider: {
-    width: '1px',
-    height: '18px',
-    backgroundColor: tokens.colorNeutralStroke2,
-  },
-  iconToolBtn: {
-    height: '28px',
-    fontSize: tokens.fontSizeBase200,
-    borderRadius: tokens.borderRadiusMedium,
-    color: tokens.colorNeutralForeground2,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
   },
   rightGroup: {
     display: 'flex',
@@ -134,30 +120,6 @@ export function Win11Toolbar(): React.JSX.Element {
             </MenuList>
           </MenuPopover>
         </Menu>
-
-        <div className={styles.toolDivider} />
-
-        <Button appearance="subtle" size="small" className={styles.iconToolBtn}>
-          <span style={{ fontSize: '14px' }}>✂</span> Cut
-        </Button>
-        <Button appearance="subtle" size="small" className={styles.iconToolBtn}>
-          <span style={{ fontSize: '14px' }}>📋</span> Copy
-        </Button>
-        <Button appearance="subtle" size="small" className={styles.iconToolBtn}>
-          <span style={{ fontSize: '14px' }}>🏷️</span> Rename
-        </Button>
-        <Button appearance="subtle" size="small" className={styles.iconToolBtn}>
-          <span style={{ fontSize: '14px' }}>🗑️</span> Delete
-        </Button>
-
-        <div className={styles.toolDivider} />
-
-        <Button appearance="subtle" size="small" className={styles.iconToolBtn}>
-          <span style={{ fontSize: '14px' }}>↕️</span> Sort
-        </Button>
-        <Button appearance="subtle" size="small" className={styles.iconToolBtn}>
-          <span style={{ fontSize: '14px' }}>≡</span> View
-        </Button>
       </div>
 
       <div className={styles.rightGroup}>
