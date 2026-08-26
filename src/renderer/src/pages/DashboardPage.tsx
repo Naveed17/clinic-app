@@ -1,9 +1,8 @@
 import { MessageBar, MessageBarBody, makeStyles, tokens } from '@fluentui/react-components';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense, useLicenseModulesLoaded } from '@/features/auth/LicenseModulesContext';
-import { AdminDashboard } from '@/features/dashboard/AdminDashboard';
+import { Win11ExplorerDashboard } from '@/features/dashboard/Win11ExplorerDashboard';
 import { DoctorDashboard } from '@/features/dashboard/DoctorDashboard';
-import { ReceptionistDashboard } from '@/features/dashboard/ReceptionistDashboard';
 import { LabDashboard } from '@/features/dashboard/LabDashboard';
 import { StatCardsSkeleton } from '@/components/LoadingUI';
 
@@ -27,7 +26,6 @@ export function DashboardPage(): React.JSX.Element {
   const { can } = useLicense();
   const modulesLoaded = useLicenseModulesLoaded();
 
-  // Doctor calendar has its own skeleton — skip the 2-column stat cards flash.
   if (!modulesLoaded && user?.role !== 'doctor') {
     return (
       <div className={styles.pad}>
@@ -38,16 +36,16 @@ export function DashboardPage(): React.JSX.Element {
 
   switch (user?.role) {
     case 'admin':
-      return <AdminDashboard />;
+      return <Win11ExplorerDashboard />;
     case 'doctor':
       return !modulesLoaded || can('doctorDashboard') ? <DoctorDashboard /> : <RoleDisabled />;
     case 'receptionist':
-      return <ReceptionistDashboard />;
+      return <Win11ExplorerDashboard />;
     case 'lab_technician':
       return can('labDashboard') ? <LabDashboard /> : <RoleDisabled />;
     case 'pharmacist':
       return <RoleDisabled />;
     default:
-      return <AdminDashboard />;
+      return <Win11ExplorerDashboard />;
   }
 }

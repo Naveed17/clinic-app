@@ -2,27 +2,27 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --cf-win11-wallpaper: linear-gradient(135deg, #cbe0fd 0%, #e4edfe 40%, #b8d4f9 100%);
-  --cf-glass-header: rgba(240, 245, 255, 0.75);
-  --cf-glass-sidebar: rgba(245, 248, 255, 0.65);
-  --cf-glass-toolbar: rgba(250, 252, 255, 0.8);
-  --cf-glass-surface: rgba(255, 255, 255, 0.88);
-  --cf-glass-border: rgba(255, 255, 255, 0.7);
-  --cf-glass-shadow: 0 10px 30px rgba(0, 50, 120, 0.08);
+  --cf-win11-wallpaper-bg: #8bb3f7;
+  --cf-glass-header: rgba(240, 245, 255, 0.82);
+  --cf-glass-sidebar: rgba(245, 248, 255, 0.75);
+  --cf-glass-toolbar: rgba(250, 252, 255, 0.88);
+  --cf-glass-surface: rgba(255, 255, 255, 0.92);
+  --cf-glass-border: rgba(255, 255, 255, 0.75);
+  --cf-glass-shadow: 0 20px 60px rgba(0, 45, 110, 0.22);
   --cf-active-pill: #e0edff;
   --cf-active-text: #0067c0;
 }
 
 [data-theme='dark'],
 .dark {
-  --cf-win11-wallpaper: linear-gradient(135deg, #101929 0%, #1a2538 50%, #0d1522 100%);
-  --cf-glass-header: rgba(30, 40, 56, 0.75);
-  --cf-glass-sidebar: rgba(25, 34, 48, 0.65);
-  --cf-glass-toolbar: rgba(35, 46, 64, 0.8);
-  --cf-glass-surface: rgba(25, 33, 46, 0.88);
-  --cf-glass-border: rgba(255, 255, 255, 0.12);
-  --cf-glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  --cf-active-pill: rgba(0, 103, 192, 0.25);
+  --cf-win11-wallpaper-bg: #0d1522;
+  --cf-glass-header: rgba(30, 40, 56, 0.82);
+  --cf-glass-sidebar: rgba(25, 34, 48, 0.75);
+  --cf-glass-toolbar: rgba(35, 46, 64, 0.88);
+  --cf-glass-surface: rgba(25, 33, 46, 0.92);
+  --cf-glass-border: rgba(255, 255, 255, 0.15);
+  --cf-glass-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  --cf-active-pill: rgba(0, 103, 192, 0.3);
   --cf-active-text: #60cdff;
 }
 
@@ -34,7 +34,42 @@ body,
   margin: 0;
   overflow: hidden;
   font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
-  background: var(--cf-win11-wallpaper);
+  background-color: var(--cf-win11-wallpaper-bg);
+}
+
+/* 3D Ribbon Wallpaper Background Effect */
+.win11-wallpaper {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.4) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(0, 100, 230, 0.3) 0%, transparent 50%),
+    linear-gradient(135deg, #a3c7f9 0%, #8bb3f7 40%, #528ce0 100%);
+  overflow: hidden;
+}
+
+.win11-wallpaper::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  left: -20%;
+  width: 140%;
+  height: 160%;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.25) 0%, transparent 60%);
+  transform: rotate(-15deg);
+  pointer-events: none;
+}
+
+.win11-wallpaper::after {
+  content: '';
+  position: absolute;
+  bottom: -20%;
+  right: -10%;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse at center, rgba(0, 70, 170, 0.2) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 * {
@@ -61,30 +96,4 @@ body,
   font-feature-settings: "tnum";
   font-variant-numeric: tabular-nums;
   letter-spacing: 2px;
-}
-
-/* Align react-phone-number-input with Fluent inputs */
-.PhoneInputField {
-  width: 100%;
-  --PhoneInput-color--focus: var(--colorBrandForeground1, #0f6cbd);
-}
-
-.PhoneInputField .PhoneInputInput {
-  font: inherit;
-  border: 1px solid var(--colorNeutralStroke1, #d1d1d1);
-  border-radius: var(--borderRadiusMedium, 4px);
-  padding: 6px 10px;
-  min-height: 32px;
-  background: var(--colorNeutralBackground1, #fff);
-  color: var(--colorNeutralForeground1, #242424);
-}
-
-.PhoneInputField .PhoneInputInput:focus {
-  outline: 2px solid var(--colorBrandStroke1, #0f6cbd);
-  outline-offset: -1px;
-}
-
-.PhoneInputField .PhoneInputCountryIcon {
-  border: none;
-  box-shadow: none;
 }
