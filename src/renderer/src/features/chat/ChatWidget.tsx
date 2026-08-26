@@ -43,11 +43,24 @@ export function ChatWidget(): React.JSX.Element | null {
               badgeContent={open ? 0 : unread}
               color="error"
               max={9}
+              sx={{
+                '& .MuiBadge-badge': {
+                  zIndex: 9999,
+                  pointerEvents: 'none',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  border: '2px solid #ffffff',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+                },
+              }}
             >
               <Fab
                 color="primary"
                 onClick={() => setOpen((value) => !value)}
-                sx={{ boxShadow: '0 12px 28px rgba(22, 163, 74, 0.35)' }}
+                sx={{
+                  zIndex: 1,
+                  boxShadow: '0 12px 28px rgba(22, 163, 74, 0.35)',
+                }}
               >
                 {open ? <CloseIcon /> : <ChatOutlinedIcon />}
               </Fab>

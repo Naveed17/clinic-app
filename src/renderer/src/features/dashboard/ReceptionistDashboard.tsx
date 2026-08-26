@@ -37,6 +37,7 @@ import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPre
 import { TokenPrintPreview } from '@/features/tokens/TokensPage';
 import { printTokenSlip } from '@/utils/printTokenSlip';
 import { InvoiceDialog } from '@/features/billing/InvoicesPage';
+import { AppointmentWhatsAppDialog } from '@/features/appointments/AppointmentWhatsAppDialog';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { useNavigate } from 'react-router-dom';
@@ -241,7 +242,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             {useExisting ? (
               <Autocomplete
                 options={patients}
-                getOptionLabel={(p) => `${p.firstName} ${p.lastName}${p.phone ? ` (${p.phone})` : ''}`}
+                getOptionLabel={(p) => `${p.firstName} ${p.lastName}`}
                 filterOptions={(options, state) => {
                   const q = state.inputValue.trim().toLowerCase();
                   if (!q) return options;
@@ -280,10 +281,16 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
                       </Avatar>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                          <Typography fontSize={14} fontWeight={600} noWrap>
+                          <Typography fontSize={14} fontWeight={600} noWrap sx={{ flex: 1, minWidth: 0 }}>
                             {option.firstName} {option.lastName}
                           </Typography>
-                          <Typography fontSize={12.5} color="primary.main" fontWeight={700} noWrap sx={{ ml: 1 }}>
+                          <Typography
+                            fontSize={12.5}
+                            color="primary.main"
+                            fontWeight={700}
+                            noWrap
+                            sx={{ width: 140, textAlign: 'left', flexShrink: 0, ml: 1 }}
+                          >
                             {option.phone ? `📞 ${option.phone}` : 'No Phone'}
                           </Typography>
                         </Stack>
@@ -545,7 +552,15 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
 /* ── Book Appointment Modal (patient → appointment, no token) ── */
 const APPT_STEPS = ['Add Patient', 'Create Appointment'];
 
-function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function BookAppointmentModal({
+  open,
+  onClose,
+  onCreatedAppointment,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreatedAppointment?: (appt: Appointment) => void;
+}) {
   const qc = useQueryClient();
   const { can } = useLicense();
   const showLabReason = can('labDashboard');
@@ -599,6 +614,12 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
     ? doctorOfflineReason(schedule, date)
     : null;
 
+  const { data: tokenForPatient } = useQuery<Token | null>({
+    queryKey: ['token-for-patient', patientId, date],
+    queryFn: () => window.clinic.tokens.getForPatient(patientId, date) as Promise<Token | null>,
+    enabled: open && !!patientId && !!date,
+  });
+
   useEffect(() => {
     if (!open || !providerId) return;
     const next = nextFreeSlot({
@@ -606,13 +627,13 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
       appointments: doctorAppts,
       providerId,
       durationMin: duration,
-      from: new Date(),
+      from: slotSearchFrom(date),
     });
     if (!next) return;
     setDate(next.date);
     setTime(next.time);
-    setSlotNotice(null);
-  }, [open, providerId, duration, schedule, doctorAppts]);
+    setSlotNotice(next.reason);
+  }, [open, providerId, duration, schedule, doctorAppts, date]);
 
   const createPatientMutation = useMutation({
     mutationFn: (values: PatientForm) => patientsService.create(walkInPatientInput(values)),
@@ -632,7 +653,7 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
       return appointmentsService.create({
         patientId,
         providerId,
-        tokenId: null,
+        tokenId: tokenForPatient?.id ?? null,
         startsAt: startsAt.toISOString(),
         endsAt: new Date(startsAt.getTime() + duration * 60000).toISOString(),
         reason: reason || null,
@@ -640,9 +661,37 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
         recurrenceRule: null,
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (saved) => {
       await qc.invalidateQueries({ queryKey: ['appointments'] });
       setDone(true);
+      if (saved && typeof saved === 'object') {
+        const doc = doctors.find((d) => d.id === providerId);
+        const pat = selectedPatient ?? { id: patientId, firstName: patientName, lastName: '', role: 'patient' };
+        const raw = saved as Appointment;
+        const fullAppt: Appointment = {
+          ...raw,
+          patient: raw.patient?.firstName ? raw.patient : (pat as unknown as AppointmentPerson),
+          provider: raw.provider?.firstName ? raw.provider : (doc ?? { id: providerId, firstName: '', lastName: '', role: 'doctor' }),
+        };
+        onCreatedAppointment?.(fullAppt);
+      }
+    },
+    onError: (err) => {
+      const msg = (err as Error)?.message || '';
+      if (msg.includes('busy') || msg.includes('slot')) {
+        const next = nextFreeSlot({
+          schedule,
+          appointments: doctorAppts,
+          providerId,
+          durationMin: duration,
+          from: slotSearchFrom(date),
+        });
+        if (next) {
+          setDate(next.date);
+          setTime(next.time);
+          setSlotNotice('busy');
+        }
+      }
     },
     meta: { silent: true },
   });
@@ -678,7 +727,7 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
             {useExisting ? (
               <Autocomplete
                 options={patients}
-                getOptionLabel={(p) => `${p.firstName} ${p.lastName}${p.phone ? ` (${p.phone})` : ''}`}
+                getOptionLabel={(p) => `${p.firstName} ${p.lastName}`}
                 filterOptions={(options, state) => {
                   const q = state.inputValue.trim().toLowerCase();
                   if (!q) return options;
@@ -720,10 +769,16 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
                       </Avatar>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                          <Typography fontSize={14} fontWeight={600} noWrap>
+                          <Typography fontSize={14} fontWeight={600} noWrap sx={{ flex: 1, minWidth: 0 }}>
                             {option.firstName} {option.lastName}
                           </Typography>
-                          <Typography fontSize={12.5} color="primary.main" fontWeight={700} noWrap sx={{ ml: 1 }}>
+                          <Typography
+                            fontSize={12.5}
+                            color="primary.main"
+                            fontWeight={700}
+                            noWrap
+                            sx={{ width: 140, textAlign: 'left', flexShrink: 0, ml: 1 }}
+                          >
                             {option.phone ? `📞 ${option.phone}` : 'No Phone'}
                           </Typography>
                         </Stack>
@@ -847,7 +902,24 @@ function BookAppointmentModal({ open, onClose }: { open: boolean; onClose: () =>
               <Select
                 label="Doctor"
                 value={providerId}
-                onChange={(e) => setProviderId(e.target.value)}
+                onChange={(e) => {
+                  const newProvId = e.target.value;
+                  setProviderId(newProvId);
+                  if (newProvId) {
+                    const next = nextFreeSlot({
+                      schedule,
+                      appointments: doctorAppts,
+                      providerId: newProvId,
+                      durationMin: duration,
+                      from: slotSearchFrom(date),
+                    });
+                    if (next) {
+                      setDate(next.date);
+                      setTime(next.time);
+                      setSlotNotice(next.reason);
+                    }
+                  }
+                }}
                 renderValue={(value) => {
                   const d = doctors.find((doc) => doc.id === value);
                   if (!d) return '';
@@ -1293,6 +1365,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [apptDialogOpen, setApptDialogOpen] = useState(false);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [whatsAppCreatedAppt, setWhatsAppCreatedAppt] = useState<Appointment | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -1809,7 +1882,16 @@ export function ReceptionistDashboard(): React.JSX.Element {
       </Box>
 
       <WalkInModal open={walkInOpen} onClose={() => setWalkInOpen(false)} />
-      <BookAppointmentModal open={apptDialogOpen} onClose={() => setApptDialogOpen(false)} />
+      <BookAppointmentModal
+        open={apptDialogOpen}
+        onClose={() => setApptDialogOpen(false)}
+        onCreatedAppointment={(appt) => setWhatsAppCreatedAppt(appt)}
+      />
+      <AppointmentWhatsAppDialog
+        open={Boolean(whatsAppCreatedAppt)}
+        appointment={whatsAppCreatedAppt}
+        onClose={() => setWhatsAppCreatedAppt(null)}
+      />
       <InvoiceDialog
         open={invoiceDialogOpen}
         onClose={() => setInvoiceDialogOpen(false)}

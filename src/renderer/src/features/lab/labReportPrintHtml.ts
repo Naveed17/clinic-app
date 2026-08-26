@@ -125,6 +125,13 @@ function resultRows(rows: LabResultRow[]): string {
     .join('');
 }
 
+function formatRefDoctorName(rawName?: string | null): string {
+  if (!rawName || rawName === '—') return '—';
+  const name = rawName.trim();
+  if (/^(lab test|test lab)$/i.test(name)) return '—';
+  return /^(dr\.|dr\b)/i.test(name) ? name : `Dr. ${name}`;
+}
+
 export function buildLabReportHtml(opts: {
   order: LabOrder;
   clinic: LabReportClinic;
@@ -189,20 +196,6 @@ export function buildLabReportHtml(opts: {
     display: flex;
     flex-direction: column;
   }
-  .watermark {
-    position: absolute;
-    top: 46%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-24deg);
-    font-size: 28px;
-    font-weight: 800;
-    color: #1565c0;
-    opacity: 0.06;
-    white-space: nowrap;
-    pointer-events: none;
-    letter-spacing: 2px;
-    z-index: 0;
-  }
   .content { position: relative; z-index: 1; display: flex; flex-direction: column; flex: 1; }
 
   .brand {
@@ -240,15 +233,15 @@ export function buildLabReportHtml(opts: {
   .contacts .ico { display: inline-block; width: 12px; text-align: center; margin-right: 4px; color: #2e7d32; font-weight: 800; }
 
   .patient {
-    margin-top: 10px;
-    border: 1px solid #c5cdd4;
-    background: #f7f9fb;
+    margin-top: 12px;
+    margin-bottom: 20px;
+    background: transparent;
     display: grid;
-    grid-template-columns: 1.2fr 1.05fr 0.95fr;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 48px;
     min-height: 92px;
   }
-  .pcol { padding: 10px 12px; }
-  .pcol + .pcol { border-left: 1px solid #dbe3ea; }
+  .pcol { padding: 4px 0; }
   .pname { font-size: 15px; font-weight: 800; margin: 0 0 6px; color: #111; }
   .prow { display: flex; font-size: 10px; margin: 2px 0; }
   .pl { width: 78px; color: #4b5563; }
@@ -258,10 +251,12 @@ export function buildLabReportHtml(opts: {
   .qr-ph { background: repeating-conic-gradient(#111 0 25%, #fff 0 50%) 0 0 / 8px 8px; }
   .mid-title { font-size: 9px; color: #4b5563; margin-bottom: 2px; }
   .mid-val { font-size: 10.5px; font-weight: 700; margin-bottom: 8px; line-height: 1.35; }
-  .barcode { width: 100%; height: 32px; object-fit: contain; object-position: right; display: block; margin-bottom: 6px; }
+  .pcol.right { display: flex; justify-content: flex-end; }
+  .right-box { width: 215px; }
+  .barcode { width: 100%; height: 34px; object-fit: fill; display: block; margin-bottom: 6px; }
   .barcode-ph { background: repeating-linear-gradient(90deg, #111 0 1px, #fff 1px 3px); }
-  .right .prow .pl { width: 88px; font-size: 9px; }
-  .right .pv { font-size: 9.5px; }
+  .right .prow .pl { width: 80px; font-size: 9px; }
+  .right .pv { font-size: 9.5px; text-align: right; }
 
   .test-title {
     text-align: center;
@@ -340,7 +335,6 @@ export function buildLabReportHtml(opts: {
 </head>
 <body>
   <div class="sheet">
-    <div class="watermark">${escapeHtml(brand)}</div>
     <div class="content">
       <div class="brand">
         <div class="brand-left">
@@ -364,21 +358,18 @@ export function buildLabReportHtml(opts: {
               <div class="prow"><span class="pl">Age :</span><span class="pv">${age ? `${escapeHtml(age)} Years` : '—'}</span></div>
               <div class="prow"><span class="pl">Blood Gp :</span><span class="pv">${escapeHtml(order.patientBloodGroup || '—')}</span></div>
               <div class="prow"><span class="pl">UHID :</span><span class="pv">${escapeHtml(order.patientMrNumber || '—')}</span></div>
+              <div class="prow"><span class="pl">Ref. By :</span><span class="pv">${escapeHtml(formatRefDoctorName(order.orderedByName))}</span></div>
             </div>
             ${qr}
           </div>
         </div>
-        <div class="pcol">
-          <div class="mid-title">Sample Collected At :</div>
-          <div class="mid-val">${escapeHtml(site)}</div>
-          <div class="prow"><span class="pl">Collected By</span><span class="pv">Lab Technician</span></div>
-          <div class="prow"><span class="pl">Ref. By</span><span class="pv">${escapeHtml(order.orderedByName)}</span></div>
-        </div>
         <div class="pcol right">
-          ${barcode}
-          <div class="prow"><span class="pl">Registered on:</span><span class="pv">${escapeHtml(fmtStamp(order.orderedAt))}</span></div>
-          <div class="prow"><span class="pl">Collected on:</span><span class="pv">${escapeHtml(fmtStamp(order.orderedAt))}</span></div>
-          <div class="prow"><span class="pl">Reported on:</span><span class="pv">${escapeHtml(fmtStamp(reportedAt))}</span></div>
+          <div class="right-box">
+            ${barcode}
+            <div class="prow"><span class="pl">Registered on:</span><span class="pv">${escapeHtml(fmtStamp(order.orderedAt))}</span></div>
+            <div class="prow"><span class="pl">Collected on:</span><span class="pv">${escapeHtml(fmtStamp(order.orderedAt))}</span></div>
+            <div class="prow"><span class="pl">Reported on:</span><span class="pv">${escapeHtml(fmtStamp(reportedAt))}</span></div>
+          </div>
         </div>
       </div>
 

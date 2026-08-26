@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useDeferredValue, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tableSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
@@ -19,6 +19,8 @@ import { useLicense } from '@/features/auth/LicenseModulesContext';
 import type { Patient } from '@/types/patient';
 import { PatientDialog } from './PatientDialog';
 import { PatientHistoryDialog } from './PatientHistoryDialog';
+import { dateOfBirthToAge } from '@shared/patientAge';
+import { formatTableDate } from '@/utils/formatDate';
 
 export function PatientsPage(): React.JSX.Element {
   const queryClient = useQueryClient();
@@ -62,7 +64,17 @@ export function PatientsPage(): React.JSX.Element {
   const theme = useTheme();
   const openCreate = () => { setDialogPatient(undefined); setDialogOpen(true); };
   const openEdit = (patient: Patient) => { setDialogPatient(patient); setDialogOpen(true); };
-  const patients = patientsQuery.data?.data ?? [];
+  const rawPatients = patientsQuery.data?.data ?? [];
+  const patients = useMemo(() => {
+    return [...rawPatients].sort((a, b) => {
+      const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (tB !== tA) return tB - tA;
+      const mrA = parseInt((a.mrNumber || '').replace(/\D/g, ''), 10) || 0;
+      const mrB = parseInt((b.mrNumber || '').replace(/\D/g, ''), 10) || 0;
+      return mrB - mrA;
+    });
+  }, [rawPatients]);
 
   const getInitials = (first: string, last: string) =>
     `${first[0] ?? ''}${last[0] ?? ''}`.toUpperCase();
@@ -117,20 +129,21 @@ export function PatientsPage(): React.JSX.Element {
         <TableHead sx={tableSx.head}>
           <TableRow>
             <TableCell>Patient</TableCell>
-            <TableCell>Allergies</TableCell>
+            <TableCell>MR #</TableCell>
             <TableCell>Chronic conditions</TableCell>
-            <TableCell>Date of Birth</TableCell>
+            <TableCell>Age</TableCell>
             <TableCell>Blood Group</TableCell>
             <TableCell>Address</TableCell>
             <TableCell>Emergency Contact</TableCell>
+            <TableCell>Created At</TableCell>
             <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {patientsQuery.isLoading ? (
-            <TableRowsSkeleton cols={8} />
+            <TableRowsSkeleton cols={9} />
           ) : patients.length === 0 ? (
-            <TableRow><TableCell colSpan={8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No patients found.</TableCell></TableRow>
+            <TableRow><TableCell colSpan={9} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No patients found.</TableCell></TableRow>
           ) : (
             patients.map((patient) => {
               const color = getAvatarColor(patient.firstName);
@@ -138,17 +151,17 @@ export function PatientsPage(): React.JSX.Element {
                 <TableRow key={patient.id} sx={tableSx.row}>
                   {/* Avatar + Name + phone */}
                   <TableCell>
-                    <Stack direction="row" alignItems="center" gap={1.5}>
+                    <Stack direction="row" alignItems="center" gap={1.25}>
                       <Avatar
                         sx={{
-                          width: 38, height: 38, fontSize: 13, fontWeight: 700,
+                          width: 34, height: 34, fontSize: 13, fontWeight: 700,
                           bgcolor: alpha(color, 0.15), color, flexShrink: 0,
                         }}
                       >
                         {getInitials(patient.firstName, patient.lastName)}
                       </Avatar>
                       <Box>
-                        <Typography fontSize={13.5} fontWeight={600} lineHeight={1.3}>
+                        <Typography fontSize={13.5} fontWeight={500} lineHeight={1.3}>
                           {patient.firstName} {patient.lastName}
                         </Typography>
                         <Typography fontSize={11.5} color="text.secondary">
@@ -158,16 +171,18 @@ export function PatientsPage(): React.JSX.Element {
                     </Stack>
                   </TableCell>
 
-                  {/* Allergies */}
-                  <TableCell sx={{ maxWidth: 180 }}>
-                    {patient.allergies ? (
+                  {/* MR Number */}
+                  <TableCell>
+                    {patient.mrNumber ? (
                       <Chip
-                        label={`⚠ ${patient.allergies}`}
+                        label={patient.mrNumber}
                         size="small"
-                        sx={{ fontSize: 10, height: 18, bgcolor: alpha(theme.palette.error.main, 0.1), color: 'error.main', fontWeight: 600 }}
+                        color="primary"
+                        variant="outlined"
+                        sx={{ fontWeight: 700, fontFamily: 'monospace', fontSize: 12 }}
                       />
                     ) : (
-                      <Typography fontSize={13} color="text.secondary">—</Typography>
+                      <Typography fontSize={13.5} color="text.secondary">—</Typography>
                     )}
                   </TableCell>
 
@@ -180,14 +195,17 @@ export function PatientsPage(): React.JSX.Element {
                         sx={{ fontSize: 10, height: 18, bgcolor: alpha(theme.palette.secondary.main, 0.1), color: 'secondary.main', fontWeight: 600 }}
                       />
                     ) : (
-                      <Typography fontSize={13} color="text.secondary">—</Typography>
+                      <Typography fontSize={13.5} color="text.secondary">—</Typography>
                     )}
                   </TableCell>
 
-                  {/* DOB */}
+                  {/* Age */}
                   <TableCell>
-                    <Typography fontSize={13}>
-                      {patient.dateOfBirth ? new Date(patient.dateOfBirth).toLocaleDateString() : '—'}
+                    <Typography fontSize={13.5}>
+                      {(() => {
+                        const age = (patient as { age?: number | null }).age ?? dateOfBirthToAge(patient.dateOfBirth);
+                        return age != null ? `${age} yrs` : '—';
+                      })()}
                     </Typography>
                   </TableCell>
 
@@ -204,7 +222,7 @@ export function PatientsPage(): React.JSX.Element {
 
                   {/* Address */}
                   <TableCell sx={{ maxWidth: 160 }}>
-                    <Typography fontSize={12} color="text.secondary" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>
+                    <Typography fontSize={13.5} color="text.primary" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>
                       {patient.address ?? '—'}
                     </Typography>
                   </TableCell>
@@ -213,10 +231,17 @@ export function PatientsPage(): React.JSX.Element {
                   <TableCell>
                     {patient.emergencyContactName ? (
                       <Box>
-                        <Typography fontSize={13} fontWeight={500}>{patient.emergencyContactName}</Typography>
-                        <Typography fontSize={11} color="text.secondary">{patient.emergencyContactPhone ?? ''}</Typography>
+                        <Typography fontSize={13.5} fontWeight={500}>{patient.emergencyContactName}</Typography>
+                        <Typography fontSize={11.5} color="text.secondary">{patient.emergencyContactPhone ?? ''}</Typography>
                       </Box>
                     ) : '—'}
+                  </TableCell>
+
+                  {/* Created At */}
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                    <Typography fontSize={13.5} color="text.primary">
+                      {formatTableDate(patient.createdAt)}
+                    </Typography>
                   </TableCell>
 
                   <TableCell align="right">

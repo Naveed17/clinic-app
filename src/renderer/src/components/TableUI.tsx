@@ -33,21 +33,29 @@ export const tableSx = {
     '& .MuiTableCell-head': {
       fontSize: 10.5,
       fontWeight: 800,
-      color: 'text.secondary',
+      color: (theme: Theme) => (theme.palette.mode === 'dark' ? '#86efac' : 'primary.dark'),
       textTransform: 'uppercase',
       letterSpacing: '0.06em',
       py: 1.75,
       px: 2.25,
-      borderBottom: '1px solid',
-      borderColor: 'divider',
-      bgcolor: (theme: Theme) => alpha(theme.palette.primary.main, 0.05),
+      borderBottom: '1.5px solid',
+      borderColor: (theme: Theme) => alpha(theme.palette.primary.main, 0.2),
+      position: 'sticky',
+      top: 0,
+      zIndex: 10,
+      bgcolor: (theme: Theme) =>
+        theme.palette.mode === 'dark'
+          ? 'rgba(20, 83, 45, 0.70)'
+          : 'rgba(236, 253, 243, 0.70)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
       whiteSpace: 'nowrap',
     },
   },
   row: {
     cursor: 'default',
     '& .MuiTableCell-body': {
-      fontSize: 13,
+      fontSize: 13.5,
       py: 1.35,
       px: 2.25,
       border: 'none',

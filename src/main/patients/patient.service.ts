@@ -122,12 +122,22 @@ export async function listPatients({ page, pageSize, search, providerId }: Patie
   const [data, total] = await prisma.$transaction([
     prisma.patient.findMany({
       where: whereFinal,
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
     prisma.patient.count({ where: whereFinal }),
   ]);
+
+  // Ensure deterministic descending sort by parsed UNIX timestamp (newest patient first)
+  data.sort((a, b) => {
+    const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    if (tB !== tA) return tB - tA;
+    const mrA = parseInt((a.mrNumber || '').replace(/\D/g, ''), 10) || 0;
+    const mrB = parseInt((b.mrNumber || '').replace(/\D/g, ''), 10) || 0;
+    return mrB - mrA;
+  });
 
   return { data, total };
 }

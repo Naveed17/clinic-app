@@ -25,6 +25,8 @@ export function PatientWhatsAppSendDialog({
   onClose: () => void;
 }): React.JSX.Element {
   const { can } = useLicense();
+  const hasApi = can('whatsapp');
+
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,33 +87,38 @@ export function PatientWhatsAppSendDialog({
             disabled={sending || sent || !phone}
           />
           <Typography variant="caption" color="text.secondary">
-            Cloud API se in-app send. WhatsApp Web ke liye neeche Open WhatsApp Web dabao.
+            {hasApi
+              ? 'Send WhatsApp message directly to patient.'
+              : 'Open in WhatsApp Web to send.'}
           </Typography>
         </Stack>
       </DialogContent>
       <DialogActions sx={dialogActionsSx}>
         <Button onClick={onClose} disabled={sending} sx={dialogCancelBtnSx}>{sent ? 'Close' : 'Cancel'}</Button>
-        {phone && (
-          <Button
-            disabled={sending}
-            onClick={() => {
-              openWhatsAppWeb(phone, text);
-              onClose();
-            }}
-            sx={dialogCancelBtnSx}
-          >
-            Open WhatsApp Web
-          </Button>
-        )}
-        {can('whatsapp') && (
+        {hasApi ? (
           <SubmitButton
             loading={sending}
             disabled={!phone || sent || !text.trim()}
             onClick={() => void handleSend()}
             startIcon={<WhatsAppIcon />}
           >
-            Send
+            Send WhatsApp
           </SubmitButton>
+        ) : (
+          phone && (
+            <Button
+              disabled={sending}
+              onClick={() => {
+                openWhatsAppWeb(phone, text);
+                onClose();
+              }}
+              variant="contained"
+              color="success"
+              startIcon={<WhatsAppIcon />}
+            >
+              Open WhatsApp Web
+            </Button>
+          )
         )}
       </DialogActions>
     </Dialog>

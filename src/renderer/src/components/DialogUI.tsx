@@ -15,7 +15,7 @@ import type { ComponentProps, ReactNode } from 'react';
 /** Paper: column layout, capped height — body scrolls, chrome stays put */
 export const dialogPaperProps = {
   sx: {
-    borderRadius: '20px',
+    borderRadius: 1,
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',

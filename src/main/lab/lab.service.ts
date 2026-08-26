@@ -18,10 +18,17 @@ const include = {
       dateOfBirth: true,
       phone: true,
       bloodGroup: true,
+      primaryDoctor: { select: { id: true, firstName: true, lastName: true } },
     },
   },
-  orderedBy: { select: { id: true, firstName: true, lastName: true } },
-  token: { select: { id: true, tokenNumber: true } },
+  orderedBy: { select: { id: true, firstName: true, lastName: true, role: true } },
+  token: {
+    select: {
+      id: true,
+      tokenNumber: true,
+      doctor: { select: { id: true, firstName: true, lastName: true } },
+    },
+  },
 } as const;
 
 type LabOrderWithRelations = {
@@ -44,17 +51,29 @@ type LabOrderWithRelations = {
     dateOfBirth: Date | null;
     phone: string | null;
     bloodGroup: string | null;
+    primaryDoctor?: { id: string; firstName: string; lastName: string } | null;
   };
-  orderedBy: { id: string; firstName: string; lastName: string };
-  token: { id: string; tokenNumber: number } | null;
+  orderedBy: { id: string; firstName: string; lastName: string; role?: string };
+  token: { id: string; tokenNumber: number; doctor?: { id: string; firstName: string; lastName: string } | null } | null;
 };
 
 function serialize(order: LabOrderWithRelations) {
+  const doctor =
+    (order.orderedBy && order.orderedBy.role === 'DOCTOR' ? order.orderedBy : null) ||
+    order.token?.doctor ||
+    order.patient.primaryDoctor ||
+    order.orderedBy;
+
+  const rawDocName = doctor ? `${doctor.firstName} ${doctor.lastName}`.trim() : '';
+  const resolvedOrderedByName = rawDocName
+    ? rawDocName.startsWith('Dr.') ? rawDocName : `Dr. ${rawDocName}`
+    : '—';
+
   return {
     ...order,
     tokenNumber: order.token?.tokenNumber ?? null,
     patientName: `${order.patient.firstName} ${order.patient.lastName}`,
-    orderedByName: `${order.orderedBy.firstName} ${order.orderedBy.lastName}`,
+    orderedByName: resolvedOrderedByName,
     patientMrNumber: order.patient.mrNumber,
     patientDob: order.patient.dateOfBirth,
     patientPhone: order.patient.phone,

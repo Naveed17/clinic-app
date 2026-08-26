@@ -48,6 +48,7 @@ import { FetchingBar, ListCardsSkeleton, StatCardsSkeleton } from '@/components/
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { appointmentsService } from '@/services/appointments.service';
 import { doctorOfflineReason, slotSearchFrom } from '@/utils/appointmentSlot';
+import { playNotificationSound } from '@/utils/sound';
 import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
@@ -167,6 +168,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
       }) as Promise<Token>;
     },
     onSuccess: async (token: Token) => {
+      playNotificationSound();
       await qc.invalidateQueries({ queryKey: ['tokens'] });
       await qc.invalidateQueries({ queryKey: ['appointments'] });
       setPatientId(''); setDoctorId(''); setNotes(''); setReason(''); setConsultationFee(''); setFeeDiscount('');
@@ -191,7 +193,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
           )}
           <Autocomplete
             options={patients}
-            getOptionLabel={(p) => `${p.firstName} ${p.lastName}${p.mrNumber ? ` (${p.mrNumber})` : ''}`}
+            getOptionLabel={(p) => `${p.firstName} ${p.lastName}`}
             value={selectedPatient}
             onChange={(_, v) => setPatientId(v?.id ?? '')}
             isOptionEqualToValue={(o, v) => o.id === v.id}

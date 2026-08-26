@@ -14,6 +14,7 @@ import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import {
   Box,
   Button,
+  CircularProgress,
   Dialog,
   IconButton,
   Stack,
@@ -159,6 +160,7 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
   const [specialization, setSpecialization] = useState('');
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiStreaming, setAiStreaming] = useState(false);
   const [aiHint, setAiHint] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -295,17 +297,16 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
   async function handleAiSuggest(): Promise<void> {
     if (!editor) return;
     setAiLoading(true);
+    setAiStreaming(false);
     setError(null);
     setAiHint(true);
     const currentText = stripAdviceHtml(editor.getHTML());
-    editor.commands.setContent('<p></p>');
     let streamed = '';
     let lastPaint = 0;
     const paint = (html: string, force = false) => {
       const now = Date.now();
       if (!force && now - lastPaint < 50) return;
       lastPaint = now;
-      // Stream may be partial HTML; TipTap still paints usable fragments.
       editor.commands.setContent(html.trim() || '<p></p>');
     };
     try {
@@ -318,6 +319,10 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
           currentText,
         },
         (delta) => {
+          if (!streamed) {
+            setAiStreaming(true);
+            editor.commands.setContent('<p></p>');
+          }
           streamed += delta;
           paint(streamed);
         },
@@ -334,6 +339,7 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
       setAiHint(false);
     } finally {
       setAiLoading(false);
+      setAiStreaming(false);
     }
   }
 
@@ -563,6 +569,34 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
 
             {/* Rx body */}
             <Box sx={{ position: 'relative', flex: 1, px: 5, pt: 1, pb: 2, minHeight: 380 }}>
+              {aiLoading && !aiStreaming && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    zIndex: 20,
+                    bgcolor: 'rgba(255, 255, 255, 0.88)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 2,
+                    p: 3,
+                    borderRadius: 1,
+                  }}
+                >
+                  <CircularProgress size={48} thickness={4} sx={{ color: PAD_BLUE }} />
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography fontSize={16} fontWeight={700} color={PAD_BLUE} sx={{ mb: 0.5 }}>
+                      Generating AI Prescription...
+                    </Typography>
+                    <Typography fontSize={13} color="text.secondary" fontWeight={500}>
+                      Analyzing diagnosis & patient details
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
               <Box
                 component="img"
                 src={brandLogo}

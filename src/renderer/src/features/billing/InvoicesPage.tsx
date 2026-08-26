@@ -47,6 +47,7 @@ import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
 import { GenderRadioGroup } from '@/components/GenderRadioGroup';
 import type { Invoice, InvoiceInput, InvoicePerson, InvoiceUpdateInput, Payment } from '@/types/invoice';
 import { printInvoiceReceipt } from '@/utils/printInvoiceReceipt';
+import { formatTableDate } from '@/utils/formatDate';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -316,7 +317,6 @@ const filterPatients = createFilterOptions<InvoicePatientOption>({
 });
 
 const ADD_NEW = '__add_new__';
-const WALK_IN = '__walk_in__';
 
 export function InvoiceDialog({
   open,
@@ -410,28 +410,6 @@ export function InvoiceDialog({
     onError: (err) => setQuickError(err instanceof Error ? err.message : 'Could not add patient.'),
   });
 
-  const walkInMutation = useMutation({
-    mutationFn: () => {
-      const suffix = String(Math.floor(Math.random() * 900) + 100);
-      return patientsService.create({
-        firstName: 'Walk-in',
-        lastName: `Patient ${suffix}`,
-        phone: null,
-        email: null,
-        address: null,
-        emergencyContactName: null,
-        emergencyContactPhone: null,
-        bloodGroup: null,
-        allergies: null,
-        chronicConditions: null,
-      });
-    },
-    onSuccess: async (patient) => {
-      await client.invalidateQueries({ queryKey: ['invoice-patients'] });
-      form.setValue('patientId', patient.id);
-    },
-    meta: { toast: 'Walk-in patient added', errorToast: 'Could not add walk-in patient.' },
-  });
 
   useEffect(() => {
     if (!open) return;
@@ -471,7 +449,6 @@ export function InvoiceDialog({
   const mutation = isEdit ? updateMutation : createMutation;
 
   const autocompleteOptions: InvoicePatientOption[] = [
-    { id: WALK_IN, firstName: '+ Quick walk-in patient', lastName: '', inputLabel: '+ Quick walk-in patient' },
     { id: ADD_NEW, firstName: '+ Add new patient…', lastName: '', inputLabel: '+ Add new patient…' },
     ...patientOptions,
   ];
@@ -498,9 +475,8 @@ export function InvoiceDialog({
                 <Autocomplete
                   options={autocompleteOptions}
                   filterOptions={(opts, state) => {
-                    const filtered = filterPatients(opts.filter((o) => o.id !== ADD_NEW && o.id !== WALK_IN), state);
+                    const filtered = filterPatients(opts.filter((o) => o.id !== ADD_NEW), state);
                     return [
-                      opts.find((o) => o.id === WALK_IN)!,
                       opts.find((o) => o.id === ADD_NEW)!,
                       ...filtered,
                     ];
@@ -523,17 +499,14 @@ export function InvoiceDialog({
                       setQuickAddOpen(true);
                       return;
                     }
-                    if (option.id === WALK_IN) {
-                      walkInMutation.mutate();
-                      return;
-                    }
+
                     form.setValue('patientId', option.id);
                     setPatientInput(personLabel(option));
                   }}
                   isOptionEqualToValue={(o, v) => o.id === v.id}
                   renderOption={(props, option) => (
                     <Box component="li" {...props} key={option.id}>
-                      {option.id === ADD_NEW || option.id === WALK_IN ? (
+                      {option.id === ADD_NEW ? (
                         <Typography fontSize={13.5} fontWeight={700} color="primary.main">{option.inputLabel}</Typography>
                       ) : (
                         <Box>
@@ -550,7 +523,7 @@ export function InvoiceDialog({
                       {...params}
                       label="Patient"
                       error={Boolean(errors.patientId)}
-                      helperText={errors.patientId?.message ?? 'Type to search, or add a walk-in patient'}
+                      helperText={errors.patientId?.message ?? 'Type to search, or add a new patient'}
                     />
                   )}
                 />
@@ -767,7 +740,7 @@ export function InvoicesPage(): React.JSX.Element {
                       </Box>
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatTableDate(invoice.createdAt)}</TableCell>
                   <TableCell><Chip label={cfg.label} color={cfg.color} size="small" sx={chipSx} /></TableCell>
                   <TableCell align="right"><Typography fontSize={13.5} fontWeight={700}>{money(invoice.total)}</Typography></TableCell>
                   <TableCell align="right">{money(Number(invoice.amountPaid ?? 0))}</TableCell>

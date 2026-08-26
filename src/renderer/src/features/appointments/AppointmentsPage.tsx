@@ -52,6 +52,9 @@ import { TokenFeeFields } from '@/features/tokens/TokenFeeFields';
 import { TokenPrintPreview } from '@/features/tokens/TokensPage';
 import { usePrintAppointmentToken } from '@/features/appointments/printAppointmentToken';
 import { nextFreeSlot, doctorOfflineReason, slotSearchFrom, type SlotAdjustReason } from '@/utils/appointmentSlot';
+import { formatTableDate } from '@/utils/formatDate';
+import { playNotificationSound } from '@/utils/sound';
+import { dateOfBirthToAge } from '@shared/patientAge';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
@@ -249,13 +252,14 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
   );
 }
 
-export function AppointmentDialog({ appointment, open, onClose, defaultDate, defaultProviderId, onSuccess }: {
+export function AppointmentDialog({ appointment, open, onClose, defaultDate, defaultProviderId, onSuccess, onCreatedAppointment }: {
   appointment?: Appointment;
   open: boolean;
   onClose: () => void;
   defaultDate?: string;
   defaultProviderId?: string;
   onSuccess?: () => void;
+  onCreatedAppointment?: (appt: Appointment) => void;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -353,18 +357,20 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
       return appointment ? appointmentsService.update(appointment.id, input) : appointmentsService.create(input);
     },
     onSuccess: (saved, values) => {
+      let createdAppt: Appointment | null = null;
       if (saved && typeof saved === 'object' && 'id' in saved) {
         const patient = patientOptions.find((p) => p.id === values.patientId);
         const provider = doctorOptions.find((d) => d.id === values.providerId);
+        const raw = saved as Appointment;
+        const next: Appointment = {
+          ...raw,
+          patient: raw.patient?.firstName ? raw.patient : (patient ?? { id: values.patientId, firstName: '', lastName: '', role: 'patient' }),
+          provider: raw.provider?.firstName ? raw.provider : (provider ?? { id: values.providerId, firstName: '', lastName: '', role: 'doctor' }),
+          status: raw.status ?? 'SCHEDULED',
+        };
+        createdAppt = next;
         queryClient.setQueryData(['appointments'], (old: Appointment[] | undefined) => {
           const list = old ?? [];
-          const raw = saved as Appointment;
-          const next: Appointment = {
-            ...raw,
-            patient: raw.patient ?? patient ?? { id: values.patientId, firstName: '', lastName: '', role: 'patient' },
-            provider: raw.provider ?? provider ?? { id: values.providerId, firstName: '', lastName: '', role: 'doctor' },
-            status: raw.status ?? 'SCHEDULED',
-          };
           const idx = list.findIndex((a) => a.id === next.id);
           if (idx >= 0) {
             const copy = [...list];
@@ -374,8 +380,12 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
           return [next, ...list];
         });
       }
+      if (!appointment) playNotificationSound();
       void queryClient.invalidateQueries({ queryKey: ['appointments'] });
       onClose();
+      if (!appointment && createdAppt) {
+        onCreatedAppointment?.(createdAppt);
+      }
       onSuccess?.();
     },
     meta: { silent: true },
@@ -447,8 +457,81 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
                   loading={patients.isLoading}
                   value={patientOptions.find((p) => p.id === field.value) ?? null}
                   isOptionEqualToValue={(option, value) => option.id === value.id}
-                  getOptionLabel={(option) => personLabel(option)}
+                  getOptionLabel={(option) => `${option.firstName} ${option.lastName}`}
                   onChange={(_, value) => field.onChange(value?.id ?? '')}
+                  filterOptions={(opts, state) => {
+                    const q = state.inputValue.trim().toLowerCase();
+                    if (!q) return opts;
+                    return opts.filter((p) => {
+                      const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+                      const phone = p.phone?.toLowerCase() || '';
+                      const mr = (p as { mrNumber?: string }).mrNumber?.toLowerCase() || '';
+                      return name.includes(q) || phone.includes(q) || mr.includes(q);
+                    });
+                  }}
+                  renderOption={(props, option) => {
+                    const initials = `${option.firstName?.[0] || ''}${option.lastName?.[0] || ''}`.toUpperCase() || 'P';
+                    const age = (option as { age?: number }).age ?? dateOfBirthToAge((option as { dateOfBirth?: string | Date | null }).dateOfBirth);
+                    const mrNumber = (option as { mrNumber?: string }).mrNumber;
+                    const gender = (option as { gender?: string }).gender;
+                    const avatar = (option as { avatar?: string | null }).avatar;
+                    return (
+                      <Box
+                        component="li"
+                        {...props}
+                        key={option.id}
+                        sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1, px: 1.5 }}
+                      >
+                        <Avatar
+                          src={avatar || undefined}
+                          sx={{
+                            width: 36,
+                            height: 36,
+                            fontSize: 13,
+                            fontWeight: 700,
+                            bgcolor: 'primary.main',
+                            color: 'primary.contrastText',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {initials}
+                        </Avatar>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                            <Typography fontSize={14} fontWeight={600} noWrap sx={{ flex: 1, minWidth: 0 }}>
+                              {option.firstName} {option.lastName}
+                            </Typography>
+                            <Typography
+                              fontSize={12.5}
+                              color="primary.main"
+                              fontWeight={700}
+                              noWrap
+                              sx={{ width: 140, textAlign: 'left', flexShrink: 0, ml: 1 }}
+                            >
+                              {option.phone ? `📞 ${option.phone}` : 'No Phone'}
+                            </Typography>
+                          </Stack>
+                          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                            {mrNumber && (
+                              <Typography fontSize={11.5} color="text.secondary" fontWeight={600} noWrap>
+                                {mrNumber}
+                              </Typography>
+                            )}
+                            {gender && (
+                              <Typography fontSize={11.5} color="text.secondary" noWrap>
+                                • {gender}
+                              </Typography>
+                            )}
+                            {age != null && (
+                              <Typography fontSize={11.5} color="text.secondary" noWrap>
+                                • {age} yrs
+                              </Typography>
+                            )}
+                          </Stack>
+                        </Box>
+                      </Box>
+                    );
+                  }}
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -781,17 +864,25 @@ export function AppointmentsPage(): React.JSX.Element {
     }
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [allData]);
-  const filtered = allData.filter((a) => {
-    if (doctorFilter !== 'ALL' && a.providerId !== doctorFilter) return false;
-    if (statusFilter !== 'ALL' && a.status !== statusFilter) return false;
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      `${a.patient.firstName} ${a.patient.lastName}`.toLowerCase().includes(q) ||
-      `${a.provider.firstName} ${a.provider.lastName}`.toLowerCase().includes(q) ||
-      (a.reason ?? '').toLowerCase().includes(q)
-    );
-  });
+  const filtered = useMemo(() => {
+    return allData
+      .filter((a) => {
+        if (doctorFilter !== 'ALL' && a.providerId !== doctorFilter) return false;
+        if (statusFilter !== 'ALL' && a.status !== statusFilter) return false;
+        if (!search) return true;
+        const q = search.toLowerCase();
+        return (
+          `${a.patient.firstName} ${a.patient.lastName}`.toLowerCase().includes(q) ||
+          `${a.provider.firstName} ${a.provider.lastName}`.toLowerCase().includes(q) ||
+          (a.reason ?? '').toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.startsAt).getTime();
+        const timeB = new Date(b.startsAt).getTime();
+        return timeB - timeA;
+      });
+  }, [allData, doctorFilter, statusFilter, search]);
   const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   const showDoctorFilter = user?.role !== 'doctor';
@@ -920,8 +1011,8 @@ export function AppointmentsPage(): React.JSX.Element {
               <TableCell>Patient</TableCell>
               <TableCell>Doctor</TableCell>
               <TableCell>Token</TableCell>
+              <TableCell>Date</TableCell>
               <TableCell>Time</TableCell>
-              <TableCell>Duration</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Reason</TableCell>
               {!isAdmin && <TableCell align="right">Actions</TableCell>}
@@ -945,7 +1036,7 @@ export function AppointmentsPage(): React.JSX.Element {
                         {a.patient.firstName[0]}{a.patient.lastName[0]}
                       </Avatar>
                       <Box>
-                        <Typography fontSize={13.5} fontWeight={600}>{personLabel(a.patient)}</Typography>
+                        <Typography fontSize={13.5} fontWeight={500}>{personLabel(a.patient)}</Typography>
                         <Typography fontSize={11.5} color="text.secondary">
                           {a.patient.phone ?? '—'}
                         </Typography>
@@ -960,7 +1051,7 @@ export function AppointmentsPage(): React.JSX.Element {
                         size={34}
                       />
                       <Box>
-                        <Typography fontSize={13.5} fontWeight={600}>{personLabel(a.provider)}</Typography>
+                        <Typography fontSize={13.5} fontWeight={500}>{personLabel(a.provider)}</Typography>
                         <Typography fontSize={11.5} color="text.secondary">{a.provider.role ?? 'Doctor'}</Typography>
                       </Box>
                     </Box>
@@ -971,7 +1062,7 @@ export function AppointmentsPage(): React.JSX.Element {
                     ) : '—'}
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    {new Date(a.startsAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                    {formatTableDate(a.startsAt)}
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     {new Date(a.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(a.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -1024,7 +1115,13 @@ export function AppointmentsPage(): React.JSX.Element {
           </TableBody>
         </TablePageShell>
       )}
-      <AppointmentDialog appointment={active} open={open} defaultDate={defaultDate} defaultProviderId={user?.role === 'doctor' ? user.id : undefined} onClose={() => setOpen(false)} />
+      <AppointmentDialog
+        appointment={active}
+        open={open}
+        defaultDate={defaultDate}
+        defaultProviderId={user?.role === 'doctor' ? user.id : undefined}
+        onClose={() => setOpen(false)}
+      />
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="Delete appointment?"

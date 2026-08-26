@@ -12,6 +12,7 @@ import { Box, Collapse, IconButton, Paper, Stack, Typography } from '@mui/materi
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
 import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
+import { playNotificationSound } from '@/utils/sound';
 
 interface ToastItem {
   id: string;
@@ -44,20 +45,6 @@ function ToastIcon({ entity, kind }: { entity?: string; kind: RealtimeNotificati
   return <InfoOutlinedIcon sx={sx} />;
 }
 
-function playNotificationSound(): void {
-  const ctx = new AudioContext();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.frequency.setValueAtTime(880, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.15);
-  gain.gain.setValueAtTime(0.15, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-  osc.start(ctx.currentTime);
-  osc.stop(ctx.currentTime + 0.4);
-  osc.onended = () => ctx.close();
-}
 
 /** Doctors only see queue-relevant alerts (their tokens / patients / appointments). */
 function shouldShowNotification(
