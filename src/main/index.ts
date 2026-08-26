@@ -58,6 +58,23 @@ ipcMain.handle('app:get-api-url', () => {
 
 ipcMain.handle('ui:get-materials', () => getMaterialsCapability());
 
+ipcMain.on('window:minimize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  win?.minimize();
+});
+
+ipcMain.on('window:toggle-maximize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return;
+  if (win.isMaximized()) win.unmaximize();
+  else win.maximize();
+});
+
+ipcMain.on('window:close', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  win?.close();
+});
+
 // ─── LAN-client background retry ────────────────────────────────────────────
 // Agar startup pe server nahi mila toh yeh function background mein retry
 // karta rehta hai (har 5 seconds). Jab server mil jaye toh:

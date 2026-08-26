@@ -2,6 +2,22 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  --cf-mica-titlebar: rgba(243, 243, 243, 0.65);
+  --cf-mica-sidebar: rgba(243, 243, 243, 0.55);
+  --cf-mica-commandbar: rgba(255, 255, 255, 0.6);
+  --cf-mica-surface: rgba(255, 255, 255, 0.85);
+  --cf-mica-fallback: #f3f3f3;
+  --cf-nav-active-fill: rgba(0, 120, 212, 0.08);
+}
+
+[data-theme='dark'],
+.dark {
+  --cf-mica-titlebar: rgba(32, 32, 32, 0.65);
+  --cf-mica-sidebar: rgba(32, 32, 32, 0.55);
+  --cf-mica-commandbar: rgba(40, 40, 40, 0.6);
+  --cf-mica-surface: rgba(40, 40, 40, 0.85);
+  --cf-mica-fallback: #202020;
+  --cf-nav-active-fill: rgba(0, 120, 212, 0.2);
 }
 
 html,
@@ -11,6 +27,7 @@ body,
   height: 100%;
   margin: 0;
   overflow: hidden;
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 * {
@@ -37,13 +54,6 @@ body,
   font-feature-settings: "tnum";
   font-variant-numeric: tabular-nums;
   letter-spacing: 2px;
-}
-
-.digital-clock .MuiTypography-root {
-  font-family: inherit;
-  font-feature-settings: inherit;
-  font-variant-numeric: inherit;
-  letter-spacing: inherit;
 }
 
 /* Align react-phone-number-input with Fluent inputs */
