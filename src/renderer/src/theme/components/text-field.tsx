@@ -5,7 +5,9 @@ export const MuiTextField = {
   styleOverrides: {
     root: {
       backgroundColor: 'transparent',
-      '& .MuiOutlinedInput-root': { borderRadius: 4 },
+      '& .MuiOutlinedInput-root': {
+        borderRadius: 8,
+      },
     },
   },
 } satisfies Components<Theme>['MuiTextField'];

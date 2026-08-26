@@ -1,5 +1,6 @@
 import type { Components } from '@mui/material/styles';
 import type { Theme } from '../types';
+import { MuiAutocomplete } from './autocomplete';
 import { MuiAvatar } from './avatar';
 import { MuiButton } from './button';
 import { MuiCard } from './card';
@@ -8,6 +9,7 @@ import { MuiCardHeader } from './card-header';
 import { MuiChip } from './chip';
 import { MuiDialog } from './dialog';
 import { MuiInputBase } from './inputBase';
+import { MuiInputLabel } from './inputLabel';
 import { MuiLinearProgress } from './linear-progress';
 import { MuiLink } from './link';
 import { MuiOutlinedInput } from './outlined-input';
@@ -22,6 +24,7 @@ import { MuiTableHead } from './table-head';
 import { MuiTextField } from './text-field';
 
 export const components = {
+  MuiAutocomplete,
   MuiAvatar,
   MuiButton,
   MuiCard,
@@ -30,6 +33,7 @@ export const components = {
   MuiChip,
   MuiDialog,
   MuiInputBase,
+  MuiInputLabel,
   MuiLinearProgress,
   MuiLink,
   MuiOutlinedInput,

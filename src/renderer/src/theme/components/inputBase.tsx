@@ -11,10 +11,10 @@ export const MuiInputBase = {
       },
     },
     root: {
-      '&.Mui-readOnly': {
+      '&.Mui-readOnly, &.Mui-disabled': {
         color: 'var(--mui-palette-text-secondary) !important',
         WebkitTextFillColor: 'var(--mui-palette-text-secondary) !important',
-        backgroundColor: 'var(--mui-palette-background-level1) !important',
+        backgroundColor: '#f1f5f9 !important',
       },
     },
   },
