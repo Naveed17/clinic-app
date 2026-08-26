@@ -340,6 +340,11 @@ const api = {
         () => request('/api/invoices', { method: 'POST', body: JSON.stringify(input) }),
         'invoices:create', input,
       ),
+    update: (id: string, input: unknown) =>
+      call(
+        () => request(`/api/invoices/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(input) }),
+        'invoices:update', id, input,
+      ),
     addPayment: (invoiceId: string, amount: number, method: string, reference?: string) =>
       call(
         () => request(`/api/invoices/${invoiceId}/payment`, { method: 'POST', body: JSON.stringify({ amount, method, reference }) }),
@@ -563,10 +568,10 @@ const api = {
     },
   },
   tokens: {
-    getForPatient: (patientId: string, date: string) =>
+    getForPatient: (patientId: string, date: string, doctorId?: string) =>
       call(
-        () => request(`/api/tokens/for-patient?patientId=${patientId}&date=${date}`),
-        'tokens:get-for-patient', patientId, date,
+        () => request(`/api/tokens/for-patient?patientId=${patientId}&date=${date}${doctorId ? `&doctorId=${encodeURIComponent(doctorId)}` : ''}`),
+        'tokens:get-for-patient', patientId, date, doctorId,
       ),
     list: (date: string) =>
       call(
@@ -949,20 +954,20 @@ const api = {
         () => request('/api/medicines'),
         'medicines:list',
       ),
-    create: (name: string, price: number) =>
+    create: (name: string, price: number, type?: string, mg?: number | null) =>
       call(
-        () => request('/api/medicines', { method: 'POST', body: JSON.stringify({ name, price }) }),
-        'medicines:create', name, price,
+        () => request('/api/medicines', { method: 'POST', body: JSON.stringify({ name, price, type, mg }) }),
+        'medicines:create', name, price, type, mg,
       ),
     updatePrice: (id: string, price: number) =>
       call(
         () => request(`/api/medicines/${id}/price`, { method: 'PUT', body: JSON.stringify({ price }) }),
         'medicines:update-price', id, price,
       ),
-    update: (id: string, name: string, price: number) =>
+    update: (id: string, name: string, price: number, type?: string, mg?: number | null) =>
       call(
-        () => request(`/api/medicines/${id}`, { method: 'PUT', body: JSON.stringify({ name, price }) }),
-        'medicines:update', id, name, price,
+        () => request(`/api/medicines/${id}`, { method: 'PUT', body: JSON.stringify({ name, price, type, mg }) }),
+        'medicines:update', id, name, price, type, mg,
       ),
     delete: (id: string) =>
       call(

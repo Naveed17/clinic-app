@@ -62,7 +62,7 @@ type ModulesCache = { key: string; modules: Record<string, boolean>; updatedAt: 
 type LicenseCache = {
   key: string;
   expiresAt: string | null;
-  licenseType?: 'monthly' | 'lifetime';
+  licenseType?: 'monthly' | 'annual' | 'lifetime';
   activatedAt: string;
   updatedAt: string;
   databaseMode?: DatabaseMode;
@@ -152,8 +152,8 @@ function toIsoExpiry(value: unknown): string | null {
   return date.toISOString();
 }
 
-function asLicenseType(value: unknown): 'monthly' | 'lifetime' | undefined {
-  return value === 'monthly' || value === 'lifetime' ? value : undefined;
+function asLicenseType(value: unknown): 'monthly' | 'annual' | 'lifetime' | undefined {
+  return value === 'monthly' || value === 'annual' || value === 'lifetime' ? value : undefined;
 }
 
 function saveLicenseCache(
@@ -163,7 +163,7 @@ function saveLicenseCache(
     databaseMode?: DatabaseMode;
     clinicalApiUrl?: string | null;
     schemaId?: string | null;
-    licenseType?: 'monthly' | 'lifetime';
+    licenseType?: 'monthly' | 'annual' | 'lifetime';
     lastGate?: 'ok' | 'blocked';
     lastReason?: string;
   },
@@ -217,10 +217,10 @@ function saveModulesCache(key: string, modules: Record<string, boolean>): void {
 function isLocallyExpired(key: string): boolean {
   const cache = getLicenseCache(key);
   if (!cache) return false;
-  if (cache.licenseType === 'monthly' && !cache.expiresAt) return true;
+  if ((cache.licenseType === 'monthly' || cache.licenseType === 'annual') && !cache.expiresAt) return true;
   if (!cache.expiresAt) return false;
   const end = new Date(cache.expiresAt);
-  if (Number.isNaN(end.getTime())) return cache.licenseType === 'monthly';
+  if (Number.isNaN(end.getTime())) return cache.licenseType === 'monthly' || cache.licenseType === 'annual';
   return Date.now() > end.getTime();
 }
 
@@ -379,11 +379,7 @@ export async function getLicenseGate(): Promise<LicenseGate> {
       message?: string;
       expiresAt?: string | null;
     } & LicenseApiExtras;
-    if (isLicenseMissingOnServer(data, response.status)) {
-      clearLocalLicense();
-      return { state: 'none' };
-    }
-    if (!data.valid) {
+    if (!data.valid || response.status !== 200) {
       const reason = String(data.error || data.message || '').trim() || DISABLED_FALLBACK;
       rememberGate(savedKey, 'blocked', reason);
       return { state: 'blocked', reason };

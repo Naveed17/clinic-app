@@ -27,6 +27,7 @@ declare global {
         get: (id: string) => Promise<unknown>;
         patients: () => Promise<unknown>;
         create: (input: unknown) => Promise<unknown>;
+        update: (id: string, input: unknown) => Promise<unknown>;
         addPayment: (invoiceId: string, amount: number, method: string, reference?: string) => Promise<unknown>;
         refund: (invoiceId: string, amount: number, method: string, reason?: string) => Promise<unknown>;
         void: (id: string) => Promise<unknown>;
@@ -52,7 +53,7 @@ declare global {
         delete: (id: string) => Promise<unknown>;
       };
       tokens: {
-        getForPatient: (patientId: string, date: string) => Promise<unknown>;
+        getForPatient: (patientId: string, date: string, doctorId?: string) => Promise<unknown>;
         getById: (tokenId: string) => Promise<unknown>;
         list: (date: string) => Promise<unknown>;
         listPrescriptions: (date: string) => Promise<unknown>;
@@ -271,9 +272,9 @@ declare global {
       medicines: {
         search: (query: string) => Promise<unknown>;
         list: () => Promise<unknown>;
-        create: (name: string, price: number) => Promise<unknown>;
+        create: (name: string, price: number, type?: string, mg?: number | null) => Promise<unknown>;
         updatePrice: (id: string, price: number) => Promise<unknown>;
-        update: (id: string, name: string, price: number) => Promise<unknown>;
+        update: (id: string, name: string, price: number, type?: string, mg?: number | null) => Promise<unknown>;
         delete: (id: string) => Promise<unknown>;
       };
       search: {

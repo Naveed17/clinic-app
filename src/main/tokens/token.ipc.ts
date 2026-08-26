@@ -19,8 +19,8 @@ import {
 import { emitNotification } from '../backend/realtime';
 
 export function registerTokenIpc(io?: SocketIOServer): void {
-  ipcMain.handle('tokens:get-for-patient', (_, patientId: string, date: string) =>
-    getTokenForPatient(patientId, date)
+  ipcMain.handle('tokens:get-for-patient', (_, patientId: string, date: string, doctorId?: string) =>
+    getTokenForPatient(patientId, date, doctorId)
   );
   ipcMain.handle('tokens:list', (_, date: string) => listTokens(date));
   ipcMain.handle('tokens:get-by-id', (_, tokenId: string) => getTokenById(tokenId));

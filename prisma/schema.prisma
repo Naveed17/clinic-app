@@ -143,6 +143,7 @@ model Patient {
   firstName             String
   lastName              String
   dateOfBirth           DateTime?
+  gender                String?
   phone                 String?
   email                 String?
   address               String?
@@ -347,7 +348,8 @@ model LabReport {
 
 model Medicine {
   id            String   @id @default(uuid())
-  name          String   @unique
+  name          String
+  mg            Int?
   genericName   String?
   categoryId    String?
   barcode       String?  @unique

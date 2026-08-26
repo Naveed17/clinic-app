@@ -27,9 +27,9 @@ function serializeInvoice(invoice: Prisma.InvoiceGetPayload<{ include: typeof in
   const amountPaid = Number(invoice.amountPaid);
   const hasRefund = invoice.payments.some((p) => Number(p.amount) < 0);
   const status =
-    invoice.status !== 'VOID' && invoice.status !== 'DRAFT' && hasRefund && amountPaid <= 0
-      ? 'REFUNDED'
-      : invoice.status;
+    invoice.status === 'VOID' || invoice.status === 'DRAFT'
+      ? invoice.status
+      : statusAfterBalance(Number(invoice.total), amountPaid, hasRefund);
   const { payments: _payments, ...rest } = invoice;
   return {
     ...rest,
@@ -73,16 +73,29 @@ export async function getInvoice(id: string) {
 
 export async function invoicePatients() {
   return getPrisma().patient.findMany({
-    select: { id: true, firstName: true, lastName: true },
-    orderBy: { createdAt: 'desc' }, 
-  });
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      mrNumber: true,
+      phone: true,
+      gender: true,
+      dateOfBirth: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  } as unknown as Prisma.PatientFindManyArgs);
 }
 
 function roundMoney(n: number) {
   return Math.round((Number(n) || 0) * 100) / 100;
 }
 
-function statusAfterBalance(total: number, paid: number): 'PAID' | 'PARTIALLY_PAID' | 'ISSUED' {
+function statusAfterBalance(
+  total: number,
+  paid: number,
+  hasRefund: boolean,
+): 'PAID' | 'PARTIALLY_PAID' | 'ISSUED' | 'REFUNDED' {
+  if (hasRefund) return 'REFUNDED';
   if (paid >= total && total > 0) return 'PAID';
   if (paid > 0) return 'PARTIALLY_PAID';
   return 'ISSUED';
@@ -105,7 +118,8 @@ export async function addPayment(invoiceId: string, amount: number, method: stri
       },
     });
     const totalPaid = roundMoney(Number(invoice.amountPaid) + pay);
-    const status = statusAfterBalance(Number(invoice.total), totalPaid);
+    const hasRefund = invoice.payments.some((p) => Number(p.amount) < 0);
+    const status = statusAfterBalance(Number(invoice.total), totalPaid, hasRefund);
     const updated = await tx.invoice.update({
       where: { id: invoiceId },
       data: { amountPaid: totalPaid, status, issuedAt: invoice.issuedAt ?? new Date() },
@@ -143,7 +157,8 @@ export async function refundPayment(
       },
     });
     const totalPaid = roundMoney(paid - refund);
-    const status = statusAfterBalance(Number(invoice.total), totalPaid);
+    const hasRefund = true;
+    const status = statusAfterBalance(Number(invoice.total), totalPaid, hasRefund);
     const updated = await tx.invoice.update({
       where: { id: invoiceId },
       data: { amountPaid: totalPaid, status },
@@ -209,4 +224,52 @@ export async function createInvoice(input: InvoiceInput) {
   });
 
   return result;
+}
+
+export interface InvoiceUpdateInput {
+  discount: number;
+  notes?: string | null;
+  items: InvoiceItemInput[];
+}
+
+export async function updateInvoice(id: string, input: InvoiceUpdateInput) {
+  const database = getPrisma();
+  return database.$transaction(async (tx) => {
+    const invoice = await tx.invoice.findUniqueOrThrow({ where: { id }, include });
+    if (invoice.status === 'VOID') throw new Error('Cannot edit a voided invoice.');
+
+    const subtotal = input.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    const discount = Math.max(0, Math.min(input.discount, subtotal));
+    const total = Math.max(0, subtotal - discount);
+
+    await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
+    if (input.items.length > 0) {
+      await tx.invoiceItem.createMany({
+        data: input.items.map((item) => ({
+          invoiceId: id,
+          description: item.description.trim(),
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          lineTotal: item.quantity * item.unitPrice,
+        })),
+      });
+    }
+
+    const hasRefund = invoice.payments.some((p) => Number(p.amount) < 0);
+    const paid = roundMoney(Number(invoice.amountPaid));
+    const status = statusAfterBalance(total, paid, hasRefund);
+
+    const updated = await tx.invoice.update({
+      where: { id },
+      data: {
+        subtotal,
+        discount,
+        total,
+        notes: input.notes?.trim() || null,
+        status,
+      },
+      include,
+    });
+    return serializeInvoice(updated);
+  });
 }

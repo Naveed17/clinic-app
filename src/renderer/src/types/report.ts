@@ -20,6 +20,7 @@ export interface OpdInvoiceRow {
 export interface OpdFeeRow {
   id: string;
   tokenNumber: number;
+  date: string;
   patientName: string;
   mrNumber: string | null;
   doctorId: string;
@@ -44,6 +45,8 @@ export interface OpdDoctorFeeSummary {
 
 export interface OpdDailyReport {
   date: string;
+  dateFrom: string;
+  dateTo: string;
   doctorId: string | null;
   doctorName: string | null;
   invoices: {
@@ -66,6 +69,8 @@ export interface OpdDailyReport {
 }
 
 export interface OpdReportInput {
-  date: string;
+  date?: string;
+  dateFrom?: string;
+  dateTo?: string;
   doctorId?: string;
 }

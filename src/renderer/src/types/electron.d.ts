@@ -14,9 +14,9 @@ declare global {
       medicines: {
         search: (query: string) => Promise<Medicine[]>;
         list: () => Promise<Medicine[]>;
-        create: (name: string, price: number) => Promise<Medicine>;
+        create: (name: string, price: number, type?: string, mg?: number | null) => Promise<Medicine>;
         updatePrice: (id: string, price: number) => Promise<Medicine>;
-        update: (id: string, name: string, price: number) => Promise<Medicine>;
+        update: (id: string, name: string, price: number, type?: string, mg?: number | null) => Promise<Medicine>;
         delete: (id: string) => Promise<{ ok: boolean; id: string } | void>;
       };
       license: {
@@ -39,7 +39,7 @@ declare global {
         delete: (id: string) => Promise<void>;
       };
       tokens: {
-        getForPatient: (patientId: string, date: string) => Promise<Token | null>;
+        getForPatient: (patientId: string, date: string, doctorId?: string) => Promise<Token | null>;
         getById: (tokenId: string) => Promise<Token | null>;
         upsertPrescription: any;
         list: (date: string) => Promise<Token[]>;
@@ -69,6 +69,7 @@ declare global {
         get: (id: string) => Promise<Invoice | null>;
         patients: () => Promise<InvoicePerson[]>;
         create: (input: InvoiceInput) => Promise<Invoice>;
+        update: (id: string, input: import('./invoice').InvoiceUpdateInput) => Promise<Invoice>;
         addPayment: (invoiceId: string, amount: number, method: string, reference?: string) => Promise<Invoice>;
         refund: (invoiceId: string, amount: number, method: string, reason?: string) => Promise<Invoice>;
         void: (id: string) => Promise<Invoice>;

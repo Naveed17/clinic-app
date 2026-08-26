@@ -40,8 +40,8 @@ function personName(person: { firstName: string; lastName: string }): string {
   return `${person.firstName} ${person.lastName}`.trim();
 }
 
-function displayInvoiceStatus(status: string, amountPaid: number, hasRefund: boolean): string {
-  if (status !== 'VOID' && status !== 'DRAFT' && hasRefund && amountPaid <= 0) return 'REFUNDED';
+function displayInvoiceStatus(status: string, _amountPaid: number, hasRefund: boolean): string {
+  if (status !== 'VOID' && status !== 'DRAFT' && hasRefund) return 'REFUNDED';
   return status;
 }
 
@@ -81,13 +81,24 @@ export async function getReportSummary(): Promise<{
 
 export interface OpdReportInput {
   date?: string;
+  dateFrom?: string;
+  dateTo?: string;
   doctorId?: string | null;
 }
 
+function resolveReportDateRange(input: OpdReportInput = {}): { dateFrom: string; dateTo: string } {
+  const legacy = input.date ? parseReportDate(input.date) : null;
+  const dateFrom = parseReportDate(input.dateFrom ?? legacy ?? undefined);
+  const dateTo = parseReportDate(input.dateTo ?? legacy ?? dateFrom);
+  if (dateFrom > dateTo) throw new Error('Start date cannot be after end date.');
+  return { dateFrom, dateTo };
+}
+
 export async function getOpdDailyReport(input: OpdReportInput = {}) {
-  const date = parseReportDate(input.date);
+  const { dateFrom, dateTo } = resolveReportDateRange(input);
   const doctorId = String(input.doctorId || '').trim() || null;
-  const { dayStart, dayEnd } = localDayBounds(date);
+  const { dayStart: rangeStart } = localDayBounds(dateFrom);
+  const { dayEnd: rangeEnd } = localDayBounds(dateTo);
   const database = getPrisma();
 
   let doctorName: string | null = null;
@@ -128,10 +139,11 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
         FROM "Token" t
         JOIN "Patient" p ON p.id = t.patientId
         JOIN "User" u ON u.id = t.doctorId
-        WHERE t.date = ? AND t.doctorId = ?
-        ORDER BY u.lastName ASC, t.tokenNumber ASC
+        WHERE t.date >= ? AND t.date <= ? AND t.doctorId = ?
+        ORDER BY t.date ASC, u.lastName ASC, t.tokenNumber ASC
         `,
-        date,
+        dateFrom,
+        dateTo,
         doctorId,
       )
     : await database.$queryRawUnsafe<TokenReportRow[]>(
@@ -143,10 +155,11 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
         FROM "Token" t
         JOIN "Patient" p ON p.id = t.patientId
         JOIN "User" u ON u.id = t.doctorId
-        WHERE t.date = ?
-        ORDER BY u.lastName ASC, t.tokenNumber ASC
+        WHERE t.date >= ? AND t.date <= ?
+        ORDER BY t.date ASC, u.lastName ASC, t.tokenNumber ASC
         `,
-        date,
+        dateFrom,
+        dateTo,
       );
 
   const patientDoctors = new Map<string, Set<string>>();
@@ -157,7 +170,7 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
   }
 
   const invoiceWhere: Prisma.InvoiceWhereInput = {
-    createdAt: { gte: dayStart, lte: dayEnd },
+    createdAt: { gte: rangeStart, lte: rangeEnd },
   };
   if (doctorId) {
     const tokenPatientIds = [...new Set(tokens.map((token) => token.patientId))];
@@ -221,6 +234,7 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
     return {
       id: token.id,
       tokenNumber: Number(token.tokenNumber),
+      date: String(token.date),
       patientName: personName({ firstName: token.patientFirstName, lastName: token.patientLastName }),
       mrNumber: token.patientMrNumber || null,
       doctorId: token.doctorId,
@@ -254,7 +268,9 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
   }
 
   return {
-    date,
+    date: dateFrom === dateTo ? dateFrom : `${dateFrom} — ${dateTo}`,
+    dateFrom,
+    dateTo,
     doctorId,
     doctorName,
     invoices: {

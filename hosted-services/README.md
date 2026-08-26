@@ -38,7 +38,7 @@ hosted-services/lib/*             →  lib/
 | Name | Required | Purpose |
 |---|---|---|
 | `GROQ_API_KEY` | yes (AI) | Your Groq key |
-| `GROQ_MODEL` | no | Default `llama-3.1-8b-instant` |
+| `GROQ_MODEL` | no | Default `gemini-3.6-flash` |
 | `WHATSAPP_TOKEN` | yes (WhatsApp) | Meta Cloud API token for the **shared** number |
 | `WHATSAPP_PHONE_NUMBER_ID` | yes (WhatsApp) | Phone Number ID for that number |
 | `LICENSE_API_ORIGIN` | no | e.g. `https://clinic-license-six.vercel.app` if validate/modules live on another origin |

@@ -1,5 +1,6 @@
 import type { Patient, Prisma } from '@prisma/client';
 import { getPrisma } from '../database/client';
+import { ageToDateOfBirth } from '../../shared/patientAge';
 import { toWhatsAppNumber } from '../../shared/whatsappPhone';
 
 export interface PatientListInput {
@@ -13,6 +14,8 @@ export interface PatientInput {
   firstName: string;
   lastName: string;
   dateOfBirth?: string | null;
+  age?: number | string | null;
+  gender?: string | null;
   phone?: string | null;
   email?: string | null;
   address?: string | null;
@@ -35,11 +38,20 @@ async function generateMrNumber(): Promise<string> {
   return `MR-${String(lastNum + 1).padStart(5, '0')}`;
 }
 
+function resolveDateOfBirth(input: PatientInput): Date | null {
+  if (input.age != null && String(input.age).trim() !== '') {
+    return ageToDateOfBirth(input.age);
+  }
+  if (input.dateOfBirth) return new Date(input.dateOfBirth);
+  return null;
+}
+
 function mapPatientInput(input: PatientInput): Omit<Prisma.PatientCreateInput, 'mrNumber'> {
-  const data: Omit<Prisma.PatientCreateInput, 'mrNumber'> = {
+  const data = {
     firstName: input.firstName.trim(),
     lastName: input.lastName.trim(),
-    dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
+    dateOfBirth: resolveDateOfBirth(input),
+    gender: input.gender?.trim() || null,
     phone: toWhatsAppNumber(input.phone) || input.phone?.trim() || null,
     email: input.email?.trim() || null,
     address: input.address?.trim() || null,
@@ -48,11 +60,9 @@ function mapPatientInput(input: PatientInput): Omit<Prisma.PatientCreateInput, '
     bloodGroup: input.bloodGroup?.trim() || null,
     allergies: input.allergies?.trim() || null,
     chronicConditions: input.chronicConditions?.trim() || null,
+    ...(input.primaryDoctorId ? { primaryDoctor: { connect: { id: input.primaryDoctorId } } } : {}),
   };
-  if (input.primaryDoctorId) {
-    data.primaryDoctor = { connect: { id: input.primaryDoctorId } };
-  }
-  return data;
+  return data as Omit<Prisma.PatientCreateInput, 'mrNumber'>;
 }
 
 export async function listPatients({ page, pageSize, search, providerId }: PatientListInput): Promise<{
@@ -112,12 +122,22 @@ export async function listPatients({ page, pageSize, search, providerId }: Patie
   const [data, total] = await prisma.$transaction([
     prisma.patient.findMany({
       where: whereFinal,
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
     prisma.patient.count({ where: whereFinal }),
   ]);
+
+  // Ensure deterministic descending sort by parsed UNIX timestamp (newest patient first)
+  data.sort((a, b) => {
+    const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    if (tB !== tA) return tB - tA;
+    const mrA = parseInt((a.mrNumber || '').replace(/\D/g, ''), 10) || 0;
+    const mrB = parseInt((b.mrNumber || '').replace(/\D/g, ''), 10) || 0;
+    return mrB - mrA;
+  });
 
   return { data, total };
 }

@@ -105,6 +105,9 @@ export async function initializeDatabase(): Promise<void> {
       'CREATE INDEX IF NOT EXISTS "Patient_primaryDoctorId_idx" ON "Patient"("primaryDoctorId")',
     );
   }
+  if (!patientCols.includes('gender')) {
+    await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "gender" TEXT');
+  }
 
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Appointment" (
@@ -455,6 +458,7 @@ export async function initializeDatabase(): Promise<void> {
   if (!medCols.includes('rackNumber')) await database.$executeRawUnsafe('ALTER TABLE "Medicine" ADD COLUMN "rackNumber" TEXT');
   if (!medCols.includes('minStockAlert')) await database.$executeRawUnsafe('ALTER TABLE "Medicine" ADD COLUMN "minStockAlert" INTEGER NOT NULL DEFAULT 10');
   if (!medCols.includes('unit')) await database.$executeRawUnsafe(`ALTER TABLE "Medicine" ADD COLUMN "unit" TEXT NOT NULL DEFAULT 'Tablet'`);
+  if (!medCols.includes('mg')) await database.$executeRawUnsafe('ALTER TABLE "Medicine" ADD COLUMN "mg" INTEGER');
 
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "MedicineBatch" (
@@ -546,6 +550,7 @@ export async function initializeDatabase(): Promise<void> {
     )
   `);
   await rebuildMedicineWithoutCategoryFk(database);
+  await migrateMedicineNameMgUnique(database);
   await database.$executeRawUnsafe('PRAGMA foreign_keys = ON');
 }
 
@@ -568,6 +573,7 @@ async function rebuildMedicineWithoutCategoryFk(database: PrismaClient): Promise
     'unit',
     'rackNumber',
     'minStockAlert',
+    'mg',
     'createdAt',
     'updatedAt',
   ];
@@ -577,13 +583,14 @@ async function rebuildMedicineWithoutCategoryFk(database: PrismaClient): Promise
   await database.$executeRawUnsafe(`
     CREATE TABLE "Medicine_rebuild" (
       "id" TEXT NOT NULL PRIMARY KEY,
-      "name" TEXT NOT NULL UNIQUE,
+      "name" TEXT NOT NULL,
       "genericName" TEXT,
       "categoryId" TEXT,
       "barcode" TEXT UNIQUE,
       "unit" TEXT NOT NULL DEFAULT 'Tablet',
       "rackNumber" TEXT,
       "minStockAlert" INTEGER NOT NULL DEFAULT 10,
+      "mg" INTEGER,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" DATETIME NOT NULL
     )
@@ -603,6 +610,69 @@ async function rebuildMedicineWithoutCategoryFk(database: PrismaClient): Promise
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Medicine_barcode_idx" ON "Medicine"("barcode")',
   );
+}
+
+/** Allow same medicine name with different mg strengths (Tab/Capsule/Injection). */
+async function migrateMedicineNameMgUnique(database: PrismaClient): Promise<void> {
+  const indexes = await database.$queryRawUnsafe<{ name: string }[]>(
+    `SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='Medicine'`,
+  );
+  if (indexes.some((i) => i.name === 'Medicine_name_mg_key')) return;
+
+  const cols = (
+    await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info("Medicine")')
+  ).map((r) => r.name);
+  const dest = [
+    'id',
+    'name',
+    'genericName',
+    'categoryId',
+    'barcode',
+    'unit',
+    'rackNumber',
+    'minStockAlert',
+    'mg',
+    'createdAt',
+    'updatedAt',
+  ];
+  const copy = dest.filter((c) => cols.includes(c));
+
+  await database.$executeRawUnsafe('PRAGMA foreign_keys=OFF');
+  await database.$executeRawUnsafe('DROP TABLE IF EXISTS "Medicine_rebuild"');
+  await database.$executeRawUnsafe(`
+    CREATE TABLE "Medicine_rebuild" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "name" TEXT NOT NULL,
+      "genericName" TEXT,
+      "categoryId" TEXT,
+      "barcode" TEXT UNIQUE,
+      "unit" TEXT NOT NULL DEFAULT 'Tablet',
+      "rackNumber" TEXT,
+      "minStockAlert" INTEGER NOT NULL DEFAULT 10,
+      "mg" INTEGER,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" DATETIME NOT NULL
+    )
+  `);
+  await database.$executeRawUnsafe(
+    `INSERT INTO "Medicine_rebuild" (${copy.map((c) => `"${c}"`).join(', ')})
+     SELECT ${copy.map((c) => `"${c}"`).join(', ')} FROM "Medicine"`,
+  );
+  await database.$executeRawUnsafe('DROP TABLE "Medicine"');
+  await database.$executeRawUnsafe('ALTER TABLE "Medicine_rebuild" RENAME TO "Medicine"');
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Medicine_name_idx" ON "Medicine"("name")',
+  );
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Medicine_genericName_idx" ON "Medicine"("genericName")',
+  );
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Medicine_barcode_idx" ON "Medicine"("barcode")',
+  );
+  await database.$executeRawUnsafe(
+    'CREATE UNIQUE INDEX IF NOT EXISTS "Medicine_name_mg_key" ON "Medicine"("name", IFNULL("mg", -1))',
+  );
+  await database.$executeRawUnsafe('PRAGMA foreign_keys=ON');
 }
 
 export async function disconnectPrisma(): Promise<void> {

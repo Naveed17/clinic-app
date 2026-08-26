@@ -4,6 +4,7 @@ export interface Patient {
   firstName: string;
   lastName: string;
   dateOfBirth: Date | string | null;
+  gender?: string | null;
   phone: string | null;
   email: string | null;
   address: string | null;
@@ -21,6 +22,9 @@ export interface PatientInput {
   firstName: string;
   lastName: string;
   dateOfBirth?: string | null;
+  /** Age in years — converted to approximate dateOfBirth on save when provided. */
+  age?: number | string | null;
+  gender?: string | null;
   phone?: string | null;
   email?: string | null;
   address?: string | null;

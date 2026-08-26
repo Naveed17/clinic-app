@@ -44,32 +44,64 @@ async function assertProviderActive(providerId: string): Promise<void> {
 
 export async function listAppointments() {
   const db = getPrisma();
-  const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(`
-    SELECT a.id, a.patientId, a.providerId, a.startsAt, a.endsAt, a.status,
-      a.reason, a.notes, a.recurrenceRule, a.parentId,
-      pat.id as patId, pat.firstName as patFirst, pat.lastName as patLast, pat.phone as patPhone,
-      prov.id as provId, prov.firstName as provFirst, prov.lastName as provLast, prov.role as provRole,
-      dp.avatar as provAvatar,
-      (
-        SELECT t.tokenNumber FROM "Token" t
-        WHERE t.patientId = a.patientId AND t.doctorId = a.providerId
-          AND t.date = strftime('%Y-%m-%d', a.startsAt)
-        ORDER BY t.tokenNumber DESC LIMIT 1
-      ) as tokenNumber
-    FROM "Appointment" a
-    JOIN "Patient" pat ON pat.id = a.patientId
-    JOIN "User" prov ON prov.id = a.providerId
-    LEFT JOIN "DoctorProfile" dp ON dp.userId = prov.id
-    ORDER BY a.createdAt DESC
-  `);
-  return rows.map((r) => ({
-    id: r.id, patientId: r.patientId, providerId: r.providerId,
-    startsAt: r.startsAt, endsAt: r.endsAt, status: r.status,
-    reason: r.reason, notes: r.notes, recurrenceRule: r.recurrenceRule, parentId: r.parentId,
-    tokenNumber: r.tokenNumber != null ? Number(r.tokenNumber) : null,
-    patient: { id: r.patId, firstName: r.patFirst, lastName: r.patLast, role: '', phone: r.patPhone ?? null },
-    provider: { id: r.provId, firstName: r.provFirst, lastName: r.provLast, role: r.provRole, avatar: r.provAvatar ?? null },
-  }));
+  const appointments = await db.appointment.findMany({
+    include: {
+      patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
+      provider: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          avatar: true,
+          doctorProfile: { select: { avatar: true } },
+        },
+      },
+    },
+    orderBy: [
+      { startsAt: 'desc' },
+      { createdAt: 'desc' },
+    ],
+  });
+
+  const tokens = await db.token.findMany({
+    select: { id: true, tokenNumber: true, patientId: true, doctorId: true, date: true },
+  });
+
+  return appointments.map((a) => {
+    const dateStr = a.startsAt.toISOString().slice(0, 10);
+    const token = tokens.find(
+      (t) => t.patientId === a.patientId && t.doctorId === a.providerId && t.date === dateStr,
+    );
+    return {
+      id: a.id,
+      patientId: a.patientId,
+      providerId: a.providerId,
+      startsAt: a.startsAt.toISOString(),
+      endsAt: a.endsAt.toISOString(),
+      status: a.status,
+      reason: a.reason,
+      notes: a.notes,
+      recurrenceRule: a.recurrenceRule,
+      parentId: a.parentId,
+      tokenId: token?.id ?? null,
+      tokenNumber: token?.tokenNumber ?? null,
+      patient: {
+        id: a.patient.id,
+        firstName: a.patient.firstName,
+        lastName: a.patient.lastName,
+        role: 'patient',
+        phone: a.patient.phone ?? null,
+      },
+      provider: {
+        id: a.provider.id,
+        firstName: a.provider.firstName,
+        lastName: a.provider.lastName,
+        role: String(a.provider.role),
+        avatar: a.provider.avatar || a.provider.doctorProfile?.avatar || null,
+      },
+    };
+  });
 }
 
 export async function listAppointmentPatients() {
@@ -102,34 +134,57 @@ export async function listDoctors() {
 
 async function getAppointmentById(id: string) {
   const db = getPrisma();
-  const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(`
-    SELECT a.id, a.patientId, a.providerId, a.startsAt, a.endsAt, a.status,
-      a.reason, a.notes, a.recurrenceRule, a.parentId,
-      pat.id as patId, pat.firstName as patFirst, pat.lastName as patLast, pat.phone as patPhone,
-      prov.id as provId, prov.firstName as provFirst, prov.lastName as provLast, prov.role as provRole,
-      dp.avatar as provAvatar,
-      (
-        SELECT t.tokenNumber FROM "Token" t
-        WHERE t.patientId = a.patientId AND t.doctorId = a.providerId
-          AND t.date = strftime('%Y-%m-%d', a.startsAt)
-        ORDER BY t.tokenNumber DESC LIMIT 1
-      ) as tokenNumber
-    FROM "Appointment" a
-    JOIN "Patient" pat ON pat.id = a.patientId
-    JOIN "User" prov ON prov.id = a.providerId
-    LEFT JOIN "DoctorProfile" dp ON dp.userId = prov.id
-    WHERE a.id = ?
-    LIMIT 1
-  `, id);
-  const r = rows[0];
-  if (!r) return null;
+  const a = await db.appointment.findUnique({
+    where: { id },
+    include: {
+      patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
+      provider: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          avatar: true,
+          doctorProfile: { select: { avatar: true } },
+        },
+      },
+    },
+  });
+  if (!a) return null;
+
+  const dateStr = a.startsAt.toISOString().slice(0, 10);
+  const token = await db.token.findFirst({
+    where: { patientId: a.patientId, doctorId: a.providerId, date: dateStr },
+    orderBy: { tokenNumber: 'desc' },
+  });
+
   return {
-    id: r.id, patientId: r.patientId, providerId: r.providerId,
-    startsAt: r.startsAt, endsAt: r.endsAt, status: r.status,
-    reason: r.reason, notes: r.notes, recurrenceRule: r.recurrenceRule, parentId: r.parentId,
-    tokenNumber: r.tokenNumber != null ? Number(r.tokenNumber) : null,
-    patient: { id: r.patId, firstName: r.patFirst, lastName: r.patLast, role: '', phone: r.patPhone ?? null },
-    provider: { id: r.provId, firstName: r.provFirst, lastName: r.provLast, role: r.provRole, avatar: r.provAvatar ?? null },
+    id: a.id,
+    patientId: a.patientId,
+    providerId: a.providerId,
+    startsAt: a.startsAt.toISOString(),
+    endsAt: a.endsAt.toISOString(),
+    status: a.status,
+    reason: a.reason,
+    notes: a.notes,
+    recurrenceRule: a.recurrenceRule,
+    parentId: a.parentId,
+    tokenId: token?.id ?? null,
+    tokenNumber: token?.tokenNumber ?? null,
+    patient: {
+      id: a.patient.id,
+      firstName: a.patient.firstName,
+      lastName: a.patient.lastName,
+      role: 'patient',
+      phone: a.patient.phone ?? null,
+    },
+    provider: {
+      id: a.provider.id,
+      firstName: a.provider.firstName,
+      lastName: a.provider.lastName,
+      role: String(a.provider.role),
+      avatar: a.provider.avatar || a.provider.doctorProfile?.avatar || null,
+    },
   };
 }
 
@@ -353,9 +408,7 @@ export async function updateAppointmentStatus(id: string, status: AppointmentSta
   await getPrisma().appointment.update({ where: { id }, data: { status } });
   const appointment = await getAppointmentById(id);
   if (status === 'COMPLETED' && appointment) {
-    const visitAt = appointment.startsAt instanceof Date
-      ? appointment.startsAt
-      : new Date(String(appointment.startsAt));
+    const visitAt = new Date(appointment.startsAt);
     if (!Number.isNaN(visitAt.getTime())) {
       await completeWaitingTokenForVisit(
         String(appointment.patientId),

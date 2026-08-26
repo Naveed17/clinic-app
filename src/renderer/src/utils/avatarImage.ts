@@ -1,5 +1,5 @@
-/** Square JPEG data URL for doctor avatars (fits local SQLite and online TEXT columns). */
-export function fileToAvatarDataUrl(file: File, size = 256): Promise<string> {
+/** Square PNG data URL for doctor avatars (keeps transparency, fits local SQLite and online TEXT columns). */
+export function fileToAvatarDataUrl(file: File, size = 300): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
       reject(new Error('Please choose an image file.'));
@@ -14,13 +14,12 @@ export function fileToAvatarDataUrl(file: File, size = 256): Promise<string> {
         canvas.height = size;
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('Could not process image.');
-        const scale = Math.max(size / img.width, size / img.height);
+        const scale = Math.min(size / img.width, size / img.height);
         const w = img.width * scale;
         const h = img.height * scale;
-        ctx.fillStyle = '#e8f5ee';
-        ctx.fillRect(0, 0, size, size);
+        ctx.clearRect(0, 0, size, size);
         ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.82));
+        resolve(canvas.toDataURL('image/png'));
       } catch (err) {
         reject(err);
       } finally {
