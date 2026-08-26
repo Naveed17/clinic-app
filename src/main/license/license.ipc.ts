@@ -217,10 +217,9 @@ function saveModulesCache(key: string, modules: Record<string, boolean>): void {
 function isLocallyExpired(key: string): boolean {
   const cache = getLicenseCache(key);
   if (!cache) return false;
-  if ((cache.licenseType === 'monthly' || cache.licenseType === 'annual') && !cache.expiresAt) return true;
   if (!cache.expiresAt) return false;
   const end = new Date(cache.expiresAt);
-  if (Number.isNaN(end.getTime())) return cache.licenseType === 'monthly' || cache.licenseType === 'annual';
+  if (Number.isNaN(end.getTime())) return false;
   return Date.now() > end.getTime();
 }
 
