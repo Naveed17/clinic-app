@@ -16,11 +16,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getNavItems } from './navigation';
 
 type NavItem = ReturnType<typeof getNavItems>[number];
+
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
 import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 
-export const drawerWidth = 230;
+export const drawerWidth = 220;
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -48,9 +49,9 @@ const useStyles = makeStyles({
     height: '100%',
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: 'var(--cf-mica-sidebar, rgba(255, 255, 255, 0.55))',
-    backdropFilter: 'blur(20px)',
-    borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: 'var(--cf-glass-sidebar)',
+    backdropFilter: 'blur(30px)',
+    borderRight: '1px solid var(--cf-glass-border)',
     boxSizing: 'border-box',
     userSelect: 'none',
   },
@@ -64,11 +65,11 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalS,
   },
   logoBox: {
-    width: '32px',
-    height: '32px',
+    width: '28px',
+    height: '28px',
     borderRadius: tokens.borderRadiusMedium,
-    backgroundColor: tokens.colorNeutralBackground1,
-    boxShadow: tokens.shadow4,
+    backgroundColor: '#ffffff',
+    boxShadow: tokens.shadow2,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -93,7 +94,7 @@ const useStyles = makeStyles({
     overflowY: 'auto',
     paddingLeft: tokens.spacingHorizontalS,
     paddingRight: tokens.spacingHorizontalS,
-    paddingTop: tokens.spacingVerticalS,
+    paddingTop: tokens.spacingVerticalXS,
     paddingBottom: tokens.spacingVerticalS,
     display: 'flex',
     flexDirection: 'column',
@@ -104,7 +105,7 @@ const useStyles = makeStyles({
     fontWeight: tokens.fontWeightSemibold,
     color: tokens.colorNeutralForeground3,
     textTransform: 'uppercase',
-    letterSpacing: '0.6px',
+    letterSpacing: '0.5px',
     paddingLeft: tokens.spacingHorizontalS,
     paddingRight: tokens.spacingHorizontalS,
     marginTop: tokens.spacingVerticalXS,
@@ -115,41 +116,40 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: tokens.spacingHorizontalS,
     width: '100%',
-    height: '36px',
+    height: '34px',
     paddingLeft: tokens.spacingHorizontalS,
     paddingRight: tokens.spacingHorizontalS,
     borderRadius: tokens.borderRadiusMedium,
     cursor: 'pointer',
     position: 'relative',
-    transition: 'background-color 120ms ease, color 120ms ease',
+    transition: 'all 120ms ease',
     boxSizing: 'border-box',
     textDecoration: 'none',
-    color: tokens.colorNeutralForeground2,
+    color: tokens.colorNeutralForeground1,
     '&:hover': {
-      backgroundColor: tokens.colorNeutralBackground1Hover,
-      color: tokens.colorNeutralForeground1,
+      backgroundColor: 'rgba(255, 255, 255, 0.5)',
     },
   },
   activeRow: {
-    backgroundColor: 'var(--cf-nav-active-fill, rgba(0, 120, 212, 0.08))',
-    color: tokens.colorBrandForeground1,
+    backgroundColor: 'var(--cf-active-pill)',
+    color: 'var(--cf-active-text)',
     fontWeight: tokens.fontWeightSemibold,
   },
   activePill: {
     position: 'absolute',
-    left: '3px',
-    top: '8px',
-    bottom: '8px',
+    left: '2px',
+    top: '7px',
+    bottom: '7px',
     width: '3px',
     borderRadius: '3px',
-    backgroundColor: tokens.colorBrandForeground1,
+    backgroundColor: 'var(--cf-active-text)',
   },
   iconBox: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '18px',
-    width: '20px',
+    fontSize: '16px',
+    width: '18px',
     flexShrink: 0,
   },
   itemLabel: {
@@ -161,7 +161,7 @@ const useStyles = makeStyles({
   },
   footer: {
     padding: tokens.spacingHorizontalM,
-    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderTop: '1px solid var(--cf-glass-border)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -203,9 +203,10 @@ function groupNavItems(items: NavItem[]): { section: string; items: NavItem[] }[
   const admin: NavItem[] = [];
 
   items.forEach((item) => {
-    if (quickAccessPaths.includes(item.path)) {
+    const p = item.path as string;
+    if (quickAccessPaths.includes(p)) {
       quick.push(item);
-    } else if (clinicalPaths.includes(item.path)) {
+    } else if (clinicalPaths.includes(p)) {
       clinical.push(item);
     } else {
       admin.push(item);
@@ -214,7 +215,7 @@ function groupNavItems(items: NavItem[]): { section: string; items: NavItem[] }[
 
   const res = [];
   if (quick.length) res.push({ section: 'Quick Access', items: quick });
-  if (clinical.length) res.push({ section: 'Clinical', items: clinical });
+  if (clinical.length) res.push({ section: 'Clinical Services', items: clinical });
   if (admin.length) res.push({ section: 'Administration', items: admin });
   return res;
 }
@@ -255,9 +256,9 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }): React.JSX
 
               return (
                 <div
-                  key={item.path}
+                  key={pathStr}
                   className={`${styles.navItemRow} ${isActive ? styles.activeRow : ''}`}
-                  onClick={() => go(item.path)}
+                  onClick={() => go(pathStr)}
                 >
                   {isActive && <div className={styles.activePill} />}
                   <span className={styles.iconBox}>{item.icon as React.JSX.Element}</span>
