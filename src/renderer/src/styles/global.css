@@ -2,6 +2,36 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  /* Light Mode Sidebar Tokens (Frosted Greenish Mint Blur) */
+  --cf-sidebar-bg: rgba(235, 247, 242, 0.85);
+  --cf-sidebar-border: rgba(16, 185, 129, 0.18);
+  --cf-sidebar-user-bg: rgba(16, 185, 129, 0.08);
+  --cf-sidebar-user-border: rgba(16, 185, 129, 0.2);
+  --cf-sidebar-search-bg: rgba(255, 255, 255, 0.7);
+  --cf-sidebar-search-border: rgba(16, 185, 129, 0.25);
+  --cf-sidebar-text: #1e293b;
+  --cf-sidebar-text-muted: #64748b;
+  --cf-sidebar-hover-bg: rgba(16, 185, 129, 0.1);
+  --cf-sidebar-active-bg: rgba(16, 185, 129, 0.16);
+  --cf-sidebar-active-text: #047857;
+  --cf-sidebar-active-bar: #059669;
+}
+
+[data-theme='dark'],
+.dark {
+  /* Dark Mode Sidebar Tokens (Dark Mica Glass) */
+  --cf-sidebar-bg: rgba(30, 38, 52, 0.88);
+  --cf-sidebar-border: rgba(255, 255, 255, 0.12);
+  --cf-sidebar-user-bg: rgba(255, 255, 255, 0.05);
+  --cf-sidebar-user-border: rgba(255, 255, 255, 0.08);
+  --cf-sidebar-search-bg: rgba(255, 255, 255, 0.08);
+  --cf-sidebar-search-border: rgba(255, 255, 255, 0.12);
+  --cf-sidebar-text: #f0f4f8;
+  --cf-sidebar-text-muted: #94a3b8;
+  --cf-sidebar-hover-bg: rgba(255, 255, 255, 0.08);
+  --cf-sidebar-active-bg: rgba(255, 255, 255, 0.15);
+  --cf-sidebar-active-text: #ffffff;
+  --cf-sidebar-active-bar: #38bdf8;
 }
 
 html,
