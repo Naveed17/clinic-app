@@ -27,129 +27,346 @@ import { ChevronLeftIcon, ChevronRightIcon, ConfirmationNumberOutlinedIcon } fro
 const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
 
 const COLORS = {
-  info: '#0078d4',
-  secondary: '#8764b8',
-  success: '#107c10',
-  warning: '#f7630c',
-  brand: tokens.colorBrandBackground,
-  brandFg: tokens.colorNeutralForegroundOnBrand,
-  error: tokens.colorPaletteRedForeground1,
+  teal: '#0D9488',
+  emerald: '#10B981',
+  orange: '#F59E0B',
+  red: '#EF4444',
+  purple: '#8B5CF6',
+  blue: '#3B82F6',
+  slate: '#64748B',
+  info: '#3B82F6',
+  secondary: '#8B5CF6',
+  success: '#10B981',
+  warning: '#F59E0B',
+  brand: '#0D9488',
+  brandFg: '#ffffff',
+  error: '#EF4444',
 };
 
 const useStyles = makeStyles({
-  page: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalL, paddingBottom: tokens.spacingVerticalL },
-  headerRow: { display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: tokens.spacingHorizontalM },
-  muted: { color: tokens.colorNeutralForeground2, fontWeight: tokens.fontWeightSemibold },
-  welcome: { letterSpacing: '-0.02em', marginTop: tokens.spacingVerticalXXS, fontWeight: tokens.fontWeightBold },
-  topGrid: { display: 'grid', gap: tokens.spacingVerticalL, gridTemplateColumns: '1fr' },
+  page: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+    paddingBottom: '24px',
+    maxWidth: '1280px',
+  },
+  headerRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    gap: tokens.spacingHorizontalM,
+  },
+  greeting: {
+    color: '#0D9488',
+    fontSize: '15px',
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  welcome: {
+    letterSpacing: '-0.03em',
+    marginTop: '2px',
+    fontWeight: '800' as unknown as number,
+    fontSize: '28px',
+    color: tokens.colorNeutralForeground1,
+  },
+  muted: {
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightRegular,
+  },
+  topGrid: {
+    display: 'grid',
+    gap: '20px',
+    gridTemplateColumns: '1fr',
+  },
+  /* ── Premium Glass Cards (CoachPro Glassmorphism) ── */
+  card: {
+    padding: '24px',
+    borderRadius: '16px',
+    border: '1px solid rgba(255, 255, 255, 0.75)',
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+    backdropFilter: 'blur(20px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.8)',
+    transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+  },
+  /* ── Banner (frosted glass card) ── */
   bannerWrap: { position: 'relative', overflow: 'visible' },
   banner: {
-    padding: tokens.spacingVerticalXXL,
-    borderRadius: tokens.borderRadiusMedium,
-    background: `linear-gradient(135deg, ${tokens.colorBrandBackgroundSelected} 0%, ${tokens.colorBrandBackground} 55%, ${tokens.colorBrandBackground2} 100%)`,
-    color: tokens.colorNeutralForegroundOnBrand,
+    padding: '28px 32px',
+    borderRadius: '16px',
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    backdropFilter: 'blur(20px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+    border: '1px solid rgba(255, 255, 255, 0.8)',
+    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.8)',
     display: 'flex',
     alignItems: 'center',
     position: 'relative',
-    overflow: 'visible',
-    minHeight: '350px',
-    boxShadow: tokens.shadow16,
+    overflow: 'hidden',
+    minHeight: '160px',
   },
-  bannerText: { position: 'relative', zIndex: 1, maxWidth: '58%' },
-  bannerEyebrow: { opacity: 0.88, fontWeight: tokens.fontWeightBold, letterSpacing: '0.05em', textTransform: 'uppercase', fontSize: tokens.fontSizeBase200 },
-  bannerTitle: { letterSpacing: '-0.02em', marginTop: tokens.spacingVerticalS, marginBottom: tokens.spacingVerticalS, lineHeight: 1.3, fontWeight: tokens.fontWeightBold },
-  bannerImg: { display: 'none', position: 'absolute', right: '24px', top: '-150px', bottom: 0, zIndex: 2, pointerEvents: 'none' },
-  bannerImgEl: { height: 'calc(100% + 3px)', width: 'auto', maxWidth: '460px', objectFit: 'contain', objectPosition: 'bottom' },
-  card: {
-    padding: tokens.spacingVerticalL,
-    borderRadius: '24px',
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground1,
-    boxShadow: tokens.shadow4,
+  bannerText: { position: 'relative', zIndex: 1, maxWidth: '65%' },
+  bannerEyebrow: {
+    color: '#0D9488',
+    fontWeight: tokens.fontWeightSemibold,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    fontSize: '12px',
   },
-  midGrid: { display: 'grid', gap: tokens.spacingVerticalL, gridTemplateColumns: '1fr' },
-  col: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalL },
-  statsGrid: { display: 'grid', gap: tokens.spacingVerticalL, gridTemplateColumns: '1fr 1fr' },
-  statRow: { display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  statValue: { fontSize: '30px', fontWeight: tokens.fontWeightBold, letterSpacing: '-0.02em', lineHeight: 1.1 },
-  ringWrap: { position: 'relative', display: 'inline-flex', flexShrink: 0, width: '58px', height: '58px' },
-  ringLabel: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', fontWeight: tokens.fontWeightBold },
-  sectionHead: { display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: tokens.spacingVerticalL },
+  bannerTitle: {
+    letterSpacing: '-0.02em',
+    marginTop: '8px',
+    marginBottom: '8px',
+    lineHeight: 1.35,
+    fontWeight: '700' as unknown as number,
+    fontSize: '22px',
+    color: tokens.colorNeutralForeground1,
+  },
+  bannerImg: {
+    display: 'none',
+    position: 'absolute',
+    right: '24px',
+    top: '-60px',
+    bottom: 0,
+    zIndex: 2,
+    pointerEvents: 'none',
+  },
+  bannerImgEl: {
+    height: 'calc(100% + 60px)',
+    width: 'auto',
+    maxWidth: '280px',
+    objectFit: 'contain',
+    objectPosition: 'bottom',
+    opacity: 0.15,
+  },
+  /* ── Metric cards grid (Frosted Glass Info Cards) ── */
+  midGrid: { display: 'grid', gap: '20px', gridTemplateColumns: '1fr' },
+  col: { display: 'flex', flexDirection: 'column', gap: '20px' },
+  statsGrid: { display: 'grid', gap: '16px', gridTemplateColumns: '1fr 1fr' },
+  statCard: {
+    padding: '20px 24px',
+    borderRadius: '16px',
+    border: '1px solid rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    backdropFilter: 'blur(20px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.9)',
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '16px',
+    transition: 'all 200ms ease',
+    '&:hover': {
+      transform: 'translateY(-2px)',
+      backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    },
+  },
+  /* Colored icon circle — soft pastel glass circle */
+  statIcon: {
+    width: '48px',
+    height: '48px',
+    borderRadius: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    fontSize: '22px',
+    backdropFilter: 'blur(8px)',
+  },
+  statValue: {
+    fontSize: '26px',
+    fontWeight: '800' as unknown as number,
+    letterSpacing: '-0.02em',
+    lineHeight: 1.1,
+    color: tokens.colorNeutralForeground1,
+  },
+  statRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  ringWrap: {
+    position: 'relative',
+    display: 'inline-flex',
+    flexShrink: 0,
+    width: '56px',
+    height: '56px',
+  },
+  ringLabel: {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '0.75rem',
+    fontWeight: tokens.fontWeightBold,
+  },
+  sectionHead: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '16px',
+  },
   progressBlock: {
-    padding: tokens.spacingVerticalL,
-    borderRadius: '24px',
-    border: `1px solid ${tokens.colorBrandStroke2}`,
-    backgroundColor: tokens.colorBrandBackground2,
+    padding: '20px',
+    borderRadius: '12px',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
   },
   progressBlockAlt: {
-    padding: tokens.spacingVerticalL,
-    borderRadius: '24px',
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground2,
+    padding: '20px',
+    borderRadius: '12px',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
   },
-  track: { width: '100%', height: '14px', borderRadius: '99px', overflow: 'hidden', backgroundColor: tokens.colorNeutralBackground3 },
-  fill: { height: '100%', transitionProperty: 'width', transitionDuration: tokens.durationNormal },
+  track: {
+    width: '100%',
+    height: '8px',
+    borderRadius: '4px',
+    overflow: 'hidden',
+    backgroundColor: 'rgba(226, 232, 240, 0.6)',
+  },
+  fill: {
+    height: '100%',
+    borderRadius: '4px',
+    transitionProperty: 'width',
+    transitionDuration: tokens.durationNormal,
+  },
   revenueRow: {
     display: 'flex',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: tokens.spacingVerticalM,
-    borderTop: `1px dashed ${tokens.colorNeutralStroke2}`,
+    paddingTop: '16px',
+    borderTop: '1px dashed rgba(226, 232, 240, 0.8)',
   },
-  doctorList: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM, flex: 1 },
+  doctorList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    flex: 1,
+  },
   doctorRow: {
-    padding: tokens.spacingVerticalS,
-    borderRadius: '18px',
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground2,
+    padding: '12px 16px',
+    borderRadius: '12px',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalM,
+    transition: 'all 120ms ease',
+    '&:hover': {
+      backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    },
   },
-  empty: { paddingTop: tokens.spacingVerticalXXL, paddingBottom: tokens.spacingVerticalXXL, textAlign: 'center' },
-  calHead: { display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: tokens.spacingVerticalM },
-  calNav: { display: 'flex', flexDirection: 'row', gap: tokens.spacingHorizontalXXS },
-  calGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center' },
-  calDayHead: { fontSize: '0.62rem', fontWeight: tokens.fontWeightBold, color: tokens.colorNeutralForeground2, padding: '4px 0' },
-  calCell: { height: '32px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' },
+  empty: {
+    paddingTop: '32px',
+    paddingBottom: '32px',
+    textAlign: 'center',
+  },
+  /* ── Calendar ── */
+  calHead: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '12px',
+  },
+  calNav: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '2px',
+  },
+  calGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, 1fr)',
+    gap: '4px',
+    textAlign: 'center',
+  },
+  calDayHead: {
+    fontSize: '0.65rem',
+    fontWeight: tokens.fontWeightBold,
+    color: tokens.colorNeutralForeground3,
+    padding: '4px 0',
+    textTransform: 'uppercase',
+  },
+  calCell: {
+    height: '32px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   calNum: {
-    width: '25px',
-    height: '25px',
-    borderRadius: '50%',
+    width: '26px',
+    height: '26px',
+    borderRadius: '8px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '0.78rem',
   },
-  dots: { display: 'flex', flexDirection: 'row', gap: '3px', height: '4px', marginTop: '2px' },
+  dots: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '3px',
+    height: '4px',
+    marginTop: '2px',
+  },
   dot: { width: '3.5px', height: '3.5px', borderRadius: '50%' },
-  tokenHead: { display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: tokens.spacingVerticalL },
-  chipRow: { display: 'flex', flexDirection: 'row', gap: tokens.spacingHorizontalS },
+  /* ── Token queue ── */
+  tokenHead: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '16px',
+  },
+  chipRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '8px',
+  },
   nowCard: {
-    marginBottom: tokens.spacingVerticalL,
-    padding: tokens.spacingVerticalL,
-    borderRadius: '20px',
-    border: `2px solid ${tokens.colorBrandStroke1}`,
-    backgroundColor: tokens.colorBrandBackground2,
+    marginBottom: '16px',
+    padding: '20px',
+    borderRadius: '14px',
+    border: '1px solid rgba(13, 148, 136, 0.3)',
+    backgroundColor: 'rgba(13, 148, 136, 0.08)',
+    backdropFilter: 'blur(12px)',
   },
-  nowInner: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: tokens.spacingHorizontalL, flexWrap: 'wrap' },
+  nowInner: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '16px',
+    flexWrap: 'wrap',
+  },
   nowBadge: {
-    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
-    borderRadius: '16px',
-    background: tokens.colorBrandBackground,
-    color: tokens.colorNeutralForegroundOnBrand,
+    padding: '12px 20px',
+    borderRadius: '12px',
+    background: 'linear-gradient(135deg, #0d9488 0%, #06b6d4 100%)',
+    boxShadow: '0 4px 14px rgba(13, 148, 136, 0.35)',
+    color: '#ffffff',
     textAlign: 'center',
-    minWidth: '105px',
+    minWidth: '100px',
   },
-  tokenList: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalS },
+  tokenList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
   tokenRow: {
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalM,
-    padding: tokens.spacingVerticalS,
-    borderRadius: '18px',
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    padding: '12px 16px',
+    borderRadius: '12px',
+    border: '1px solid rgba(255, 255, 255, 0.6)',
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
   },
 });
 
@@ -209,18 +426,18 @@ export function AdminDashboard(): React.JSX.Element {
   const apptPercentage = totalAppts ? Math.round((completedAppts / totalAppts) * 100) : 0;
 
   const statCards = [
-    { label: 'Total Patients', value: patients.data?.total ?? 0, subtext: 'Registered patients', percent: patients.data?.total ? 85 : 0, color: COLORS.info },
-    { label: 'Today Appointments', value: todaysPatientsCount, subtext: 'Scheduled for today', percent: apptPercentage, color: COLORS.secondary },
-    showReports && { label: 'Monthly Revenue', value: money(summary.data?.monthlyRevenue ?? 0), subtext: 'Current month total', percent: summary.data?.monthlyRevenue ? 92 : 0, color: COLORS.success },
-    showBilling && { label: 'Total Invoices', value: totalInvoices, subtext: `${paidInvoices} paid invoices`, percent: paidPercentage, color: COLORS.warning },
-  ].filter(Boolean) as Array<{ label: string; value: string | number; subtext: string; percent: number; color: string }>;
+    { label: 'Total Patients', value: patients.data?.total ?? 0, subtext: 'Registered patients', color: COLORS.blue, icon: '👥' },
+    { label: 'Patients Today', value: todaysPatientsCount, subtext: 'Scheduled for today', color: COLORS.purple, icon: '📋' },
+    showReports && { label: 'Monthly Revenue', value: money(summary.data?.monthlyRevenue ?? 0), subtext: 'Current month total', color: COLORS.teal, icon: '💰' },
+    showBilling && { label: 'Total Invoices', value: totalInvoices, subtext: `${paidInvoices} paid invoices`, color: COLORS.orange, icon: '🧾' },
+  ].filter(Boolean) as Array<{ label: string; value: string | number; subtext: string; color: string; icon: string }>;
 
   return (
     <div className={styles.page}>
       <div className={styles.headerRow}>
         <div>
-          <Text className={styles.muted}>Hi {user?.name || 'Admin'},</Text>
-          <Title2 className={styles.welcome}>Welcome Back!</Title2>
+          <Text className={styles.greeting}>Welcome back, {user?.name || 'Admin'} 👋</Text>
+          <div className={styles.welcome}>Dashboard</div>
         </div>
         <LiveClock />
       </div>
@@ -229,9 +446,9 @@ export function AdminDashboard(): React.JSX.Element {
         <div className={styles.bannerWrap}>
           <div className={styles.banner}>
             <div className={styles.bannerText}>
-              <Text className={styles.bannerEyebrow}>CareFlow Clinic Operations</Text>
-              <Title2 className={styles.bannerTitle}>Real-time Patient Queue & Live Performance Summary</Title2>
-              <Text>Seamlessly monitor staff load, appointments, and OPD workflow.</Text>
+              <Text className={styles.bannerEyebrow}>Clinic Update</Text>
+              <div className={styles.bannerTitle}>Real-time Patient Queue & Live Performance Summary</div>
+              <Text style={{ color: '#64748B', fontSize: '14px', lineHeight: 1.5 }}>Seamlessly monitor staff load, appointments, and OPD workflow.</Text>
             </div>
             <div className={styles.bannerImg} style={{ display: 'block' }}>
               <img className={styles.bannerImgEl} src={doctorImg} alt="Doctor" />
@@ -250,14 +467,14 @@ export function AdminDashboard(): React.JSX.Element {
               </div>
             ) : (
               statCards.map((c) => (
-                <div key={c.label} className={styles.card}>
-                  <div className={styles.statRow}>
-                    <div>
-                      <div className={styles.statValue}>{c.value}</div>
-                      <Text weight="bold" style={{ marginTop: 6, display: 'block' }}>{c.label}</Text>
-                      <Text size={200} className={styles.muted} style={{ display: 'block', marginTop: 2 }}>{c.subtext}</Text>
-                    </div>
-                    <PercentRing percent={c.percent} color={c.color} />
+                <div key={c.label} className={styles.statCard}>
+                  <div className={styles.statIcon} style={{ backgroundColor: `${c.color}15`, color: c.color }}>
+                    {c.icon}
+                  </div>
+                  <div>
+                    <div className={styles.statValue}>{c.value}</div>
+                    <Text weight="semibold" style={{ marginTop: 4, display: 'block', fontSize: '13px' }}>{c.label}</Text>
+                    <Text size={200} className={styles.muted} style={{ display: 'block', marginTop: 2 }}>{c.subtext}</Text>
                   </div>
                 </div>
               ))
@@ -267,7 +484,7 @@ export function AdminDashboard(): React.JSX.Element {
           <div className={styles.card}>
             <div className={styles.sectionHead}>
               <div>
-                <Title3>Billing & Appointment Progress</Title3>
+                <Text weight="bold" style={{ fontSize: '18px' }}>Billing & Appointment Progress</Text>
                 <Text size={200} className={styles.muted}>Revenue collection and appointment completion rate</Text>
               </div>
               <Badge appearance="filled" color="brand">Realtime</Badge>
@@ -280,10 +497,10 @@ export function AdminDashboard(): React.JSX.Element {
                       <Text weight="semibold">Paid Invoices</Text>
                       <Text size={200} className={styles.muted} style={{ display: 'block' }}>Revenue collected from issued bills</Text>
                     </div>
-                    <Text weight="bold" style={{ color: tokens.colorBrandForeground1 }}>{paidPercentage}%</Text>
+                    <Text weight="bold" style={{ color: '#0D9488' }}>{paidPercentage}%</Text>
                   </div>
                   <div className={styles.track}>
-                    <div className={styles.fill} style={{ width: `${paidPercentage}%`, backgroundColor: tokens.colorBrandBackground }} />
+                    <div className={styles.fill} style={{ width: `${paidPercentage}%`, background: 'linear-gradient(135deg, #0D9488, #10B981)' }} />
                   </div>
                   <div className={styles.statRow} style={{ marginTop: 10 }}>
                     <Text size={200} className={styles.muted}>{paidInvoices} of {totalInvoices} invoices</Text>
@@ -309,7 +526,7 @@ export function AdminDashboard(): React.JSX.Element {
               </div>
               <div className={styles.revenueRow}>
                 <Text className={styles.muted} weight="semibold">Total Accumulated Revenue</Text>
-                <Text weight="bold" style={{ color: tokens.colorBrandForeground1, fontSize: '1.3rem' }}>{money(totalRevenue)}</Text>
+                <Text weight="bold" style={{ color: '#0D9488', fontSize: '1.3rem' }}>{money(totalRevenue)}</Text>
               </div>
             </div>
           </div>
@@ -317,8 +534,8 @@ export function AdminDashboard(): React.JSX.Element {
 
         <div className={styles.card} style={{ display: 'flex', flexDirection: 'column' }}>
           <div className={styles.sectionHead}>
-            <Title3>Doctor Performance</Title3>
-            <Button appearance="transparent" size="small">View all</Button>
+            <Text weight="bold" style={{ fontSize: '18px' }}>Doctor Performance</Text>
+            <Button appearance="transparent" size="small" style={{ color: '#0D9488' }}>View all</Button>
           </div>
           {doctors.length === 0 ? (
             <div className={styles.empty}>
@@ -366,7 +583,7 @@ function MiniCalendarWidget({ appointments }: { appointments: Appointment[] }): 
     if (d.getFullYear() === year && d.getMonth() === month) {
       const day = d.getDate();
       if (!apptDateMap.has(day)) apptDateMap.set(day, []);
-      const color = a.status === 'COMPLETED' ? tokens.colorBrandForeground1 : a.status === 'CANCELLED' ? COLORS.error : COLORS.info;
+      const color = a.status === 'COMPLETED' ? COLORS.teal : a.status === 'CANCELLED' ? COLORS.red : COLORS.blue;
       const list = apptDateMap.get(day)!;
       if (list.length < 3) list.push(color);
     }
@@ -399,8 +616,8 @@ function MiniCalendarWidget({ appointments }: { appointments: Appointment[] }): 
                   <div
                     className={styles.calNum}
                     style={{
-                      backgroundColor: isToday ? tokens.colorBrandBackground : 'transparent',
-                      color: isToday ? tokens.colorNeutralForegroundOnBrand : tokens.colorNeutralForeground1,
+                      backgroundColor: isToday ? '#0D9488' : 'transparent',
+                      color: isToday ? '#ffffff' : tokens.colorNeutralForeground1,
                       fontWeight: isToday ? 800 : 500,
                     }}
                   >
@@ -444,7 +661,7 @@ function TokenQueuePanel(): React.JSX.Element {
     <div className={styles.card}>
       <div className={styles.tokenHead}>
         <div>
-          <Title3>Live Token Queue</Title3>
+          <Text weight="bold" style={{ fontSize: '18px' }}>Live Token Queue</Text>
           <Text size={200} className={styles.muted}>Today&apos;s OPD token tracking</Text>
         </div>
         <div className={styles.chipRow}>

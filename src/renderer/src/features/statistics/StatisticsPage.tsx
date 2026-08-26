@@ -26,7 +26,7 @@ import {
   Typography,
   alpha,
   useTheme,
-} from '@/compat/fluentMui';
+} from '@/utils/fluentHelpers';
 
 import { useQuery } from '@tanstack/react-query';
 import { StatCardsSkeleton } from '@/components/LoadingUI';

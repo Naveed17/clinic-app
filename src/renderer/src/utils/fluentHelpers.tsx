@@ -1,8 +1,3 @@
-/**
- * Temporary Fluent-backed stand-ins for former Material UI primitives.
- * Accepts and ignores `sx` / theme props so pages can finish migrating off
- * the Material UI package without ThemeRegistry / MuiThemeProvider.
- */
 import {
   Avatar as FAvatar,
   Badge as FBadge,
@@ -32,7 +27,6 @@ import {
   createElement,
   forwardRef,
   useMemo,
-  useState,
   type CSSProperties,
   type HTMLAttributes,
   type ReactNode,
@@ -179,14 +173,75 @@ export function Stack(props: AnyProps): React.JSX.Element {
 export function Paper(props: AnyProps): React.JSX.Element {
   const styleFromSx = convertSxToStyle(props.sx);
   const style: CSSProperties = {
-    backgroundColor: tokens.colorNeutralBackground1,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: tokens.borderRadiusMedium,
-    boxShadow: tokens.shadow4,
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+    backdropFilter: 'blur(20px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+    border: '1px solid rgba(255, 255, 255, 0.75)',
+    borderRadius: '16px',
+    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.8)',
     ...styleFromSx,
     ...(props.style as CSSProperties | undefined),
   };
   return <div {...(omitMui(props) as HTMLAttributes<HTMLDivElement>)} style={style}>{props.children}</div>;
+}
+
+export function Card(props: AnyProps): React.JSX.Element {
+  return <Paper {...props} />;
+}
+
+export function CardContent(props: AnyProps): React.JSX.Element {
+  const styleFromSx = convertSxToStyle(props.sx);
+  const style: CSSProperties = {
+    padding: '16px 20px',
+    ...styleFromSx,
+    ...(props.style as CSSProperties | undefined),
+  };
+  return <div {...(omitMui(props) as HTMLAttributes<HTMLDivElement>)} style={style}>{props.children}</div>;
+}
+
+export function TableContainer(props: AnyProps): React.JSX.Element {
+  const styleFromSx = convertSxToStyle(props.sx);
+  const style: CSSProperties = {
+    width: '100%',
+    overflowX: 'auto',
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+    backdropFilter: 'blur(20px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+    border: '1px solid rgba(255, 255, 255, 0.75)',
+    borderRadius: '16px',
+    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.05)',
+    ...styleFromSx,
+    ...(props.style as CSSProperties | undefined),
+  };
+  return <div {...(omitMui(props) as HTMLAttributes<HTMLDivElement>)} style={style}>{props.children}</div>;
+}
+
+export function Table(props: AnyProps): React.JSX.Element {
+  return <table className="glass-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, ...(props.style as CSSProperties | undefined) }}>{props.children}</table>;
+}
+
+export function TableHead(props: AnyProps): React.JSX.Element {
+  return <thead style={{ backgroundColor: 'rgba(255, 255, 255, 0.3)', ...(props.style as CSSProperties | undefined) }}>{props.children}</thead>;
+}
+
+export function TableBody(props: AnyProps): React.JSX.Element {
+  return <tbody style={props.style as CSSProperties | undefined}>{props.children}</tbody>;
+}
+
+export function TableRow(props: AnyProps): React.JSX.Element {
+  return <tr style={{ transition: 'background-color 150ms ease', ...(props.style as CSSProperties | undefined) }}>{props.children}</tr>;
+}
+
+export function TableCell(props: AnyProps & { align?: string }): React.JSX.Element {
+  const styleFromSx = convertSxToStyle(props.sx);
+  const style: CSSProperties = {
+    padding: '12px 16px',
+    textAlign: (props.align as CSSProperties['textAlign']) || 'left',
+    borderBottom: '1px solid rgba(226, 232, 240, 0.5)',
+    ...styleFromSx,
+    ...(props.style as CSSProperties | undefined),
+  };
+  return <td style={style}>{props.children}</td>;
 }
 
 export function Typography(props: AnyProps & { variant?: string; fontWeight?: number | string; fontSize?: number | string | Record<string, number | string> }): React.JSX.Element {
@@ -437,7 +492,7 @@ export function Dialog({
 }: AnyProps & { open: boolean; onClose?: () => void }): React.JSX.Element {
   return (
     <FDialog open={open} onOpenChange={(_, d) => { if (!d.open) onClose?.(); }}>
-      <DialogSurface style={{ maxWidth: 560, width: '100%', maxHeight: '90vh', overflow: 'auto' }} {...(omitMui(rest) as object)}>
+      <DialogSurface style={{ maxWidth: 560, width: '100%', maxHeight: '90vh', overflow: 'auto', borderRadius: tokens.borderRadiusLarge, border: `1px solid ${tokens.colorNeutralStroke1}`, boxShadow: tokens.shadow16 }} {...(omitMui(rest) as object)}>
         {children}
       </DialogSurface>
     </FDialog>
@@ -582,7 +637,7 @@ export function Autocomplete<T>({
   onChange,
   getOptionLabel,
   renderInput,
-  renderOption,
+  renderOption: _ro,
   isOptionEqualToValue,
   disabled,
 }: {
@@ -622,7 +677,7 @@ export function Menu({
   onClose,
   anchorEl,
   children,
-  anchorReference,
+  anchorReference: _ar,
   anchorPosition,
 }: AnyProps & {
   open?: boolean;
@@ -646,7 +701,7 @@ export function Menu({
           top,
           left,
           background: tokens.colorNeutralBackground1,
-          border: `1px solid ${tokens.colorNeutralStroke2}`,
+          border: `1px solid ${tokens.colorNeutralStroke1}`,
           borderRadius: 8,
           boxShadow: tokens.shadow16,
           minWidth: 180,
@@ -812,7 +867,7 @@ export function useTheme() {
         info: { main: '#0078d4', dark: '#004578', light: '#c7e0f4' },
         text: { primary: tokens.colorNeutralForeground1, secondary: tokens.colorNeutralForeground2, disabled: tokens.colorNeutralForeground3 },
         background: { paper: tokens.colorNeutralBackground1, default: tokens.colorNeutralBackground2 },
-        divider: tokens.colorNeutralStroke2,
+        divider: tokens.colorNeutralStroke1,
         action: { hover: tokens.colorNeutralBackground1Hover, active: tokens.colorNeutralForeground3 },
         common: { white: '#fff', black: '#000' },
         grey: {

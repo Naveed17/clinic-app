@@ -2,36 +2,63 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  /* Light Mode Sidebar Tokens (Frosted Greenish Mint Blur) */
-  --cf-sidebar-bg: rgba(235, 247, 242, 0.85);
-  --cf-sidebar-border: rgba(16, 185, 129, 0.18);
-  --cf-sidebar-user-bg: rgba(16, 185, 129, 0.08);
-  --cf-sidebar-user-border: rgba(16, 185, 129, 0.2);
-  --cf-sidebar-search-bg: rgba(255, 255, 255, 0.7);
-  --cf-sidebar-search-border: rgba(16, 185, 129, 0.25);
-  --cf-sidebar-text: #1e293b;
-  --cf-sidebar-text-muted: #64748b;
-  --cf-sidebar-hover-bg: rgba(16, 185, 129, 0.1);
-  --cf-sidebar-active-bg: rgba(16, 185, 129, 0.16);
-  --cf-sidebar-active-text: #047857;
-  --cf-sidebar-active-bar: #059669;
+
+  /* ── Canvas Pastel Mesh Gradient Background ── */
+  --cf-canvas-bg: #e6eff5;
+  --cf-ambient-glow: 
+    radial-gradient(at 0% 0%, rgba(20, 184, 166, 0.18) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(236, 72, 153, 0.12) 0px, transparent 50%),
+    linear-gradient(135deg, #eef3f7 0%, #e2ebf2 100%);
+
+  /* ── Glassmorphism Tokens (Light) ── */
+  --cf-glass-bg: rgba(255, 255, 255, 0.55);
+  --cf-glass-bg-hover: rgba(255, 255, 255, 0.75);
+  --cf-glass-border: rgba(255, 255, 255, 0.7);
+  --cf-glass-blur: blur(20px) saturate(180%);
+  --cf-glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+
+  /* ── Sidebar Tokens (Light Glass) ── */
+  --cf-sidebar-bg: rgba(255, 255, 255, 0.45);
+  --cf-sidebar-border: rgba(255, 255, 255, 0.6);
+  --cf-sidebar-shadow: 4px 0 24px rgba(31, 38, 135, 0.04);
+  --cf-sidebar-user-bg: rgba(255, 255, 255, 0.5);
+  --cf-sidebar-user-border: rgba(255, 255, 255, 0.7);
+  --cf-sidebar-text: #1E293B;
+  --cf-sidebar-text-muted: #475569;
+  --cf-sidebar-hover-bg: rgba(255, 255, 255, 0.6);
+  --cf-sidebar-active-bg: linear-gradient(135deg, #0d9488 0%, #06b6d4 100%);
+  --cf-sidebar-active-text: #ffffff;
+  --cf-sidebar-active-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
 }
 
 [data-theme='dark'],
 .dark {
-  /* Dark Mode Sidebar Tokens (Dark Mica Glass) */
-  --cf-sidebar-bg: rgba(30, 38, 52, 0.88);
-  --cf-sidebar-border: rgba(255, 255, 255, 0.12);
-  --cf-sidebar-user-bg: rgba(255, 255, 255, 0.05);
-  --cf-sidebar-user-border: rgba(255, 255, 255, 0.08);
-  --cf-sidebar-search-bg: rgba(255, 255, 255, 0.08);
-  --cf-sidebar-search-border: rgba(255, 255, 255, 0.12);
-  --cf-sidebar-text: #f0f4f8;
-  --cf-sidebar-text-muted: #94a3b8;
-  --cf-sidebar-hover-bg: rgba(255, 255, 255, 0.08);
-  --cf-sidebar-active-bg: rgba(255, 255, 255, 0.15);
+  --cf-canvas-bg: #0F172A;
+  --cf-ambient-glow: 
+    radial-gradient(at 0% 0%, rgba(45, 212, 191, 0.12) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(192, 132, 252, 0.1) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(96, 165, 250, 0.1) 0px, transparent 50%),
+    linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+
+  --cf-glass-bg: rgba(30, 41, 59, 0.6);
+  --cf-glass-bg-hover: rgba(30, 41, 59, 0.8);
+  --cf-glass-border: rgba(255, 255, 255, 0.1);
+  --cf-glass-blur: blur(20px) saturate(180%);
+  --cf-glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+
+  --cf-sidebar-bg: rgba(15, 23, 42, 0.6);
+  --cf-sidebar-border: rgba(255, 255, 255, 0.08);
+  --cf-sidebar-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+  --cf-sidebar-user-bg: rgba(30, 41, 59, 0.6);
+  --cf-sidebar-user-border: rgba(255, 255, 255, 0.1);
+  --cf-sidebar-text: #F1F5F9;
+  --cf-sidebar-text-muted: #94A3B8;
+  --cf-sidebar-hover-bg: rgba(30, 41, 59, 0.7);
+  --cf-sidebar-active-bg: linear-gradient(135deg, #0d9488 0%, #06b6d4 100%);
   --cf-sidebar-active-text: #ffffff;
-  --cf-sidebar-active-bar: #38bdf8;
+  --cf-sidebar-active-shadow: 0 4px 14px rgba(13, 148, 136, 0.3);
 }
 
 html,
@@ -42,16 +69,67 @@ body,
   margin: 0;
   overflow: hidden;
   font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--cf-canvas-bg);
+}
+
+/* ── Global Frosted Glass Utility Classes ── */
+.glass-panel,
+.glass-card {
+  background: var(--cf-glass-bg) !important;
+  backdrop-filter: var(--cf-glass-blur) !important;
+  -webkit-backdrop-filter: var(--cf-glass-blur) !important;
+  border: 1px solid var(--cf-glass-border) !important;
+  box-shadow: var(--cf-glass-shadow) !important;
+  border-radius: 16px !important;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.glass-card:hover {
+  background: var(--cf-glass-bg-hover) !important;
+  transform: translateY(-1px);
+}
+
+.glass-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.glass-table th {
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(10px);
+  color: #64748B;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+}
+
+.glass-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.4);
+  font-size: 13.5px;
+  color: #1E293B;
+}
+
+.glass-table tr:last-child td {
+  border-bottom: none;
+}
+
+.glass-table tr:hover td {
+  background: rgba(255, 255, 255, 0.4);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
 }
 
 *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 *::-webkit-scrollbar-track {
@@ -59,8 +137,12 @@ body,
 }
 
 *::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(148, 163, 184, 0.3);
   border-radius: 99px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
 }
 
 .digital-clock {
@@ -73,21 +155,21 @@ body,
 /* Align react-phone-number-input with Fluent inputs */
 .PhoneInputField {
   width: 100%;
-  --PhoneInput-color--focus: var(--colorBrandForeground1, #0f6cbd);
+  --PhoneInput-color--focus: var(--colorBrandForeground1, #0D9488);
 }
 
 .PhoneInputField .PhoneInputInput {
   font: inherit;
-  border: 1px solid var(--colorNeutralStroke1, #d1d1d1);
-  border-radius: var(--borderRadiusMedium, 4px);
+  border: 1px solid var(--colorNeutralStroke1, #E2E8F0);
+  border-radius: var(--borderRadiusMedium, 8px);
   padding: 6px 10px;
   min-height: 32px;
   background: var(--colorNeutralBackground1, #fff);
-  color: var(--colorNeutralForeground1, #242424);
+  color: var(--colorNeutralForeground1, #1E293B);
 }
 
 .PhoneInputField .PhoneInputInput:focus {
-  outline: 2px solid var(--colorBrandStroke1, #0f6cbd);
+  outline: 2px solid var(--colorBrandStroke1, #0D9488);
   outline-offset: -1px;
 }
 

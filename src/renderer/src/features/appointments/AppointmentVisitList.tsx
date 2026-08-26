@@ -1,22 +1,21 @@
+import { Avatar, Badge, Button, Text, Tooltip, tokens } from '@fluentui/react-components';
 import { CalendarMonthOutlinedIcon, PrintOutlinedIcon } from '@/icons/fluent';
-import { alpha, Avatar, Box, Chip, IconButton, Stack, Tooltip, Typography, useTheme } from '@/compat/fluentMui';
-import { chipSx } from '@/components/TableUI';
 import type { Appointment } from '@/types/appointment';
 
-const statusColor: Record<string, 'default' | 'primary' | 'warning' | 'success' | 'error'> = {
-  SCHEDULED: 'primary',
+const statusBadgeColor: Record<string, 'brand' | 'warning' | 'success' | 'informative' | 'danger'> = {
+  SCHEDULED: 'brand',
   CHECKED_IN: 'warning',
   COMPLETED: 'success',
-  CANCELLED: 'default',
-  NO_SHOW: 'error',
+  CANCELLED: 'informative',
+  NO_SHOW: 'danger',
 };
 
 const leftBorder: Record<string, string> = {
-  SCHEDULED: 'primary.main',
-  CHECKED_IN: 'warning.main',
-  COMPLETED: 'success.main',
-  CANCELLED: 'divider',
-  NO_SHOW: 'error.main',
+  SCHEDULED: tokens.colorBrandStroke1,
+  CHECKED_IN: tokens.colorBrandStroke1,
+  COMPLETED: tokens.colorPaletteGreenBorder2,
+  CANCELLED: tokens.colorNeutralStroke1,
+  NO_SHOW: tokens.colorPaletteRedBorder2,
 };
 
 interface Props {
@@ -40,59 +39,45 @@ export function AppointmentVisitList({
   printingId: _printingId,
   showNotes = true,
 }: Props): React.JSX.Element {
-  const theme = useTheme();
-
   if (!appointments.length) {
     return (
-      <Typography color="text.secondary" variant="body2" sx={{ py: 2 }}>
+      <Text size={200} block style={{ padding: '16px 0', color: tokens.colorNeutralForeground2 }}>
         No visits found.
-      </Typography>
+      </Text>
     );
   }
 
   return (
-    <Stack spacing={1}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {appointments.map((a) => {
         const selected = selectedId === a.id;
         return (
-          <Box
+          <div
             key={a.id}
             onClick={() => onOpen?.(a)}
-            sx={{
-              p: 1.5,
-              borderRadius: 1,
+            style={{
+              padding: '12px',
+              borderRadius: tokens.borderRadiusMedium,
               display: 'flex',
               alignItems: 'flex-start',
-              gap: 1.5,
+              gap: '12px',
               cursor: onOpen ? 'pointer' : 'default',
-              bgcolor: selected
-                ? alpha(theme.palette.primary.main, 0.08)
-                : alpha(theme.palette.primary.main, 0.03),
-              border: '1px solid',
-              borderColor: selected ? 'primary.main' : 'divider',
-              borderLeft: '4px solid',
-              borderLeftColor: leftBorder[a.status] ?? 'divider',
-              '&:hover': onOpen ? { bgcolor: alpha(theme.palette.primary.main, 0.07) } : undefined,
+              backgroundColor: selected ? tokens.colorBrandBackground2 : tokens.colorNeutralBackground2,
+              border: `1px solid ${selected ? tokens.colorBrandStroke1 : tokens.colorNeutralStroke1}`,
+              borderLeft: `4px solid ${leftBorder[a.status] ?? tokens.colorNeutralStroke1}`,
             }}
           >
             <Avatar
-              sx={{
-                width: 40,
-                height: 40,
-                borderRadius: 1,
-                bgcolor: alpha(theme.palette.warning.main, 0.14),
-                color: 'warning.dark',
-                fontSize: 12,
-                fontWeight: 800,
-                fontFamily: 'monospace',
-              }}
-            >
-              {a.tokenNumber != null ? String(a.tokenNumber).padStart(3, '0') : <CalendarMonthOutlinedIcon />}
-            </Avatar>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1}>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography fontWeight={700} fontSize={14} noWrap>
+              name={a.tokenNumber != null ? String(a.tokenNumber).padStart(3, '0') : undefined}
+              icon={a.tokenNumber == null ? <CalendarMonthOutlinedIcon /> : undefined}
+              size={40}
+              shape="square"
+              color="brand"
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 0 }}>
+                  <Text weight="bold" block style={{ fontSize: 14 }}>
                     {new Date(a.startsAt).toLocaleString([], {
                       day: 'numeric',
                       month: 'short',
@@ -100,40 +85,35 @@ export function AppointmentVisitList({
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
+                  </Text>
+                  <Text size={200} block style={{ color: tokens.colorNeutralForeground2 }}>
                     Dr. {a.provider.firstName} {a.provider.lastName}
-                  </Typography>
-                </Box>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Chip
-                    label={a.status.replace('_', ' ')}
-                    size="small"
-                    color={statusColor[a.status] ?? 'default'}
-                    sx={{ ...chipSx, fontWeight: 700, borderRadius: 1 }}
-                  />
-                  <Tooltip title={a.tokenNumber != null || a.tokenId ? 'Print token' : 'No token for this visit'}>
-                    <span onClick={(e) => { e.stopPropagation(); onPrint(a); }}>
-                      <IconButton
-                        size="small"
-                        disabled={!a.tokenNumber && !a.tokenId}
-                        sx={{ borderRadius: 1 }}
-                      >
-                        <PrintOutlinedIcon />
-                      </IconButton>
-                    </span>
+                  </Text>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Badge appearance="tint" color={statusBadgeColor[a.status] ?? 'informative'}>
+                    {a.status.replace('_', ' ')}
+                  </Badge>
+                  <Tooltip content={a.tokenNumber != null || a.tokenId ? 'Print token' : 'No token for this visit'} relationship="label">
+                    <Button
+                      appearance="subtle"
+                      size="small"
+                      icon={<PrintOutlinedIcon />}
+                      disabled={!a.tokenNumber && !a.tokenId}
+                      onClick={(e) => { e.stopPropagation(); onPrint(a); }}
+                    />
                   </Tooltip>
-                </Stack>
-              </Stack>
+                </div>
+              </div>
               {showNotes && a.notes && (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, fontSize: 13 }}>
+                <Text size={200} block style={{ marginTop: 6, color: tokens.colorNeutralForeground2 }}>
                   {a.notes}
-                </Typography>
+                </Text>
               )}
-            </Box>
-          </Box>
+            </div>
+          </div>
         );
       })}
-    </Stack>
+    </div>
   );
 }

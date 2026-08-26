@@ -6,7 +6,7 @@ import {
   Divider, FormControl, IconButton, InputLabel, MenuItem, Paper, Select, Skeleton,
   Step, StepLabel, Stepper, Stack, TextField, Typography, Chip, Avatar,
   alpha, useTheme,
-} from '@/compat/fluentMui';
+} from '@/utils/fluentHelpers';
 import {
   FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogPaperProps, telInputDialogProps,

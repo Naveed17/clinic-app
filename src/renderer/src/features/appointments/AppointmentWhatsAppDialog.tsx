@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
 import {
-  Alert,
   Button,
-  CircularProgress,
   Dialog,
   DialogActions,
+  DialogBody,
   DialogContent,
+  DialogSurface,
   DialogTitle,
-  IconButton,
-  Stack,
-  TextField,
-  Typography,
-  useTheme,
-} from '@/compat/fluentMui';
+  MessageBar,
+  MessageBarBody,
+  Spinner,
+  Text,
+  Textarea,
+  tokens,
+} from '@fluentui/react-components';
 import { CloseIcon, ContentCopyIcon, WhatsAppIcon } from '@/icons/fluent';
 import { openWhatsAppWeb } from '@/utils/whatsappWeb';
 import { formatTableDate } from '@/utils/formatDate';
@@ -69,7 +70,6 @@ export function AppointmentWhatsAppDialog({
   const timeFormatted = appointment.startsAt
     ? new Date(appointment.startsAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
     : '10:00 AM';
-  const tokenStr = appointment.tokenNumber ? `#${String(appointment.tokenNumber).padStart(3, '0')}` : 'WALK-IN';
   const rawPhone = appointment.patient.phone || '';
   const formattedPhone = toWhatsAppNumber(rawPhone) || rawPhone.trim();
 
@@ -120,94 +120,85 @@ export function AppointmentWhatsAppDialog({
   }
 
   return (
-    <Dialog open={open} onClose={sendingApi ? undefined : onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 1 } }}>
-      <DialogTitle sx={{ m: 0, p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Stack direction="row" spacing={1.25} alignItems="center">
-          <WhatsAppIcon />
-          <Typography variant="h6" fontWeight={700}>
-            Send WhatsApp Confirmation
-          </Typography>
-        </Stack>
-        <IconButton onClick={onClose} size="small" disabled={sendingApi}>
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
+    <Dialog open={open} onOpenChange={(_, d) => { if (!d.open && !sendingApi) onClose(); }}>
+      <DialogSurface style={{ maxWidth: 560, width: '100%', borderRadius: tokens.borderRadiusLarge, border: `1px solid ${tokens.colorNeutralStroke1}`, boxShadow: tokens.shadow16 }}>
+        <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${tokens.colorNeutralStroke1}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <WhatsAppIcon />
+            <DialogTitle style={{ margin: 0 }}>Send WhatsApp Confirmation</DialogTitle>
+          </div>
+          <Button appearance="subtle" size="small" icon={<CloseIcon />} onClick={onClose} disabled={sendingApi} />
+        </div>
 
-      <DialogContent dividers sx={{ p: 3 }}>
-        <Stack spacing={2.5}>
-          {apiError && <Alert severity="error">{apiError}</Alert>}
-          {apiSent && <Alert severity="success">WhatsApp message successfully sent!</Alert>}
+        <DialogBody style={{ padding: 20 }}>
+          <DialogContent style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {apiError && (
+              <MessageBar intent="error">
+                <MessageBarBody>{apiError}</MessageBarBody>
+              </MessageBar>
+            )}
+            {apiSent && (
+              <MessageBar intent="success">
+                <MessageBarBody>WhatsApp message successfully sent!</MessageBarBody>
+              </MessageBar>
+            )}
 
-          <Alert severity="info" icon={<WhatsAppIcon />}>
-            {hasApiSubscription
-              ? 'Appointment booked! Click Send WhatsApp below to send message directly.'
-              : 'Appointment booked! Review the pre-filled message below and click Open WhatsApp Web to send.'}
-          </Alert>
+            <MessageBar intent="info">
+              <MessageBarBody>
+                {hasApiSubscription
+                  ? 'Appointment booked! Click Send WhatsApp below to send message directly.'
+                  : 'Appointment booked! Review the pre-filled message below and click Open WhatsApp Web to send.'}
+              </MessageBarBody>
+            </MessageBar>
 
-          <Typography fontSize={14} fontWeight={700} color="text.primary">
-            Message Preview:
-          </Typography>
+            <Text weight="bold" size={300}>Message Preview:</Text>
 
-          <TextField
-            multiline
-            rows={8}
-            fullWidth
-            value={defaultMessage}
-            slotProps={{ input: { readOnly: true } }}
-            variant="outlined"
-            sx={{
-              '& .MuiInputBase-root': {
-                fontFamily: 'inherit',
-                fontSize: 14,
-                lineHeight: 1.6,
-                color: 'text.primary',
-                bgcolor: 'background.default',
-              },
-            }}
-          />
+            <Textarea
+              rows={6}
+              value={defaultMessage}
+              readOnly
+              style={{ width: '100%', fontFamily: 'inherit', fontSize: '14px', lineHeight: '1.5' }}
+            />
 
-          <Stack direction="row" spacing={2} justifyContent="flex-start">
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <Button
+                appearance="outline"
+                icon={<ContentCopyIcon />}
+                onClick={() => void handleCopyText()}
+              >
+                {copiedText ? 'Text Copied!' : 'Copy Text'}
+              </Button>
+            </div>
+          </DialogContent>
+        </DialogBody>
+
+        <DialogActions style={{ padding: '16px 20px', borderTop: `1px solid ${tokens.colorNeutralStroke1}` }}>
+          <Button appearance="subtle" onClick={onClose} disabled={sendingApi}>
+            Close
+          </Button>
+
+          {hasApiSubscription ? (
             <Button
-              variant="outlined"
-              size="medium"
-              startIcon={<ContentCopyIcon />}
-              onClick={() => void handleCopyText()}
-              color={copiedText ? 'success' : 'primary'}
+              appearance="primary"
+              icon={sendingApi ? <Spinner size="tiny" /> : <WhatsAppIcon />}
+              onClick={() => void handleSendApi()}
+              disabled={sendingApi || !formattedPhone}
+              style={{ backgroundColor: '#107c10', fontWeight: 700 }}
             >
-              {copiedText ? 'Text Copied!' : 'Copy Text'}
+              {sendingApi ? 'Sending…' : 'Send WhatsApp'}
             </Button>
-          </Stack>
-        </Stack>
-      </DialogContent>
-
-      <DialogActions sx={{ px: 3, py: 2, bgcolor: 'background.default' }}>
-        <Button onClick={onClose} color="inherit" disabled={sendingApi}>
-          Close
-        </Button>
-
-        {hasApiSubscription ? (
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={sendingApi ? <CircularProgress size={18} color="inherit" /> : <WhatsAppIcon />}
-            onClick={() => void handleSendApi()}
-            disabled={sendingApi || !formattedPhone}
-            sx={{ fontWeight: 700, px: 3 }}
-          >
-            {sendingApi ? 'Sending…' : 'Send WhatsApp'}
-          </Button>
-        ) : (
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={<WhatsAppIcon />}
-            onClick={handleSendWhatsAppWeb}
-            sx={{ fontWeight: 700, px: 3 }}
-          >
-            Open WhatsApp Web & Send
-          </Button>
-        )}
-      </DialogActions>
+          ) : (
+            <Button
+              appearance="primary"
+              icon={<WhatsAppIcon />}
+              onClick={handleSendWhatsAppWeb}
+              style={{ backgroundColor: '#107c10', fontWeight: 700 }}
+            >
+              Open WhatsApp Web & Send
+            </Button>
+          )}
+        </DialogActions>
+      </DialogSurface>
     </Dialog>
   );
 }

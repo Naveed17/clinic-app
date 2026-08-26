@@ -5,9 +5,11 @@ import {
   Button,
   Chip,
   Divider,
+  LinearProgress,
   Link,
   Paper,
   Skeleton,
+  Snackbar,
   Stack,
   Tab,
   Tabs,
@@ -15,11 +17,9 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Typography,
-  useTheme,
   alpha,
-  LinearProgress,
-  Snackbar,
-} from '@/compat/fluentMui';
+  useTheme,
+} from '@/utils/fluentHelpers';
 
 import { useUpdate } from '@/context/updateProvider';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
