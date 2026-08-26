@@ -1,13 +1,11 @@
 import {
-  Alert,
-  Autocomplete,
-  Box,
-  InputAdornment,
-  MenuItem,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material';
+  Field,
+  Input,
+  Select,
+  Text,
+  makeStyles,
+  tokens,
+} from '@fluentui/react-components';
 import { useMemo } from 'react';
 import type { Medicine } from '@/types/medicine';
 import { findCatalogDuplicate, formatMedicineDisplayName } from '@shared/medicineCatalog';
@@ -30,6 +28,14 @@ interface Props {
   onSelectExisting?: (medicine: Medicine) => void;
 }
 
+const useStyles = makeStyles({
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+});
+
 export function MedicineCatalogFormFields({
   name,
   type,
@@ -43,106 +49,86 @@ export function MedicineCatalogFormFields({
   onPriceChange,
   onSelectExisting,
 }: Props): React.JSX.Element {
-  const showMg = medicineTypeUsesMg(type);
-  const mgNum = showMg && mg.trim() ? parseInt(mg, 10) : null;
+  const styles = useStyles();
+  const showMg = medicineTypeUsesMg(type || DEFAULT_MEDICINE_TYPE);
 
-  const filteredMedicines = useMemo(() => {
-    const q = name.trim().toLowerCase();
-    if (!q) return medicines.slice(0, 50);
-    return medicines.filter((m) => {
-      const label = formatMedicineDisplayName(m.name, m.mg).toLowerCase();
-      return m.name.toLowerCase().includes(q) || label.includes(q);
-    }).slice(0, 50);
-  }, [medicines, name]);
-
-  const existingMatch = useMemo(
-    () => findCatalogDuplicate(medicines, name, mgNum, excludeId),
-    [medicines, name, mgNum, excludeId],
+  const catalogDuplicate = useMemo(
+    () => findCatalogDuplicate(medicines, name, showMg && mg.trim() ? Number(mg) : null, excludeId),
+    [medicines, name, mg, showMg, excludeId],
   );
 
-  function applyExisting(med: Medicine): void {
+  const applyExisting = (med: Medicine) => {
     onNameChange(med.name);
-    onTypeChange(med.type || DEFAULT_MEDICINE_TYPE);
+    onTypeChange(med.type);
     onMgChange(med.mg != null ? String(med.mg) : '');
     onPriceChange(String(med.price));
     onSelectExisting?.(med);
-  }
+  };
 
   return (
-    <Stack spacing={2}>
-      {existingMatch && (
-        <Alert severity="warning">
-          <strong>{formatMedicineDisplayName(existingMatch.name, existingMatch.mg)}</strong> already exists
-          ({existingMatch.type}, {money(existingMatch.price)}).
-        </Alert>
+    <div className={styles.container}>
+      {catalogDuplicate && (
+        <div style={{ padding: '8px 12px', background: '#fff4ce', borderRadius: '4px', border: '1px solid #f7630c' }}>
+          <Text weight="semibold" size={200} style={{ color: '#8a3707' }}>
+            Identical medicine exists: <strong>{formatMedicineDisplayName(catalogDuplicate.name, catalogDuplicate.mg)}</strong> ({money(catalogDuplicate.price)})
+          </Text>
+          {onSelectExisting && (
+            <button
+              type="button"
+              onClick={() => applyExisting(catalogDuplicate)}
+              style={{ display: 'block', marginTop: '4px', background: 'none', border: 'none', color: '#0078d4', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+            >
+              Use existing details & price
+            </button>
+          )}
+        </div>
       )}
-      <Autocomplete
-        freeSolo
-        options={filteredMedicines}
-        getOptionLabel={(m) => (typeof m === 'string' ? m : formatMedicineDisplayName(m.name, m.mg))}
-        inputValue={name}
-        onInputChange={(_, value, reason) => {
-          if (reason === 'reset') return;
-          onNameChange(value);
-        }}
-        onChange={(_, med) => {
-          if (med && typeof med !== 'string') applyExisting(med);
-        }}
-        filterOptions={(x) => x}
-        renderOption={(props, m) => (
-          <Box component="li" {...props} key={m.id}>
-            <Box sx={{ flex: 1 }}>
-              <Typography fontSize={13.5}>{formatMedicineDisplayName(m.name, m.mg)}</Typography>
-              <Typography fontSize={11.5} color="text.secondary">
-                {m.type}{m.mg != null ? ` · ${m.mg}mg` : ''} · {money(m.price)}
-              </Typography>
-            </Box>
-          </Box>
-        )}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            label="Medicine name"
-            size="small"
-            autoFocus
-            helperText="Type to search — existing medicines will appear as you type"
-          />
-        )}
-      />
-      <TextField select label="Type" size="small" fullWidth value={type} onChange={(e) => {
-        const next = e.target.value;
-        onTypeChange(next);
-        if (!medicineTypeUsesMg(next)) onMgChange('');
-      }}>
-        {MEDICINE_TYPES.map((t) => (
-          <MenuItem key={t} value={t}>{t}</MenuItem>
-        ))}
-      </TextField>
-      {showMg && (
-        <TextField
-          label="Strength (mg)"
-          size="small"
-          type="number"
-          fullWidth
-          value={mg}
-          onChange={(e) => onMgChange(e.target.value)}
-          placeholder="e.g. 500"
-          InputProps={{ endAdornment: <InputAdornment position="end">mg</InputAdornment> }}
-          slotProps={{ htmlInput: { min: 1, step: 1 } }}
-          helperText="Optional — use when same medicine has different strengths (100mg vs 500mg)"
+
+      <Field label="Medicine Name" hint="Type medicine name">
+        <Input
+          value={name}
+          onChange={(e) => onNameChange(e.target.value)}
+          placeholder="e.g. Panadol"
         />
+      </Field>
+
+      <Field label="Type">
+        <Select
+          value={type}
+          onChange={(e) => {
+            const next = e.target.value;
+            onTypeChange(next);
+            if (!medicineTypeUsesMg(next)) onMgChange('');
+          }}
+        >
+          {MEDICINE_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </Select>
+      </Field>
+
+      {showMg && (
+        <Field label="Strength (mg)" hint="Optional — e.g. 500">
+          <Input
+            type="number"
+            value={mg}
+            onChange={(e) => onMgChange(e.target.value)}
+            placeholder="500"
+          />
+        </Field>
       )}
-      <TextField
-        label="Price"
-        size="small"
-        type="number"
-        fullWidth
-        value={price}
-        onChange={(e) => onPriceChange(e.target.value)}
-        InputProps={{ startAdornment: <InputAdornment position="start">Rs.</InputAdornment> }}
-        slotProps={{ htmlInput: { min: 0, step: 'any' } }}
-      />
-    </Stack>
+
+      <Field label="Price (Rs.)">
+        <Input
+          type="number"
+          value={price}
+          onChange={(e) => onPriceChange(e.target.value)}
+          placeholder="0"
+        />
+      </Field>
+    </div>
   );
 }
 

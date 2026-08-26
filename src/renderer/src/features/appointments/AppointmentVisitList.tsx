@@ -1,7 +1,5 @@
-import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
-import { Avatar, Box, Chip, IconButton, Stack, Tooltip, Typography } from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+import { CalendarMonthOutlinedIcon, PrintOutlinedIcon } from '@/icons/fluent';
+import { alpha, Avatar, Box, Chip, IconButton, Stack, Tooltip, Typography, useTheme } from '@/compat/fluentMui';
 import { chipSx } from '@/components/TableUI';
 import type { Appointment } from '@/types/appointment';
 
@@ -21,37 +19,45 @@ const leftBorder: Record<string, string> = {
   NO_SHOW: 'error.main',
 };
 
+interface Props {
+  appointments: Appointment[];
+  selectedId?: string;
+  onOpen?: (appointment: Appointment) => void;
+  onPrint: (appointment: Appointment) => void;
+  printingId?: string | null;
+  showNotes?: boolean;
+}
+
 export function formatTokenLabel(tokenNumber: number | null | undefined): string {
   return tokenNumber != null ? `#${String(tokenNumber).padStart(3, '0')}` : 'No token';
 }
 
 export function AppointmentVisitList({
   appointments,
-  currentId,
+  selectedId,
   onOpen,
   onPrint,
-  printingId,
-  showNotes = false,
-  maxHeight,
-}: {
-  appointments: Appointment[];
-  currentId?: string;
-  onOpen?: (appointment: Appointment) => void;
-  onPrint: (appointment: Appointment) => void;
-  printingId?: string | null;
-  showNotes?: boolean;
-  maxHeight?: number;
-}): React.JSX.Element {
+  printingId: _printingId,
+  showNotes = true,
+}: Props): React.JSX.Element {
   const theme = useTheme();
 
+  if (!appointments.length) {
+    return (
+      <Typography color="text.secondary" variant="body2" sx={{ py: 2 }}>
+        No visits found.
+      </Typography>
+    );
+  }
+
   return (
-    <Stack spacing={1} sx={{ p: 2, maxHeight, overflowY: maxHeight ? 'auto' : undefined }}>
+    <Stack spacing={1}>
       {appointments.map((a) => {
-        const selected = currentId === a.id;
+        const selected = selectedId === a.id;
         return (
           <Box
             key={a.id}
-            onClick={onOpen ? () => onOpen(a) : undefined}
+            onClick={() => onOpen?.(a)}
             sx={{
               p: 1.5,
               borderRadius: 1,
@@ -81,7 +87,7 @@ export function AppointmentVisitList({
                 fontFamily: 'monospace',
               }}
             >
-              {a.tokenNumber != null ? String(a.tokenNumber).padStart(3, '0') : <CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} />}
+              {a.tokenNumber != null ? String(a.tokenNumber).padStart(3, '0') : <CalendarMonthOutlinedIcon />}
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1}>
@@ -95,19 +101,11 @@ export function AppointmentVisitList({
                       minute: '2-digit',
                     })}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', mt: 0.15 }}>
+                  <Typography variant="caption" color="text.secondary">
                     Dr. {a.provider.firstName} {a.provider.lastName}
-                    {a.reason ? ` · ${a.reason}` : ''}
                   </Typography>
                 </Box>
-                <Stack direction="row" spacing={0.75} alignItems="center" flexShrink={0}>
-                  <Chip
-                    label={formatTokenLabel(a.tokenNumber)}
-                    size="small"
-                    color={a.tokenNumber != null ? 'warning' : 'default'}
-                    variant={a.tokenNumber != null ? 'outlined' : 'filled'}
-                    sx={{ ...chipSx, fontWeight: 800, borderRadius: 1, fontFamily: 'monospace' }}
-                  />
+                <Stack direction="row" spacing={1} alignItems="center">
                   <Chip
                     label={a.status.replace('_', ' ')}
                     size="small"
@@ -115,18 +113,13 @@ export function AppointmentVisitList({
                     sx={{ ...chipSx, fontWeight: 700, borderRadius: 1 }}
                   />
                   <Tooltip title={a.tokenNumber != null || a.tokenId ? 'Print token' : 'No token for this visit'}>
-                    <span>
+                    <span onClick={(e) => { e.stopPropagation(); onPrint(a); }}>
                       <IconButton
                         size="small"
                         disabled={!a.tokenNumber && !a.tokenId}
-                        loading={printingId === a.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onPrint(a);
-                        }}
                         sx={{ borderRadius: 1 }}
                       >
-                        <PrintOutlinedIcon sx={{ fontSize: 18 }} />
+                        <PrintOutlinedIcon />
                       </IconButton>
                     </span>
                   </Tooltip>

@@ -630,7 +630,7 @@ export function StatisticsPage(): React.JSX.Element {
             <Button
               size="small"
               endIcon={<KeyboardArrowDownRoundedIcon style={{ fontSize: 18 }} />}
-              onClick={(e) => setRangeMenuEl(e.currentTarget)}
+              onClick={(e) => setRangeMenuEl(e.currentTarget as HTMLElement)}
               sx={{
                 textTransform: 'none',
                 color: ink,
@@ -1136,7 +1136,7 @@ export function StatisticsPage(): React.JSX.Element {
               <Button
                 size="small"
                 endIcon={<KeyboardArrowDownRoundedIcon style={{ fontSize: 18 }} />}
-                onClick={(e) => setReasonYearMenuEl(e.currentTarget)}
+                onClick={(e) => setReasonYearMenuEl(e.currentTarget as HTMLElement)}
                 sx={{
                   textTransform: 'none',
                   color: green,

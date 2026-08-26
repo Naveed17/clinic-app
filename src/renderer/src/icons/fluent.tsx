@@ -238,4 +238,5 @@ export const VisibilityOutlinedIcon = Eye24Regular;
 export const WarningAmberOutlinedIcon = Warning24Regular;
 export const WifiTetheringIcon = Wifi124Regular;
 export const WifiTetheringOutlinedIcon = Wifi124Regular;
+export const ContentCopyIcon = DocumentData24Regular;
 export const WorkOutlineOutlinedIcon = Briefcase24Regular;

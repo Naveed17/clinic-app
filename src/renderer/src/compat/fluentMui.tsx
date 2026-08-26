@@ -707,6 +707,10 @@ export function Popper({
   );
 }
 
+export function DialogTitle(props: AnyProps) {
+  return <Typography variant="h6" fontWeight={700} {...props} />;
+}
+
 export function useTheme() {
   return useMemo(
     () => ({

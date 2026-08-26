@@ -11,10 +11,9 @@ import {
   Stack,
   TextField,
   Typography,
-} from '@mui/material';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import CloseIcon from '@mui/icons-material/Close';
+  useTheme,
+} from '@/compat/fluentMui';
+import { CloseIcon, ContentCopyIcon, WhatsAppIcon } from '@/icons/fluent';
 import { openWhatsAppWeb } from '@/utils/whatsappWeb';
 import { formatTableDate } from '@/utils/formatDate';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
@@ -124,7 +123,7 @@ export function AppointmentWhatsAppDialog({
     <Dialog open={open} onClose={sendingApi ? undefined : onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 1 } }}>
       <DialogTitle sx={{ m: 0, p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Stack direction="row" spacing={1.25} alignItems="center">
-          <WhatsAppIcon sx={{ color: '#25D366', fontSize: 28 }} />
+          <WhatsAppIcon />
           <Typography variant="h6" fontWeight={700}>
             Send WhatsApp Confirmation
           </Typography>
@@ -162,7 +161,7 @@ export function AppointmentWhatsAppDialog({
                 fontSize: 14,
                 lineHeight: 1.6,
                 color: 'text.primary',
-                bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.7)' : '#f8fafc'),
+                bgcolor: 'background.default',
               },
             }}
           />
@@ -181,7 +180,7 @@ export function AppointmentWhatsAppDialog({
         </Stack>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, py: 2, bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.8)' : '#f8fafc') }}>
+      <DialogActions sx={{ px: 3, py: 2, bgcolor: 'background.default' }}>
         <Button onClick={onClose} color="inherit" disabled={sendingApi}>
           Close
         </Button>

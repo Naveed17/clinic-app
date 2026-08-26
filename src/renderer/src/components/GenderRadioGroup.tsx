@@ -1,4 +1,4 @@
-import { FormControl, FormControlLabel, FormLabel, Radio, RadioGroup } from '@mui/material';
+import { Label, Radio, RadioGroup } from '@fluentui/react-components';
 
 export const GENDER_OPTIONS = ['Male', 'Female', 'Other'] as const;
 
@@ -16,26 +16,19 @@ export function GenderRadioGroup({
   optional = false,
 }: GenderRadioGroupProps): React.JSX.Element {
   return (
-    <FormControl>
-      <FormLabel sx={{ fontSize: 13.5, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>
+    <div>
+      <Label size="small" weight="semibold">
         {optional ? `${label} (optional)` : label}
-      </FormLabel>
+      </Label>
       <RadioGroup
-        row
+        layout="horizontal"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        sx={{ gap: { xs: 0, sm: 1 } }}
+        onChange={(_e, data) => onChange(data.value)}
       >
         {GENDER_OPTIONS.map((g) => (
-          <FormControlLabel
-            key={g}
-            value={g}
-            control={<Radio size="small" />}
-            label={g}
-            sx={{ '& .MuiFormControlLabel-label': { fontSize: 13.5 } }}
-          />
+          <Radio key={g} value={g} label={g} />
         ))}
       </RadioGroup>
-    </FormControl>
+    </div>
   );
 }

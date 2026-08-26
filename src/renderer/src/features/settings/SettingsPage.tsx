@@ -604,7 +604,7 @@ export function SettingsPage(): React.JSX.Element {
         <Stack spacing={0} sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <Tabs
             value={settingsTab}
-            onChange={(_, v: 'general' | 'ai' | 'whatsapp' | 'backup' | 'support') => setSettingsTab(v)}
+            onChange={(_, v: unknown) => setSettingsTab(v as never)}
             sx={{
               mb: 3,
               minHeight: 44,
@@ -1187,8 +1187,8 @@ export function SettingsPage(): React.JSX.Element {
                       <ToggleButtonGroup
                         exclusive
                         value={drive.schedule}
-                        onChange={(_e, val: DriveSchedule | null) => {
-                          if (val) void handleGoogleSchedule(val);
+                        onChange={(_e: unknown, val: string | null) => {
+                          if (val) void handleGoogleSchedule(val as DriveSchedule);
                         }}
                         sx={{ flexWrap: 'wrap', gap: 1 }}
                       >
