@@ -1,10 +1,10 @@
 import { Outlet } from 'react-router-dom';
-import { Win11DesktopShell } from './Win11DesktopShell';
+import { Windows12Shell } from './Windows12Shell';
 
 export function AppShell(): React.JSX.Element {
   return (
-    <Win11DesktopShell>
+    <Windows12Shell>
       <Outlet />
-    </Win11DesktopShell>
+    </Windows12Shell>
   );
 }
