@@ -1,8 +1,9 @@
 import { MessageBar, MessageBarBody, makeStyles, tokens } from '@fluentui/react-components';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense, useLicenseModulesLoaded } from '@/features/auth/LicenseModulesContext';
-import { Win12Dashboard } from '@/features/dashboard/Win12Dashboard';
+import { AdminDashboard } from '@/features/dashboard/AdminDashboard';
 import { DoctorDashboard } from '@/features/dashboard/DoctorDashboard';
+import { ReceptionistDashboard } from '@/features/dashboard/ReceptionistDashboard';
 import { LabDashboard } from '@/features/dashboard/LabDashboard';
 import { StatCardsSkeleton } from '@/components/LoadingUI';
 
@@ -36,16 +37,16 @@ export function DashboardPage(): React.JSX.Element {
 
   switch (user?.role) {
     case 'admin':
-      return <Win12Dashboard />;
+      return <AdminDashboard />;
     case 'doctor':
       return !modulesLoaded || can('doctorDashboard') ? <DoctorDashboard /> : <RoleDisabled />;
     case 'receptionist':
-      return <Win12Dashboard />;
+      return <ReceptionistDashboard />;
     case 'lab_technician':
       return can('labDashboard') ? <LabDashboard /> : <RoleDisabled />;
     case 'pharmacist':
       return <RoleDisabled />;
     default:
-      return <Win12Dashboard />;
+      return <AdminDashboard />;
   }
 }

@@ -2,36 +2,6 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --cf-win12-wallpaper-bg: #5c749c;
-  --cf-glass-header: rgba(28, 34, 46, 0.85);
-  --cf-glass-sidebar: rgba(36, 44, 58, 0.8);
-  --cf-glass-toolbar: rgba(38, 46, 60, 0.85);
-  --cf-glass-surface: rgba(30, 36, 48, 0.88);
-  --cf-glass-card: rgba(45, 54, 70, 0.65);
-  --cf-glass-card-hover: rgba(55, 65, 84, 0.85);
-  --cf-glass-border: rgba(255, 255, 255, 0.14);
-  --cf-glass-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
-  --cf-active-pill: rgba(255, 255, 255, 0.14);
-  --cf-active-text: #ffffff;
-  --cf-text-primary: #f0f4f8;
-  --cf-text-secondary: #94a3b8;
-}
-
-[data-theme='light'],
-.light {
-  --cf-win12-wallpaper-bg: #637ca3;
-  --cf-glass-header: rgba(30, 36, 48, 0.88);
-  --cf-glass-sidebar: rgba(38, 46, 60, 0.82);
-  --cf-glass-toolbar: rgba(40, 48, 62, 0.88);
-  --cf-glass-surface: rgba(32, 38, 50, 0.9);
-  --cf-glass-card: rgba(45, 54, 70, 0.65);
-  --cf-glass-card-hover: rgba(58, 68, 88, 0.85);
-  --cf-glass-border: rgba(255, 255, 255, 0.15);
-  --cf-glass-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
-  --cf-active-pill: rgba(255, 255, 255, 0.15);
-  --cf-active-text: #ffffff;
-  --cf-text-primary: #f0f4f8;
-  --cf-text-secondary: #94a3b8;
 }
 
 html,
@@ -42,37 +12,11 @@ body,
   margin: 0;
   overflow: hidden;
   font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: var(--cf-win12-wallpaper-bg);
-  color: var(--cf-text-primary);
-}
-
-/* Windows 12 3D Wallpaper Backdrop */
-.win12-wallpaper {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background:
-    radial-gradient(ellipse at 15% 25%, rgba(140, 180, 240, 0.4) 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 75%, rgba(90, 130, 190, 0.35) 0%, transparent 60%),
-    linear-gradient(135deg, #4f658b 0%, #6882ab 40%, #3e5173 100%);
-  overflow: hidden;
-}
-
-.win12-wallpaper::before {
-  content: '';
-  position: absolute;
-  bottom: -30%;
-  left: -10%;
-  width: 120%;
-  height: 100%;
-  background: radial-gradient(ellipse at center, rgba(160, 200, 255, 0.22) 0%, transparent 70%);
-  transform: rotate(-10deg);
-  pointer-events: none;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -85,7 +29,7 @@ body,
 }
 
 *::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(0, 0, 0, 0.18);
   border-radius: 99px;
 }
 
@@ -96,31 +40,28 @@ body,
   letter-spacing: 2px;
 }
 
-/* Windows 12 Dark Glass Tables */
-table {
+/* Align react-phone-number-input with Fluent inputs */
+.PhoneInputField {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
+  --PhoneInput-color--focus: var(--colorBrandForeground1, #0f6cbd);
 }
 
-th {
-  background-color: rgba(255, 255, 255, 0.06) !important;
-  color: #94a3b8 !important;
-  font-weight: 600 !important;
-  font-size: 12px !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.5px !important;
-  padding: 12px 16px !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+.PhoneInputField .PhoneInputInput {
+  font: inherit;
+  border: 1px solid var(--colorNeutralStroke1, #d1d1d1);
+  border-radius: var(--borderRadiusMedium, 4px);
+  padding: 6px 10px;
+  min-height: 32px;
+  background: var(--colorNeutralBackground1, #fff);
+  color: var(--colorNeutralForeground1, #242424);
 }
 
-td {
-  padding: 12px 16px !important;
-  color: #f0f4f8 !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
-  font-size: 13px !important;
+.PhoneInputField .PhoneInputInput:focus {
+  outline: 2px solid var(--colorBrandStroke1, #0f6cbd);
+  outline-offset: -1px;
 }
 
-tr:hover td {
-  background-color: rgba(255, 255, 255, 0.05) !important;
+.PhoneInputField .PhoneInputCountryIcon {
+  border: none;
+  box-shadow: none;
 }

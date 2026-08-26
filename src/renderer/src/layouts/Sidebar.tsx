@@ -3,7 +3,6 @@ import {
   Button,
   Drawer,
   DrawerBody,
-  Input,
   Text,
   Tooltip,
   makeStyles,
@@ -14,16 +13,15 @@ import {
   SignOut24Regular,
 } from '@fluentui/react-icons';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
 import { getNavItems } from './navigation';
 
 type NavItem = ReturnType<typeof getNavItems>[number];
 
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
-import { SearchOutlinedIcon } from '@/icons/fluent';
+import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 
-export const drawerWidth = 230;
+export const drawerWidth = 220;
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -51,61 +49,18 @@ const useStyles = makeStyles({
     height: '100%',
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: 'var(--cf-glass-sidebar, rgba(36, 44, 58, 0.8))',
-    backdropFilter: 'blur(30px)',
-    borderRight: '1px solid var(--cf-glass-border)',
+    backgroundColor: tokens.colorNeutralBackground1,
+    borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
     boxSizing: 'border-box',
     userSelect: 'none',
-  },
-  userCard: {
-    padding: tokens.spacingHorizontalM,
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
-    margin: tokens.spacingHorizontalS,
-    borderRadius: '12px',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-  },
-  userMeta: {
-    display: 'flex',
-    flexDirection: 'column',
-    minWidth: 0,
-  },
-  userName: {
-    fontSize: tokens.fontSizeBase200,
-    fontWeight: tokens.fontWeightBold,
-    color: '#f0f4f8',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  userEmail: {
-    fontSize: tokens.fontSizeBase100,
-    color: '#94a3b8',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  searchBox: {
-    paddingLeft: tokens.spacingHorizontalS,
-    paddingRight: tokens.spacingHorizontalS,
-    marginBottom: tokens.spacingVerticalS,
-  },
-  searchPill: {
-    width: '100%',
-    height: '32px',
-    borderRadius: '99px',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    border: '1px solid rgba(255, 255, 255, 0.12)',
-    color: '#f0f4f8',
-    fontSize: tokens.fontSizeBase200,
   },
   scrollBody: {
     flex: 1,
     overflowY: 'auto',
     paddingLeft: tokens.spacingHorizontalS,
     paddingRight: tokens.spacingHorizontalS,
+    paddingTop: tokens.spacingVerticalM,
+    paddingBottom: tokens.spacingVerticalS,
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalS,
@@ -113,7 +68,7 @@ const useStyles = makeStyles({
   sectionTitle: {
     fontSize: '11px',
     fontWeight: tokens.fontWeightSemibold,
-    color: '#94a3b8',
+    color: tokens.colorNeutralForeground3,
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
     paddingLeft: tokens.spacingHorizontalS,
@@ -124,41 +79,35 @@ const useStyles = makeStyles({
   navItemRow: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalS,
     width: '100%',
     height: '36px',
     paddingLeft: tokens.spacingHorizontalM,
     paddingRight: tokens.spacingHorizontalM,
-    borderRadius: '10px',
+    borderRadius: tokens.borderRadiusMedium,
     cursor: 'pointer',
     position: 'relative',
     transition: 'all 120ms ease',
     boxSizing: 'border-box',
-    color: '#cbd5e1',
+    textDecoration: 'none',
+    color: tokens.colorNeutralForeground1,
     '&:hover': {
-      backgroundColor: 'rgba(255, 255, 255, 0.08)',
-      color: '#ffffff',
+      backgroundColor: tokens.colorNeutralBackground1Hover,
     },
   },
   activeRow: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    color: '#ffffff',
-    fontWeight: tokens.fontWeightBold,
+    backgroundColor: tokens.colorBrandBackground2,
+    color: tokens.colorBrandForeground1,
+    fontWeight: tokens.fontWeightSemibold,
   },
   activePill: {
     position: 'absolute',
-    left: '3px',
-    top: '8px',
-    bottom: '8px',
+    left: '2px',
+    top: '7px',
+    bottom: '7px',
     width: '3px',
     borderRadius: '3px',
-    backgroundColor: '#38bdf8',
-  },
-  itemLeft: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
-    minWidth: 0,
+    backgroundColor: tokens.colorBrandBackground,
   },
   iconBox: {
     display: 'flex',
@@ -173,17 +122,40 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-  },
-  arrowIcon: {
-    fontSize: '11px',
-    color: '#64748b',
+    flex: 1,
   },
   footer: {
     padding: tokens.spacingHorizontalM,
-    borderTop: '1px solid var(--cf-glass-border)',
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalXS,
+  },
+  userInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    minWidth: 0,
+    flex: 1,
+  },
+  userMeta: {
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 0,
+  },
+  userName: {
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground1,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  userRole: {
+    fontSize: tokens.fontSizeBase100,
+    color: tokens.colorNeutralForeground3,
+    textTransform: 'capitalize',
   },
 });
 
@@ -221,7 +193,6 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }): React.JSX
   const modules = useLicenseModules();
   const navItems = user ? getNavItems(user.role, modules) : [];
   const grouped = groupNavItems(navItems);
-  const [filterText, setFilterText] = useState('');
 
   const go = (path: string) => {
     navigate(path);
@@ -230,70 +201,49 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }): React.JSX
 
   return (
     <div className={styles.sidebarPane}>
-      {/* User Profile Card */}
-      <div className={styles.userCard}>
-        <Avatar size={32} name={user?.name || 'User'} />
-        <div className={styles.userMeta}>
-          <Text className={styles.userName}>{user?.name || 'Doctor'}</Text>
-          <Text className={styles.userEmail}>{user?.role || 'Staff'} · CareFlow</Text>
-        </div>
-      </div>
-
-      {/* Search Input */}
-      <div className={styles.searchBox}>
-        <Input
-          size="small"
-          placeholder="Find a setting or page"
-          value={filterText}
-          onChange={(e) => setFilterText(e.target.value)}
-          contentBefore={<SearchOutlinedIcon style={{ fontSize: 13 }} />}
-          className={styles.searchPill}
-        />
-      </div>
-
-      {/* Nav List */}
       <div className={styles.scrollBody}>
         {grouped.map((group) => (
           <div key={group.section} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <div className={styles.sectionTitle}>{group.section}</div>
-            {group.items
-              .filter((i) => !filterText || i.label.toLowerCase().includes(filterText.toLowerCase()))
-              .map((item) => {
-                const pathStr = item.path as string;
-                const isActive =
-                  location.pathname === pathStr ||
-                  (pathStr !== '/' && location.pathname.startsWith(`${pathStr}/`));
+            {group.items.map((item) => {
+              const pathStr = item.path as string;
+              const isActive =
+                location.pathname === pathStr ||
+                (pathStr !== '/' && location.pathname.startsWith(`${pathStr}/`));
 
-                return (
-                  <div
-                    key={pathStr}
-                    className={`${styles.navItemRow} ${isActive ? styles.activeRow : ''}`}
-                    onClick={() => go(pathStr)}
-                  >
-                    {isActive && <div className={styles.activePill} />}
-                    <div className={styles.itemLeft}>
-                      <span className={styles.iconBox}>{item.icon as React.JSX.Element}</span>
-                      <span className={styles.itemLabel}>{item.label}</span>
-                    </div>
-                    <span className={styles.arrowIcon}>&#10140;</span>
-                  </div>
-                );
-              })}
+              return (
+                <div
+                  key={pathStr}
+                  className={`${styles.navItemRow} ${isActive ? styles.activeRow : ''}`}
+                  onClick={() => go(pathStr)}
+                >
+                  {isActive && <div className={styles.activePill} />}
+                  <span className={styles.iconBox}>{item.icon as React.JSX.Element}</span>
+                  <span className={styles.itemLabel}>{item.label}</span>
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>
 
-      {/* Footer */}
       <div className={styles.footer}>
-        <Button
-          appearance="subtle"
-          size="small"
-          icon={<Settings24Regular />}
-          onClick={() => go('/settings')}
-          style={{ color: '#94a3b8' }}
-        >
-          Settings
-        </Button>
+        <div className={styles.userInfo}>
+          <Avatar size={28} name={user?.name || 'User'} />
+          <div className={styles.userMeta}>
+            <Text className={styles.userName}>{user?.name || 'Doctor'}</Text>
+            <Text className={styles.userRole}>{user?.role || 'Staff'}</Text>
+          </div>
+        </div>
+
+        <Tooltip content="Settings" relationship="label">
+          <Button
+            appearance="subtle"
+            size="small"
+            icon={<Settings24Regular />}
+            onClick={() => go('/settings')}
+          />
+        </Tooltip>
 
         <Tooltip content="Logout" relationship="label">
           <Button
@@ -305,7 +255,6 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }): React.JSX
               navigate('/login', { replace: true });
               onNavigate?.();
             }}
-            style={{ color: '#94a3b8' }}
           />
         </Tooltip>
       </div>

@@ -179,12 +179,10 @@ export function Stack(props: AnyProps): React.JSX.Element {
 export function Paper(props: AnyProps): React.JSX.Element {
   const styleFromSx = convertSxToStyle(props.sx);
   const style: CSSProperties = {
-    backgroundColor: 'var(--cf-glass-card, rgba(45, 54, 70, 0.65))',
-    backdropFilter: 'blur(20px)',
-    border: '1px solid var(--cf-glass-border, rgba(255, 255, 255, 0.14))',
-    borderRadius: '14px',
+    backgroundColor: tokens.colorNeutralBackground1,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusMedium,
     boxShadow: tokens.shadow4,
-    color: 'var(--cf-text-primary, #f0f4f8)',
     ...styleFromSx,
     ...(props.style as CSSProperties | undefined),
   };
@@ -439,21 +437,7 @@ export function Dialog({
 }: AnyProps & { open: boolean; onClose?: () => void }): React.JSX.Element {
   return (
     <FDialog open={open} onOpenChange={(_, d) => { if (!d.open) onClose?.(); }}>
-      <DialogSurface
-        style={{
-          maxWidth: 580,
-          width: '100%',
-          maxHeight: '90vh',
-          overflow: 'auto',
-          backgroundColor: 'var(--cf-glass-surface, rgba(30, 36, 48, 0.95))',
-          backdropFilter: 'blur(40px)',
-          border: '1px solid var(--cf-glass-border, rgba(255, 255, 255, 0.15))',
-          borderRadius: '20px',
-          boxShadow: 'var(--cf-glass-shadow)',
-          color: 'var(--cf-text-primary, #f0f4f8)',
-        }}
-        {...(omitMui(rest) as object)}
-      >
+      <DialogSurface style={{ maxWidth: 560, width: '100%', maxHeight: '90vh', overflow: 'auto' }} {...(omitMui(rest) as object)}>
         {children}
       </DialogSurface>
     </FDialog>
