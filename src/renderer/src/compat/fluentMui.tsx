@@ -46,9 +46,72 @@ type AnyProps = Record<string, unknown> & {
   component?: keyof React.JSX.IntrinsicElements | React.ElementType;
 };
 
+function convertSxToStyle(sx: unknown): CSSProperties {
+  if (!sx || typeof sx !== 'object') return {};
+  const res: CSSProperties = {};
+
+  for (const [k, v] of Object.entries(sx as Record<string, unknown>)) {
+    if (v == null) continue;
+    if (typeof v === 'object' && !Array.isArray(v)) {
+      const obj = v as Record<string, unknown>;
+      const val = obj.lg ?? obj.md ?? obj.sm ?? obj.xs;
+      if (val != null) (res as Record<string, unknown>)[k] = val;
+      continue;
+    }
+
+    if (k === 'mb') res.marginBottom = typeof v === 'number' ? `${v * 8}px` : (v as string);
+    else if (k === 'mt') res.marginTop = typeof v === 'number' ? `${v * 8}px` : (v as string);
+    else if (k === 'mr') res.marginRight = typeof v === 'number' ? `${v * 8}px` : (v as string);
+    else if (k === 'ml') res.marginLeft = typeof v === 'number' ? `${v * 8}px` : (v as string);
+    else if (k === 'mx') {
+      const val = typeof v === 'number' ? `${v * 8}px` : (v as string);
+      res.marginLeft = val;
+      res.marginRight = val;
+    } else if (k === 'my') {
+      const val = typeof v === 'number' ? `${v * 8}px` : (v as string);
+      res.marginTop = val;
+      res.marginBottom = val;
+    } else if (k === 'm') res.margin = typeof v === 'number' ? `${v * 8}px` : (v as string);
+    else if (k === 'pb') res.paddingBottom = typeof v === 'number' ? `${v * 8}px` : (v as string);
+    else if (k === 'pt') res.paddingTop = typeof v === 'number' ? `${v * 8}px` : (v as string);
+    else if (k === 'pr') res.paddingRight = typeof v === 'number' ? `${v * 8}px` : (v as string);
+    else if (k === 'pl') res.paddingLeft = typeof v === 'number' ? `${v * 8}px` : (v as string);
+    else if (k === 'px') {
+      const val = typeof v === 'number' ? `${v * 8}px` : (v as string);
+      res.paddingLeft = val;
+      res.paddingRight = val;
+    } else if (k === 'py') {
+      const val = typeof v === 'number' ? `${v * 8}px` : (v as string);
+      res.paddingTop = val;
+      res.paddingBottom = val;
+    } else if (k === 'p') res.padding = typeof v === 'number' ? `${v * 8}px` : (v as string);
+    else if (k === 'bgcolor') {
+      if (v === 'primary.main') res.backgroundColor = tokens.colorBrandBackground;
+      else if (v === 'primary.dark') res.backgroundColor = tokens.colorBrandBackgroundSelected;
+      else if (v === 'transparent') res.backgroundColor = 'transparent';
+      else res.backgroundColor = String(v);
+    } else if (k === 'color') {
+      if (v === 'text.primary') res.color = tokens.colorNeutralForeground1;
+      else if (v === 'text.secondary') res.color = tokens.colorNeutralForeground2;
+      else if (v === 'text.disabled') res.color = tokens.colorNeutralForeground3;
+      else if (v === 'primary.main') res.color = tokens.colorBrandForeground1;
+      else res.color = String(v);
+    } else if (k === 'borderRadius') {
+      res.borderRadius = typeof v === 'number' ? `${v * 8}px` : (v as string);
+    } else if (k === 'fontWeight') {
+      res.fontWeight = v as CSSProperties['fontWeight'];
+    } else if (k === 'fontSize') {
+      res.fontSize = typeof v === 'number' ? `${v}px` : (v as string);
+    } else {
+      (res as Record<string, unknown>)[k] = v;
+    }
+  }
+  return res;
+}
+
 function omitMui(props: AnyProps): Record<string, unknown> {
   const {
-    sx: _sx,
+    sx,
     variant: _v,
     color: _c,
     size: _s,
@@ -78,7 +141,11 @@ function omitMui(props: AnyProps): Record<string, unknown> {
     TransitionProps: _tp,
     ...rest
   } = props;
-  const style: CSSProperties = { ...(props.style as CSSProperties | undefined) };
+  const styleFromSx = convertSxToStyle(sx);
+  const style: CSSProperties = {
+    ...styleFromSx,
+    ...(props.style as CSSProperties | undefined),
+  };
   if (fullWidth) style.width = '100%';
   if (typeof textAlign === 'string') style.textAlign = textAlign as CSSProperties['textAlign'];
   if (typeof alignItems === 'string') style.alignItems = alignItems as CSSProperties['alignItems'];
@@ -98,38 +165,59 @@ export const Box = forwardRef<HTMLElement, AnyProps>(function Box(props, ref) {
 
 export function Stack(props: AnyProps): React.JSX.Element {
   const { children, direction = 'column', spacing = 1, ...rest } = props;
+  const styleFromSx = convertSxToStyle(props.sx);
   const style: CSSProperties = {
     display: 'flex',
     flexDirection: (direction as CSSProperties['flexDirection']) || 'column',
     gap: typeof spacing === 'number' ? spacing * 8 : 8,
+    ...styleFromSx,
     ...(props.style as CSSProperties | undefined),
   };
   return <div {...(omitMui(rest) as HTMLAttributes<HTMLDivElement>)} style={style}>{children}</div>;
 }
 
 export function Paper(props: AnyProps): React.JSX.Element {
+  const styleFromSx = convertSxToStyle(props.sx);
   const style: CSSProperties = {
     backgroundColor: tokens.colorNeutralBackground1,
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     borderRadius: tokens.borderRadiusMedium,
     boxShadow: tokens.shadow4,
+    ...styleFromSx,
     ...(props.style as CSSProperties | undefined),
   };
   return <div {...(omitMui(props) as HTMLAttributes<HTMLDivElement>)} style={style}>{props.children}</div>;
 }
 
-export function Typography(props: AnyProps & { variant?: string }): React.JSX.Element {
-  const { children, variant, color, ...rest } = props;
-  const style: CSSProperties = { ...(props.style as CSSProperties | undefined) };
+export function Typography(props: AnyProps & { variant?: string; fontWeight?: number | string; fontSize?: number | string | Record<string, number | string> }): React.JSX.Element {
+  const { children, variant, color, fontWeight, fontSize, ...rest } = props;
+  const styleFromSx = convertSxToStyle(props.sx);
+  const style: CSSProperties = {
+    display: 'block',
+    ...styleFromSx,
+    ...(props.style as CSSProperties | undefined),
+  };
   if (color === 'text.secondary' || color === 'text.disabled') style.color = tokens.colorNeutralForeground2;
-  if (typeof color === 'string' && color.includes('.')) {
-    /* ignore palette paths */
-  } else if (typeof color === 'string') style.color = color;
-  if (variant === 'h3' || variant === 'h4' || variant === 'h5' || variant === 'h6') {
-    style.fontWeight = 700;
-    style.fontSize = variant === 'h3' ? 28 : variant === 'h4' ? 24 : variant === 'h5' ? 20 : 16;
+  else if (color === 'text.primary') style.color = tokens.colorNeutralForeground1;
+  else if (typeof color === 'string' && !color.includes('.')) style.color = color;
+
+  if (fontWeight) style.fontWeight = fontWeight as CSSProperties['fontWeight'];
+  if (fontSize) {
+    if (typeof fontSize === 'number') style.fontSize = `${fontSize}px`;
+    else if (typeof fontSize === 'string') style.fontSize = fontSize;
+    else if (typeof fontSize === 'object') {
+      const val = fontSize.lg ?? fontSize.md ?? fontSize.sm ?? fontSize.xs;
+      if (val != null) style.fontSize = typeof val === 'number' ? `${val}px` : val;
+    }
   }
-  return <FText {...(omitMui(rest) as object)} style={style}>{children}</FText>;
+
+  if (variant === 'h1' || variant === 'h2' || variant === 'h3' || variant === 'h4' || variant === 'h5' || variant === 'h6') {
+    style.fontWeight = (fontWeight as CSSProperties['fontWeight']) ?? 700;
+    if (!style.fontSize) {
+      style.fontSize = variant === 'h1' ? 32 : variant === 'h2' ? 28 : variant === 'h3' ? 24 : variant === 'h4' ? 20 : variant === 'h5' ? 18 : 16;
+    }
+  }
+  return <FText block {...(omitMui(rest) as object)} style={style}>{children}</FText>;
 }
 
 export function Button({

@@ -1167,21 +1167,20 @@ export function ReceptionistDashboard(): React.JSX.Element {
               </Typography>
             </Box>
 
-            {/* Illustration cluster — sits ~20px above banner bottom */}
+            {/* Illustration cluster — bounded to banner */}
             <Box
               sx={{
-                display: { xs: 'none', sm: 'block' },
+                display: { xs: 'none', md: 'block' },
                 position: 'absolute',
-                right: { sm: 8, md: 20 },
-                bottom: 0,
-                width: { sm: 280, md: 320 },
-                height: { sm: 210, md: 230 },
+                right: 20,
+                bottom: 10,
+                width: 280,
+                height: 180,
                 zIndex: 1,
                 pointerEvents: 'none',
                 overflow: 'hidden',
               }}
             >
-
               {CLINIC_CLUSTER.map((img) => (
                 <Box
                   key={img.alt}
@@ -1193,12 +1192,12 @@ export function ReceptionistDashboard(): React.JSX.Element {
                     top: img.top,
                     left: img.left,
                     width: img.w,
-                    height: 'auto',
+                    maxHeight: 110,
                     objectFit: 'contain',
                     transform: `rotate(${img.rot}deg)`,
                     zIndex: img.z,
                     opacity: img.opacity,
-                    filter: 'drop-shadow(0 12px 20px rgba(0,0,0,0.28))',
+                    filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.2))',
                     userSelect: 'none',
                   }}
                 />
