@@ -1,20 +1,117 @@
 import { app } from 'electron';
 import { PrismaClient } from '@prisma/client';
 import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
+import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { seedDefaultAdmin } from '../auth/seed';
+
+function getSavedLicenseKey(): string | null {
+  try {
+    const file = join(app.getPath('userData'), 'license.dat');
+    if (existsSync(file)) {
+      const key = readFileSync(file, 'utf-8').trim();
+      if (key) return key;
+    }
+  } catch { /* ignore */ }
+  try {
+    const cacheFile = join(app.getPath('userData'), 'license-cache.json');
+    if (existsSync(cacheFile)) {
+      const cache = JSON.parse(readFileSync(cacheFile, 'utf-8')) as { key?: string; schemaId?: string };
+      if (cache?.key) return cache.key;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+export function schemaIdForLicenseKey(key: string): string {
+  const normalized = String(key || '').trim().toUpperCase();
+  if (!normalized) return '';
+  const hash = createHash('sha256').update(normalized).digest('hex').slice(0, 16);
+  return `lic_${hash}`;
+}
+
+export function getActiveSchemaId(): string {
+  const key = getSavedLicenseKey();
+  if (!key) return '';
+  try {
+    const cacheFile = join(app.getPath('userData'), 'license-cache.json');
+    if (existsSync(cacheFile)) {
+      const cache = JSON.parse(readFileSync(cacheFile, 'utf-8')) as { key?: string; schemaId?: string };
+      if (cache?.key === key && cache?.schemaId) return cache.schemaId;
+    }
+  } catch { /* ignore */ }
+  return schemaIdForLicenseKey(key);
+}
+
+export function getClinicDbPath(): string {
+  const schemaId = getActiveSchemaId();
+  if (!schemaId) {
+    return join(app.getPath('userData'), 'clinic.db');
+  }
+
+  const schemaDbPath = join(app.getPath('userData'), `clinic_${schemaId}.db`);
+  const legacyDbPath = join(app.getPath('userData'), 'clinic.db');
+  const legacyFlagPath = join(app.getPath('userData'), 'clinic_legacy_migrated.flag');
+
+  // Legacy migration runs ONCE ONLY for the original installed license key.
+  // Fresh/new license keys will NOT copy legacy data and will start with a clean database.
+  if (!existsSync(schemaDbPath) && existsSync(legacyDbPath) && !existsSync(legacyFlagPath)) {
+    try {
+      copyFileSync(legacyDbPath, schemaDbPath);
+      writeFileSync(legacyFlagPath, schemaId, 'utf-8');
+      console.log(`[Database] Migrated legacy clinic.db to ${schemaDbPath}`);
+    } catch (err) {
+      console.error(`[Database] Failed to migrate legacy clinic.db:`, err);
+    }
+  }
+
+  return schemaDbPath;
+}
 
 let prisma: PrismaClient | undefined;
+let currentDbPath: string | undefined;
+const initializedDbPaths = new Set<string>();
+let initPromise: Promise<void> | undefined;
 
 export function getPrisma(): PrismaClient {
+  const targetDbPath = getClinicDbPath();
+  if (prisma && currentDbPath !== targetDbPath) {
+    try {
+      void prisma.$disconnect();
+    } catch { /* ignore */ }
+    prisma = undefined;
+  }
+
   if (!prisma) {
+    currentDbPath = targetDbPath;
     prisma = new PrismaClient({
       datasources: {
-        db: { url: `file:${join(app.getPath('userData'), 'clinic.db').replaceAll('\\', '/')}` },
+        db: { url: `file:${targetDbPath.replaceAll('\\', '/')}` },
       },
     });
   }
 
   return prisma;
+}
+
+export async function ensureDatabaseReady(): Promise<PrismaClient> {
+  const db = getPrisma();
+  const targetDbPath = currentDbPath || getClinicDbPath();
+  if (!initializedDbPaths.has(targetDbPath)) {
+    if (!initPromise) {
+      initPromise = (async () => {
+        await initializeDatabase(db);
+        try {
+          await seedDefaultAdmin();
+        } catch { /* ignore */ }
+        initializedDbPaths.add(targetDbPath);
+      })().finally(() => {
+        initPromise = undefined;
+      });
+    }
+    await initPromise;
+  }
+  return db;
 }
 
 /** Idempotent — safe to call before pharmacy queue / dispense queries. */
@@ -37,8 +134,7 @@ export async function ensurePrescriptionPharmacyColumns(
   }
 }
 
-export async function initializeDatabase(): Promise<void> {
-  const database = getPrisma();
+export async function initializeDatabase(database: PrismaClient = getPrisma()): Promise<void> {
 
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "User" (

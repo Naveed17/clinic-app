@@ -39,10 +39,10 @@ async function generateMrNumber(): Promise<string> {
 }
 
 function resolveDateOfBirth(input: PatientInput): Date | null {
+  if (input.dateOfBirth) return new Date(input.dateOfBirth);
   if (input.age != null && String(input.age).trim() !== '') {
     return ageToDateOfBirth(input.age);
   }
-  if (input.dateOfBirth) return new Date(input.dateOfBirth);
   return null;
 }
 

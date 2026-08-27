@@ -3,9 +3,12 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
+import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
+import { alpha, useTheme } from '@mui/material/styles';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Chip,
@@ -284,6 +287,7 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
 }
 
 export function UsersPage(): React.JSX.Element {
+  const theme = useTheme();
   const queryClient = useQueryClient();
   const { user: me } = useAuth();
   const { can } = useLicense();
@@ -366,7 +370,24 @@ export function UsersPage(): React.JSX.Element {
                     </Box>
                   </Box>
                 </TableCell>
-                <TableCell>{user.email}</TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                  <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.25, whiteSpace: 'nowrap' }}>
+                    <Avatar
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                        color: 'secondary.main',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <EmailOutlinedIcon sx={{ fontSize: 16 }} />
+                    </Avatar>
+                    <Typography fontSize={13} fontWeight={500} color="text.primary" sx={{ whiteSpace: 'nowrap' }}>
+                      {user.email}
+                    </Typography>
+                  </Box>
+                </TableCell>
                 <TableCell><Chip label={roleLabels[user.role] ?? user.role} color={roleColors[user.role] ?? 'default'} size="small" sx={{ ...chipSx, border: 'none' }} /></TableCell>
                 <TableCell>{user.doctorProfile ? <Typography variant="body2">{user.doctorProfile.specialization}</Typography> : <Typography variant="body2" color="text.disabled">—</Typography>}</TableCell>
                 <TableCell>

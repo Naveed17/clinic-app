@@ -3,7 +3,8 @@ import { machineIdSync } from 'node-machine-id';
 import { join } from 'node:path';
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import os from 'node:os';
-import { saveSettings, saveDatabaseModeSettings, type DatabaseMode, resolveOnlineApiOrigin, isUnusableOnlineOrigin } from '../config/settings';
+import { saveSettings, getSettings, saveDatabaseModeSettings, type DatabaseMode, resolveOnlineApiOrigin, isUnusableOnlineOrigin } from '../config/settings';
+import { schemaIdForLicenseKey } from '../database/client';
 
 const API_BASE_URL = process.env.API_BASE_URL || 'https://clinic-license-six.vercel.app/api';
 
@@ -196,13 +197,38 @@ function getCachedModules(key: string): Record<string, boolean> | null {
   } catch { return null; }
 }
 
-/** Sync read of cached license modules (no network). Missing key = disabled. */
+const DEFAULT_MODULE_FALLBACKS: Record<string, boolean> = {
+  doctorDashboard: true,
+  labDashboard: true,
+  billing: true,
+  reports: true,
+  opdReports: true,
+  statistics: true,
+  tokens: true,
+  manageDoctors: true,
+  managePatients: true,
+  manageMedicines: true,
+  manageUsers: true,
+  pharmacy: false,
+  whatsapp: false,
+  ai: false,
+  chat: true,
+};
+
+/** Sync read of cached license modules (no network). Fallback to default if pending. */
 export function isLicenseModuleEnabled(moduleKey: string): boolean {
   const savedKey = getSavedKey();
-  if (!savedKey) return false;
+  if (!savedKey) return DEFAULT_MODULE_FALLBACKS[moduleKey] ?? false;
   if (isLocallyExpired(savedKey)) return false;
   const modules = getCachedModules(savedKey);
-  return modules?.[moduleKey] === true;
+  if (!modules) {
+    void getLicenseModules().catch(() => {});
+    return DEFAULT_MODULE_FALLBACKS[moduleKey] ?? false;
+  }
+  if (modules[moduleKey] !== undefined) {
+    return modules[moduleKey] === true;
+  }
+  return DEFAULT_MODULE_FALLBACKS[moduleKey] ?? false;
 }
 
 /** OPD daily reports page. */
@@ -216,11 +242,9 @@ function saveModulesCache(key: string, modules: Record<string, boolean>): void {
 }
 function isLocallyExpired(key: string): boolean {
   const cache = getLicenseCache(key);
-  if (!cache) return false;
-  if ((cache.licenseType === 'monthly' || cache.licenseType === 'annual') && !cache.expiresAt) return true;
-  if (!cache.expiresAt) return false;
+  if (!cache || !cache.expiresAt) return false;
   const end = new Date(cache.expiresAt);
-  if (Number.isNaN(end.getTime())) return cache.licenseType === 'monthly' || cache.licenseType === 'annual';
+  if (Number.isNaN(end.getTime())) return false;
   return Date.now() > end.getTime();
 }
 
@@ -232,18 +256,23 @@ function clearLocalLicense(): void {
   }
 }
 
-/** Backend deleted the key (as opposed to merely disabling it). */
+/** Backend deleted the key, or device was removed/unlinked from license. */
 function isLicenseMissingOnServer(
   data: { valid?: boolean; error?: string; code?: string; message?: string },
   httpStatus: number,
 ): boolean {
   const code = String(data.code || '').trim().toLowerCase();
-  if (code === 'not_found' || code === 'missing') return true;
+  if (code === 'not_found' || code === 'missing' || code === 'device') return true;
   if (httpStatus === 404) return true;
   const err = String(data.error || data.message || '').trim().toLowerCase();
   if (!err) return false;
   if (err.includes('has been disabled')) return false;
-  if (err.includes('not found') || err.includes('does not exist') || err.includes('no such license')) {
+  if (
+    err.includes('not found') ||
+    err.includes('does not exist') ||
+    err.includes('no such license') ||
+    err.includes('not activated for this license')
+  ) {
     return true;
   }
   // Current / previous validate payload when the key row was deleted
@@ -309,12 +338,13 @@ const KNOWN_MODULE_KEYS = [
 function normalizeModulesPayload(modules?: Record<string, boolean> | null): Record<string, boolean> {
   const out: Record<string, boolean> = {};
   for (const key of KNOWN_MODULE_KEYS) {
-    out[key] = modules?.[key] === true;
+    out[key] = modules?.[key] ?? DEFAULT_MODULE_FALLBACKS[key] ?? false;
   }
   out.pharmacy = false;
   out.billing = true;
   out.manageMedicines = true;
   out.reports = true;
+  out.chat = true;
   return out;
 }
 
@@ -380,6 +410,10 @@ export async function getLicenseGate(): Promise<LicenseGate> {
       expiresAt?: string | null;
     } & LicenseApiExtras;
     if (!data.valid || response.status !== 200) {
+      if (isLicenseMissingOnServer(data, response.status)) {
+        clearLocalLicense();
+        return { state: 'none' };
+      }
       const reason = String(data.error || data.message || '').trim() || DISABLED_FALLBACK;
       rememberGate(savedKey, 'blocked', reason);
       return { state: 'blocked', reason };
@@ -389,6 +423,7 @@ export async function getLicenseGate(): Promise<LicenseGate> {
       rememberGate(savedKey, 'blocked', EXPIRED_REASON);
       return { state: 'blocked', reason: EXPIRED_REASON };
     }
+    void getLicenseModules().catch(() => {});
     return { state: 'ok' };
   } catch {
     const cache = getLicenseCache(savedKey);
@@ -478,6 +513,25 @@ export function registerLicenseIpc(): void {
         writeFileSync(getLicenseFilePath(), formattedKey, 'utf-8');
         applyDatabaseModeFromApi(formattedKey, data);
         try { unlinkSync(getModulesCacheFilePath()); } catch { /* ignore */ }
+
+        // Force setupDone: false for fresh license key activation so SetupWizard runs
+        const schemaId = data.schemaId || schemaIdForLicenseKey(formattedKey);
+        const schemaSettingsPath = join(app.getPath('userData'), `settings_${schemaId}.json`);
+        try {
+          let existingSettings: Record<string, unknown> = {};
+          if (existsSync(schemaSettingsPath)) {
+            existingSettings = JSON.parse(readFileSync(schemaSettingsPath, 'utf-8')) as Record<string, unknown>;
+          }
+          if (existingSettings.setupDone !== true) {
+            writeFileSync(
+              schemaSettingsPath,
+              JSON.stringify({ ...getSettings(), ...existingSettings, setupDone: false }, null, 2),
+              'utf-8',
+            );
+            console.log(`[License] Fresh license activation ${schemaId}: set setupDone to false`);
+          }
+        } catch { /* ignore */ }
+
         return {
           ok: true,
           databaseMode: data.databaseMode === 'online' || data.onlineDatabase ? 'online' : 'local',

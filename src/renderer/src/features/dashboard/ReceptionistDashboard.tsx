@@ -48,6 +48,7 @@ import { TokenFeeFields } from '@/features/tokens/TokenFeeFields';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { LiveClock } from '@/components/LiveClock';
 import { nextFreeSlot, doctorOfflineReason, slotSearchFrom, type SlotAdjustReason } from '@/utils/appointmentSlot';
+import { ageToDateOfBirth, dateOfBirthToAge } from '@shared/patientAge';
 import imgMask from '@/assets/dashboard/clinic-mask.svg';
 import imgCapsule from '@/assets/dashboard/clinic-capsule.svg';
 import imgVirus from '@/assets/dashboard/clinic-virus.svg';
@@ -71,22 +72,27 @@ const patientSchema = z.object({
   firstName: z.string().trim().min(1, 'Required'),
   lastName: z.string().trim().min(1, 'Required'),
   phone: z.string().trim(),
-  age: z.string(),
+  ageValue: z.string(),
+  ageUnit: z.enum(['years', 'months', 'days']),
   gender: z.string(),
   address: z.string().trim(),
 });
 type PatientForm = z.infer<typeof patientSchema>;
-const patientDefaults: PatientForm = { firstName: '', lastName: '', phone: '', age: '', gender: '', address: '' };
+const patientDefaults: PatientForm = { firstName: '', lastName: '', phone: '', ageValue: '', ageUnit: 'years', gender: '', address: '' };
 
 const VISIT_REASONS = ['Checkup', 'Follow-up', 'Urgent', 'Consultation', 'Vaccination', 'Free'] as const;
 
 function walkInPatientInput(values: PatientForm): PatientInput {
-  const ageNum = values.age.trim() ? parseInt(values.age, 10) : null;
+  const num = values.ageValue.trim() ? parseFloat(values.ageValue) : null;
+  const dob = num != null && !Number.isNaN(num) ? ageToDateOfBirth(num, values.ageUnit) : null;
+  const ageYears = values.ageUnit === 'years' ? (num != null ? Math.floor(num) : null) : (dob ? dateOfBirthToAge(dob) : null);
+
   return {
     firstName: values.firstName,
     lastName: values.lastName,
     phone: values.phone || null,
-    age: Number.isFinite(ageNum) ? ageNum : null,
+    age: ageYears,
+    dateOfBirth: dob ? dob.toISOString() : null,
     gender: values.gender || null,
     email: null,
     address: values.address || null,
@@ -364,8 +370,19 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
                     <TextField label="First name" error={!!form.formState.errors.firstName} helperText={form.formState.errors.firstName?.message} {...form.register('firstName')} />
                     <TextField label="Last name" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
                   </Box>
-                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '110px minmax(0, 1fr)' }, alignItems: 'start' }}>
-                    <TextField label="Age (optional)" type="number" slotProps={{ htmlInput: { min: 0, max: 150 } }} {...form.register('age')} />
+                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '110px 130px minmax(0, 1fr)' }, alignItems: 'start' }}>
+                    <TextField label="Age (optional)" type="number" slotProps={{ htmlInput: { min: 0, max: 150 } }} {...form.register('ageValue')} />
+                    <Controller
+                      name="ageUnit"
+                      control={form.control}
+                      render={({ field }) => (
+                        <TextField select fullWidth label="Unit" value={field.value || 'years'} onChange={field.onChange}>
+                          <MenuItem value="years">Years</MenuItem>
+                          <MenuItem value="months">Months</MenuItem>
+                          <MenuItem value="days">Days</MenuItem>
+                        </TextField>
+                      )}
+                    />
                     <Controller
                       name="phone"
                       control={form.control}
@@ -852,8 +869,19 @@ function BookAppointmentModal({
                     <TextField label="First name" error={!!form.formState.errors.firstName} helperText={form.formState.errors.firstName?.message} {...form.register('firstName')} />
                     <TextField label="Last name" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
                   </Box>
-                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '110px minmax(0, 1fr)' }, alignItems: 'start' }}>
-                    <TextField label="Age (optional)" type="number" slotProps={{ htmlInput: { min: 0, max: 150 } }} {...form.register('age')} />
+                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '110px 130px minmax(0, 1fr)' }, alignItems: 'start' }}>
+                    <TextField label="Age (optional)" type="number" slotProps={{ htmlInput: { min: 0, max: 150 } }} {...form.register('ageValue')} />
+                    <Controller
+                      name="ageUnit"
+                      control={form.control}
+                      render={({ field }) => (
+                        <TextField select fullWidth label="Unit" value={field.value || 'years'} onChange={field.onChange}>
+                          <MenuItem value="years">Years</MenuItem>
+                          <MenuItem value="months">Months</MenuItem>
+                          <MenuItem value="days">Days</MenuItem>
+                        </TextField>
+                      )}
+                    />
                     <Controller
                       name="phone"
                       control={form.control}

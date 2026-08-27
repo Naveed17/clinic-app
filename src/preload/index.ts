@@ -17,19 +17,20 @@ const settingsReady = ipcRenderer
     clinicalApiUrl?: string;
     schemaId?: string;
   }) => {
+    try {
+      const meta = (await ipcRenderer.invoke('license:database-mode')) as {
+        schemaId?: string;
+        key?: string;
+      };
+      if (meta?.schemaId) onlineSchemaId = meta.schemaId;
+      if (meta?.key) onlineLicenseKey = meta.key;
+    } catch { /* ignore */ }
+
     if (s.databaseMode === 'online' && s.clinicalApiUrl) {
       apiUrl = s.clinicalApiUrl.replace(/\/+$/, '').replace(/\/api$/i, '');
       isOnlineClient = true;
       isLanClient = true; // reuse HTTP path in call()
-      onlineSchemaId = s.schemaId || '';
-      try {
-        const meta = await ipcRenderer.invoke('license:database-mode') as {
-          schemaId?: string;
-          key?: string;
-        };
-        if (meta?.schemaId) onlineSchemaId = meta.schemaId;
-        if (meta?.key) onlineLicenseKey = meta.key;
-      } catch { /* ignore */ }
+      if (s.schemaId) onlineSchemaId = s.schemaId;
       return;
     }
     if (s.serverMode === 'lan-client' && s.clientApiUrl) {
@@ -131,8 +132,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(isOnlineClient && onlineSchemaId ? { 'x-schema-id': onlineSchemaId } : {}),
-      ...(isOnlineClient && onlineLicenseKey ? { 'x-license-key': onlineLicenseKey } : {}),
+      ...(onlineSchemaId ? { 'x-schema-id': onlineSchemaId } : {}),
+      ...(onlineLicenseKey ? { 'x-license-key': onlineLicenseKey } : {}),
       ...(isOnlineClient || isLanClient ? { 'x-timezone': timeZone } : {}),
       ...(init?.headers ?? {}),
     },

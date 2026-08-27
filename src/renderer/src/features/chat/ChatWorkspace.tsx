@@ -443,11 +443,14 @@ export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspac
             {messages.map((item, index) => {
               const mine = Boolean(me) && item.senderId === me;
               const showDay = dayKey(item.createdAt) !== dayKey(messages[index - 1]?.createdAt || '');
+              const isDark = theme.palette.mode === 'dark';
               const bubbleColor = mine
                 ? theme.palette.primary.main
-                : compact
-                  ? '#F1F3F4'
-                  : theme.palette.background.paper;
+                : isDark
+                  ? alpha(theme.palette.common.white, 0.08)
+                  : compact
+                    ? '#F1F3F4'
+                    : theme.palette.background.paper;
               return (
                 <Box key={item.id}>
                   {showDay && (
@@ -471,22 +474,13 @@ export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspac
                       />
                     )}
                     <Box
-                      sx={
-                        compact
-                          ? {
-                              width: '75%',
-                              maxWidth: '75%',
-                              flex: '0 0 75%',
-                              minWidth: 0,
-                              boxSizing: 'border-box',
-                            }
-                          : {
-                              width: 'fit-content',
-                              maxWidth: '75%',
-                              minWidth: 0,
-                              boxSizing: 'border-box',
-                            }
-                      }
+                      sx={{
+                        width: 'fit-content',
+                        maxWidth: compact ? '85%' : '75%',
+                        minWidth: 0,
+                        boxSizing: 'border-box',
+                        ml: mine ? 'auto' : 0,
+                      }}
                     >
                       <Typography
                         variant="caption"
@@ -555,7 +549,8 @@ export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspac
               fullWidth
               size="small"
               multiline
-              maxRows={3}
+              minRows={1}
+              maxRows={4}
               placeholder={isTeamRoom(roomId) ? 'Message the team…' : `Message ${headerTitle}…`}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -565,7 +560,18 @@ export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspac
                   submit();
                 }
               }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', minHeight: 40 } }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '10px',
+                  py: 1,
+                  px: 1.5,
+                  fontSize: 13.5,
+                  lineHeight: 1.4,
+                },
+                '& .MuiOutlinedInput-input': {
+                  p: 0,
+                },
+              }}
             />
             <IconButton
               color="primary"

@@ -6,6 +6,7 @@ import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import LoginOutlinedIcon from '@mui/icons-material/LoginOutlined';
 import PersonOffOutlinedIcon from '@mui/icons-material/PersonOffOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
 import TableRowsOutlinedIcon from '@mui/icons-material/TableRowsOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
@@ -38,7 +39,7 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -765,6 +766,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
 }
 
 export function AppointmentsPage(): React.JSX.Element {
+  const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -887,12 +889,12 @@ export function AppointmentsPage(): React.JSX.Element {
 
   const showDoctorFilter = user?.role !== 'doctor';
   const appointmentFilters = (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, width: '100%', flexShrink: 0, flexWrap: 'wrap' }}>
       <SearchField
         value={search}
         onChange={(v) => { setSearch(v); setPage(0); }}
         placeholder="Search patient, doctor, reason..."
-        sx={{ flex: 1, maxWidth: 360, '& .MuiOutlinedInput-root': { borderRadius: 0.5 } }}
+        sx={{ flexGrow: 1, maxWidth: 360, '& .MuiOutlinedInput-root': { borderRadius: 0.5 } }}
       />
       {showDoctorFilter && (
         <FormControl size="small" sx={{ minWidth: 170, flexShrink: 0 }}>
@@ -961,7 +963,7 @@ export function AppointmentsPage(): React.JSX.Element {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {view === 'calendar' ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, flex: 1, minHeight: 0 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minHeight: 0 }}>
           <Box sx={{ display: 'flex', alignItems: { sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'space-between' }}>
             <Box>
               <Typography variant="h5" fontWeight={700}>Appointments</Typography>
@@ -1062,10 +1064,40 @@ export function AppointmentsPage(): React.JSX.Element {
                     ) : '—'}
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    {formatTableDate(a.startsAt)}
+                    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.25, whiteSpace: 'nowrap' }}>
+                      <Avatar
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          bgcolor: alpha(theme.palette.info.main, 0.1),
+                          color: 'info.main',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <CalendarMonthOutlinedIcon sx={{ fontSize: 16 }} />
+                      </Avatar>
+                      <Typography fontSize={13} fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                        {formatTableDate(a.startsAt)}
+                      </Typography>
+                    </Box>
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    {new Date(a.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(a.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.25, whiteSpace: 'nowrap' }}>
+                      <Avatar
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          bgcolor: alpha(theme.palette.warning.main, 0.1),
+                          color: 'warning.main',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <AccessTimeOutlinedIcon sx={{ fontSize: 16 }} />
+                      </Avatar>
+                      <Typography fontSize={13} fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                        {new Date(a.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(a.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </Typography>
+                    </Box>
                   </TableCell>
                   <TableCell>
                     <Chip color={statusConfig[a.status]?.color ?? 'default'} label={statusConfig[a.status]?.label ?? a.status} size="small" sx={chipSx} />

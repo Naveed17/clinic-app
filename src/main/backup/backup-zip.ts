@@ -1,13 +1,10 @@
-import { app } from 'electron';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import AdmZip from 'adm-zip';
-import { disconnectPrisma, getPrisma } from '../database/client';
+import { disconnectPrisma, getPrisma, getClinicDbPath } from '../database/client';
 import { getDocumentsRoot } from './docs-paths';
 
-export function getClinicDbPath(): string {
-  return join(app.getPath('userData'), 'clinic.db');
-}
+export { getClinicDbPath };
 
 export function defaultBackupFileName(at = new Date()): string {
   const stamp = at.toISOString().slice(0, 16).replace('T', '-').replace(':', '');

@@ -15,13 +15,14 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { GenderRadioGroup } from '@/components/GenderRadioGroup';
 import { patientsService } from '@/services/patients.service';
-import { dateOfBirthToAge } from '@shared/patientAge';
+import { ageToDateOfBirth, dateOfBirthToAgeParts, dateOfBirthToAge, type AgeUnit } from '@shared/patientAge';
 import type { Patient, PatientInput } from '@/types/patient';
 
 const patientSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.'),
   lastName: z.string().trim().min(1, 'Last name is required.'),
-  age: z.string(),
+  ageValue: z.string(),
+  ageUnit: z.enum(['years', 'months', 'days']),
   gender: z.string(),
   phone: z.string().trim(),
   email: z.string().trim().refine(
@@ -39,18 +40,19 @@ const patientSchema = z.object({
 export type PatientFormValues = z.infer<typeof patientSchema>;
 
 const emptyFormValues: PatientFormValues = {
-  firstName: '', lastName: '', age: '', gender: '', phone: '',
+  firstName: '', lastName: '', ageValue: '', ageUnit: 'years', gender: '', phone: '',
   email: '', address: '', emergencyContactName: '', emergencyContactPhone: '',
   bloodGroup: '', allergies: '', chronicConditions: '',
 };
 
 function toFormValues(patient?: Patient): PatientFormValues {
   if (!patient) return emptyFormValues;
-  const age = dateOfBirthToAge(patient.dateOfBirth);
+  const parts = dateOfBirthToAgeParts(patient.dateOfBirth);
   return {
     firstName: patient.firstName,
     lastName: patient.lastName,
-    age: age != null ? String(age) : '',
+    ageValue: parts ? String(parts.value) : (patient.age != null ? String(patient.age) : ''),
+    ageUnit: parts ? parts.unit : 'years',
     gender: patient.gender ?? '',
     phone: patient.phone ?? '',
     email: patient.email ?? '',
@@ -64,11 +66,14 @@ function toFormValues(patient?: Patient): PatientFormValues {
 }
 
 function toPatientInput(values: PatientFormValues, primaryDoctorId?: string | null): PatientInput {
-  const ageNum = values.age.trim() ? parseInt(values.age, 10) : null;
+  const num = values.ageValue.trim() ? parseFloat(values.ageValue) : null;
+  const dob = num != null && !Number.isNaN(num) ? ageToDateOfBirth(num, values.ageUnit) : null;
+  const ageYears = values.ageUnit === 'years' ? (num != null ? Math.floor(num) : null) : (dob ? dateOfBirthToAge(dob) : null);
+
   return {
     ...values,
-    age: Number.isFinite(ageNum) ? ageNum : null,
-    dateOfBirth: null,
+    age: ageYears,
+    dateOfBirth: dob ? dob.toISOString() : null,
     gender: values.gender || null,
     phone: values.phone || null,
     email: values.email || null,
@@ -141,13 +146,30 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
               <TextField fullWidth label="First name" error={Boolean(errors.firstName)} helperText={errors.firstName?.message} {...form.register('firstName')} />
               <TextField fullWidth label="Last name" error={Boolean(errors.lastName)} helperText={errors.lastName?.message} {...form.register('lastName')} />
             </Box>
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '110px minmax(0, 1fr)' }, alignItems: 'start' }}>
+            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '110px 130px minmax(0, 1fr)' }, alignItems: 'start' }}>
               <TextField
                 fullWidth
                 label="Age"
                 type="number"
                 slotProps={{ htmlInput: { min: 0, max: 150, step: 1 } }}
-                {...form.register('age')}
+                {...form.register('ageValue')}
+              />
+              <Controller
+                name="ageUnit"
+                control={form.control}
+                render={({ field }) => (
+                  <TextField
+                    select
+                    fullWidth
+                    label="Unit"
+                    value={field.value || 'years'}
+                    onChange={field.onChange}
+                  >
+                    <MenuItem value="years">Years</MenuItem>
+                    <MenuItem value="months">Months</MenuItem>
+                    <MenuItem value="days">Days</MenuItem>
+                  </TextField>
+                )}
               />
               <Controller
                 name="phone"

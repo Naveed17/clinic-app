@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { getPrisma } from '../database/client';
+import { getPrisma, ensureDatabaseReady } from '../database/client';
 import { signToken } from '../backend/middleware/auth';
 import { getLicenseModules } from '../license/license.ipc';
 import { listLoginDirectory } from './login-directory';
@@ -11,9 +11,13 @@ const ROLE_MODULE: Record<string, string> = {
 };
 
 export function registerAuthIpc(): void {
-  ipcMain.handle('auth:directory', () => listLoginDirectory());
+  ipcMain.handle('auth:directory', async () => {
+    await ensureDatabaseReady();
+    return listLoginDirectory();
+  });
 
   ipcMain.handle('auth:login', async (_e, email: string, password: string) => {
+    await ensureDatabaseReady();
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const bcrypt = require('bcryptjs') as typeof import('bcryptjs');
     const user = await getPrisma().user.findUnique({

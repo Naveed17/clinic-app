@@ -23,8 +23,8 @@ export type AppRoute =
 /** Which roles can access each route */
 export const ROUTE_ACCESS: Record<AppRoute, UserRole[]> = {
   '/dashboard':    ['admin', 'doctor', 'receptionist', 'lab_technician', 'pharmacist'],
-  '/patients':     ['doctor', 'receptionist', 'lab_technician'],
-  '/patients/:id': ['doctor', 'receptionist', 'lab_technician'],
+  '/patients':     ['doctor', 'receptionist'],
+  '/patients/:id': ['doctor', 'receptionist'],
   '/appointments': ['doctor', 'receptionist'],
   '/tokens':       ['receptionist'],
   '/waiting-room': ['doctor'],

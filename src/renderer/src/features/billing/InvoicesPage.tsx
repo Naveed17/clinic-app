@@ -6,6 +6,7 @@ import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
@@ -45,12 +46,14 @@ import { invoicesService } from '@/services/invoices.service';
 import { patientsService } from '@/services/patients.service';
 import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
 import { GenderRadioGroup } from '@/components/GenderRadioGroup';
+import { ageToDateOfBirth, dateOfBirthToAge, type AgeUnit } from '@shared/patientAge';
 import type { Invoice, InvoiceInput, InvoicePerson, InvoiceUpdateInput, Payment } from '@/types/invoice';
 import { printInvoiceReceipt } from '@/utils/printInvoiceReceipt';
 import { formatTableDate } from '@/utils/formatDate';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
 import { useAuth } from '@/features/auth/AuthContext';
+import { alpha, useTheme } from '@mui/material/styles';
 
 const statusConfig: Record<string, { label: string; color: 'default' | 'warning' | 'info' | 'success' | 'error' }> = {
   DRAFT: { label: 'Draft', color: 'default' },
@@ -347,6 +350,7 @@ export function InvoiceDialog({
   const [quickFirst, setQuickFirst] = useState('');
   const [quickLast, setQuickLast] = useState('');
   const [quickAge, setQuickAge] = useState('');
+  const [quickAgeUnit, setQuickAgeUnit] = useState<AgeUnit>('years');
   const [quickGender, setQuickGender] = useState('');
   const [quickError, setQuickError] = useState('');
 
@@ -381,11 +385,17 @@ export function InvoiceDialog({
   });
 
   const quickPatientMutation = useMutation({
-    mutationFn: (input: { firstName: string; lastName: string; age?: string; gender?: string }) =>
-      patientsService.create({
+    mutationFn: (input: { firstName: string; lastName: string; age?: string; ageUnit?: AgeUnit; gender?: string }) => {
+      const num = input.age?.trim() ? parseFloat(input.age) : null;
+      const unit = input.ageUnit || 'years';
+      const dob = num != null && !Number.isNaN(num) ? ageToDateOfBirth(num, unit) : null;
+      const ageYears = unit === 'years' ? (num != null ? Math.floor(num) : null) : (dob ? dateOfBirthToAge(dob) : null);
+
+      return patientsService.create({
         firstName: input.firstName,
         lastName: input.lastName,
-        age: input.age?.trim() ? parseInt(input.age, 10) : null,
+        age: ageYears,
+        dateOfBirth: dob ? dob.toISOString() : null,
         gender: input.gender || null,
         phone: null,
         email: null,
@@ -395,7 +405,8 @@ export function InvoiceDialog({
         bloodGroup: null,
         allergies: null,
         chronicConditions: null,
-      }),
+      });
+    },
     onSuccess: async (patient) => {
       await client.invalidateQueries({ queryKey: ['invoice-patients'] });
       await client.invalidateQueries({ queryKey: ['patients'] });
@@ -404,6 +415,7 @@ export function InvoiceDialog({
       setQuickFirst('');
       setQuickLast('');
       setQuickAge('');
+      setQuickAgeUnit('years');
       setQuickGender('');
       setQuickError('');
     },
@@ -586,7 +598,14 @@ export function InvoiceDialog({
               <TextField label="First name" fullWidth value={quickFirst} onChange={(e) => setQuickFirst(e.target.value)} />
               <TextField label="Last name" fullWidth value={quickLast} onChange={(e) => setQuickLast(e.target.value)} />
             </Box>
-            <TextField label="Age" type="number" value={quickAge} onChange={(e) => setQuickAge(e.target.value)} slotProps={{ htmlInput: { min: 0, max: 150 } }} sx={{ maxWidth: 110 }} />
+            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '110px 130px' }}>
+              <TextField label="Age" type="number" value={quickAge} onChange={(e) => setQuickAge(e.target.value)} slotProps={{ htmlInput: { min: 0, max: 150 } }} />
+              <TextField select label="Unit" value={quickAgeUnit} onChange={(e) => setQuickAgeUnit(e.target.value as AgeUnit)}>
+                <MenuItem value="years">Years</MenuItem>
+                <MenuItem value="months">Months</MenuItem>
+                <MenuItem value="days">Days</MenuItem>
+              </TextField>
+            </Box>
           </Stack>
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>
@@ -594,7 +613,7 @@ export function InvoiceDialog({
           <SubmitButton
             loading={quickPatientMutation.isPending}
             disabled={!quickFirst.trim() || !quickLast.trim()}
-            onClick={() => quickPatientMutation.mutate({ firstName: quickFirst.trim(), lastName: quickLast.trim(), age: quickAge, gender: quickGender })}
+            onClick={() => quickPatientMutation.mutate({ firstName: quickFirst.trim(), lastName: quickLast.trim(), age: quickAge, ageUnit: quickAgeUnit, gender: quickGender })}
           >
             Add patient
           </SubmitButton>
@@ -606,6 +625,7 @@ export function InvoiceDialog({
 
 /* ── Invoices Page ── */
 export function InvoicesPage(): React.JSX.Element {
+  const theme = useTheme();
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -740,7 +760,24 @@ export function InvoicesPage(): React.JSX.Element {
                       </Box>
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatTableDate(invoice.createdAt)}</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.25, whiteSpace: 'nowrap' }}>
+                      <Avatar
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          bgcolor: alpha(theme.palette.info.main, 0.1),
+                          color: 'info.main',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <CalendarMonthOutlinedIcon sx={{ fontSize: 16 }} />
+                      </Avatar>
+                      <Typography fontSize={13} fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                        {formatTableDate(invoice.createdAt)}
+                      </Typography>
+                    </Box>
+                  </TableCell>
                   <TableCell><Chip label={cfg.label} color={cfg.color} size="small" sx={chipSx} /></TableCell>
                   <TableCell align="right"><Typography fontSize={13.5} fontWeight={700}>{money(invoice.total)}</Typography></TableCell>
                   <TableCell align="right">{money(Number(invoice.amountPaid ?? 0))}</TableCell>

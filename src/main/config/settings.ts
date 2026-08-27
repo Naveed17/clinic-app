@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import { join } from 'node:path';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 export type DatabaseMode = 'local' | 'online';
 
@@ -54,8 +55,61 @@ const DEFAULTS: AppSettings = {
   whatsappDisplayNumber: '',
 };
 
+function getSavedLicenseKey(): string | null {
+  try {
+    const file = join(app.getPath('userData'), 'license.dat');
+    if (existsSync(file)) {
+      const key = readFileSync(file, 'utf-8').trim();
+      if (key) return key;
+    }
+  } catch { /* ignore */ }
+  try {
+    const cacheFile = join(app.getPath('userData'), 'license-cache.json');
+    if (existsSync(cacheFile)) {
+      const cache = JSON.parse(readFileSync(cacheFile, 'utf-8')) as { key?: string };
+      if (cache?.key) return cache.key;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+function getActiveSchemaId(): string {
+  const key = getSavedLicenseKey();
+  if (!key) return '';
+  try {
+    const cacheFile = join(app.getPath('userData'), 'license-cache.json');
+    if (existsSync(cacheFile)) {
+      const cache = JSON.parse(readFileSync(cacheFile, 'utf-8')) as { key?: string; schemaId?: string };
+      if (cache?.key === key && cache?.schemaId) return cache.schemaId;
+    }
+  } catch { /* ignore */ }
+  const hash = createHash('sha256').update(key.toUpperCase()).digest('hex').slice(0, 16);
+  return `lic_${hash}`;
+}
+
 function getPath(): string {
-  return join(app.getPath('userData'), 'settings.json');
+  const schemaId = getActiveSchemaId();
+  if (!schemaId) {
+    return join(app.getPath('userData'), 'settings.json');
+  }
+
+  const schemaSettingsPath = join(app.getPath('userData'), `settings_${schemaId}.json`);
+  const legacySettingsPath = join(app.getPath('userData'), 'settings.json');
+  const legacyFlagPath = join(app.getPath('userData'), 'clinic_legacy_migrated.flag');
+
+  // Legacy one-time migration for pre-existing single-clinic installations:
+  if (!existsSync(schemaSettingsPath) && existsSync(legacySettingsPath) && !existsSync(legacyFlagPath)) {
+    try {
+      const legacyRaw = JSON.parse(readFileSync(legacySettingsPath, 'utf-8')) as Partial<AppSettings>;
+      if (legacyRaw.setupDone === true) {
+        copyFileSync(legacySettingsPath, schemaSettingsPath);
+        writeFileSync(legacyFlagPath, schemaId, 'utf-8');
+        console.log(`[Settings] One-time legacy migration of settings.json to ${schemaSettingsPath}`);
+      }
+    } catch { /* ignore */ }
+  }
+
+  return schemaSettingsPath;
 }
 
 function stripApiSuffix(url: string): string {

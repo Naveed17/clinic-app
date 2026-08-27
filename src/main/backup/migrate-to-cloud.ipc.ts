@@ -53,8 +53,10 @@ type ProgressCb = (progress: MigrateProgress) => void;
 
 type JsonRow = Record<string, unknown>;
 
+import { getClinicDbPath } from '../database/client';
+
 function dbPath(): string {
-  return join(app.getPath('userData'), 'clinic.db');
+  return getClinicDbPath();
 }
 
 function apiOrigin(): string {

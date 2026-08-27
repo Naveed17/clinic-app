@@ -3,6 +3,9 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
+import CakeOutlinedIcon from '@mui/icons-material/CakeOutlined';
+import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
+import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import {
   Alert, Avatar, Box, Button, Chip, IconButton, Stack, Tooltip, Typography,
 } from '@mui/material';
@@ -19,7 +22,7 @@ import { useLicense } from '@/features/auth/LicenseModulesContext';
 import type { Patient } from '@/types/patient';
 import { PatientDialog } from './PatientDialog';
 import { PatientHistoryDialog } from './PatientHistoryDialog';
-import { dateOfBirthToAge } from '@shared/patientAge';
+import { calcAgeLabel, getAgeDisplayParts } from '@shared/patientAge';
 import { formatTableDate } from '@/utils/formatDate';
 
 export function PatientsPage(): React.JSX.Element {
@@ -200,13 +203,52 @@ export function PatientsPage(): React.JSX.Element {
                   </TableCell>
 
                   {/* Age */}
-                  <TableCell>
-                    <Typography fontSize={13.5}>
-                      {(() => {
-                        const age = (patient as { age?: number | null }).age ?? dateOfBirthToAge(patient.dateOfBirth);
-                        return age != null ? `${age} yrs` : '—';
-                      })()}
-                    </Typography>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                    {(() => {
+                      const parts = getAgeDisplayParts(patient.dateOfBirth, patient.age);
+                      if (!parts) return <Typography fontSize={13} color="text.secondary">—</Typography>;
+                      return (
+                        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.25, whiteSpace: 'nowrap' }}>
+                          <Avatar
+                            sx={{
+                              width: 28,
+                              height: 28,
+                              bgcolor: alpha(theme.palette.primary.main, 0.1),
+                              color: 'primary.main',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <CakeOutlinedIcon sx={{ fontSize: 16 }} />
+                          </Avatar>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
+                            {parts.dateStr && (
+                              <Typography
+                                fontSize={13}
+                                fontWeight={600}
+                                sx={{
+                                  fontVariantNumeric: 'tabular-nums',
+                                  letterSpacing: '-0.01em',
+                                  color: 'text.primary',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {parts.dateStr}
+                              </Typography>
+                            )}
+                            <Typography
+                              fontSize={11.5}
+                              fontWeight={500}
+                              sx={{
+                                color: 'text.secondary',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {parts.ageText}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      );
+                    })()}
                   </TableCell>
 
                   {/* Blood Group */}
@@ -221,10 +263,27 @@ export function PatientsPage(): React.JSX.Element {
                   </TableCell>
 
                   {/* Address */}
-                  <TableCell sx={{ maxWidth: 160 }}>
-                    <Typography fontSize={13.5} color="text.primary" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>
-                      {patient.address ?? '—'}
-                    </Typography>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                    {patient.address ? (
+                      <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.25, whiteSpace: 'nowrap' }}>
+                        <Avatar
+                          sx={{
+                            width: 28,
+                            height: 28,
+                            bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                            color: 'secondary.main',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <LocationOnOutlinedIcon sx={{ fontSize: 16 }} />
+                        </Avatar>
+                        <Typography fontSize={13} fontWeight={500} color="text.primary" sx={{ whiteSpace: 'nowrap' }}>
+                          {patient.address}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography fontSize={13} color="text.secondary">—</Typography>
+                    )}
                   </TableCell>
 
                   {/* Emergency Contact */}
@@ -239,9 +298,22 @@ export function PatientsPage(): React.JSX.Element {
 
                   {/* Created At */}
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    <Typography fontSize={13.5} color="text.primary">
-                      {formatTableDate(patient.createdAt)}
-                    </Typography>
+                    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.25, whiteSpace: 'nowrap' }}>
+                      <Avatar
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          bgcolor: alpha(theme.palette.info.main, 0.1),
+                          color: 'info.main',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <CalendarMonthOutlinedIcon sx={{ fontSize: 16 }} />
+                      </Avatar>
+                      <Typography fontSize={13} fontWeight={500} color="text.primary" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                        {formatTableDate(patient.createdAt)}
+                      </Typography>
+                    </Box>
                   </TableCell>
 
                   <TableCell align="right">

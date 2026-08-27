@@ -210,14 +210,26 @@ export function LoginPage(): React.JSX.Element {
   const glassField = {
     '& .MuiOutlinedInput-root': {
       borderRadius: '8px',
-      bgcolor: 'rgba(255,255,255,0.07)',
+      bgcolor: 'rgba(255,255,255,0.07) !important',
+      backgroundColor: 'rgba(255,255,255,0.07) !important',
       backdropFilter: 'blur(8px)',
-      color: '#fff',
+      WebkitBackdropFilter: 'blur(8px)',
+      color: '#fff !important',
       overflow: 'hidden',
-      '& fieldset': { borderRadius: '8px', borderColor: 'rgba(255,255,255,0.22)' },
-      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.45)' },
-      '&.Mui-focused fieldset': { borderRadius: '8px', borderColor: 'rgba(255,255,255,0.7)' },
-      '& input': { borderRadius: 0 },
+      boxShadow: 'none !important',
+      '& fieldset': { borderRadius: '8px', borderColor: 'rgba(255,255,255,0.22) !important' },
+      '&:hover': {
+        bgcolor: 'rgba(255,255,255,0.12) !important',
+        backgroundColor: 'rgba(255,255,255,0.12) !important',
+        '& fieldset': { borderColor: 'rgba(255,255,255,0.45) !important' },
+      },
+      '&.Mui-focused': {
+        bgcolor: 'rgba(255,255,255,0.14) !important',
+        backgroundColor: 'rgba(255,255,255,0.14) !important',
+        boxShadow: 'none !important',
+        '& fieldset': { borderRadius: '8px', borderColor: 'rgba(255,255,255,0.7) !important' },
+      },
+      '& input': { borderRadius: 0, color: '#fff !important' },
       '& input:-webkit-autofill': {
         borderRadius: '0 !important',
         WebkitBoxShadow: '0 0 0 1000px rgba(255,255,255,0.07) inset !important',
@@ -228,7 +240,7 @@ export function LoginPage(): React.JSX.Element {
     },
     '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.55)' },
     '& .MuiInputLabel-root.Mui-focused': { color: 'rgba(255,255,255,0.9)' },
-    input: { color: '#fff', '&::placeholder': { color: 'rgba(255,255,255,0.4)' } },
+    input: { color: '#fff !important', '&::placeholder': { color: 'rgba(255,255,255,0.4)' } },
   };
 
   return (

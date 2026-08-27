@@ -30,6 +30,8 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
 
   const [step, setStep] = useState(0);
   const [clinicName, setClinicName] = useState('');
+  const [clinicPhone, setClinicPhone] = useState('');
+  const [clinicAddress, setClinicAddress] = useState('');
   const [mode, setMode] = useState<Mode>('local');
   const [scanning, setScanning] = useState(false);
   const [discovered, setDiscovered] = useState<{ ip: string; port: number; name: string }[]>([]);
@@ -109,7 +111,9 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
       }
 
       await window.clinic?.settings.save({
-        clinicName: clinicName.trim() || 'Clinic',
+        clinicName: clinicName.trim() || 'CareFlow Clinic',
+        clinicPhone: clinicPhone.trim() || '',
+        clinicAddress: clinicAddress.trim() || '',
         serverMode: onlineMode ? 'local' : mode,
         clientApiUrl: !onlineMode && mode === 'lan-client' ? serverUrl : '',
         setupDone: true,
@@ -168,11 +172,11 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
 
         {/* Step 0: Welcome */}
         {step === 0 && (
-          <Stack spacing={3}>
+          <Stack spacing={2.5}>
             <Box>
               <Typography variant="h6">Welcome to CareFlow</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                Let's set up your clinic in a few steps.
+                Let's set up your clinic details in a few steps.
               </Typography>
             </Box>
             <TextField
@@ -180,14 +184,30 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
               placeholder="e.g. Care Clinic"
               value={clinicName}
               onChange={(e) => setClinicName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && clinicName.trim() && setStep(onlineMode ? 2 : 1)}
               fullWidth
               autoFocus
+            />
+            <TextField
+              label="Phone Number"
+              placeholder="e.g. +92 300 1234567"
+              value={clinicPhone}
+              onChange={(e) => setClinicPhone(e.target.value)}
+              fullWidth
+            />
+            <TextField
+              label="Clinic Address"
+              placeholder="e.g. Main Boulevard, City"
+              value={clinicAddress}
+              onChange={(e) => setClinicAddress(e.target.value)}
+              fullWidth
+              multiline
+              rows={2}
             />
             <Button
               variant="contained"
               disabled={!clinicName.trim()}
               onClick={() => setStep(onlineMode ? 2 : 1)}
+              sx={{ py: 1.2, fontWeight: 700 }}
             >
               Next
             </Button>
