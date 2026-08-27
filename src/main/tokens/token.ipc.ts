@@ -26,7 +26,7 @@ export function registerTokenIpc(io?: SocketIOServer): void {
   ipcMain.handle('tokens:get-by-id', (_, tokenId: string) => getTokenById(tokenId));
   ipcMain.handle('tokens:list-prescriptions', (_, date: string) => listPrescriptionFeed(date));
   ipcMain.handle('tokens:doctors', () => listTokenDoctors());
-  ipcMain.handle('tokens:patients', () => listTokenPatients());
+  ipcMain.handle('tokens:patients', (_, search?: string) => listTokenPatients(search));
   ipcMain.handle('tokens:week-visits', (_, patientId: string, doctorId: string, date: string) =>
     countPriorVisitsThisWeek(patientId, doctorId, date),
   );

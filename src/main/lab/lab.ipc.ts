@@ -44,9 +44,9 @@ function notifyLabUpdated(io: SocketIOServer | undefined, action: string, order?
 }
 
 export function registerLabIpc(io?: SocketIOServer): void {
-  ipcMain.handle('lab:list', () => {
+  ipcMain.handle('lab:list', (_e, limit?: number) => {
     assertLabAddon();
-    return listLabOrders();
+    return listLabOrders(limit);
   });
   ipcMain.handle('lab:get', (_e, id: string) => {
     assertLabAddon();
@@ -56,9 +56,9 @@ export function registerLabIpc(io?: SocketIOServer): void {
     assertLabAddon();
     return listLabOrdersByToken(tokenId);
   });
-  ipcMain.handle('lab:patients', () => {
+  ipcMain.handle('lab:patients', (_e, search?: string) => {
     assertLabAddon();
-    return labPatients();
+    return labPatients(search);
   });
   ipcMain.handle('lab:create', async (_e, input) => {
     assertLabAddon();

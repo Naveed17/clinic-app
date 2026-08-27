@@ -81,10 +81,11 @@ function serialize(order: LabOrderWithRelations) {
   };
 }
 
-export async function listLabOrders() {
+export async function listLabOrders(limit: number = 200) {
   const orders = await getPrisma().labOrder.findMany({
     include,
     orderBy: { orderedAt: 'desc' }, // Latest order sab se top par
+    take: limit,
   });
   return orders.map(serialize);
 }
@@ -136,9 +137,21 @@ export async function saveLabResult(id: string, result: string) {
   return serialize(order);
 }
 
-export async function labPatients() {
+export async function labPatients(search?: string) {
+  const query = search?.trim();
+  const where = query
+    ? {
+        OR: [
+          { firstName: { contains: query } },
+          { lastName: { contains: query } },
+          { mrNumber: { contains: query } },
+        ],
+      }
+    : {};
   return getPrisma().patient.findMany({
+    where,
     select: { id: true, firstName: true, lastName: true },
-    orderBy: { createdAt: 'desc' }, 
+    orderBy: { createdAt: 'desc' },
+    take: query ? 50 : 100,
   });
 }

@@ -135,6 +135,14 @@ export async function ensurePrescriptionPharmacyColumns(
 }
 
 export async function initializeDatabase(database: PrismaClient = getPrisma()): Promise<void> {
+  try {
+    await database.$executeRawUnsafe('PRAGMA journal_mode = WAL');
+    await database.$executeRawUnsafe('PRAGMA synchronous = NORMAL');
+    await database.$executeRawUnsafe('PRAGMA temp_store = MEMORY');
+    await database.$executeRawUnsafe('PRAGMA cache_size = -64000');
+  } catch {
+    /* Ignore pragma errors on non-SQLite backends */
+  }
 
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "User" (
@@ -421,6 +429,12 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
     'CREATE INDEX IF NOT EXISTS "Token_date_doctorId_idx" ON "Token"("date", "doctorId")',
   );
   await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Token_date_status_idx" ON "Token"("date", "status")',
+  );
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Token_date_doctorId_status_idx" ON "Token"("date", "doctorId", "status")',
+  );
+  await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Token_patientId_idx" ON "Token"("patientId")',
   );
 
@@ -506,6 +520,12 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
   `);
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Prescription_tokenId_idx" ON "Prescription"("tokenId")',
+  );
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Prescription_pharmacyStatus_idx" ON "Prescription"("pharmacyStatus")',
+  );
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Prescription_createdAt_idx" ON "Prescription"("createdAt")',
   );
   const prescriptionCols = (
     await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Prescription)')

@@ -173,7 +173,7 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
     createdAt: { gte: rangeStart, lte: rangeEnd },
   };
   if (doctorId) {
-    const tokenPatientIds = [...new Set(tokens.map((token) => token.patientId))];
+    const tokenPatientIds = [...new Set(tokens.map((token) => token.patientId))].slice(0, 500);
     const or: Prisma.InvoiceWhereInput[] = [{ appointment: { providerId: doctorId } }];
     if (tokenPatientIds.length) or.push({ patientId: { in: tokenPatientIds } });
     invoiceWhere.OR = or;

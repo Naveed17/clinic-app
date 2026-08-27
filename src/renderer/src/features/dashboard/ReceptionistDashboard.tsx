@@ -183,9 +183,6 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   const tokenMutation = useMutation({
     mutationFn: async () => {
       if (!patientId || !doctorId) throw new Error('Select a patient and doctor first.');
-      const schedule = await window.clinic.schedule.get(doctorId);
-      const offline = doctorOfflineReason(schedule, todayStr);
-      if (offline) throw new Error(offline);
       const startsAt = slotSearchFrom(todayStr);
       const endsAt = new Date(startsAt.getTime() + 30 * 60000);
       await appointmentsService.ensureSameDay({

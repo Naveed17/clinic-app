@@ -34,7 +34,7 @@ export const MuiOutlinedInput = {
         },
       },
       '&.Mui-readOnly, &.Mui-disabled, &.Mui-readOnly:hover, &.Mui-disabled:hover': {
-        backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#f1f5f9',
+        backgroundColor: `${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : '#f1f5f9'} !important`,
         backdropFilter: 'none',
         WebkitBackdropFilter: 'none',
         boxShadow: 'none',

@@ -127,7 +127,7 @@ export async function searchCatalogMedicines(query: string) {
       : undefined,
     include: catalogInclude,
     orderBy: { name: 'asc' },
-    ...(q ? { take: 50 } : {}),
+    take: q ? 50 : 200,
   });
 
   const withMg = await attachMg(medicines);

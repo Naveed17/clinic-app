@@ -279,10 +279,23 @@ export async function listTokenDoctors() {
   }));
 }
 
-export async function listTokenPatients() {
+export async function listTokenPatients(search?: string) {
+  const query = search?.trim();
+  const where: Prisma.PatientWhereInput = query
+    ? {
+        OR: [
+          { firstName: { contains: query } },
+          { lastName: { contains: query } },
+          { phone: { contains: query } },
+          { mrNumber: { contains: query } },
+        ],
+      }
+    : {};
   const rows = await getPrisma().patient.findMany({
+    where,
     select: { id: true, firstName: true, lastName: true, mrNumber: true, gender: true, dateOfBirth: true, phone: true },
     orderBy: { createdAt: 'desc' },
+    take: query ? 50 : 100,
   } as unknown as Prisma.PatientFindManyArgs);
   return rows.map((row) => mapPatientPerson(row as Parameters<typeof mapPatientPerson>[0]));
 }
@@ -318,7 +331,11 @@ export async function createToken(input: TokenInput) {
   if (!doctor) throw new Error('Doctor not found.');
   if (!doctor.isActive) throw new Error('This doctor is inactive. Activate them in Doctor Schedule first.');
   if (!(await hasBookedVisitOnDate(input.patientId, input.doctorId, input.date))) {
-    await assertDoctorAvailableOnDate(input.doctorId, input.date);
+    try {
+      await assertDoctorAvailableOnDate(input.doctorId, input.date);
+    } catch {
+      /* Walk-in token: allow token generation even if weekly schedule day template is unconfigured */
+    }
   }
 
   const consultationFee = await resolveConsultationFee(input.doctorId, input.consultationFee);
@@ -351,36 +368,51 @@ export async function createToken(input: TokenInput) {
       prescription: null,
     });
   }
-  const last = await getPrisma().token.findFirst({
-    where: { date: input.date, doctorId: input.doctorId },
-    orderBy: { tokenNumber: 'desc' },
-    select: { tokenNumber: true },
-  });
-  const tokenNumber = (last?.tokenNumber ?? 0) + 1;
-  const token = await getPrisma().token.create({
-    data: {
-      tokenNumber,
-      date: input.date,
-      patientId: input.patientId,
-      doctorId: input.doctorId,
-      notes: input.notes?.trim() ?? null,
-      reason: input.reason?.trim() ?? null,
-      consultationFee,
-    },
-    include: tokenInclude,
-  });
-  await getPrisma().$executeRawUnsafe(
-    `UPDATE "Token" SET feeDiscount = ? WHERE id = ?`,
-    feeDiscount,
-    token.id,
-  );
-  return mapTokenRecord({
-    ...token,
-    patient: token.patient as Parameters<typeof mapPatientPerson>[0],
-    feeDiscount,
-    feeRefunded: (token as { feeRefunded?: unknown }).feeRefunded,
-    prescription: null,
-  });
+
+  let attempts = 0;
+  while (attempts < 5) {
+    attempts++;
+    try {
+      const nextRes = await getPrisma().$queryRawUnsafe<{ nextNum: number }[]>(
+        `SELECT COALESCE(MAX("tokenNumber"), 0) + 1 AS nextNum FROM "Token" WHERE "date" = ? AND "doctorId" = ?`,
+        input.date,
+        input.doctorId,
+      );
+      const tokenNumber = Number(nextRes[0]?.nextNum ?? 1);
+
+      const token = await getPrisma().token.create({
+        data: {
+          tokenNumber,
+          date: input.date,
+          patientId: input.patientId,
+          doctorId: input.doctorId,
+          notes: input.notes?.trim() ?? null,
+          reason: input.reason?.trim() ?? null,
+          consultationFee,
+        },
+        include: tokenInclude,
+      });
+      await getPrisma().$executeRawUnsafe(
+        `UPDATE "Token" SET feeDiscount = ? WHERE id = ?`,
+        feeDiscount,
+        token.id,
+      );
+      return mapTokenRecord({
+        ...token,
+        patient: token.patient as Parameters<typeof mapPatientPerson>[0],
+        feeDiscount,
+        feeRefunded: (token as { feeRefunded?: unknown }).feeRefunded,
+        prescription: null,
+      });
+    } catch (err: unknown) {
+      const errorObj = err as { code?: string };
+      if (errorObj?.code === 'P2002' && attempts < 5) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('Could not allocate a unique token number. Please try again.');
 }
 
 export async function updateTokenStatus(id: string, status: TokenStatus) {

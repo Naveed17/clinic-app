@@ -61,8 +61,8 @@ function toInvoiceData(input: InvoiceInput): Omit<Prisma.InvoiceUncheckedCreateI
   };
 }
 
-export async function listInvoices() {
-  const invoices = await getPrisma().invoice.findMany({ include, orderBy: { createdAt: 'desc' } });
+export async function listInvoices(limit: number = 200) {
+  const invoices = await getPrisma().invoice.findMany({ include, orderBy: { createdAt: 'desc' }, take: limit });
   return invoices.map(serializeInvoice);
 }
 
@@ -71,8 +71,20 @@ export async function getInvoice(id: string) {
   return invoice ? serializeInvoice(invoice) : null;
 }
 
-export async function invoicePatients() {
+export async function invoicePatients(search?: string) {
+  const query = search?.trim();
+  const where: Prisma.PatientWhereInput = query
+    ? {
+        OR: [
+          { firstName: { contains: query } },
+          { lastName: { contains: query } },
+          { phone: { contains: query } },
+          { mrNumber: { contains: query } },
+        ],
+      }
+    : {};
   return getPrisma().patient.findMany({
+    where,
     select: {
       id: true,
       firstName: true,
@@ -83,6 +95,7 @@ export async function invoicePatients() {
       dateOfBirth: true,
     },
     orderBy: { createdAt: 'desc' },
+    take: query ? 50 : 100,
   } as unknown as Prisma.PatientFindManyArgs);
 }
 

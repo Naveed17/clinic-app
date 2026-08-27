@@ -68,11 +68,14 @@ export async function listAppointments() {
     select: { id: true, tokenNumber: true, patientId: true, doctorId: true, date: true },
   });
 
+  const tokenMap = new Map<string, { id: string; tokenNumber: number }>();
+  for (const t of tokens) {
+    tokenMap.set(`${t.patientId}_${t.doctorId}_${t.date}`, { id: t.id, tokenNumber: t.tokenNumber });
+  }
+
   return appointments.map((a) => {
     const dateStr = a.startsAt.toISOString().slice(0, 10);
-    const token = tokens.find(
-      (t) => t.patientId === a.patientId && t.doctorId === a.providerId && t.date === dateStr,
-    );
+    const token = tokenMap.get(`${a.patientId}_${a.providerId}_${dateStr}`);
     return {
       id: a.id,
       patientId: a.patientId,
@@ -255,7 +258,11 @@ async function resolveWalkInSlot(
   const y = startsAt.getFullYear();
   const m = String(startsAt.getMonth() + 1).padStart(2, '0');
   const d = String(startsAt.getDate()).padStart(2, '0');
-  await assertDoctorAvailableOnDate(providerId, `${y}-${m}-${d}`);
+  try {
+    await assertDoctorAvailableOnDate(providerId, `${y}-${m}-${d}`);
+  } catch {
+    /* Walk-in visit: allow slot creation even if schedule is unconfigured for the day */
+  }
   const slots = await getDoctorSchedule(providerId);
   const slot = slots.find((s) => s.dayOfWeek === startsAt.getDay());
   if (slot?.isActive) {
