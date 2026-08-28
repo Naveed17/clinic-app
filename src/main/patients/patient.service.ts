@@ -30,10 +30,11 @@ export interface PatientInput {
 
 async function generateMrNumber(): Promise<string> {
   const prisma = getPrisma();
-  const res = await prisma.$queryRawUnsafe<{ maxNum: number | null }[]>(
+  const res = await prisma.$queryRawUnsafe<{ maxNum: number | bigint | null }[]>(
     `SELECT MAX(CAST(SUBSTR("mrNumber", 4) AS INTEGER)) as maxNum FROM "Patient" WHERE "mrNumber" LIKE 'MR-%'`,
   );
-  const lastNum = res[0]?.maxNum ?? 0;
+  const raw = res[0]?.maxNum;
+  const lastNum = raw != null && Number.isFinite(Number(raw)) ? Number(raw) : 0;
   return `MR-${String(lastNum + 1).padStart(5, '0')}`;
 }
 
