@@ -12,6 +12,7 @@ import {
 import { alpha, useTheme } from '@mui/material/styles';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDeferredValue, useMemo, useState } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useNavigate } from 'react-router-dom';
 import { tableSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
@@ -36,7 +37,7 @@ export function PatientsPage(): React.JSX.Element {
   const isAdmin = user?.role === 'admin';
   const canManagePatients = canViewRecords && !isAdmin && !isLabTech;
   const [search, setSearch] = useState('');
-  const deferredSearch = useDeferredValue(search);
+  const debouncedSearch = useDebounce(search, 300);
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(10);
   const [dialogPatient, setDialogPatient] = useState<Patient | undefined>();
@@ -45,12 +46,12 @@ export function PatientsPage(): React.JSX.Element {
   const [historyPatient, setHistoryPatient] = useState<Patient | undefined>();
 
   const patientsQuery = useQuery({
-    queryKey: ['patients', { page, rowsPerPage, search: deferredSearch, providerId: isDoctor ? user?.id : undefined }],
+    queryKey: ['patients', { page, rowsPerPage, search: debouncedSearch, providerId: isDoctor ? user?.id : undefined }],
     queryFn: () =>
       patientsService.list({
         page: page + 1,
         pageSize: rowsPerPage,
-        search: deferredSearch,
+        search: debouncedSearch,
         providerId: isDoctor ? user?.id : undefined,
       }),
     placeholderData: keepPreviousData,

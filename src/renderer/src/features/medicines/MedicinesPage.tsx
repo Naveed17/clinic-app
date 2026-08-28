@@ -48,12 +48,15 @@ import { findCatalogDuplicate } from '@shared/medicineCatalog';
 const money = (value: number) =>
   `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
 
+import { useDebounce } from '@/hooks/useDebounce';
+
 export function MedicinesPage(): React.JSX.Element {
   const { user } = useAuth();
   const qc = useQueryClient();
   const canManage = user?.role === 'receptionist';
 
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -66,13 +69,13 @@ export function MedicinesPage(): React.JSX.Element {
   });
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = debouncedSearch.trim().toLowerCase();
     if (!q) return medicines;
     return medicines.filter((m) => {
       const label = medicineCatalogLabel(m).toLowerCase();
       return label.includes(q) || m.name.toLowerCase().includes(q) || m.type.toLowerCase().includes(q);
     });
-  }, [medicines, search]);
+  }, [medicines, debouncedSearch]);
 
   const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   const cols = canManage ? 6 : 5;

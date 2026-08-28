@@ -304,6 +304,8 @@ export function OpdReportDocument({
   const copy = reportCopy(section);
   const showInvoices = section === 'all' || section === 'invoices';
   const showFees = section === 'all' || section === 'fees';
+  const pdfInvoices = report.invoices.rows.slice(0, 200);
+  const pdfFees = report.fees.rows.slice(0, 200);
 
   return (
     <Document title={`${copy.title} ${report.date}`} author={clinicName}>
@@ -366,10 +368,10 @@ export function OpdReportDocument({
               {report.invoices.rows.length === 0 ? (
                 <Text style={styles.empty}>No invoices for this day.</Text>
               ) : (
-                report.invoices.rows.map((row, index) => (
+                pdfInvoices.map((row, index) => (
                   <View
                     key={row.id}
-                    style={index === report.invoices.rows.length - 1 ? styles.tableRowLast : styles.tableRow}
+                    style={index === pdfInvoices.length - 1 ? styles.tableRowLast : styles.tableRow}
                     wrap={false}
                   >
                     <Text style={[styles.tdBold, { width: '18%', paddingRight: 4 }]}>{row.invoiceNumber}</Text>
@@ -383,6 +385,11 @@ export function OpdReportDocument({
                   </View>
                 ))
               )}
+              {report.invoices.rows.length > 200 ? (
+                <Text style={[styles.empty, { marginTop: 4, fontStyle: 'italic' }]}>
+                  Showing first 200 of {report.invoices.rows.length} invoices. Summary totals above include all {report.invoices.rows.length} invoices.
+                </Text>
+              ) : null}
               <View style={styles.tableFooter} wrap={false}>
                 <Text style={[styles.tdBold, { width: '60%' }]}>Totals</Text>
                 <Text style={[styles.numBold, { width: '10%' }]}>{money(report.invoices.billed)}</Text>
@@ -443,10 +450,10 @@ export function OpdReportDocument({
               {report.fees.rows.length === 0 ? (
                 <Text style={styles.empty}>No doctor fees for this day.</Text>
               ) : (
-                report.fees.rows.map((row, index) => (
+                pdfFees.map((row, index) => (
                   <View
                     key={row.id}
-                    style={index === report.fees.rows.length - 1 ? styles.tableRowLast : styles.tableRow}
+                    style={index === pdfFees.length - 1 ? styles.tableRowLast : styles.tableRow}
                     wrap={false}
                   >
                     <Text style={[styles.tdBold, { width: '9%', paddingRight: 4 }]}>
@@ -462,6 +469,11 @@ export function OpdReportDocument({
                   </View>
                 ))
               )}
+              {report.fees.rows.length > 200 ? (
+                <Text style={[styles.empty, { marginTop: 4, fontStyle: 'italic' }]}>
+                  Showing first 200 of {report.fees.rows.length} doctor fee records. Summary totals above include all {report.fees.rows.length} records.
+                </Text>
+              ) : null}
               <View style={styles.tableFooter} wrap={false}>
                 <Text style={[styles.tdBold, { width: '53%' }]}>Totals</Text>
                 <Text style={[styles.numBold, { width: '12%' }]}>{money(report.fees.rows.reduce((s, r) => s + r.consultationFee, 0))}</Text>

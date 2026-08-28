@@ -32,6 +32,7 @@ import {
   Snackbar,
   Select,
   createFilterOptions,
+  TablePagination,
 } from '@mui/material';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
@@ -41,6 +42,7 @@ import { useFieldArray, useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { useEffect, useState } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useNavigate } from 'react-router-dom';
 import { invoicesService } from '@/services/invoices.service';
 import { patientsService } from '@/services/patients.service';
@@ -487,7 +489,7 @@ export function InvoiceDialog({
                 <Autocomplete
                   options={autocompleteOptions}
                   filterOptions={(opts, state) => {
-                    const filtered = filterPatients(opts.filter((o) => o.id !== ADD_NEW), state);
+                    const filtered = filterPatients(opts.filter((o) => o.id !== ADD_NEW), state).slice(0, 50);
                     return [
                       opts.find((o) => o.id === ADD_NEW)!,
                       ...filtered,
@@ -638,10 +640,17 @@ export function InvoicesPage(): React.JSX.Element {
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [page, setPage] = useState(0);
-  const rowsPerPage = 10;
-  const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list });
+  const [rowsPerPage] = useState(10);
+  const [isPageChanging, setIsPageChanging] = useState(false);
+  const handlePageChange = (newPage: number) => {
+    setIsPageChanging(true);
+    setPage(newPage);
+    setTimeout(() => setIsPageChanging(false), 250);
+  };
+  const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list, staleTime: 30_000 });
 
   async function handlePrintInvoice(invoice: Invoice): Promise<void> {
     setPrintingId(invoice.id);
@@ -657,8 +666,8 @@ export function InvoicesPage(): React.JSX.Element {
 
   const filtered = (invoices.data ?? []).filter((inv) => {
     if (statusFilter !== 'ALL' && inv.status !== statusFilter) return false;
-    if (!search) return true;
-    const q = search.toLowerCase();
+    if (!debouncedSearch) return true;
+    const q = debouncedSearch.toLowerCase();
     return (
       inv.invoiceNumber.toLowerCase().includes(q) ||
       `${inv.patient.firstName} ${inv.patient.lastName}`.toLowerCase().includes(q)
@@ -709,11 +718,11 @@ export function InvoicesPage(): React.JSX.Element {
         }
         pager={
           filtered.length > rowsPerPage ? (
-            <TablePager page={page} rowsPerPage={rowsPerPage} total={filtered.length} onPageChange={setPage} />
+            <TablePager page={page} rowsPerPage={rowsPerPage} total={filtered.length} onPageChange={handlePageChange} />
           ) : undefined
         }
         error={invoices.isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load invoices.</Alert>}
-        fetching={invoices.isFetching && !invoices.isLoading}
+        fetching={(invoices.isFetching && !invoices.isLoading) || isPageChanging}
       >
         <TableHead sx={tableSx.head}>
           <TableRow>

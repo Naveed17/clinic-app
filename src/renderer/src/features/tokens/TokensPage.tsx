@@ -49,7 +49,9 @@ import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { appointmentsService } from '@/services/appointments.service';
 import { doctorOfflineReason, slotSearchFrom } from '@/utils/appointmentSlot';
 import { playNotificationSound } from '@/utils/sound';
+import { useDebounce } from '@/hooks/useDebounce';
 import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
+import { PatientAutocomplete } from '@/components/PatientAutocomplete';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogPaperProps,
@@ -89,6 +91,8 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   const [reason, setReason] = useState('');
   const [consultationFee, setConsultationFee] = useState('');
   const [feeDiscount, setFeeDiscount] = useState('');
+  const [patientQuery, setPatientQuery] = useState('');
+  const debouncedPatientQuery = useDebounce(patientQuery, 450);
 
   useEffect(() => {
     if (open) {
@@ -98,16 +102,33 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
       setReason('');
       setConsultationFee('');
       setFeeDiscount('');
+      setPatientQuery('');
     }
   }, [open, defaultPatientId, defaultDoctorId]);
 
   const { data: patients = [] } = useQuery<TokenPerson[]>({
     queryKey: ['token-patients'],
     queryFn: () => window.clinic.tokens.patients(),
+    enabled: open,
+    staleTime: 60_000,
   });
+
+  const filteredPatients = useMemo(() => {
+    const q = debouncedPatientQuery.trim().toLowerCase();
+    if (!q) return patients.slice(0, 50);
+    return patients.filter((p) => {
+      const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+      const phone = (p.phone || '').toLowerCase();
+      const mr = (p.mrNumber || '').toLowerCase();
+      return name.includes(q) || phone.includes(q) || mr.includes(q);
+    }).slice(0, 50);
+  }, [patients, debouncedPatientQuery]);
+
   const { data: doctors = [] } = useQuery<TokenPerson[]>({
     queryKey: ['token-doctors'],
     queryFn: () => window.clinic.tokens.doctors(),
+    enabled: open,
+    staleTime: 60_000,
   });
 
   const selectedPatient = useMemo(
@@ -191,20 +212,11 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
           {offlineReason && (
             <Alert severity="warning">{offlineReason}</Alert>
           )}
-          <Autocomplete
-            options={patients}
-            getOptionLabel={(p) => `${p.firstName} ${p.lastName}`}
-            value={selectedPatient}
-            onChange={(_, v) => setPatientId(v?.id ?? '')}
-            isOptionEqualToValue={(o, v) => o.id === v.id}
-            filterOptions={(opts, state) => {
-              const q = state.inputValue.trim().toLowerCase();
-              if (!q) return opts;
-              return opts.filter((p) =>
-                `${p.firstName} ${p.lastName} ${p.mrNumber ?? ''}`.toLowerCase().includes(q),
-              );
-            }}
-            renderInput={(params) => <TextField {...params} label="Patient" fullWidth helperText="Type to search patient" />}
+          <PatientAutocomplete
+            value={patientId}
+            onChange={(id) => setPatientId(id)}
+            label="Patient"
+            helperText="Type to search patient"
           />
           <Autocomplete
             options={doctors}
@@ -940,12 +952,13 @@ export function TokensPage(): React.JSX.Element {
   const { data: tokens = [], isLoading, isFetching, isError } = useQuery<Token[]>({
     queryKey: ['tokens', date],
     queryFn: () => window.clinic.tokens.list(date),
-    refetchInterval: 10_000,
+    staleTime: 60_000,
   });
 
   const { data: doctors = [] } = useQuery<TokenPerson[]>({
     queryKey: ['token-doctors'],
     queryFn: () => window.clinic.tokens.doctors(),
+    staleTime: 60_000,
   });
 
   const statusMutation = useMutation({
@@ -964,8 +977,28 @@ export function TokensPage(): React.JSX.Element {
     meta: { silent: true },
   });
 
+  const [displayLimit, setDisplayLimit] = useState(20);
+
+  useEffect(() => {
+    setDisplayLimit(20);
+  }, [date, filterDoctor]);
+
   const roleFiltered = isDoctor ? tokens.filter((t) => t.doctorId === user?.id) : tokens;
   const filtered = filterDoctor === 'ALL' ? roleFiltered : roleFiltered.filter((t) => t.doctorId === filterDoctor);
+
+  const displayedTokens = useMemo(() => filtered.slice(0, displayLimit), [filtered, displayLimit]);
+
+  const handleQueueScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight < 150) {
+      setDisplayLimit((prev) => {
+        if (prev < filtered.length) {
+          return Math.min(prev + 20, filtered.length);
+        }
+        return prev;
+      });
+    }
+  }, [filtered.length]);
 
   const waiting = tokens.filter((t) => t.status === 'WAITING').length;
   const done = tokens.filter((t) => t.status === 'DONE').length;
@@ -1182,6 +1215,7 @@ export function TokensPage(): React.JSX.Element {
               ) : (
                 <Stack
                   spacing={1}
+                  onScroll={handleQueueScroll}
                   sx={{
                     maxHeight: { lg: 520 },
                     overflowY: 'auto',
@@ -1190,7 +1224,7 @@ export function TokensPage(): React.JSX.Element {
                     '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
                   }}
                 >
-                  {filtered.map((token) => {
+                  {displayedTokens.map((token) => {
                     const cfg = statusConfig[token.status];
                     const isDone = token.status === 'DONE' || token.status === 'SKIPPED';
                     const isCurrent = currentToken?.id === token.id;
@@ -1322,6 +1356,13 @@ export function TokensPage(): React.JSX.Element {
                       </Box>
                     );
                   })}
+                  {displayLimit < filtered.length && (
+                    <Box sx={{ py: 1.5, textAlign: 'center' }}>
+                      <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                        Showing {displayedTokens.length} of {filtered.length} tokens — Scroll down to load more...
+                      </Typography>
+                    </Box>
+                  )}
                 </Stack>
               )}
             </Paper>

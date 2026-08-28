@@ -21,7 +21,7 @@ import {
   dialogPaperProps, dialogSubmitBtnSx,
 } from '@/components/DialogUI';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
@@ -71,9 +71,14 @@ export function DoctorDashboard(): React.JSX.Element {
   const [ctxMenu, setCtxMenu] = useState<{ mouseX: number; mouseY: number } | null>(null);
   const [apptCtxMenu, setApptCtxMenu] = useState<{ mouseX: number; mouseY: number; appointment: Appointment } | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [queueLimit, setQueueLimit] = useState(20);
   const [historyPatient, setHistoryPatient] = useState<Patient | undefined>();
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
   const [labOrder, setLabOrder] = useState<{ patientId: string; patientName: string; tokenId?: string } | null>(null);
+
+  useEffect(() => {
+    setQueueLimit(20);
+  }, [activeTab]);
 
   const { data: raw = [], isLoading: apptsLoading, isFetching: apptsFetching } = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
   const appointments = (raw as Appointment[]).filter((a) => a.providerId === user?.id);
@@ -226,8 +231,18 @@ export function DoctorDashboard(): React.JSX.Element {
       );
     }
 
+    const displayed = list.slice(0, queueLimit);
+
+    const handleQueueScroll = (e: React.UIEvent<HTMLDivElement>): void => {
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+      if (scrollHeight - scrollTop - clientHeight < 150) {
+        setQueueLimit((prev) => (prev < list.length ? Math.min(list.length, prev + 20) : prev));
+      }
+    };
+
     return (
       <Stack
+        onScroll={handleQueueScroll}
         spacing={0}
         sx={{
           flex: 1,
@@ -237,7 +252,7 @@ export function DoctorDashboard(): React.JSX.Element {
           '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
         }}
       >
-        {list.map((appt, idx) => {
+        {displayed.map((appt, idx) => {
           const start = new Date(appt.startsAt);
           const end = new Date(appt.endsAt);
           const color = STATUS_COLOR[appt.status];
@@ -357,6 +372,11 @@ export function DoctorDashboard(): React.JSX.Element {
             </Box>
           );
         })}
+        {displayed.length < list.length && (
+          <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ display: 'block', py: 1.5, fontStyle: 'italic' }}>
+            Scroll down to load more ({displayed.length} of {list.length} appointments loaded)...
+          </Typography>
+        )}
       </Stack>
     );
   }

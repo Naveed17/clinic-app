@@ -312,9 +312,15 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
     queryFn: () => window.clinic.tokens.list(selectedDateKey) as Promise<Token[]>,
   });
 
+  const [dayLimit, setDayLimit] = useState(20);
+
   useEffect(() => {
     if (loading) setDayListOpen(false);
   }, [loading]);
+
+  useEffect(() => {
+    setDayLimit(20);
+  }, [selectedDateKey, dayListOpen]);
 
   const selectedAppts = useMemo(
     () =>
@@ -325,6 +331,18 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
       ).sort(sortByTokenDesc),
     [appointments, selected, dayTokens],
   );
+
+  const displayedDayAppts = useMemo(
+    () => selectedAppts.slice(0, dayLimit),
+    [selectedAppts, dayLimit],
+  );
+
+  const handleDayScroll = (e: React.UIEvent<HTMLDivElement>): void => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight < 150) {
+      setDayLimit((prev) => (prev < selectedAppts.length ? Math.min(selectedAppts.length, prev + 20) : prev));
+    }
+  };
 
   function apptsByDay(d: Date) {
     return dedupeSameDayVisits(
@@ -1131,6 +1149,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
         </Box>
 
         <Box
+          onScroll={handleDayScroll}
           sx={{
             px: 2.5,
             py: 2.25,
@@ -1171,7 +1190,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
             </Box>
           ) : (
             <Stack spacing={1.25}>
-              {selectedAppts.map((a, index) => {
+              {displayedDayAppts.map((a, index) => {
                 const start = new Date(a.startsAt);
                 const end = new Date(a.endsAt);
                 const mins = Math.round((end.getTime() - start.getTime()) / 60000);
@@ -1210,7 +1229,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                       >
                         {start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                       </Typography>
-                      {index < selectedAppts.length - 1 && (
+                      {index < displayedDayAppts.length - 1 && (
                         <Box sx={{ mt: 1, mr: 0.5, ml: 'auto', width: 2, height: 18, borderRadius: 1, bgcolor: alpha(theme.palette.primary.main, 0.18) }} />
                       )}
                     </Box>
@@ -1238,14 +1257,20 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                         },
                       }}
                     >
-                      <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0 }}>
-                        <Stack
-                          direction="row"
-                          alignItems="center"
-                          spacing={1.25}
-                          sx={{ minWidth: 0, flex: 1 }}
-                        >
-                          <Avatar sx={{ width: 34, height: 34, fontSize: 12, fontWeight: 800, bgcolor: alpha(color, 0.18), color, flexShrink: 0 }}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5}>
+                        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
+                          <Avatar
+                            src={a.patient.avatar ?? undefined}
+                            sx={{
+                              width: 38,
+                              height: 38,
+                              fontSize: 13,
+                              fontWeight: 800,
+                              bgcolor: alpha(color, 0.18),
+                              color,
+                              flexShrink: 0,
+                            }}
+                          >
                             {initials}
                           </Avatar>
                           <Box sx={{ minWidth: 0 }}>
@@ -1278,19 +1303,6 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                               </Typography>
                             </Stack>
                           </Box>
-                          <Chip
-                            size="small"
-                            label={a.status.replace('_', ' ')}
-                            sx={{
-                              bgcolor: alpha(color, 0.14),
-                              color,
-                              fontWeight: 800,
-                              borderRadius: 99,
-                              fontSize: '0.68rem',
-                              textTransform: 'capitalize',
-                              flexShrink: 0,
-                            }}
-                          />
                         </Stack>
 
                         <Stack direction="row" alignItems="center" gap={0.5} flexShrink={0}>
@@ -1380,6 +1392,11 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                   </Box>
                 );
               })}
+              {displayedDayAppts.length < selectedAppts.length && (
+                <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ display: 'block', py: 1.5, fontStyle: 'italic' }}>
+                  Scroll down to load more ({displayedDayAppts.length} of {selectedAppts.length} visits loaded)...
+                </Typography>
+              )}
             </Stack>
           )}
         </Box>

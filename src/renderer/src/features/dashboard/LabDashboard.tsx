@@ -104,7 +104,7 @@ export function LabDashboard(): React.JSX.Element {
   const { data: orders = [], isPending, isError, error } = useQuery<LabOrder[]>({
     queryKey: ['lab-orders'],
     queryFn: () => window.clinic.lab.list(),
-    refetchInterval: 15_000,
+    staleTime: 30_000,
   });
 
   const startMutation = useMutation({
@@ -126,6 +126,20 @@ export function LabDashboard(): React.JSX.Element {
         .sort((a, b) => new Date(a.orderedAt).getTime() - new Date(b.orderedAt).getTime()),
     [orders, today],
   );
+
+  const [ordersLimit, setOrdersLimit] = useState(20);
+
+  const displayedTodaysOrders = useMemo(
+    () => todaysOrders.slice(0, ordersLimit),
+    [todaysOrders, ordersLimit],
+  );
+
+  const handleOrdersScroll = (e: React.UIEvent<HTMLDivElement>): void => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight < 150) {
+      setOrdersLimit((prev) => (prev < todaysOrders.length ? Math.min(todaysOrders.length, prev + 20) : prev));
+    }
+  };
 
   const queue = useMemo(
     () =>
@@ -351,6 +365,7 @@ export function LabDashboard(): React.JSX.Element {
               </Box>
             ) : (
               <Stack
+                onScroll={handleOrdersScroll}
                 spacing={1}
                 sx={{
                   maxHeight: 420,
@@ -360,7 +375,7 @@ export function LabDashboard(): React.JSX.Element {
                   '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
                 }}
               >
-                {todaysOrders.map((order) => (
+                {displayedTodaysOrders.map((order) => (
                   <Box
                     key={order.id}
                     onClick={() => navigate(`/lab/${order.id}`)}
@@ -418,6 +433,11 @@ export function LabDashboard(): React.JSX.Element {
                     />
                   </Box>
                 ))}
+                {displayedTodaysOrders.length < todaysOrders.length && (
+                  <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ display: 'block', py: 1.5, fontStyle: 'italic' }}>
+                    Scroll down to load more ({displayedTodaysOrders.length} of {todaysOrders.length} lab orders loaded)...
+                  </Typography>
+                )}
               </Stack>
             )}
           </Paper>

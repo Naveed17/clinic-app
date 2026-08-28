@@ -136,7 +136,7 @@ export async function ensurePrescriptionPharmacyColumns(
 
 export async function initializeDatabase(database: PrismaClient = getPrisma()): Promise<void> {
   try {
-    await database.$executeRawUnsafe('PRAGMA journal_mode = WAL');
+    await database.$queryRawUnsafe('PRAGMA journal_mode = WAL');
     await database.$executeRawUnsafe('PRAGMA synchronous = NORMAL');
     await database.$executeRawUnsafe('PRAGMA temp_store = MEMORY');
     await database.$executeRawUnsafe('PRAGMA cache_size = -64000');

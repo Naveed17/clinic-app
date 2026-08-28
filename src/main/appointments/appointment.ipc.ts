@@ -15,7 +15,7 @@ import {
 import { emitNotification, emitDataChange } from '../backend/realtime';
 
 export function registerAppointmentIpc(io?: SocketIOServer): void {
-  ipcMain.handle('appointments:list', () => listAppointments());
+  ipcMain.handle('appointments:list', (_, date?: string) => listAppointments(date));
   ipcMain.handle('appointments:get', (_, id: string) => getAppointment(id));
   ipcMain.handle('appointments:patients', () => listAppointmentPatients());
   ipcMain.handle('appointments:doctors', () => listDoctors());

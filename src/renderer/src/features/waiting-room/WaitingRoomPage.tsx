@@ -148,6 +148,23 @@ export function WaitingRoomPage(): React.JSX.Element {
   );
   const currentToken = waitingAll[0] ?? null;
   const waitingRest = waitingAll.slice(1);
+  const [waitingLimit, setWaitingLimit] = useState(20);
+
+  useEffect(() => {
+    setWaitingLimit(20);
+  }, [date, user?.id]);
+
+  const displayedWaitingRest = useMemo(
+    () => waitingRest.slice(0, waitingLimit),
+    [waitingRest, waitingLimit],
+  );
+
+  const handleWaitingScroll = (e: React.UIEvent<HTMLDivElement>): void => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight < 150) {
+      setWaitingLimit((prev) => (prev < waitingRest.length ? Math.min(waitingRest.length, prev + 20) : prev));
+    }
+  };
   const pendingAppointments = useMemo(
     () => {
       const tokened = new Set(mine.map((t) => t.patientId));
@@ -560,6 +577,7 @@ export function WaitingRoomPage(): React.JSX.Element {
               </Box>
             ) : (
               <Stack
+                onScroll={handleWaitingScroll}
                 spacing={1}
                 sx={{
                   maxHeight: 320,
@@ -569,7 +587,7 @@ export function WaitingRoomPage(): React.JSX.Element {
                   '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
                 }}
               >
-                {waitingRest.map((token) => {
+                {displayedWaitingRest.map((token) => {
                   const eta = etaFor(token);
                   return (
                     <Box
@@ -626,6 +644,11 @@ export function WaitingRoomPage(): React.JSX.Element {
                     </Box>
                   );
                 })}
+                {displayedWaitingRest.length < waitingRest.length && (
+                  <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ display: 'block', py: 1.5, fontStyle: 'italic' }}>
+                    Scroll down to load more ({displayedWaitingRest.length} of {waitingRest.length} next in line loaded)...
+                  </Typography>
+                )}
               </Stack>
             )}
           </Paper>

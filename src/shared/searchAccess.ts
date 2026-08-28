@@ -45,12 +45,13 @@ export function getSearchScope(
 
   const billingOn = licensed(modules, 'billing');
   const labOn = licensed(modules, 'labDashboard');
+  const patientsOn = licensed(modules, 'managePatients');
 
   return {
-    patients: r === 'doctor' || r === 'receptionist' || r === 'lab_technician',
-    appointments: r === 'doctor' || r === 'receptionist',
-    invoices: r === 'receptionist' && billingOn,
-    labOrders: r !== 'pharmacist' && labOn,
+    patients: (r === 'admin' || r === 'doctor' || r === 'receptionist') && patientsOn,
+    appointments: r === 'admin' || r === 'doctor' || r === 'receptionist',
+    invoices: (r === 'admin' || r === 'receptionist') && billingOn,
+    labOrders: (r === 'admin' || r === 'doctor' || r === 'lab_technician') && labOn,
   };
 }
 

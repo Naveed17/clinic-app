@@ -17,7 +17,7 @@ import {
   Typography,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { GlobalSearchResult } from '@/types/search';
 import { getSearchScope, searchPlaceholder } from '@shared/searchAccess';
@@ -62,8 +62,16 @@ export function GlobalSearchModal({ open, onClose }: Props) {
   const theme = useTheme();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { modules } = useLicense();
-  const scope = getSearchScope(user?.role, modules);
+  const { modules, can } = useLicense();
+  const scope = useMemo(() => {
+    const base = getSearchScope(user?.role, modules);
+    return {
+      patients: base.patients && can('managePatients'),
+      appointments: base.appointments,
+      invoices: base.invoices && can('billing'),
+      labOrders: base.labOrders && can('labDashboard'),
+    };
+  }, [user?.role, modules, can]);
   const canPatients = scope.patients;
   const canBilling = scope.invoices;
   const canLab = scope.labOrders;

@@ -19,7 +19,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { alpha } from '@mui/material/styles';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export const softCardSx: SxProps<Theme> = {
   borderRadius: '20px',
@@ -195,11 +196,24 @@ interface SearchFieldProps {
 }
 
 export function SearchField({ value, onChange, placeholder = 'Search...', sx }: SearchFieldProps): React.JSX.Element {
+  const [localValue, setLocalValue] = useState(value);
+  const debouncedValue = useDebounce(localValue, 450);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  useEffect(() => {
+    if (debouncedValue !== value) {
+      onChange(debouncedValue);
+    }
+  }, [debouncedValue]);
+
   return (
     <TextField
       size="small"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
       placeholder={placeholder}
       sx={{ minWidth: 220, ...sx }}
       slotProps={{

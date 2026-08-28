@@ -7,6 +7,7 @@ function licenseModulesForSearch(): Record<string, boolean> {
   return {
     billing: isLicenseModuleEnabled('billing'),
     labDashboard: isLicenseModuleEnabled('labDashboard'),
+    managePatients: isLicenseModuleEnabled('managePatients'),
   };
 }
 

@@ -19,20 +19,23 @@ import {
   Tab,
   Tabs,
   Typography,
+  TablePagination,
 } from '@mui/material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { DateRangePickerField } from '@/components/DateRangePickerField';
 import { alpha, useTheme } from '@mui/material/styles';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useDebounce } from '@/hooks/useDebounce';
 import { FetchingBar, StatCardsSkeleton, TableRowsSkeleton } from '@/components/LoadingUI';
 import {
   chipSx,
   SearchField,
   softCardSx,
   tableSx,
+  TablePager,
   Table,
   TableBody,
   TableCell,
@@ -110,13 +113,27 @@ export function OpdReportsPage(): React.JSX.Element {
   const [doctorId, setDoctorId] = useState('');
   const [tab, setTab] = useState<'invoices' | 'fees'>('invoices');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage] = useState(10);
+  const [isPageChanging, setIsPageChanging] = useState(false);
+  const handlePageChange = (newPage: number) => {
+    setIsPageChanging(true);
+    setPage(newPage);
+    setTimeout(() => setIsPageChanging(false), 250);
+  };
   const [preview, setPreview] = useState<{ report: OpdDailyReport; section: OpdPrintSection } | null>(null);
+
+  useEffect(() => {
+    setPage(0);
+  }, [dateFrom, dateTo, doctorId, tab, debouncedSearch]);
 
   const detailFrom = '/opd-reports';
 
   const doctors = useQuery<TokenPerson[]>({
     queryKey: ['token-doctors'],
     queryFn: () => window.clinic.tokens.doctors(),
+    staleTime: 60_000,
   });
   const doctorList = doctors.data ?? [];
   const doctorById = useMemo(() => new Map(doctorList.map((doctor) => [doctor.id, doctor])), [doctorList]);
@@ -136,10 +153,11 @@ export function OpdReportsPage(): React.JSX.Element {
         dateTo,
         ...(doctorId ? { doctorId } : {}),
       }),
+    staleTime: 30_000,
   });
 
   const data = report.data;
-  const q = search.trim().toLowerCase();
+  const q = debouncedSearch.trim().toLowerCase();
   const invoiceRows = useMemo(() => {
     const rows = data?.invoices.rows ?? [];
     if (!q) return rows;
@@ -154,6 +172,14 @@ export function OpdReportsPage(): React.JSX.Element {
       `${row.tokenNumber} ${row.patientName} ${row.doctorName} ${row.status}`.toLowerCase().includes(q),
     );
   }, [data, q]);
+
+  const paginatedInvoiceRows = useMemo(() => {
+    return invoiceRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  }, [invoiceRows, page, rowsPerPage]);
+
+  const paginatedFeeRows = useMemo(() => {
+    return feeRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  }, [feeRows, page, rowsPerPage]);
 
   const summaryCards = tab === 'invoices'
     ? [
@@ -321,7 +347,7 @@ export function OpdReportsPage(): React.JSX.Element {
         ) : null}
 
         <Paper elevation={0} sx={{ ...softCardSx, overflow: 'hidden', position: 'relative' }}>
-          <FetchingBar show={report.isFetching && !report.isLoading} />
+          <FetchingBar show={(report.isFetching && !report.isLoading) || isPageChanging} />
           <Box sx={{ px: 2, pt: 1.25, pb: 1.25, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             <Tabs
               value={tab}
@@ -373,7 +399,7 @@ export function OpdReportsPage(): React.JSX.Element {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    invoiceRows.map((row) => {
+                    paginatedInvoiceRows.map((row) => {
                       const cfg = invoiceStatusConfig[row.status] ?? { label: row.status, color: 'default' as const };
                       return (
                         <TableRow
@@ -431,7 +457,7 @@ export function OpdReportsPage(): React.JSX.Element {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    feeRows.map((row) => {
+                    paginatedFeeRows.map((row) => {
                       const cfg = feeStatusConfig[row.status] ?? { label: row.status, color: 'default' as const };
                       return (
                         <TableRow
@@ -459,6 +485,16 @@ export function OpdReportsPage(): React.JSX.Element {
               </Table>
             )}
           </Box>
+          {(tab === 'invoices' ? invoiceRows.length : feeRows.length) > rowsPerPage ? (
+            <Box sx={{ borderTop: '1px solid', borderColor: 'divider' }}>
+              <TablePager
+                page={page}
+                rowsPerPage={rowsPerPage}
+                total={tab === 'invoices' ? invoiceRows.length : feeRows.length}
+                onPageChange={handlePageChange}
+              />
+            </Box>
+          ) : null}
         </Paper>
       </Stack>
       {preview ? (

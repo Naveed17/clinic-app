@@ -46,6 +46,8 @@ const statusColor: Record<LabOrderStatus, 'warning' | 'primary' | 'success' | 'e
   CANCELLED: 'error',
 };
 
+import { useDebounce } from '@/hooks/useDebounce';
+
 export function LabPage(): React.JSX.Element {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -55,9 +57,16 @@ export function LabPage(): React.JSX.Element {
   const isLabTech = user?.role === 'lab_technician';
 
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [page, setPage] = useState(0);
   const rowsPerPage = 10;
+  const [isPageChanging, setIsPageChanging] = useState(false);
+  const handlePageChange = (newPage: number) => {
+    setIsPageChanging(true);
+    setPage(newPage);
+    setTimeout(() => setIsPageChanging(false), 250);
+  };
   const [dialogOpen, setDialogOpen] = useState(false);
   const [builderOrder, setBuilderOrder] = useState<LabOrder | null>(null);
   const [printOrder, setPrintOrder] = useState<LabOrder | null>(null);
@@ -66,7 +75,7 @@ export function LabPage(): React.JSX.Element {
   const { data: orders = [], isLoading, isFetching, isError } = useQuery<LabOrder[]>({
     queryKey: ['lab-orders'],
     queryFn: () => window.clinic.lab.list(),
-    refetchInterval: 15_000,
+    staleTime: 30_000,
   });
 
   const { data: patients = [] } = useQuery<{ id: string; firstName: string; lastName: string }[]>({
@@ -101,7 +110,7 @@ export function LabPage(): React.JSX.Element {
   });
 
   const filtered = orders.filter((order) => {
-    const q = search.trim().toLowerCase();
+    const q = debouncedSearch.trim().toLowerCase();
     const reportNo = labReportNumber(order.id).toLowerCase();
     const needle = q.replace(/[^a-z0-9]/g, '');
     const matchSearch =
@@ -153,10 +162,10 @@ export function LabPage(): React.JSX.Element {
           </>
         }
         error={isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Failed to load lab orders.</Alert>}
-        fetching={isFetching && !isLoading}
+        fetching={(isFetching && !isLoading) || isPageChanging}
         pager={
           filtered.length > rowsPerPage ? (
-            <TablePager page={page} rowsPerPage={rowsPerPage} total={filtered.length} onPageChange={setPage} />
+            <TablePager page={page} rowsPerPage={rowsPerPage} total={filtered.length} onPageChange={handlePageChange} />
           ) : undefined
         }
       >

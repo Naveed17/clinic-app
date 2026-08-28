@@ -10,7 +10,7 @@ import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
-  Alert, Autocomplete, Box, Button, Dialog, DialogActions, DialogContent,
+  Alert, Autocomplete, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent,
   Divider, FormControl, IconButton, InputLabel, MenuItem, Paper, Select, Skeleton,
   Step, StepLabel, Stepper, Stack, TextField, Typography, Chip, Avatar,
 } from '@mui/material';
@@ -21,6 +21,8 @@ import {
 import { ListCardsSkeleton } from '@/components/LoadingUI';
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { GenderRadioGroup } from '@/components/GenderRadioGroup';
+import { PatientAutocomplete } from '@/components/PatientAutocomplete';
+import { useDebounce } from '@/hooks/useDebounce';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
 import { alpha, useTheme } from '@mui/material/styles';
@@ -119,20 +121,37 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   const [consultationFee, setConsultationFee] = useState('');
   const [feeDiscount, setFeeDiscount] = useState('');
   const [useExisting, setUseExisting] = useState(false);
+  const [patientQuery, setPatientQuery] = useState('');
+  const debouncedPatientQuery = useDebounce(patientQuery, 150);
   const [previewToken, setPreviewToken] = useState<Token | null>(null);
   const [previewAutoPrint, setPreviewAutoPrint] = useState(false);
 
   const form = useForm<PatientForm>({ resolver: zodResolver(patientSchema), defaultValues: patientDefaults });
 
-  const { data: patients = [] } = useQuery<TokenPerson[]>({
+  const { data: patients = [], isLoading: isPatientsLoading, isFetching: isPatientsFetching } = useQuery<TokenPerson[]>({
     queryKey: ['token-patients'],
     queryFn: () => window.clinic.tokens.patients(),
     enabled: open,
+    staleTime: 60_000,
   });
+
+  const isPatientSearching = isPatientsFetching || isPatientsLoading || patientQuery.trim() !== debouncedPatientQuery.trim();
+
+  const filteredPatients = useMemo(() => {
+    const q = debouncedPatientQuery.trim().toLowerCase();
+    if (!q) return patients.slice(0, 50);
+    return patients.filter((p) => {
+      const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+      const phone = (p.phone || '').toLowerCase();
+      const mr = (p.mrNumber || '').toLowerCase();
+      return name.includes(q) || phone.includes(q) || mr.includes(q);
+    }).slice(0, 50);
+  }, [patients, debouncedPatientQuery]);
   const { data: doctors = [] } = useQuery<TokenPerson[]>({
     queryKey: ['token-doctors'],
     queryFn: () => window.clinic.tokens.doctors(),
     enabled: open,
+    staleTime: 60_000,
   });
 
   const selectedPatient = useMemo(() => patients.find((p) => p.id === patientId) ?? null, [patients, patientId]);
@@ -243,115 +262,10 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
               <Button size="small" variant={useExisting ? 'contained' : 'outlined'} onClick={() => setUseExisting(true)}>Existing Patient</Button>
             </Stack>
             {useExisting ? (
-              <Autocomplete
-                options={patients}
-                getOptionLabel={(p) => `${p.firstName} ${p.lastName}`}
-                filterOptions={(options, state) => {
-                  const q = state.inputValue.trim().toLowerCase();
-                  if (!q) return options;
-                  return options.filter((p) => {
-                    const name = `${p.firstName} ${p.lastName}`.toLowerCase();
-                    const phone = (p.phone || '').toLowerCase();
-                    const mr = (p.mrNumber || '').toLowerCase();
-                    return name.includes(q) || phone.includes(q) || mr.includes(q);
-                  });
-                }}
-                value={selectedPatient}
-                onChange={(_, v) => setPatientId(v?.id ?? '')}
-                isOptionEqualToValue={(o, v) => o.id === v.id}
-                renderOption={(props, option) => {
-                  const initials = `${option.firstName?.[0] || ''}${option.lastName?.[0] || ''}`.toUpperCase() || 'P';
-                  return (
-                    <Box
-                      component="li"
-                      {...props}
-                      key={option.id}
-                      sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1, px: 1.5 }}
-                    >
-                      <Avatar
-                        src={option.avatar || undefined}
-                        sx={{
-                          width: 36,
-                          height: 36,
-                          fontSize: 13,
-                          fontWeight: 700,
-                          bgcolor: 'primary.main',
-                          color: 'primary.contrastText',
-                          flexShrink: 0,
-                        }}
-                      >
-                        {initials}
-                      </Avatar>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                          <Typography fontSize={14} fontWeight={600} noWrap sx={{ flex: 1, minWidth: 0 }}>
-                            {option.firstName} {option.lastName}
-                          </Typography>
-                          <Typography
-                            fontSize={12.5}
-                            color="primary.main"
-                            fontWeight={700}
-                            noWrap
-                            sx={{ width: 140, textAlign: 'left', flexShrink: 0, ml: 1 }}
-                          >
-                            {option.phone ? `📞 ${option.phone}` : 'No Phone'}
-                          </Typography>
-                        </Stack>
-                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                          {option.mrNumber && (
-                            <Typography fontSize={11.5} color="text.secondary" fontWeight={600} noWrap>
-                              {option.mrNumber}
-                            </Typography>
-                          )}
-                          {option.gender && (
-                            <Typography fontSize={11.5} color="text.secondary" noWrap>
-                              • {option.gender}
-                            </Typography>
-                          )}
-                          {option.age != null && (
-                            <Typography fontSize={11.5} color="text.secondary" noWrap>
-                              • {option.age} yrs
-                            </Typography>
-                          )}
-                        </Stack>
-                      </Box>
-                    </Box>
-                  );
-                }}
-                renderInput={(params) => {
-                  const selected = selectedPatient;
-                  const initials = selected ? `${selected.firstName?.[0] || ''}${selected.lastName?.[0] || ''}`.toUpperCase() : '';
-                  return (
-                    <TextField
-                      {...params}
-                      label="Search patient"
-                      fullWidth
-                      InputProps={{
-                        ...params.InputProps,
-                        startAdornment: selected ? (
-                          <>
-                            <Avatar
-                              src={selected.avatar || undefined}
-                              sx={{
-                                width: 26,
-                                height: 26,
-                                fontSize: 10,
-                                fontWeight: 700,
-                                bgcolor: 'primary.main',
-                                color: 'primary.contrastText',
-                                ml: 0.5,
-                                mr: 0.5,
-                              }}
-                            >
-                              {initials}
-                            </Avatar>
-                            {params.InputProps.startAdornment}
-                          </>
-                        ) : params.InputProps.startAdornment,
-                      }}
-                    />
-                  );
-                }}
+              <PatientAutocomplete
+                value={patientId}
+                onChange={(id) => setPatientId(id)}
+                label="Search patient"
               />
             ) : (
               <Box component="form" id="patient-form" onSubmit={form.handleSubmit((v) => createPatientMutation.mutate(v))}>
@@ -582,6 +496,8 @@ function BookAppointmentModal({
   const [patientId, setPatientId] = useState('');
   const [patientName, setPatientName] = useState('');
   const [useExisting, setUseExisting] = useState(false);
+  const [patientQuery, setPatientQuery] = useState('');
+  const debouncedPatientQuery = useDebounce(patientQuery, 150);
   const [providerId, setProviderId] = useState('');
   const [date, setDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
@@ -593,25 +509,42 @@ function BookAppointmentModal({
 
   const form = useForm<PatientForm>({ resolver: zodResolver(patientSchema), defaultValues: patientDefaults });
 
-  const { data: patients = [] } = useQuery<TokenPerson[]>({
+  const { data: patients = [], isLoading: isPatientsLoading, isFetching: isPatientsFetching } = useQuery<TokenPerson[]>({
     queryKey: ['token-patients'],
     queryFn: () => window.clinic.tokens.patients(),
     enabled: open,
+    staleTime: 60_000,
   });
+
+  const isPatientSearching = isPatientsFetching || isPatientsLoading || patientQuery.trim() !== debouncedPatientQuery.trim();
+
+  const filteredPatients = useMemo(() => {
+    const q = debouncedPatientQuery.trim().toLowerCase();
+    if (!q) return patients.slice(0, 50);
+    return patients.filter((p) => {
+      const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+      const phone = (p.phone || '').toLowerCase();
+      const mr = (p.mrNumber || '').toLowerCase();
+      return name.includes(q) || phone.includes(q) || mr.includes(q);
+    }).slice(0, 50);
+  }, [patients, debouncedPatientQuery]);
   const { data: doctors = [] } = useQuery<AppointmentPerson[]>({
     queryKey: ['doctors'],
     queryFn: appointmentsService.doctors,
     enabled: open,
+    staleTime: 60_000,
   });
   const { data: schedule = [], isFetched: scheduleFetched } = useQuery({
     queryKey: ['schedule', providerId],
     queryFn: () => window.clinic.schedule.get(providerId),
     enabled: open && Boolean(providerId),
+    staleTime: 60_000,
   });
   const { data: rawAppts = [] } = useQuery({
     queryKey: ['appointments'],
     queryFn: appointmentsService.list,
     enabled: open,
+    staleTime: 30_000,
   });
   const doctorAppts = rawAppts as Appointment[];
   const selectedPatient = useMemo(() => patients.find((p) => p.id === patientId) ?? null, [patients, patientId]);
@@ -644,10 +577,10 @@ function BookAppointmentModal({
       from: slotSearchFrom(date),
     });
     if (!next) return;
-    setDate(next.date);
-    setTime(next.time);
-    setSlotNotice(next.reason);
-  }, [open, providerId, duration, schedule, doctorAppts, date]);
+    setDate((prev) => (prev !== next.date ? next.date : prev));
+    setTime((prev) => (prev !== next.time ? next.time : prev));
+    setSlotNotice((prev) => (prev !== next.reason ? next.reason : prev));
+  }, [open, providerId, duration, schedule, doctorAppts]);
 
   const createPatientMutation = useMutation({
     mutationFn: (values: PatientForm) => patientsService.create(walkInPatientInput(values)),
@@ -739,118 +672,13 @@ function BookAppointmentModal({
               <Button size="small" variant={useExisting ? 'contained' : 'outlined'} onClick={() => setUseExisting(true)}>Existing Patient</Button>
             </Stack>
             {useExisting ? (
-              <Autocomplete
-                options={patients}
-                getOptionLabel={(p) => `${p.firstName} ${p.lastName}`}
-                filterOptions={(options, state) => {
-                  const q = state.inputValue.trim().toLowerCase();
-                  if (!q) return options;
-                  return options.filter((p) => {
-                    const name = `${p.firstName} ${p.lastName}`.toLowerCase();
-                    const phone = (p.phone || '').toLowerCase();
-                    const mr = (p.mrNumber || '').toLowerCase();
-                    return name.includes(q) || phone.includes(q) || mr.includes(q);
-                  });
+              <PatientAutocomplete
+                value={patientId}
+                onChange={(id, p) => {
+                  setPatientId(id);
+                  setPatientName(p ? `${p.firstName} ${p.lastName}` : '');
                 }}
-                value={selectedPatient}
-                onChange={(_, v) => {
-                  setPatientId(v?.id ?? '');
-                  setPatientName(v ? `${v.firstName} ${v.lastName}` : '');
-                }}
-                isOptionEqualToValue={(o, v) => o.id === v.id}
-                renderOption={(props, option) => {
-                  const initials = `${option.firstName?.[0] || ''}${option.lastName?.[0] || ''}`.toUpperCase() || 'P';
-                  return (
-                    <Box
-                      component="li"
-                      {...props}
-                      key={option.id}
-                      sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1, px: 1.5 }}
-                    >
-                      <Avatar
-                        src={option.avatar || undefined}
-                        sx={{
-                          width: 36,
-                          height: 36,
-                          fontSize: 13,
-                          fontWeight: 700,
-                          bgcolor: 'primary.main',
-                          color: 'primary.contrastText',
-                          flexShrink: 0,
-                        }}
-                      >
-                        {initials}
-                      </Avatar>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                          <Typography fontSize={14} fontWeight={600} noWrap sx={{ flex: 1, minWidth: 0 }}>
-                            {option.firstName} {option.lastName}
-                          </Typography>
-                          <Typography
-                            fontSize={12.5}
-                            color="primary.main"
-                            fontWeight={700}
-                            noWrap
-                            sx={{ width: 140, textAlign: 'left', flexShrink: 0, ml: 1 }}
-                          >
-                            {option.phone ? `📞 ${option.phone}` : 'No Phone'}
-                          </Typography>
-                        </Stack>
-                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                          {option.mrNumber && (
-                            <Typography fontSize={11.5} color="text.secondary" fontWeight={600} noWrap>
-                              {option.mrNumber}
-                            </Typography>
-                          )}
-                          {option.gender && (
-                            <Typography fontSize={11.5} color="text.secondary" noWrap>
-                              • {option.gender}
-                            </Typography>
-                          )}
-                          {option.age != null && (
-                            <Typography fontSize={11.5} color="text.secondary" noWrap>
-                              • {option.age} yrs
-                            </Typography>
-                          )}
-                        </Stack>
-                      </Box>
-                    </Box>
-                  );
-                }}
-                renderInput={(params) => {
-                  const selected = selectedPatient;
-                  const initials = selected ? `${selected.firstName?.[0] || ''}${selected.lastName?.[0] || ''}`.toUpperCase() : '';
-                  return (
-                    <TextField
-                      {...params}
-                      label="Search patient"
-                      fullWidth
-                      InputProps={{
-                        ...params.InputProps,
-                        startAdornment: selected ? (
-                          <>
-                            <Avatar
-                              src={selected.avatar || undefined}
-                              sx={{
-                                width: 26,
-                                height: 26,
-                                fontSize: 10,
-                                fontWeight: 700,
-                                bgcolor: 'primary.main',
-                                color: 'primary.contrastText',
-                                ml: 0.5,
-                                mr: 0.5,
-                              }}
-                            >
-                              {initials}
-                            </Avatar>
-                            {params.InputProps.startAdornment}
-                          </>
-                        ) : params.InputProps.startAdornment,
-                      }}
-                    />
-                  );
-                }}
+                label="Search patient"
               />
             ) : (
               <Box component="form" id="book-patient-form" onSubmit={form.handleSubmit((v) => createPatientMutation.mutate(v))}>
@@ -1101,12 +929,12 @@ function PrescriptionFeed(): React.JSX.Element {
   const { data: feed = [] } = useQuery<PrescriptionFeedItem[]>({
     queryKey: ['prescription-feed', date],
     queryFn: () => window.clinic.tokens.listPrescriptions(date),
-    refetchInterval: 30_000,
+    staleTime: 30_000,
   });
   const { data: tokens = [] } = useQuery<Token[]>({
     queryKey: ['tokens', date],
     queryFn: () => window.clinic.tokens.list(date) as Promise<Token[]>,
-    refetchInterval: 30_000,
+    staleTime: 30_000,
   });
 
   useEffect(() => {
@@ -1400,29 +1228,29 @@ export function ReceptionistDashboard(): React.JSX.Element {
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments'],
     queryFn: appointmentsService.list,
-    refetchInterval: 15_000,
+    staleTime: 30_000,
   });
   const { data: patientsData } = useQuery({
     queryKey: ['patients', { page: 1, pageSize: 1, search: '' }],
     queryFn: () => patientsService.list({ page: 1, pageSize: 1, search: '' }),
-    refetchInterval: 30_000,
+    staleTime: 30_000,
   });
   const { data: invoices = [] } = useQuery({
     queryKey: ['invoices'],
     queryFn: invoicesService.list,
-    refetchInterval: 30_000,
+    staleTime: 30_000,
     enabled: showBilling,
   });
   const { data: doctors = [] } = useQuery<AppointmentPerson[]>({
     queryKey: ['appointment-doctors'],
     queryFn: () => appointmentsService.doctors(),
-    refetchInterval: 60_000,
+    staleTime: 60_000,
   });
   const todayKey = toDayKey(new Date());
   const { data: tokens = [] } = useQuery<Token[]>({
     queryKey: ['tokens', todayKey],
     queryFn: () => window.clinic.tokens.list(todayKey) as Promise<Token[]>,
-    refetchInterval: 15_000,
+    staleTime: 30_000,
   });
 
   const today = new Date();
@@ -1696,7 +1524,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
                   '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
                 }}
               >
-                {selectedDayAppts.map((a) => (
+                {selectedDayAppts.slice(0, 20).map((a) => (
                   <Box
                     key={a.id}
                     onClick={() => navigate(`/appointments/${a.id}`)}
@@ -1750,6 +1578,18 @@ export function ReceptionistDashboard(): React.JSX.Element {
                   </Box>
                 ))}
               </Stack>
+            )}
+            {selectedDayAppts.length > 20 && (
+              <Box sx={{ pt: 1.5, mt: 1.5, textAlign: 'center', borderTop: `1px solid ${theme.palette.divider}` }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => navigate('/appointments')}
+                  sx={{ borderRadius: 2, fontWeight: 700, px: 3 }}
+                >
+                  View all ({selectedDayAppts.length} appointments)
+                </Button>
+              </Box>
             )}
           </Paper>
         </Stack>

@@ -36,6 +36,7 @@ import {
   Typography,
   Autocomplete,
   Select,
+  TablePagination,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
@@ -56,6 +57,7 @@ import { nextFreeSlot, doctorOfflineReason, slotSearchFrom, type SlotAdjustReaso
 import { formatTableDate } from '@/utils/formatDate';
 import { playNotificationSound } from '@/utils/sound';
 import { dateOfBirthToAge } from '@shared/patientAge';
+import { PatientAutocomplete } from '@/components/PatientAutocomplete';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
@@ -64,6 +66,7 @@ import {
 } from '@/components/DialogUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
+import { useDebounce } from '@/hooks/useDebounce';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
 
@@ -453,96 +456,13 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
               name="patientId"
               control={form.control}
               render={({ field }) => (
-                <Autocomplete
-                  options={patientOptions}
-                  loading={patients.isLoading}
-                  value={patientOptions.find((p) => p.id === field.value) ?? null}
-                  isOptionEqualToValue={(option, value) => option.id === value.id}
-                  getOptionLabel={(option) => `${option.firstName} ${option.lastName}`}
-                  onChange={(_, value) => field.onChange(value?.id ?? '')}
-                  filterOptions={(opts, state) => {
-                    const q = state.inputValue.trim().toLowerCase();
-                    if (!q) return opts;
-                    return opts.filter((p) => {
-                      const name = `${p.firstName} ${p.lastName}`.toLowerCase();
-                      const phone = p.phone?.toLowerCase() || '';
-                      const mr = (p as { mrNumber?: string }).mrNumber?.toLowerCase() || '';
-                      return name.includes(q) || phone.includes(q) || mr.includes(q);
-                    });
-                  }}
-                  renderOption={(props, option) => {
-                    const initials = `${option.firstName?.[0] || ''}${option.lastName?.[0] || ''}`.toUpperCase() || 'P';
-                    const age = (option as { age?: number }).age ?? dateOfBirthToAge((option as { dateOfBirth?: string | Date | null }).dateOfBirth);
-                    const mrNumber = (option as { mrNumber?: string }).mrNumber;
-                    const gender = (option as { gender?: string }).gender;
-                    const avatar = (option as { avatar?: string | null }).avatar;
-                    return (
-                      <Box
-                        component="li"
-                        {...props}
-                        key={option.id}
-                        sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1, px: 1.5 }}
-                      >
-                        <Avatar
-                          src={avatar || undefined}
-                          sx={{
-                            width: 36,
-                            height: 36,
-                            fontSize: 13,
-                            fontWeight: 700,
-                            bgcolor: 'primary.main',
-                            color: 'primary.contrastText',
-                            flexShrink: 0,
-                          }}
-                        >
-                          {initials}
-                        </Avatar>
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                            <Typography fontSize={14} fontWeight={600} noWrap sx={{ flex: 1, minWidth: 0 }}>
-                              {option.firstName} {option.lastName}
-                            </Typography>
-                            <Typography
-                              fontSize={12.5}
-                              color="primary.main"
-                              fontWeight={700}
-                              noWrap
-                              sx={{ width: 140, textAlign: 'left', flexShrink: 0, ml: 1 }}
-                            >
-                              {option.phone ? `📞 ${option.phone}` : 'No Phone'}
-                            </Typography>
-                          </Stack>
-                          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                            {mrNumber && (
-                              <Typography fontSize={11.5} color="text.secondary" fontWeight={600} noWrap>
-                                {mrNumber}
-                              </Typography>
-                            )}
-                            {gender && (
-                              <Typography fontSize={11.5} color="text.secondary" noWrap>
-                                • {gender}
-                              </Typography>
-                            )}
-                            {age != null && (
-                              <Typography fontSize={11.5} color="text.secondary" noWrap>
-                                • {age} yrs
-                              </Typography>
-                            )}
-                          </Stack>
-                        </Box>
-                      </Box>
-                    );
-                  }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      fullWidth
-                      label="Patient"
-                      error={Boolean(errors.patientId)}
-                      helperText={errors.patientId?.message}
-                      onBlur={field.onBlur}
-                    />
-                  )}
+                <PatientAutocomplete
+                  value={field.value}
+                  onChange={(id) => field.onChange(id)}
+                  label="Patient"
+                  error={Boolean(errors.patientId)}
+                  helperText={errors.patientId?.message}
+                  onBlur={field.onBlur}
                 />
               )}
             />
@@ -785,17 +705,24 @@ export function AppointmentsPage(): React.JSX.Element {
     }, { replace: true });
   };
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [doctorFilter, setDoctorFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [page, setPage] = useState(0);
-  const rowsPerPage = 10;
+  const [rowsPerPage] = useState(10);
+  const [isPageChanging, setIsPageChanging] = useState(false);
+  const handlePageChange = (newPage: number) => {
+    setIsPageChanging(true);
+    setPage(newPage);
+    setTimeout(() => setIsPageChanging(false), 250);
+  };
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
   const detailNavState = { from: `${location.pathname}${location.search}` };
 
   const [deleteTarget, setDeleteTarget] = useState<Appointment | undefined>();
-  const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
+  const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list, staleTime: 30_000 });
   const cancelMutation = useMutation({
     mutationFn: appointmentsService.cancel,
     onMutate: async (id) => {
@@ -871,8 +798,8 @@ export function AppointmentsPage(): React.JSX.Element {
       .filter((a) => {
         if (doctorFilter !== 'ALL' && a.providerId !== doctorFilter) return false;
         if (statusFilter !== 'ALL' && a.status !== statusFilter) return false;
-        if (!search) return true;
-        const q = search.toLowerCase();
+        if (!debouncedSearch) return true;
+        const q = debouncedSearch.toLowerCase();
         return (
           `${a.patient.firstName} ${a.patient.lastName}`.toLowerCase().includes(q) ||
           `${a.provider.firstName} ${a.provider.lastName}`.toLowerCase().includes(q) ||
@@ -884,7 +811,7 @@ export function AppointmentsPage(): React.JSX.Element {
         const timeB = new Date(b.startsAt).getTime();
         return timeB - timeA;
       });
-  }, [allData, doctorFilter, statusFilter, search]);
+  }, [allData, doctorFilter, statusFilter, debouncedSearch]);
   const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   const showDoctorFilter = user?.role !== 'doctor';
@@ -1002,11 +929,11 @@ export function AppointmentsPage(): React.JSX.Element {
           toolbar={appointmentFilters}
           pager={
             filtered.length > rowsPerPage ? (
-              <TablePager page={page} rowsPerPage={rowsPerPage} total={filtered.length} onPageChange={setPage} />
+              <TablePager page={page} rowsPerPage={rowsPerPage} total={filtered.length} onPageChange={handlePageChange} />
             ) : undefined
           }
           error={appointments.isError && <Alert severity="error" sx={{ mx: 2, mb: 1 }}>Unable to load appointments.</Alert>}
-          fetching={appointments.isFetching && !appointments.isLoading}
+          fetching={(appointments.isFetching && !appointments.isLoading) || isPageChanging}
         >
           <TableHead sx={tableSx.head}>
             <TableRow>

@@ -32,6 +32,7 @@ import {
 } from '@mui/material';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDeferredValue, useEffect, useState } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { usersService } from '@/services/users.service';
@@ -293,7 +294,7 @@ export function UsersPage(): React.JSX.Element {
   const { can } = useLicense();
   const extraAdmins = can('manageUsers');
   const [search, setSearch] = useState('');
-  const deferredSearch = useDeferredValue(search);
+  const debouncedSearch = useDebounce(search, 300);
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(10);
   const [dialogUser, setDialogUser] = useState<User | undefined>();
@@ -301,8 +302,8 @@ export function UsersPage(): React.JSX.Element {
   const [deleteUser, setDeleteUser] = useState<User | undefined>();
 
   const usersQuery = useQuery({
-    queryKey: ['users', { page, rowsPerPage, search: deferredSearch }],
-    queryFn: () => usersService.list({ page: page + 1, pageSize: rowsPerPage, search: deferredSearch }),
+    queryKey: ['users', { page, rowsPerPage, search: debouncedSearch }],
+    queryFn: () => usersService.list({ page: page + 1, pageSize: rowsPerPage, search: debouncedSearch }),
     placeholderData: keepPreviousData,
   });
   const deleteMutation = useMutation({

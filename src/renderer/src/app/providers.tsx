@@ -36,7 +36,12 @@ export function AppProviders({ children }: PropsWithChildren): React.JSX.Element
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { retry: 1, refetchOnWindowFocus: false },
+          queries: {
+            retry: 1,
+            refetchOnWindowFocus: false,
+            staleTime: 30_000,
+            gcTime: 300_000,
+          },
         },
         mutationCache: new MutationCache({
           onSuccess: (_data, _vars, _ctx, mutation) => {

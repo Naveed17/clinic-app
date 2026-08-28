@@ -25,6 +25,7 @@ import {
 } from '@mui/material';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDeferredValue, useEffect, useState } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useNavigate } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -241,7 +242,7 @@ export function DoctorsPage(): React.JSX.Element {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const deferredSearch = useDeferredValue(search);
+  const debouncedSearch = useDebounce(search, 300);
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(10);
   const [dialogDoctor, setDialogDoctor] = useState<Doctor | undefined>();
@@ -249,8 +250,8 @@ export function DoctorsPage(): React.JSX.Element {
   const [deleteDoctor, setDeleteDoctor] = useState<Doctor | undefined>();
 
   const doctorsQuery = useQuery({
-    queryKey: ['doctors', { page, rowsPerPage, search: deferredSearch }],
-    queryFn: () => doctorsService.list({ page: page + 1, pageSize: rowsPerPage, search: deferredSearch }),
+    queryKey: ['doctors', { page, rowsPerPage, search: debouncedSearch }],
+    queryFn: () => doctorsService.list({ page: page + 1, pageSize: rowsPerPage, search: debouncedSearch }),
     placeholderData: keepPreviousData,
   });
   const deleteMutation = useMutation({

@@ -5,6 +5,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { Box, Paper, Stack, Typography, Chip, Avatar, LinearProgress, CircularProgress, Button } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { reportsService } from '@/services/reports.service';
 import { patientsService } from '@/services/patients.service';
@@ -30,10 +31,10 @@ export function AdminDashboard(): React.JSX.Element {
   const showBilling = can('billing');
   const showTokens = can('tokens');
 
-  const summary = useQuery({ queryKey: ['reports:summary'], queryFn: reportsService.summary, refetchInterval: 30_000, enabled: showReports });
-  const patients = useQuery({ queryKey: ['patients', { page: 1, pageSize: 1, search: '' }], queryFn: () => patientsService.list({ page: 1, pageSize: 1, search: '' }), refetchInterval: 30_000 });
-  const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list, refetchInterval: 30_000, enabled: showBilling });
-  const appointments = useQuery<Appointment[]>({ queryKey: ['appointments'], queryFn: appointmentsService.list, refetchInterval: 30_000 });
+  const summary = useQuery({ queryKey: ['reports:summary'], queryFn: reportsService.summary, staleTime: 30_000, enabled: showReports });
+  const patients = useQuery({ queryKey: ['patients', { page: 1, pageSize: 1, search: '' }], queryFn: () => patientsService.list({ page: 1, pageSize: 1, search: '' }), staleTime: 30_000 });
+  const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list, staleTime: 30_000, enabled: showBilling });
+  const appointments = useQuery<Appointment[]>({ queryKey: ['appointments'], queryFn: appointmentsService.list, staleTime: 30_000 });
 
   const totalRevenue = (invoices.data ?? []).reduce((s, inv) => s + inv.total, 0);
   const paidInvoices = (invoices.data ?? []).filter((i) => i.status === 'PAID').length;
@@ -613,8 +614,22 @@ function TokenQueuePanel(): React.JSX.Element {
   const { data: tokens = [], isLoading } = useQuery<Token[]>({
     queryKey: ['tokens', todayStr()],
     queryFn: () => window.clinic.tokens.list(todayStr()),
-    refetchInterval: 10_000,
+    staleTime: 30_000,
   });
+
+  const [displayLimit, setDisplayLimit] = useState(20);
+
+  const displayedTokens = useMemo(
+    () => tokens.slice(0, displayLimit),
+    [tokens, displayLimit],
+  );
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>): void => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight < 150) {
+      setDisplayLimit((prev) => (prev < tokens.length ? Math.min(tokens.length, prev + 20) : prev));
+    }
+  };
 
   const waiting = tokens.filter((t) => t.status === 'WAITING').length;
   const done = tokens.filter((t) => t.status === 'DONE').length;
@@ -726,65 +741,72 @@ function TokenQueuePanel(): React.JSX.Element {
           <Typography variant="body2" color="text.secondary" fontWeight={500}>No OPD tokens generated for today.</Typography>
         </Box>
       ) : (
-        <Stack spacing={1.2}>
-          {tokens.map((token) => {
-            const cfg = statusConfig[token.status];
-            const isDone = token.status === 'DONE' || token.status === 'SKIPPED';
-            const chipColorKey = cfg.color === 'default' ? 'action' : cfg.color;
-            const mainColor = cfg.color === 'default' ? theme.palette.action.active : theme.palette[cfg.color].main;
+        <Box onScroll={handleScroll} sx={{ maxHeight: 460, overflowY: 'auto', pr: 0.5 }}>
+          <Stack spacing={1.2}>
+            {displayedTokens.map((token: Token) => {
+              const cfg = statusConfig[token.status];
+              const isDone = token.status === 'DONE' || token.status === 'SKIPPED';
+              const chipColorKey = cfg.color === 'default' ? 'action' : cfg.color;
+              const mainColor = cfg.color === 'default' ? theme.palette.action.active : theme.palette[cfg.color].main;
 
-            return (
-              <Paper
-                key={token.id}
-                elevation={0}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 2,
-                  p: 1.75,
-                  borderRadius: '18px',
-                  border: '1px solid',
-                  borderColor: token.status === 'WAITING' ? alpha(theme.palette.warning.main, 0.4) : 'divider',
-                  bgcolor: token.status === 'WAITING' ? alpha(theme.palette.warning.main, 0.02) : 'transparent',
-                  opacity: isDone ? 0.6 : 1,
-                  transition: 'all 0.15s ease',
-                  '&:hover': {
-                    bgcolor: alpha(theme.palette.action.hover, 0.05)
-                  }
-                }}
-              >
-                <Avatar
+              return (
+                <Paper
+                  key={token.id}
+                  elevation={0}
                   sx={{
-                    width: 48,
-                    height: 48,
-                    fontWeight: 900,
-                    fontSize: 13,
-                    bgcolor: alpha(mainColor, 0.12),
-                    color: cfg.color === 'default' ? 'text.secondary' : `${cfg.color}.main`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    p: 1.75,
+                    borderRadius: '18px',
                     border: '1px solid',
-                    borderColor: alpha(mainColor, 0.25)
+                    borderColor: token.status === 'WAITING' ? alpha(theme.palette.warning.main, 0.4) : 'divider',
+                    bgcolor: token.status === 'WAITING' ? alpha(theme.palette.warning.main, 0.02) : 'transparent',
+                    opacity: isDone ? 0.6 : 1,
+                    transition: 'all 0.15s ease',
+                    '&:hover': {
+                      bgcolor: alpha(theme.palette.action.hover, 0.05)
+                    }
                   }}
                 >
-                  #{String(token.tokenNumber).padStart(3, '0')}
-                </Avatar>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography fontSize="0.92rem" fontWeight={700} noWrap>
-                    {token.patient.firstName} {token.patient.lastName}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                    Dr. {token.doctor.firstName} {token.doctor.lastName}{token.reason ? ` • ${token.reason}` : ''}
-                  </Typography>
-                </Box>
-                <Chip
-                  label={cfg.label}
-                  color={cfg.color}
-                  size="small"
-                  sx={{ fontWeight: 700, minWidth: 90, borderRadius: '12px' }}
-                />
-              </Paper>
-            );
-          })}
-        </Stack>
+                  <Avatar
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      fontWeight: 900,
+                      fontSize: 13,
+                      bgcolor: alpha(mainColor, 0.12),
+                      color: cfg.color === 'default' ? 'text.secondary' : `${cfg.color}.main`,
+                      border: '1px solid',
+                      borderColor: alpha(mainColor, 0.25)
+                    }}
+                  >
+                    #{String(token.tokenNumber).padStart(3, '0')}
+                  </Avatar>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography fontSize="0.92rem" fontWeight={700} noWrap>
+                      {token.patient.firstName} {token.patient.lastName}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                      Dr. {token.doctor.firstName} {token.doctor.lastName}{token.reason ? ` • ${token.reason}` : ''}
+                    </Typography>
+                  </Box>
+                  <Chip
+                    label={cfg.label}
+                    color={cfg.color}
+                    size="small"
+                    sx={{ fontWeight: 700, minWidth: 90, borderRadius: '12px' }}
+                  />
+                </Paper>
+              );
+            })}
+            {displayedTokens.length < tokens.length && (
+              <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ display: 'block', py: 1.5, fontStyle: 'italic' }}>
+                Scroll down to load more ({displayedTokens.length} of {tokens.length} tokens loaded)...
+              </Typography>
+            )}
+          </Stack>
+        </Box>
       )}
     </Paper>
   );

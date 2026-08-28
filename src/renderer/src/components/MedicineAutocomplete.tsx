@@ -7,6 +7,8 @@ import { MedicinePickerDialog } from './MedicinePickerDialog';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { formatMedicineDisplayName } from '@shared/medicineCatalog';
 
+import { useDebounce } from '@/hooks/useDebounce';
+
 interface Props {
   value: string;
   onChange: (name: string, price: number) => void;
@@ -21,6 +23,7 @@ export function MedicineAutocomplete({ value, onChange, label = 'Medicine', size
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
+  const debouncedInput = useDebounce(inputValue, 250);
   const catalogOn = useLicense().can('manageMedicines');
 
   const { data: medicines = [] } = useQuery<Medicine[]>({
@@ -35,13 +38,13 @@ export function MedicineAutocomplete({ value, onChange, label = 'Medicine', size
   );
 
   const filtered = useMemo(() => {
-    const q = inputValue.trim().toLowerCase();
+    const q = debouncedInput.trim().toLowerCase();
     if (!q) return medicines.slice(0, 50);
     return medicines.filter((m) => {
       const labelText = formatMedicineDisplayName(m.name, m.mg).toLowerCase();
       return labelText.includes(q) || m.name.toLowerCase().includes(q);
     }).slice(0, 50);
-  }, [medicines, inputValue]);
+  }, [medicines, debouncedInput]);
 
   useEffect(() => {
     setInputValue(value);

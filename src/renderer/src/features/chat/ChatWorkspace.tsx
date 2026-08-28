@@ -129,13 +129,13 @@ export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspac
     queryKey: ['chat-inbox', me],
     queryFn: () => chatService.inbox(me),
     enabled: Boolean(me),
-    refetchInterval: 20_000,
+    staleTime: 10_000,
     refetchOnWindowFocus: false,
   });
   const messagesQuery = useQuery({
     queryKey: ['chat', roomId],
     queryFn: () => chatService.list(roomId),
-    refetchInterval: 12_000,
+    staleTime: 5_000,
     refetchOnWindowFocus: false,
   });
 

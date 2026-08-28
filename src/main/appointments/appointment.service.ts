@@ -42,9 +42,22 @@ async function assertProviderActive(providerId: string): Promise<void> {
   if (!doctor.isActive) throw new Error('This doctor is inactive. Activate them in Doctor Schedule first.');
 }
 
-export async function listAppointments() {
+export async function listAppointments(date?: string) {
   const db = getPrisma();
+  let whereClause = {};
+  if (date) {
+    const startOfDay = new Date(`${date}T00:00:00.000Z`);
+    const endOfDay = new Date(`${date}T23:59:59.999Z`);
+    whereClause = {
+      startsAt: {
+        gte: startOfDay,
+        lte: endOfDay,
+      },
+    };
+  }
+
   const appointments = await db.appointment.findMany({
+    where: whereClause,
     include: {
       patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
       provider: {
@@ -62,9 +75,11 @@ export async function listAppointments() {
       { startsAt: 'desc' },
       { createdAt: 'desc' },
     ],
+    take: date ? undefined : 200,
   });
 
   const tokens = await db.token.findMany({
+    where: date ? { date } : undefined,
     select: { id: true, tokenNumber: true, patientId: true, doctorId: true, date: true },
   });
 
