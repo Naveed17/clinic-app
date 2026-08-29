@@ -1,5 +1,5 @@
 import { ipcMain, dialog, app } from 'electron';
-import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, rmSync, unlinkSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -15,6 +15,8 @@ import {
   getGoogleDriveStatus,
   setGoogleDriveSchedule,
   startGoogleDriveBackupScheduler,
+  listGoogleDriveBackups,
+  downloadGoogleDriveBackup,
   type DriveSchedule,
 } from './google-drive';
 import { registerMigrateToCloudIpc } from './migrate-to-cloud.ipc';
@@ -160,6 +162,60 @@ export function registerBackupIpc(): void {
     return getGoogleDriveStatus();
   });
   ipcMain.handle('backup:google-now', () => backupToGoogleDriveNow());
+  ipcMain.handle('backup:google-list', () => listGoogleDriveBackups());
+  ipcMain.handle('backup:google-restore', async (event, fileId: string) => {
+    if (isOnlineDatabaseMode()) {
+      return { ok: false, error: 'Restore is not available in online database mode.' };
+    }
+    const staging = join(tmpdir(), `careflow-drive-restore-${randomUUID()}`);
+    const downloadZip = join(tmpdir(), `drive-backup-${Date.now()}.zip`);
+    try {
+      event.sender.send('backup:google-progress', { percent: 15, label: 'Downloading backup from Google Drive…' });
+      const dl = await downloadGoogleDriveBackup(fileId, downloadZip, (pct) => {
+        event.sender.send('backup:google-progress', { percent: Math.round(15 + pct * 0.45), label: 'Downloading backup from Google Drive…' });
+      });
+      if (!dl.ok) return { ok: false, error: dl.error || 'Failed to download backup.' };
+
+      event.sender.send('backup:google-progress', { percent: 65, label: 'Extracting database and documents…' });
+      await disconnectPrisma();
+      mkdirSync(staging, { recursive: true });
+
+      const zip = new AdmZip(downloadZip);
+      zip.extractAllTo(staging, true);
+
+      let dbSource = join(staging, 'clinic.db');
+      if (!existsSync(dbSource)) {
+        throw new Error('Backup zip does not contain clinic.db');
+      }
+
+      const stagedDocs = join(staging, 'documents');
+      if (existsSync(stagedDocs)) {
+        copyDirRecursive(stagedDocs, getDocumentsRoot());
+      }
+
+      event.sender.send('backup:google-progress', { percent: 85, label: 'Restoring clinic database…' });
+      copyFileSync(dbSource, getClinicDbPath());
+      getPrisma();
+      await remapDocumentPaths();
+
+      event.sender.send('backup:google-progress', { percent: 100, label: 'Restore complete!' });
+      return { ok: true };
+    } catch (e) {
+      try {
+        getPrisma();
+      } catch {
+        /* ignore */
+      }
+      return { ok: false, error: e instanceof Error ? e.message : 'Google Drive restore failed.' };
+    } finally {
+      try {
+        if (existsSync(staging)) rmSync(staging, { recursive: true, force: true });
+        if (existsSync(downloadZip)) unlinkSync(downloadZip);
+      } catch {
+        /* ignore */
+      }
+    }
+  });
 
   startGoogleDriveBackupScheduler();
   registerMigrateToCloudIpc();

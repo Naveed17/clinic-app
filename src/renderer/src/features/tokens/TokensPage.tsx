@@ -169,6 +169,9 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
     mutationFn: async () => {
       const startsAt = slotSearchFrom(date);
       const endsAt = new Date(startsAt.getTime() + 30 * 60000);
+      const fee = parseFloat(consultationFee) || 0;
+      const discount = parseFloat(feeDiscount) || 0;
+      const feeType = fee === 0 ? 'FREE' : discount > 0 ? 'HALF' : 'PAID';
       await appointmentsService.ensureSameDay({
         patientId,
         providerId: doctorId,
@@ -177,6 +180,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
         reason: reason || null,
         notes: notes || null,
         recurrenceRule: null,
+        feeType,
       });
       return window.clinic.tokens.create({
         patientId,
@@ -262,23 +266,16 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
             feeDiscount={feeDiscount}
             onFeeChange={setConsultationFee}
             onDiscountChange={setFeeDiscount}
+            defaultDoctorFee={selectedDoctor?.consultationFee}
             priorVisitsThisWeek={weekVisits?.count ?? 0}
+            disabled={!doctorId}
           />
           <FormControl fullWidth>
             <InputLabel>Reason (optional)</InputLabel>
             <Select
               label="Reason (optional)"
               value={reason}
-              onChange={(e) => {
-                const next = e.target.value;
-                setReason(next);
-                if (next === 'Free') {
-                  setConsultationFee('0');
-                  setFeeDiscount('');
-                } else if (selectedDoctor) {
-                  setConsultationFee(String(Number(selectedDoctor.consultationFee ?? 0)));
-                }
-              }}
+              onChange={(e) => setReason(e.target.value)}
             >
               <MenuItem value="">— None —</MenuItem>
               <MenuItem value="Checkup">Checkup</MenuItem>
@@ -287,7 +284,6 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
               <MenuItem value="Consultation">Consultation</MenuItem>
               {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
               <MenuItem value="Vaccination">Vaccination</MenuItem>
-              <MenuItem value="Free">Free</MenuItem>
             </Select>
           </FormControl>
           <TextField

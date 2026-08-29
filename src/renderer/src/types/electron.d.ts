@@ -232,6 +232,9 @@ declare global {
           configured: boolean;
         }>;
         googleBackupNow: () => Promise<{ ok: boolean; name?: string; error?: string }>;
+        googleList: () => Promise<{ ok: boolean; files?: Array<{ id: string; name: string; size: number; createdTime: string }>; error?: string }>;
+        googleRestore: (fileId: string) => Promise<{ ok: boolean; error?: string }>;
+        onGoogleProgress: (handler: (progress: { percent: number; label: string }) => void) => () => void;
       };
       docs: {
         patient: {

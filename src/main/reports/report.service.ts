@@ -127,6 +127,8 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
     patientMrNumber: string | null;
     doctorFirstName: string;
     doctorLastName: string;
+    doctorConsultationFee: unknown;
+    appointmentFeeType: string | null;
   };
 
   const tokens = doctorId
@@ -135,12 +137,19 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
         SELECT t.id, t.tokenNumber, t.date, t.status, t.consultationFee, t.feeDiscount, t.feeRefunded,
           t.patientId, t.doctorId, t.createdAt,
           p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
-          u.firstName as doctorFirstName, u.lastName as doctorLastName
+          u.firstName as doctorFirstName, u.lastName as doctorLastName,
+          dp.consultationFee as doctorConsultationFee,
+          (
+            SELECT a.feeType FROM "Appointment" a
+            WHERE a.patientId = t.patientId AND a.providerId = t.doctorId AND a.startsAt LIKE (t.date || '%')
+            ORDER BY a.createdAt DESC LIMIT 1
+          ) as appointmentFeeType
         FROM "Token" t
         JOIN "Patient" p ON p.id = t.patientId
         JOIN "User" u ON u.id = t.doctorId
+        LEFT JOIN "DoctorProfile" dp ON dp.userId = t.doctorId
         WHERE t.date >= ? AND t.date <= ? AND t.doctorId = ?
-        ORDER BY t.date ASC, u.lastName ASC, t.tokenNumber ASC
+        ORDER BY t.date DESC, t.tokenNumber DESC
         `,
         dateFrom,
         dateTo,
@@ -151,12 +160,19 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
         SELECT t.id, t.tokenNumber, t.date, t.status, t.consultationFee, t.feeDiscount, t.feeRefunded,
           t.patientId, t.doctorId, t.createdAt,
           p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
-          u.firstName as doctorFirstName, u.lastName as doctorLastName
+          u.firstName as doctorFirstName, u.lastName as doctorLastName,
+          dp.consultationFee as doctorConsultationFee,
+          (
+            SELECT a.feeType FROM "Appointment" a
+            WHERE a.patientId = t.patientId AND a.providerId = t.doctorId AND a.startsAt LIKE (t.date || '%')
+            ORDER BY a.createdAt DESC LIMIT 1
+          ) as appointmentFeeType
         FROM "Token" t
         JOIN "Patient" p ON p.id = t.patientId
         JOIN "User" u ON u.id = t.doctorId
+        LEFT JOIN "DoctorProfile" dp ON dp.userId = t.doctorId
         WHERE t.date >= ? AND t.date <= ?
-        ORDER BY t.date ASC, u.lastName ASC, t.tokenNumber ASC
+        ORDER BY t.date DESC, t.tokenNumber DESC
         `,
         dateFrom,
         dateTo,
@@ -227,10 +243,41 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
   const invoiceRefunded = roundMoney(countableInvoices.reduce((sum, row) => sum + row.refunded, 0));
 
   const feeRows = tokens.map((token) => {
-    const gross = roundMoney(Number(token.consultationFee));
-    const discounted = roundMoney(Number(token.feeDiscount));
+    const rawGross = roundMoney(Number(token.consultationFee));
+    const doctorDefaultFee = roundMoney(Number(token.doctorConsultationFee));
+    const apptType = String(token.appointmentFeeType || '').toUpperCase();
+
+    let feeType: 'PAID' | 'FREE' | 'HALF';
+    let gross: number;
+    let discounted = roundMoney(Number(token.feeDiscount));
     const refunded = roundMoney(Number(token.feeRefunded));
+
+    if (apptType === 'FREE' || (rawGross === 0 && !token.consultationFee && doctorDefaultFee === 0)) {
+      feeType = 'FREE';
+      gross = 0;
+      discounted = 0;
+    } else if (apptType === 'HALF') {
+      feeType = 'HALF';
+      gross = rawGross > 0 ? rawGross : (doctorDefaultFee > 0 ? doctorDefaultFee : 1000);
+      if (discounted === 0) discounted = roundMoney(gross / 2);
+    } else if (rawGross === 0 && (token.consultationFee !== null && token.consultationFee !== undefined)) {
+      // Specifically recorded with 0 fee (e.g. walk-in free checkup)
+      feeType = 'FREE';
+      gross = 0;
+      discounted = 0;
+    } else if (rawGross > 0) {
+      gross = rawGross;
+      feeType = discounted >= gross ? 'FREE' : discounted > 0 ? 'HALF' : 'PAID';
+    } else if (doctorDefaultFee > 0 && apptType === 'PAID') {
+      gross = doctorDefaultFee;
+      feeType = discounted >= gross ? 'FREE' : discounted > 0 ? 'HALF' : 'PAID';
+    } else {
+      gross = 0;
+      feeType = 'FREE';
+    }
+
     const collected = roundMoney(Math.max(0, gross - discounted));
+
     return {
       id: token.id,
       tokenNumber: Number(token.tokenNumber),
@@ -240,6 +287,7 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       doctorId: token.doctorId,
       doctorName: personName({ firstName: token.doctorFirstName, lastName: token.doctorLastName }),
       status: token.status,
+      feeType,
       consultationFee: gross,
       feeDiscount: discounted,
       feeRefunded: refunded,
@@ -248,24 +296,52 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
     };
   });
 
-  const byDoctorMap = new Map<string, { doctorId: string; doctorName: string; tokens: number; collected: number; discounted: number; refunded: number; net: number }>();
+  const byDoctorMap = new Map<
+    string,
+    {
+      doctorId: string;
+      doctorName: string;
+      tokens: number;
+      paidCount: number;
+      halfCount: number;
+      freeCount: number;
+      collected: number;
+      discounted: number;
+      refunded: number;
+      net: number;
+    }
+  >();
   for (const row of feeRows) {
     const current = byDoctorMap.get(row.doctorId) ?? {
       doctorId: row.doctorId,
       doctorName: row.doctorName,
       tokens: 0,
+      paidCount: 0,
+      halfCount: 0,
+      freeCount: 0,
       collected: 0,
       discounted: 0,
       refunded: 0,
       net: 0,
     };
     current.tokens += 1;
+    if (row.feeType === 'FREE') {
+      current.freeCount += 1;
+    } else if (row.feeType === 'HALF') {
+      current.halfCount += 1;
+    } else {
+      current.paidCount += 1;
+    }
     current.collected = roundMoney(current.collected + (row.consultationFee - row.feeDiscount));
     current.discounted = roundMoney(current.discounted + row.feeDiscount);
     current.refunded = roundMoney(current.refunded + row.feeRefunded);
     current.net = roundMoney(current.net + row.net);
     byDoctorMap.set(row.doctorId, current);
   }
+
+  const overallPaidCount = feeRows.filter((r) => r.feeType === 'PAID').length;
+  const overallHalfCount = feeRows.filter((r) => r.feeType === 'HALF').length;
+  const overallFreeCount = feeRows.filter((r) => r.feeType === 'FREE').length;
 
   return {
     date: dateFrom === dateTo ? dateFrom : `${dateFrom} — ${dateTo}`,
@@ -285,6 +361,9 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       rows: feeRows,
       byDoctor: [...byDoctorMap.values()],
       count: feeRows.length,
+      paidCount: overallPaidCount,
+      halfCount: overallHalfCount,
+      freeCount: overallFreeCount,
       collected: roundMoney(feeRows.reduce((sum, row) => sum + (row.consultationFee - row.feeDiscount), 0)),
       discounted: roundMoney(feeRows.reduce((sum, row) => sum + row.feeDiscount, 0)),
       refunded: roundMoney(feeRows.reduce((sum, row) => sum + row.feeRefunded, 0)),

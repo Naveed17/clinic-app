@@ -17,6 +17,7 @@ export interface Appointment {
   status: 'SCHEDULED' | 'CHECKED_IN' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
   reason: string | null;
   notes: string | null;
+  feeType?: 'PAID' | 'FREE' | 'HALF' | string | null;
   recurrenceRule: string | null;
   parentId: string | null;
   tokenId: string | null;
@@ -32,6 +33,7 @@ export interface AppointmentInput {
   endsAt: string;
   reason?: string | null;
   notes?: string | null;
+  feeType?: 'PAID' | 'FREE' | 'HALF' | string | null;
   recurrenceRule?: string | null;
   tokenId?: string | null;
 }

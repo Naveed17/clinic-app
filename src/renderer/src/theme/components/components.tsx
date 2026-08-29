@@ -22,8 +22,10 @@ import { MuiTableBody } from './table-body';
 import { MuiTableCell } from './table-cell';
 import { MuiTableHead } from './table-head';
 import { MuiTextField } from './text-field';
+import { MuiAlert, MuiMenu, MuiPopover } from './feedback-and-menu';
 
 export const components = {
+  MuiAlert,
   MuiAutocomplete,
   MuiAvatar,
   MuiButton,
@@ -36,11 +38,13 @@ export const components = {
   MuiInputLabel,
   MuiLinearProgress,
   MuiLink,
+  MuiMenu,
   MuiOutlinedInput,
   MuiPaper,
   MuiPickersInputBase,
   MuiPickersOutlinedInput,
   MuiPickersTextField,
+  MuiPopover,
   MuiStack,
   MuiTab,
   MuiTable,

@@ -23,7 +23,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useDebounce } from '@/hooks/useDebounce';
 
 export const softCardSx: SxProps<Theme> = {
-  borderRadius: '20px',
+  borderRadius: 1,
   border: '1px solid',
   borderColor: 'divider',
   boxShadow: (theme) => `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,

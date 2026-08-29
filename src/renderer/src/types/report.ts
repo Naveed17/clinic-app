@@ -26,6 +26,7 @@ export interface OpdFeeRow {
   doctorId: string;
   doctorName: string;
   status: string;
+  feeType: 'PAID' | 'FREE' | 'HALF';
   consultationFee: number;
   feeDiscount: number;
   feeRefunded: number;
@@ -37,6 +38,9 @@ export interface OpdDoctorFeeSummary {
   doctorId: string;
   doctorName: string;
   tokens: number;
+  paidCount: number;
+  halfCount: number;
+  freeCount: number;
   collected: number;
   discounted: number;
   refunded: number;
@@ -61,6 +65,9 @@ export interface OpdDailyReport {
     rows: OpdFeeRow[];
     byDoctor: OpdDoctorFeeSummary[];
     count: number;
+    paidCount: number;
+    halfCount: number;
+    freeCount: number;
     collected: number;
     discounted: number;
     refunded: number;

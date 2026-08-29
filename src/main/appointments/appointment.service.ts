@@ -1,7 +1,7 @@
 import type { AppointmentStatus } from '@prisma/client';
 import { getPrisma } from '../database/client';
 import { assertDoctorAvailable, assertDoctorAvailableOnDate, getDoctorSchedule } from '../doctors/schedule.service';
-import { completeWaitingTokenForVisit } from '../tokens/token.service';
+import { completeWaitingTokenForVisit, createToken, updateTokenStatus } from '../tokens/token.service';
 
 export interface AppointmentInput {
   patientId: string;
@@ -10,6 +10,7 @@ export interface AppointmentInput {
   endsAt: string;
   reason?: string | null;
   notes?: string | null;
+  feeType?: string | null;
   recurrenceRule?: string | null;
   tokenId?: string | null;
 }
@@ -80,17 +81,20 @@ export async function listAppointments(date?: string) {
 
   const tokens = await db.token.findMany({
     where: date ? { date } : undefined,
-    select: { id: true, tokenNumber: true, patientId: true, doctorId: true, date: true },
+    select: { id: true, tokenNumber: true, patientId: true, doctorId: true, date: true, consultationFee: true },
   });
 
-  const tokenMap = new Map<string, { id: string; tokenNumber: number }>();
+  const tokenMap = new Map<string, { id: string; tokenNumber: number; feeType: string }>();
   for (const t of tokens) {
-    tokenMap.set(`${t.patientId}_${t.doctorId}_${t.date}`, { id: t.id, tokenNumber: t.tokenNumber });
+    const fee = Number(t.consultationFee ?? 0);
+    const tokenFeeType = fee === 0 ? 'FREE' : 'PAID';
+    tokenMap.set(`${t.patientId}_${t.doctorId}_${t.date}`, { id: t.id, tokenNumber: t.tokenNumber, feeType: tokenFeeType });
   }
 
   return appointments.map((a) => {
     const dateStr = a.startsAt.toISOString().slice(0, 10);
     const token = tokenMap.get(`${a.patientId}_${a.providerId}_${dateStr}`);
+    const resolvedFeeType = (a as unknown as { feeType?: string }).feeType ?? token?.feeType ?? 'PAID';
     return {
       id: a.id,
       patientId: a.patientId,
@@ -100,6 +104,7 @@ export async function listAppointments(date?: string) {
       status: a.status,
       reason: a.reason,
       notes: a.notes,
+      feeType: token?.feeType === 'FREE' ? 'FREE' : resolvedFeeType,
       recurrenceRule: a.recurrenceRule,
       parentId: a.parentId,
       tokenId: token?.id ?? null,
@@ -303,35 +308,36 @@ async function resolveWalkInSlot(
 
 export async function createAppointment(input: AppointmentInput) {
   await assertProviderActive(input.providerId);
-  const startsAt = parseDate(input.startsAt, 'startsAt');
-  const endsAt = parseDate(input.endsAt, 'endsAt');
-  await assertDoctorAvailable(input.providerId, startsAt, endsAt);
-  await assertSlotFree(input.providerId, startsAt, endsAt);
+  let startsAt = parseDate(input.startsAt, 'startsAt');
+  let endsAt = parseDate(input.endsAt, 'endsAt');
 
-  if (input.recurrenceRule) {
-    const [freq, countStr] = input.recurrenceRule.split(':');
-    const count = parseInt(countStr ?? '1', 10);
-    if (freq === 'WEEKLY' && count > 1) {
-      const durationMs = endsAt.getTime() - startsAt.getTime();
-      for (let i = 1; i < count; i++) {
-        const occStart = new Date(startsAt.getTime() + i * 7 * 24 * 60 * 60 * 1000);
-        const occEnd = new Date(occStart.getTime() + durationMs);
-        await assertDoctorAvailable(input.providerId, occStart, occEnd);
-        await assertSlotFree(input.providerId, occStart, occEnd);
-      }
-    }
+  const clash = await findClash(input.providerId, startsAt, endsAt);
+  if (clash) {
+    const resolved = await resolveWalkInSlot(input.providerId, startsAt, endsAt);
+    startsAt = resolved.startsAt;
+    endsAt = resolved.endsAt;
   }
 
-  const first = await getPrisma().appointment.create({ data: toData(input) });
+  const durationMs = Math.max(endsAt.getTime() - startsAt.getTime(), 15 * 60 * 1000);
+
+  const first = await getPrisma().appointment.create({
+    data: toData({
+      ...input,
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt.toISOString(),
+    }),
+  });
+  if (input.feeType) {
+    await getPrisma().$executeRawUnsafe('UPDATE "Appointment" SET "feeType" = ? WHERE id = ?', String(input.feeType), first.id);
+  }
 
   if (input.recurrenceRule) {
     const [freq, countStr] = input.recurrenceRule.split(':');
     const count = parseInt(countStr ?? '1', 10);
     if (freq === 'WEEKLY' && count > 1) {
-      const durationMs = endsAt.getTime() - startsAt.getTime();
       for (let i = 1; i < count; i++) {
         const occStartsAt = new Date(startsAt.getTime() + i * 7 * 24 * 60 * 60 * 1000);
-        await getPrisma().appointment.create({
+        const sub = await getPrisma().appointment.create({
           data: {
             ...toData({
               ...input,
@@ -342,6 +348,9 @@ export async function createAppointment(input: AppointmentInput) {
             recurrenceRule: null,
           },
         });
+        if (input.feeType) {
+          await getPrisma().$executeRawUnsafe('UPDATE "Appointment" SET "feeType" = ? WHERE id = ?', String(input.feeType), sub.id);
+        }
       }
     }
   }
@@ -388,6 +397,9 @@ export async function ensureSameDayAppointment(input: AppointmentInput) {
         status: nextStatus,
       },
     });
+    if (input.feeType) {
+      await getPrisma().$executeRawUnsafe('UPDATE "Appointment" SET "feeType" = ? WHERE id = ?', String(input.feeType), target.id);
+    }
     // One visit card per patient+doctor+day — cancel leftover duplicates (e.g. UTC-bound bug).
     const extras = existing.filter((a) => a.id !== target.id);
     if (extras.length > 0) {
@@ -408,6 +420,9 @@ export async function ensureSameDayAppointment(input: AppointmentInput) {
       recurrenceRule: null,
     }),
   });
+  if (input.feeType) {
+    await getPrisma().$executeRawUnsafe('UPDATE "Appointment" SET "feeType" = ? WHERE id = ?', String(input.feeType), created.id);
+  }
   return getAppointmentById(created.id);
 }
 
@@ -418,6 +433,9 @@ export async function updateAppointment(id: string, input: AppointmentInput) {
   await assertDoctorAvailable(input.providerId, startsAt, endsAt);
   await assertSlotFree(input.providerId, startsAt, endsAt, id);
   await getPrisma().appointment.update({ where: { id }, data: toData(input) });
+  if (input.feeType) {
+    await getPrisma().$executeRawUnsafe('UPDATE "Appointment" SET "feeType" = ? WHERE id = ?', String(input.feeType), id);
+  }
   return getAppointmentById(id);
 }
 
@@ -427,6 +445,45 @@ export async function cancelAppointment(id: string) {
 }
 
 export async function updateAppointmentStatus(id: string, status: AppointmentStatus) {
+  const existingAppt = await getAppointmentById(id);
+
+  if (existingAppt && ['CHECKED_IN', 'COMPLETED'].includes(status)) {
+    const visitAt = new Date(existingAppt.startsAt);
+    if (!Number.isNaN(visitAt.getTime())) {
+      const dateStr = visitAt.toISOString().slice(0, 10);
+      const existingToken = await getPrisma().token.findFirst({
+        where: {
+          patientId: existingAppt.patientId,
+          doctorId: existingAppt.providerId,
+          date: dateStr,
+        },
+      });
+
+      if (!existingToken) {
+        try {
+          const doctor = await getPrisma().user.findUnique({
+            where: { id: existingAppt.providerId },
+            select: { doctorProfile: { select: { consultationFee: true } } },
+          });
+          const fee = (existingAppt as unknown as { feeType?: string }).feeType === 'FREE' ? 0 : Number(doctor?.doctorProfile?.consultationFee ?? 0);
+          const newToken = await createToken({
+            patientId: existingAppt.patientId,
+            doctorId: existingAppt.providerId,
+            date: dateStr,
+            reason: existingAppt.reason ?? undefined,
+            consultationFee: fee,
+            feeDiscount: 0,
+          });
+          if (status === 'COMPLETED') {
+            await updateTokenStatus(newToken.id, 'DONE');
+          }
+        } catch (err) {
+          console.error('Failed to auto-create token for appointment checkin/complete:', err);
+        }
+      }
+    }
+  }
+
   await getPrisma().appointment.update({ where: { id }, data: { status } });
   const appointment = await getAppointmentById(id);
   if (status === 'COMPLETED' && appointment) {

@@ -19,6 +19,14 @@ import {
   alpha,
   LinearProgress,
   Snackbar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  CircularProgress,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
 } from '@mui/material';
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import LaptopOutlinedIcon from '@mui/icons-material/LaptopOutlined';
@@ -173,6 +181,7 @@ export function SettingsPage(): React.JSX.Element {
   const [waTesting, setWaTesting] = useState(false);
   const [waTest, setWaTest] = useState<{ ok: boolean; name?: string; phone?: string; error?: string } | null>(null);
   const [waCampaignOpen, setWaCampaignOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [aiTesting, setAiTesting] = useState(false);
   const [aiTest, setAiTest] = useState<{ ok: boolean; error?: string } | null>(null);
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
@@ -184,6 +193,62 @@ export function SettingsPage(): React.JSX.Element {
   const [drive, setDrive] = useState<GoogleDriveStatus | null>(null);
   const [driveConnecting, setDriveConnecting] = useState(false);
   const [driveUploading, setDriveUploading] = useState(false);
+  const [driveRestoreOpen, setDriveRestoreOpen] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<Array<{ id: string; name: string; size: number; createdTime: string }>>([]);
+  const [driveFilesLoading, setDriveFilesLoading] = useState(false);
+  const [selectedDriveFile, setSelectedDriveFile] = useState<string>('');
+  const [driveRestoreLoading, setDriveRestoreLoading] = useState(false);
+  const [driveProgress, setDriveProgress] = useState<{ percent: number; label: string }>({ percent: 0, label: '' });
+
+  useEffect(() => {
+    const unsub = window.clinic?.backup?.onGoogleProgress?.((p) => {
+      setDriveProgress({
+        percent: Math.min(100, Math.max(0, Math.round(p.percent))),
+        label: p.label || 'Restoring from Drive…',
+      });
+    });
+    return () => unsub?.();
+  }, []);
+
+  async function handleOpenDriveRestore() {
+    setDriveRestoreOpen(true);
+    setDriveFilesLoading(true);
+    setSelectedDriveFile('');
+    try {
+      const res = await window.clinic?.backup.googleList();
+      if (res?.ok && res.files) {
+        setDriveFiles(res.files);
+        if (res.files[0]) setSelectedDriveFile(res.files[0].id);
+      } else {
+        showAppToast({ type: 'error', message: res?.error || 'Could not load backups from Google Drive.' });
+      }
+    } finally {
+      setDriveFilesLoading(false);
+    }
+  }
+
+  async function handleConfirmDriveRestore() {
+    if (!selectedDriveFile) return;
+    const confirmed = window.confirm(
+      'Restore this backup from Google Drive? This will replace your local database with this backup. App will reload after restore.'
+    );
+    if (!confirmed) return;
+    setDriveRestoreLoading(true);
+    setDriveProgress({ percent: 5, label: 'Connecting to Google Drive…' });
+    try {
+      const res = await window.clinic?.backup.googleRestore(selectedDriveFile);
+      if (res?.ok) {
+        showAppToast({ type: 'success', message: 'Google Drive backup restored successfully! Reloading…' });
+        setTimeout(() => {
+          window.location.reload();
+        }, 1200);
+      } else {
+        showAppToast({ type: 'error', message: res?.error || 'Restore from Google Drive failed.' });
+      }
+    } finally {
+      setDriveRestoreLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (settingsTab !== 'backup' || isOnline) return;
@@ -1182,24 +1247,21 @@ export function SettingsPage(): React.JSX.Element {
                   <Divider />
 
                   <Stack direction="row" alignItems="center" spacing={1}>
-                    <CloudOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
-                    <Typography variant="subtitle1" fontWeight={800}>Google Drive</Typography>
+                    <CloudOutlinedIcon sx={{ fontSize: 22, color: 'primary.main' }} />
+                    <Typography variant="subtitle1" fontWeight={800}>
+                      Google Drive Backup (Cloud Auto-Sync)
+                    </Typography>
                   </Stack>
                   <Typography variant="body2" color="text.secondary">
-                    Connect a Google account, then pick daily, weekly, or monthly. CareFlow uploads a ZIP into a
-                    CareFlow Backups folder while this PC is on.
+                    Connect your Google account with 0-configuration (like WhatsApp). CareFlow automatically creates a 
+                    <strong>CareFlow Backups</strong> folder in your Google Drive and backs up your clinic data safely.
                   </Typography>
-                  {drive && !drive.configured && (
-                    <Alert severity="warning">
-                      Google Drive is not configured on the license server yet. Add GOOGLE_DRIVE_CLIENT_ID (Desktop OAuth client).
-                    </Alert>
-                  )}
                   {drive?.connected ? (
                     <Stack spacing={1.5}>
                       <Alert severity="success">
                         Connected as <strong>{drive.email}</strong>
                       </Alert>
-                      <Typography variant="body2" fontWeight={700}>Backup schedule</Typography>
+                      <Typography variant="body2" fontWeight={700}>Backup Schedule</Typography>
                       <ToggleButtonGroup
                         exclusive
                         value={drive.schedule}
@@ -1210,7 +1272,7 @@ export function SettingsPage(): React.JSX.Element {
                       >
                         {([
                           { value: 'off', label: 'Off' },
-                          { value: 'daily', label: 'Daily' },
+                          { value: 'daily', label: 'Daily (Recommended)' },
                           { value: 'weekly', label: 'Weekly' },
                           { value: 'monthly', label: 'Monthly' },
                         ] as const).map((opt) => (
@@ -1224,30 +1286,125 @@ export function SettingsPage(): React.JSX.Element {
                           Last Drive backup: {new Date(drive.lastBackupAt).toLocaleString()}
                         </Typography>
                       )}
-                      <Stack direction="row" gap={1.5} flexWrap="wrap">
+                      <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="center">
                         <Button
                           variant="contained"
                           startIcon={<CloudUploadOutlinedIcon />}
                           loading={driveUploading}
                           onClick={() => void handleGoogleBackupNow()}
                         >
-                          Backup now to Drive
+                          Backup Now to Drive
                         </Button>
-                        <Button color="warning" onClick={() => void handleGoogleDisconnect()}>
+                        <Button
+                          variant="outlined"
+                          color="warning"
+                          startIcon={<CloudDownloadOutlinedIcon />}
+                          onClick={() => void handleOpenDriveRestore()}
+                        >
+                          Restore from Drive
+                        </Button>
+                        <Button color="inherit" sx={{ color: 'text.secondary' }} onClick={() => void handleGoogleDisconnect()}>
                           Disconnect
                         </Button>
                       </Stack>
+
+                      {/* Google Drive Restore Dialog */}
+                      <Dialog
+                        open={driveRestoreOpen}
+                        onClose={() => !driveRestoreLoading && setDriveRestoreOpen(false)}
+                        maxWidth="sm"
+                        fullWidth
+                        PaperProps={{ sx: { borderRadius: 1.5 } }}
+                      >
+                        <DialogTitle sx={{ fontWeight: 800 }}>Restore from Google Drive</DialogTitle>
+                        <DialogContent dividers>
+                          {driveRestoreLoading ? (
+                            <Box sx={{ py: 3 }}>
+                              <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+                                <Typography variant="body2" fontWeight={600}>{driveProgress.label}</Typography>
+                                <Typography variant="body2" fontWeight={800} color="primary.main">{driveProgress.percent}%</Typography>
+                              </Stack>
+                              <LinearProgress variant="determinate" value={driveProgress.percent} sx={{ height: 8, borderRadius: 1 }} />
+                            </Box>
+                          ) : driveFilesLoading ? (
+                            <Box sx={{ py: 4, textAlign: 'center' }}>
+                              <CircularProgress size={32} />
+                              <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+                                Fetching backups from Google Drive…
+                              </Typography>
+                            </Box>
+                          ) : driveFiles.length === 0 ? (
+                            <Alert severity="info">No backups found in your Google Drive &apos;CareFlow Backups&apos; folder yet.</Alert>
+                          ) : (
+                            <Stack spacing={1.5}>
+                              <Typography variant="body2" color="text.secondary">
+                                Select a backup to restore onto this PC. This will safely restore the complete database and patient documents:
+                              </Typography>
+                              <RadioGroup
+                                value={selectedDriveFile}
+                                onChange={(_e, val) => setSelectedDriveFile(val)}
+                              >
+                                {driveFiles.map((file) => (
+                                  <Paper
+                                    key={file.id}
+                                    variant="outlined"
+                                    sx={{
+                                      p: 1.5,
+                                      mb: 1,
+                                      borderRadius: 1,
+                                      borderColor: selectedDriveFile === file.id ? 'primary.main' : 'divider',
+                                      bgcolor: selectedDriveFile === file.id ? alpha(theme.palette.primary.main, 0.05) : 'background.paper',
+                                      cursor: 'pointer',
+                                    }}
+                                    onClick={() => setSelectedDriveFile(file.id)}
+                                  >
+                                    <FormControlLabel
+                                      value={file.id}
+                                      control={<Radio size="small" />}
+                                      label={
+                                        <Box>
+                                          <Typography variant="body2" fontWeight={700}>{file.name}</Typography>
+                                          <Typography variant="caption" color="text.secondary">
+                                            {new Date(file.createdTime).toLocaleString()} {file.size ? ` • ${(file.size / (1024 * 1024)).toFixed(2)} MB` : ''}
+                                          </Typography>
+                                        </Box>
+                                      }
+                                      sx={{ width: '100%', m: 0 }}
+                                    />
+                                  </Paper>
+                                ))}
+                              </RadioGroup>
+                            </Stack>
+                          )}
+                        </DialogContent>
+                        <DialogActions sx={{ px: 3, py: 2 }}>
+                          <Button disabled={driveRestoreLoading} onClick={() => setDriveRestoreOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="contained"
+                            color="warning"
+                            disabled={!selectedDriveFile || driveRestoreLoading || driveFilesLoading}
+                            onClick={() => void handleConfirmDriveRestore()}
+                          >
+                            {driveRestoreLoading ? 'Restoring…' : 'Restore Selected'}
+                          </Button>
+                        </DialogActions>
+                      </Dialog>
                     </Stack>
                   ) : (
-                    <Button
-                      variant="contained"
-                      startIcon={<CloudOutlinedIcon />}
-                      loading={driveConnecting}
-                      disabled={drive?.configured === false}
-                      onClick={() => void handleGoogleConnect()}
-                    >
-                      Connect Google Drive
-                    </Button>
+                    <Stack spacing={1.5} alignItems="flex-start">
+                      <Button
+                        variant="contained"
+                        size="large"
+                        startIcon={<CloudOutlinedIcon />}
+                        loading={driveConnecting}
+                        onClick={() => void handleGoogleConnect()}
+                        sx={{ px: 3, py: 1, borderRadius: 2, fontWeight: 700 }}
+                      >
+                        Connect Google Drive
+                      </Button>
+                    </Stack>
                   )}
                 </Stack>
               )}
@@ -1333,6 +1490,23 @@ export function SettingsPage(): React.JSX.Element {
                   Support contact details are unavailable right now. Check your internet connection and try again later.
                 </Alert>
               )}
+
+              <Divider sx={{ my: 3 }} />
+
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                Legal & Privacy
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                CareFlow protects your clinic data and patient records with local device storage and secure Google Drive backups.
+              </Typography>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setPrivacyOpen(true)}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                View Privacy Policy
+              </Button>
             </Box>
           )}
           </Box>
@@ -1357,6 +1531,51 @@ export function SettingsPage(): React.JSX.Element {
         clinicName={settings?.clinicName || ''}
         enabled={can('whatsapp')}
       />
+
+      {/* Privacy Policy Dialog */}
+      <Dialog
+        open={privacyOpen}
+        onClose={() => setPrivacyOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Privacy Policy - CareFlow Clinic Management
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ py: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              <strong>CareFlow Clinic Management System</strong> ("we", "our") is committed to safeguarding patient confidentiality and medical clinic data.
+            </Typography>
+
+            <Typography variant="subtitle2" fontWeight={700}>
+              1. Local Data Privacy & Storage
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              CareFlow runs locally on your computer. All patient records, prescriptions, invoices, and lab reports are stored securely in a local database on your device.
+            </Typography>
+
+            <Typography variant="subtitle2" fontWeight={700}>
+              2. Google Drive Backup Access
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              When you enable Google Drive Cloud Backup, CareFlow uses restricted scope access (<code>drive.file</code>) to upload database ZIP files exclusively into a <strong>CareFlow Backups</strong> folder inside your personal Google Drive account. We do not access, share, or sell your personal files or patient data to any third party.
+            </Typography>
+
+            <Typography variant="subtitle2" fontWeight={700}>
+              3. Data Control & Revocation
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              You maintain complete ownership of your clinic data. You can disconnect Google Drive integration at any time from Settings or via your Google Account Security Settings page.
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPrivacyOpen(false)} variant="contained">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Primary Notification Toast / Snackbar for Updates & Dynamic Errors */}
       <Snackbar

@@ -12,10 +12,19 @@ export function defaultBackupFileName(at = new Date()): string {
 }
 
 export async function writeBackupZip(zipPath: string): Promise<void> {
+  try {
+    const db = getPrisma();
+    await db.$executeRawUnsafe('PRAGMA wal_checkpoint(FULL);').catch(() => { /* ignore non-sqlite */ });
+  } catch {
+    /* ignore */
+  }
   await disconnectPrisma();
   try {
     const zip = new AdmZip();
-    zip.addFile('clinic.db', readFileSync(getClinicDbPath()));
+    const dbPath = getClinicDbPath();
+    if (existsSync(dbPath)) {
+      zip.addFile('clinic.db', readFileSync(dbPath));
+    }
 
     const docsRoot = getDocumentsRoot();
     if (existsSync(docsRoot) && readdirSync(docsRoot).length > 0) {

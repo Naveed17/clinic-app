@@ -6,7 +6,7 @@ export const MuiPaper = {
   styleOverrides: {
     root: {
       backgroundImage: 'none',
-      borderRadius: 16,
+      borderRadius: 8,
       border: '1px solid var(--mui-palette-divider)',
     },
   },

@@ -82,7 +82,7 @@ const patientSchema = z.object({
 type PatientForm = z.infer<typeof patientSchema>;
 const patientDefaults: PatientForm = { firstName: '', lastName: '', phone: '', ageValue: '', ageUnit: 'years', gender: '', address: '' };
 
-const VISIT_REASONS = ['Checkup', 'Follow-up', 'Urgent', 'Consultation', 'Vaccination', 'Free'] as const;
+const VISIT_REASONS = ['Checkup', 'Follow-up', 'Urgent', 'Consultation', 'Vaccination'] as const;
 
 function walkInPatientInput(values: PatientForm): PatientInput {
   const num = values.ageValue.trim() ? parseFloat(values.ageValue) : null;
@@ -204,6 +204,9 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       if (!patientId || !doctorId) throw new Error('Select a patient and doctor first.');
       const startsAt = slotSearchFrom(todayStr);
       const endsAt = new Date(startsAt.getTime() + 30 * 60000);
+      const fee = parseFloat(consultationFee) || 0;
+      const discount = parseFloat(feeDiscount) || 0;
+      const feeType = fee === 0 ? 'FREE' : discount > 0 ? 'HALF' : 'PAID';
       await appointmentsService.ensureSameDay({
         patientId,
         providerId: doctorId,
@@ -212,6 +215,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
         reason: reason || null,
         notes: null,
         recurrenceRule: null,
+        feeType,
       });
       const token = await window.clinic.tokens.create({
         patientId, doctorId,
@@ -367,23 +371,16 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
               feeDiscount={feeDiscount}
               onFeeChange={setConsultationFee}
               onDiscountChange={setFeeDiscount}
+              defaultDoctorFee={selectedDoctor?.consultationFee}
               priorVisitsThisWeek={weekVisits?.count ?? 0}
+              disabled={!doctorId}
             />
             <FormControl fullWidth>
               <InputLabel>Reason (optional)</InputLabel>
               <Select
                 label="Reason (optional)"
                 value={reason}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setReason(next);
-                  if (next === 'Free') {
-                    setConsultationFee('0');
-                    setFeeDiscount('');
-                  } else if (selectedDoctor) {
-                    setConsultationFee(String(Number(selectedDoctor.consultationFee ?? 0)));
-                  }
-                }}
+                onChange={(e) => setReason(e.target.value)}
               >
                 <MenuItem value="">— None —</MenuItem>
                 {VISIT_REASONS.map((r) => (

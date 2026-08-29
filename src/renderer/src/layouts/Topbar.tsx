@@ -240,7 +240,7 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
             onClose={() => setBellAnchor(null)}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-            slotProps={{ paper: { sx: { width: 320, borderRadius: 2, mt: 1 } } }}
+            slotProps={{ paper: { sx: { width: 320, borderRadius: 1, mt: 1, boxShadow: '0 4px 20px rgba(0,0,0,0.12)' } } }}
           >
             <Box sx={{ px: 2, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="subtitle2" fontWeight={700}>Notifications</Typography>
@@ -264,7 +264,7 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
               <List dense disablePadding sx={{
                 maxHeight: 360, overflowY: 'auto',
                 '&::-webkit-scrollbar': { width: 4 },
-                '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
+                '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 1 },
               }}>
                 {notifications.map((n) => (
                   <ListItem key={n.id} divider alignItems="flex-start"
@@ -301,6 +301,7 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
               fontWeight: 700,
               fontSize: 11,
               height: 22,
+              borderRadius: 1,
             }}
           />
           <Tooltip title={user?.name ?? ''}>
@@ -315,7 +316,7 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
           <Menu anchorEl={avatarAnchor} open={Boolean(avatarAnchor)} onClose={() => setAvatarAnchor(null)}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-            slotProps={{ paper: { sx: { mt: 1, minWidth: 180 } } }}
+            slotProps={{ paper: { sx: { mt: 1, minWidth: 180, borderRadius: 1, boxShadow: '0 4px 20px rgba(0,0,0,0.12)' } } }}
           >
             <Box sx={{ px: 2, py: 1 }}>
               <Typography variant="subtitle2" fontWeight={700}>{user?.name}</Typography>

@@ -409,43 +409,50 @@ export function OpdReportDocument({
             </View>
             <KpiRow
               items={[
-                ['Tokens', String(report.fees.count)],
+                ['Tokens', `${report.fees.count} (${report.fees.paidCount} Paid · ${report.fees.halfCount} Half · ${report.fees.freeCount} Free)`],
                 ['Collected', money(report.fees.collected)],
                 ['Discount', money(report.fees.discounted)],
                 ['Refunded', money(report.fees.refunded)],
                 ['Net', money(report.fees.net)],
               ]}
             />
-            {report.fees.byDoctor.length > 1 ? (
+            {report.fees.byDoctor.length > 0 ? (
               <View style={styles.table}>
                 <View style={styles.tableHeader} wrap={false}>
-                  <Text style={[styles.th, { width: '40%' }]}>Doctor</Text>
-                  <Text style={[styles.th, styles.numBold, { width: '12%' }]}>Tokens</Text>
-                  <Text style={[styles.th, styles.numBold, { width: '16%' }]}>Collected</Text>
-                  <Text style={[styles.th, styles.numBold, { width: '16%' }]}>Refunded</Text>
-                  <Text style={[styles.th, styles.numBold, { width: '16%' }]}>Net</Text>
+                  <Text style={[styles.th, { width: '28%' }]}>Doctor</Text>
+                  <Text style={[styles.th, styles.numBold, { width: '8%' }]}>Tokens</Text>
+                  <Text style={[styles.th, styles.numBold, { width: '8%' }]}>Paid</Text>
+                  <Text style={[styles.th, styles.numBold, { width: '8%' }]}>Half</Text>
+                  <Text style={[styles.th, styles.numBold, { width: '8%' }]}>Free</Text>
+                  <Text style={[styles.th, styles.numBold, { width: '14%' }]}>Collected</Text>
+                  <Text style={[styles.th, styles.numBold, { width: '12%' }]}>Refunded</Text>
+                  <Text style={[styles.th, styles.numBold, { width: '14%' }]}>Net</Text>
                 </View>
                 {report.fees.byDoctor.map((row) => (
                   <View key={row.doctorId} style={styles.tableRow} wrap={false}>
-                    <Text style={[styles.td, { width: '40%', paddingRight: 4 }]}>{row.doctorName}</Text>
-                    <Text style={[styles.num, { width: '12%' }]}>{String(row.tokens)}</Text>
-                    <Text style={[styles.num, { width: '16%' }]}>{money(row.collected)}</Text>
-                    <Text style={[styles.num, { width: '16%' }]}>{money(row.refunded)}</Text>
-                    <Text style={[styles.num, { width: '16%' }]}>{money(row.net)}</Text>
+                    <Text style={[styles.td, { width: '28%', paddingRight: 4 }]}>{row.doctorName}</Text>
+                    <Text style={[styles.num, { width: '8%' }]}>{String(row.tokens)}</Text>
+                    <Text style={[styles.num, { width: '8%' }]}>{String(row.paidCount)}</Text>
+                    <Text style={[styles.num, { width: '8%' }]}>{String(row.halfCount)}</Text>
+                    <Text style={[styles.num, { width: '8%' }]}>{String(row.freeCount)}</Text>
+                    <Text style={[styles.num, { width: '14%' }]}>{money(row.collected)}</Text>
+                    <Text style={[styles.num, { width: '12%' }]}>{money(row.refunded)}</Text>
+                    <Text style={[styles.num, { width: '14%' }]}>{money(row.net)}</Text>
                   </View>
                 ))}
               </View>
             ) : null}
             <View style={styles.table}>
               <View style={styles.tableHeader} wrap={false}>
-                <Text style={[styles.th, { width: '9%' }]}>Token</Text>
-                <Text style={[styles.th, { width: '18%' }]}>Patient</Text>
-                <Text style={[styles.th, { width: '16%' }]}>Doctor</Text>
+                <Text style={[styles.th, { width: '8%' }]}>Token</Text>
+                <Text style={[styles.th, { width: '17%' }]}>Patient</Text>
+                <Text style={[styles.th, { width: '15%' }]}>Doctor</Text>
+                <Text style={[styles.th, { width: '10%' }]}>Fee Type</Text>
                 <Text style={[styles.th, { width: '10%' }]}>Status</Text>
-                <Text style={[styles.th, styles.numBold, { width: '12%' }]}>Fee</Text>
-                <Text style={[styles.th, styles.numBold, { width: '11%' }]}>Discount</Text>
-                <Text style={[styles.th, styles.numBold, { width: '12%' }]}>Refunded</Text>
-                <Text style={[styles.th, styles.numBold, { width: '12%' }]}>Net</Text>
+                <Text style={[styles.th, styles.numBold, { width: '10%' }]}>Fee</Text>
+                <Text style={[styles.th, styles.numBold, { width: '10%' }]}>Discount</Text>
+                <Text style={[styles.th, styles.numBold, { width: '10%' }]}>Refunded</Text>
+                <Text style={[styles.th, styles.numBold, { width: '10%' }]}>Net</Text>
               </View>
               {report.fees.rows.length === 0 ? (
                 <Text style={styles.empty}>No doctor fees for this day.</Text>
@@ -456,16 +463,17 @@ export function OpdReportDocument({
                     style={index === pdfFees.length - 1 ? styles.tableRowLast : styles.tableRow}
                     wrap={false}
                   >
-                    <Text style={[styles.tdBold, { width: '9%', paddingRight: 4 }]}>
-                      {String(row.tokenNumber).padStart(3, '0')}
+                    <Text style={[styles.tdBold, { width: '8%', paddingRight: 4 }]}>
+                      #{String(row.tokenNumber).padStart(3, '0')}
                     </Text>
-                    <Text style={[styles.td, { width: '18%', paddingRight: 4 }]}>{row.patientName}</Text>
-                    <Text style={[styles.td, { width: '16%', paddingRight: 4 }]}>{row.doctorName}</Text>
+                    <Text style={[styles.td, { width: '17%', paddingRight: 4 }]}>{row.patientName}</Text>
+                    <Text style={[styles.td, { width: '15%', paddingRight: 4 }]}>{row.doctorName}</Text>
+                    <Text style={[styles.td, { width: '10%', paddingRight: 4 }]}>{row.feeType === 'FREE' ? 'Free' : row.feeType === 'HALF' ? '50% Off' : 'Paid'}</Text>
                     <Text style={[styles.td, { width: '10%', paddingRight: 4 }]}>{statusLabel(row.status)}</Text>
-                    <Text style={[styles.num, { width: '12%' }]}>{money(row.consultationFee)}</Text>
-                    <Text style={[styles.num, { width: '11%' }]}>{money(row.feeDiscount)}</Text>
-                    <Text style={[styles.num, { width: '12%' }]}>{money(row.feeRefunded)}</Text>
-                    <Text style={[styles.num, { width: '12%' }]}>{money(row.net)}</Text>
+                    <Text style={[styles.num, { width: '10%' }]}>{money(row.consultationFee)}</Text>
+                    <Text style={[styles.num, { width: '10%' }]}>{money(row.feeDiscount)}</Text>
+                    <Text style={[styles.num, { width: '10%' }]}>{money(row.feeRefunded)}</Text>
+                    <Text style={[styles.num, { width: '10%' }]}>{money(row.net)}</Text>
                   </View>
                 ))
               )}
@@ -475,9 +483,9 @@ export function OpdReportDocument({
                 </Text>
               ) : null}
               <View style={styles.tableFooter} wrap={false}>
-                <Text style={[styles.tdBold, { width: '53%' }]}>Totals</Text>
-                <Text style={[styles.numBold, { width: '12%' }]}>{money(report.fees.rows.reduce((s, r) => s + r.consultationFee, 0))}</Text>
-                <Text style={[styles.numBold, { width: '11%' }]}>{money(report.fees.discounted)}</Text>
+                <Text style={[styles.tdBold, { width: '60%' }]}>Totals</Text>
+                <Text style={[styles.numBold, { width: '10%' }]}>{money(report.fees.rows.reduce((s, r) => s + r.consultationFee, 0))}</Text>
+                <Text style={[styles.numBold, { width: '10%' }]}>{money(report.fees.discounted)}</Text>
                 <Text style={[styles.numBold, { width: '12%' }]}>{money(report.fees.refunded)}</Text>
                 <Text style={[styles.numBold, { width: '12%' }]}>{money(report.fees.net)}</Text>
               </View>

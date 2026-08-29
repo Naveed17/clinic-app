@@ -452,6 +452,15 @@ const api = {
         googleSchedule: (schedule: 'off' | 'daily' | 'weekly' | 'monthly') =>
           ipc('backup:google-schedule', schedule),
         googleBackupNow: () => ipc('backup:google-now'),
+        googleList: () => ipc<{ ok: boolean; files?: Array<{ id: string; name: string; size: number; createdTime: string }>; error?: string }>('backup:google-list'),
+        googleRestore: (fileId: string) => ipc<{ ok: boolean; error?: string }>('backup:google-restore', fileId),
+        onGoogleProgress: (handler: (progress: { percent: number; label: string }) => void) => {
+          const listener = (_: unknown, progress: { percent: number; label: string }) => handler(progress);
+          ipcRenderer.on('backup:google-progress', listener);
+          return () => {
+            ipcRenderer.removeListener('backup:google-progress', listener);
+          };
+        },
       },
   docs: {
     patient: {

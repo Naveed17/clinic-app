@@ -397,6 +397,14 @@ export async function createToken(input: TokenInput) {
         feeDiscount,
         token.id,
       );
+      const derivedFeeType = consultationFee === 0 ? 'FREE' : feeDiscount > 0 ? 'HALF' : 'PAID';
+      await getPrisma().$executeRawUnsafe(
+        `UPDATE "Appointment" SET "feeType" = ? WHERE "patientId" = ? AND "providerId" = ? AND "startsAt" LIKE ?`,
+        derivedFeeType,
+        input.patientId,
+        input.doctorId,
+        `${input.date}%`,
+      );
       return mapTokenRecord({
         ...token,
         patient: token.patient as Parameters<typeof mapPatientPerson>[0],

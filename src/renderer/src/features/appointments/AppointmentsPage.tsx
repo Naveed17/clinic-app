@@ -210,23 +210,15 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
         feeDiscount={feeDiscount}
         onFeeChange={setConsultationFee}
         onDiscountChange={setFeeDiscount}
+        defaultDoctorFee={doctors.find((d) => d.id === providerId)?.consultationFee}
         priorVisitsThisWeek={weekVisits?.count ?? 0}
+        disabled={!providerId}
         compact
       />
       <Stack direction="row" spacing={1}>
         <TextField
           select size="small" label="Reason (optional)" value={reason}
-          onChange={(e) => {
-            const next = e.target.value;
-            setReason(next);
-            if (next === 'Free') {
-              setConsultationFee('0');
-              setFeeDiscount('');
-            } else {
-              const doctor = doctors.find((d) => d.id === providerId);
-              if (doctor) setConsultationFee(String(Number(doctor.consultationFee ?? 0)));
-            }
-          }}
+          onChange={(e) => setReason(e.target.value)}
           sx={{ flex: 1 }}
         >
           <MenuItem value="">— None —</MenuItem>
@@ -236,7 +228,6 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
           <MenuItem value="Consultation">Consultation</MenuItem>
           {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
           <MenuItem value="Vaccination">Vaccination</MenuItem>
-          <MenuItem value="Free">Free</MenuItem>
         </TextField>
         <Button
           variant="contained" color="warning" size="small"
@@ -639,7 +630,6 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
                   <MenuItem value="Consultation">Consultation</MenuItem>
                   {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
                   <MenuItem value="Vaccination">Vaccination</MenuItem>
-                  <MenuItem value="Free">Free</MenuItem>
                 </TextField>
               )}
             />
@@ -708,6 +698,7 @@ export function AppointmentsPage(): React.JSX.Element {
   const debouncedSearch = useDebounce(search, 300);
   const [doctorFilter, setDoctorFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [feeTypeFilter, setFeeTypeFilter] = useState('ALL');
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(10);
   const [isPageChanging, setIsPageChanging] = useState(false);
@@ -797,7 +788,12 @@ export function AppointmentsPage(): React.JSX.Element {
     return allData
       .filter((a) => {
         if (doctorFilter !== 'ALL' && a.providerId !== doctorFilter) return false;
-        if (statusFilter !== 'ALL' && a.status !== statusFilter) return false;
+        if (statusFilter === 'NO_TOKEN') {
+          if (a.tokenNumber || a.tokenId) return false;
+        } else if (statusFilter !== 'ALL' && a.status !== statusFilter) {
+          return false;
+        }
+        if (feeTypeFilter !== 'ALL' && (a.feeType ?? 'PAID') !== feeTypeFilter) return false;
         if (!debouncedSearch) return true;
         const q = debouncedSearch.toLowerCase();
         return (
@@ -811,7 +807,7 @@ export function AppointmentsPage(): React.JSX.Element {
         const timeB = new Date(b.startsAt).getTime();
         return timeB - timeA;
       });
-  }, [allData, doctorFilter, statusFilter, debouncedSearch]);
+  }, [allData, doctorFilter, statusFilter, feeTypeFilter, debouncedSearch]);
   const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   const showDoctorFilter = user?.role !== 'doctor';
@@ -848,9 +844,24 @@ export function AppointmentsPage(): React.JSX.Element {
           sx={filterSelectSx}
         >
           <MenuItem value="ALL">All statuses</MenuItem>
+          <MenuItem value="NO_TOKEN">Without Token (Pending)</MenuItem>
           {Object.entries(statusConfig).map(([value, cfg]) => (
             <MenuItem key={value} value={value}>{cfg.label}</MenuItem>
           ))}
+        </Select>
+      </FormControl>
+      <FormControl size="small" sx={{ minWidth: 150, flexShrink: 0 }}>
+        <InputLabel>Fee Type</InputLabel>
+        <Select
+          label="Fee Type"
+          value={feeTypeFilter}
+          onChange={(e) => { setFeeTypeFilter(e.target.value); setPage(0); }}
+          sx={filterSelectSx}
+        >
+          <MenuItem value="ALL">All fee types</MenuItem>
+          <MenuItem value="PAID">Paid Visit</MenuItem>
+          <MenuItem value="FREE">Free Checkup</MenuItem>
+          <MenuItem value="HALF">50% Discount</MenuItem>
         </Select>
       </FormControl>
     </Box>
@@ -937,21 +948,22 @@ export function AppointmentsPage(): React.JSX.Element {
         >
           <TableHead sx={tableSx.head}>
             <TableRow>
-              <TableCell>Patient</TableCell>
-              <TableCell>Doctor</TableCell>
-              <TableCell>Token</TableCell>
-              <TableCell>Date</TableCell>
-              <TableCell>Time</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Reason</TableCell>
-              {!isAdmin && <TableCell align="right">Actions</TableCell>}
+              <TableCell sx={{ whiteSpace: 'nowrap' }}>Patient</TableCell>
+              <TableCell sx={{ whiteSpace: 'nowrap' }}>Doctor</TableCell>
+              <TableCell sx={{ whiteSpace: 'nowrap' }}>Token</TableCell>
+              <TableCell sx={{ whiteSpace: 'nowrap' }}>Date</TableCell>
+              <TableCell sx={{ whiteSpace: 'nowrap' }}>Time</TableCell>
+              <TableCell sx={{ whiteSpace: 'nowrap' }}>Fee Type</TableCell>
+              <TableCell sx={{ whiteSpace: 'nowrap' }}>Status</TableCell>
+              <TableCell sx={{ whiteSpace: 'nowrap' }}>Reason</TableCell>
+              {!isAdmin && <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>Actions</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
             {appointments.isLoading ? (
-              <TableRowsSkeleton cols={isAdmin ? 7 : 8} />
+              <TableRowsSkeleton cols={isAdmin ? 8 : 9} />
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={isAdmin ? 7 : 8} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No appointments scheduled.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={isAdmin ? 8 : 9} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No appointments scheduled.</TableCell></TableRow>
             ) : (
               paginated.map((a) => (
                 <TableRow
@@ -959,36 +971,38 @@ export function AppointmentsPage(): React.JSX.Element {
                   sx={{ ...tableSx.row, cursor: 'pointer' }}
                   onClick={() => navigate(`/appointments/${a.id}`, { state: detailNavState })}
                 >
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                      <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'primary.main' }}>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, whiteSpace: 'nowrap' }}>
+                      <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'primary.main', flexShrink: 0 }}>
                         {a.patient.firstName[0]}{a.patient.lastName[0]}
                       </Avatar>
-                      <Box>
-                        <Typography fontSize={13.5} fontWeight={500}>{personLabel(a.patient)}</Typography>
-                        <Typography fontSize={11.5} color="text.secondary">
+                      <Box sx={{ whiteSpace: 'nowrap' }}>
+                        <Typography fontSize={13.5} fontWeight={500} sx={{ whiteSpace: 'nowrap' }}>{personLabel(a.patient)}</Typography>
+                        <Typography fontSize={11.5} color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
                           {a.patient.phone ?? '—'}
                         </Typography>
                       </Box>
                     </Box>
                   </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, whiteSpace: 'nowrap' }}>
                       <DoctorAvatar
                         src={a.provider.avatar}
                         name={`Dr. ${a.provider.firstName} ${a.provider.lastName}`}
                         size={34}
                       />
-                      <Box>
-                        <Typography fontSize={13.5} fontWeight={500}>{personLabel(a.provider)}</Typography>
-                        <Typography fontSize={11.5} color="text.secondary">{a.provider.role ?? 'Doctor'}</Typography>
+                      <Box sx={{ whiteSpace: 'nowrap' }}>
+                        <Typography fontSize={13.5} fontWeight={500} sx={{ whiteSpace: 'nowrap' }}>{personLabel(a.provider)}</Typography>
+                        <Typography fontSize={11.5} color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>{a.provider.role ?? 'Doctor'}</Typography>
                       </Box>
                     </Box>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     {a.tokenNumber ? (
                       <Chip label={`#${String(a.tokenNumber).padStart(3, '0')}`} size="small" color="primary" variant="outlined" sx={{ fontWeight: 700, fontFamily: 'monospace' }} />
-                    ) : '—'}
+                    ) : (
+                      <Chip label="No Token" size="small" color="default" variant="outlined" sx={{ fontWeight: 500, fontSize: 11, opacity: 0.6 }} />
+                    )}
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.25, whiteSpace: 'nowrap' }}>
@@ -1026,10 +1040,19 @@ export function AppointmentsPage(): React.JSX.Element {
                       </Typography>
                     </Box>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                    {a.feeType === 'FREE' ? (
+                      <Chip label="Free Checkup" size="small" color="success" variant="filled" sx={{ fontWeight: 700, fontSize: 11 }} />
+                    ) : a.feeType === 'HALF' ? (
+                      <Chip label="50% Off" size="small" color="warning" variant="filled" sx={{ fontWeight: 700, fontSize: 11 }} />
+                    ) : (
+                      <Chip label="Paid Visit" size="small" color="primary" variant="outlined" sx={{ fontWeight: 600, fontSize: 11 }} />
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     <Chip color={statusConfig[a.status]?.color ?? 'default'} label={statusConfig[a.status]?.label ?? a.status} size="small" sx={chipSx} />
                   </TableCell>
-                  <TableCell>{a.reason || '—'}</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{a.reason || '—'}</TableCell>
                   {!isAdmin && (
                     <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                       <Stack direction="row" gap={0.5} justifyContent="flex-end">

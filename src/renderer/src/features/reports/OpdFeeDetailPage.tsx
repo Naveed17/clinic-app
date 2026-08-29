@@ -177,6 +177,11 @@ export function OpdFeeDetailPage(): React.JSX.Element {
       value: doctorLabel,
     },
     {
+      icon: <PaymentsOutlinedIcon sx={{ fontSize: 18, color: 'text.disabled' }} />,
+      label: 'Fee Type',
+      value: fee === 0 ? 'Free Checkup' : discount > 0 ? '50% Discount' : 'Paid Visit',
+    },
+    {
       icon: <NotesOutlinedIcon sx={{ fontSize: 18, color: 'text.disabled' }} />,
       label: 'Reason',
       value: token.reason?.trim() || '—',

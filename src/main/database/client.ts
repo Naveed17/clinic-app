@@ -223,6 +223,7 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
       "status" TEXT NOT NULL DEFAULT 'SCHEDULED',
       "reason" TEXT,
       "notes" TEXT,
+      "feeType" TEXT NOT NULL DEFAULT 'PAID',
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" DATETIME NOT NULL,
       FOREIGN KEY ("patientId") REFERENCES "Patient"("id") ON DELETE RESTRICT,
@@ -239,6 +240,7 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
   const apptCols = (await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Appointment)')).map(r => r.name);
   if (!apptCols.includes('recurrenceRule')) await database.$executeRawUnsafe('ALTER TABLE "Appointment" ADD COLUMN "recurrenceRule" TEXT');
   if (!apptCols.includes('parentId')) await database.$executeRawUnsafe('ALTER TABLE "Appointment" ADD COLUMN "parentId" TEXT');
+  if (!apptCols.includes('feeType')) await database.$executeRawUnsafe('ALTER TABLE "Appointment" ADD COLUMN "feeType" TEXT NOT NULL DEFAULT \'PAID\'');
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Appointment_providerId_startsAt_idx" ON "Appointment"("providerId", "startsAt")',
   );

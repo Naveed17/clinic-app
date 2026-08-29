@@ -198,6 +198,7 @@ model Appointment {
   status         AppointmentStatus @default(SCHEDULED)
   reason         String?
   notes          String?
+  feeType        String            @default("PAID") // "PAID", "FREE", "HALF"
   recurrenceRule String? // e.g. "WEEKLY:4" = repeat weekly 4 times
   parentId       String? // original appointment id for recurring copies
   createdAt      DateTime          @default(now())
