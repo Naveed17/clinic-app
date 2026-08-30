@@ -6,7 +6,7 @@ export interface GlobalSearchResult {
     id: string;
     mrNumber: string;
     firstName: string;
-    lastName: string;
+    lastName: string | null;
     phone: string | null;
     email: string | null;
     bloodGroup: string | null;
@@ -167,7 +167,7 @@ export async function globalSearch(
       status: a.status,
       startsAt: a.startsAt,
       patientId: a.patientId,
-      patientName: `${a.patient.firstName} ${a.patient.lastName}`,
+      patientName: `${a.patient.firstName} ${a.patient.lastName || ''}`.trim(),
       patientMrNumber: a.patient.mrNumber,
       providerName: `${a.provider.firstName} ${a.provider.lastName}`,
     })),
@@ -178,7 +178,7 @@ export async function globalSearch(
       total: Number(i.total),
       amountPaid: Number(i.amountPaid),
       patientId: i.patientId,
-      patientName: `${i.patient.firstName} ${i.patient.lastName}`,
+      patientName: `${i.patient.firstName} ${i.patient.lastName || ''}`.trim(),
       patientMrNumber: i.patient.mrNumber,
       createdAt: i.createdAt,
     })),
@@ -187,7 +187,7 @@ export async function globalSearch(
       test: l.test,
       status: l.status,
       patientId: l.patientId,
-      patientName: `${l.patient.firstName} ${l.patient.lastName}`,
+      patientName: `${l.patient.firstName} ${l.patient.lastName || ''}`.trim(),
       patientMrNumber: l.patient.mrNumber,
       orderedAt: l.orderedAt,
     })),

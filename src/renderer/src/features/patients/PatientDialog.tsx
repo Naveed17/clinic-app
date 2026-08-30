@@ -20,7 +20,8 @@ import type { Patient, PatientInput } from '@/types/patient';
 
 const patientSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.'),
-  lastName: z.string().trim().min(1, 'Last name is required.'),
+  lastName: z.string().trim(),
+  weight: z.string().trim(),
   ageValue: z.string(),
   ageUnit: z.enum(['years', 'months', 'days']),
   gender: z.string(),
@@ -40,7 +41,7 @@ const patientSchema = z.object({
 export type PatientFormValues = z.infer<typeof patientSchema>;
 
 const emptyFormValues: PatientFormValues = {
-  firstName: '', lastName: '', ageValue: '', ageUnit: 'years', gender: '', phone: '',
+  firstName: '', lastName: '', weight: '', ageValue: '', ageUnit: 'years', gender: '', phone: '',
   email: '', address: '', emergencyContactName: '', emergencyContactPhone: '',
   bloodGroup: '', allergies: '', chronicConditions: '',
 };
@@ -50,7 +51,8 @@ function toFormValues(patient?: Patient): PatientFormValues {
   const parts = dateOfBirthToAgeParts(patient.dateOfBirth);
   return {
     firstName: patient.firstName,
-    lastName: patient.lastName,
+    lastName: patient.lastName ?? '',
+    weight: patient.weight != null ? String(patient.weight) : '',
     ageValue: parts ? String(parts.value) : (patient.age != null ? String(patient.age) : ''),
     ageUnit: parts ? parts.unit : 'years',
     gender: patient.gender ?? '',
@@ -69,9 +71,12 @@ function toPatientInput(values: PatientFormValues, primaryDoctorId?: string | nu
   const num = values.ageValue.trim() ? parseFloat(values.ageValue) : null;
   const dob = num != null && !Number.isNaN(num) ? ageToDateOfBirth(num, values.ageUnit) : null;
   const ageYears = values.ageUnit === 'years' ? (num != null ? Math.floor(num) : null) : (dob ? dateOfBirthToAge(dob) : null);
+  const weightNum = values.weight.trim() ? parseFloat(values.weight) : null;
 
   return {
     ...values,
+    lastName: values.lastName.trim() || null,
+    weight: weightNum != null && !Number.isNaN(weightNum) ? weightNum : null,
     age: ageYears,
     dateOfBirth: dob ? dob.toISOString() : null,
     gender: values.gender || null,
@@ -144,7 +149,7 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
             />
             <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
               <TextField fullWidth label="First name" error={Boolean(errors.firstName)} helperText={errors.firstName?.message} {...form.register('firstName')} />
-              <TextField fullWidth label="Last name" error={Boolean(errors.lastName)} helperText={errors.lastName?.message} {...form.register('lastName')} />
+              <TextField fullWidth label="Last name (optional)" error={Boolean(errors.lastName)} helperText={errors.lastName?.message} {...form.register('lastName')} />
             </Box>
             <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '110px 130px minmax(0, 1fr)' }, alignItems: 'start' }}>
               <TextField
@@ -183,7 +188,17 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
                 )}
               />
             </Box>
-            <TextField fullWidth label="Email" type="email" error={Boolean(errors.email)} helperText={errors.email?.message} {...form.register('email')} />
+            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+              <TextField
+                fullWidth
+                label="Weight (kg) (optional)"
+                type="number"
+                placeholder="e.g. 70"
+                slotProps={{ htmlInput: { min: 0, max: 500, step: 0.1 } }}
+                {...form.register('weight')}
+              />
+              <TextField fullWidth label="Email (optional)" type="email" error={Boolean(errors.email)} helperText={errors.email?.message} {...form.register('email')} />
+            </Box>
             <TextField fullWidth label="Address" minRows={2} multiline {...form.register('address')} />
             <Typography color="text.secondary" variant="subtitle2">Emergency contact</Typography>
             <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>

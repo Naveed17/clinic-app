@@ -20,7 +20,7 @@ export const MuiMenu = {
 export const MuiPopover = {
   styleOverrides: {
     paper: {
-      borderRadius: 8,
+      borderRadius: '8px',
     },
   },
 } satisfies Components<Theme>['MuiPopover'];

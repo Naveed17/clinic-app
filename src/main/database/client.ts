@@ -167,7 +167,8 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
     CREATE TABLE IF NOT EXISTS "Patient" (
       "id" TEXT NOT NULL PRIMARY KEY,
       "firstName" TEXT NOT NULL,
-      "lastName" TEXT NOT NULL,
+      "lastName" TEXT,
+      "weight" REAL,
       "dateOfBirth" DATETIME,
       "phone" TEXT,
       "email" TEXT,
@@ -189,10 +190,56 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
   );
 
   // Patient Migrations
-  const patientCols = (await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Patient)')).map(r => r.name);
+  const patientTableInfo = await database.$queryRawUnsafe<{ name: string; notnull: number | bigint }[]>('PRAGMA table_info(Patient)');
+  const patientCols = patientTableInfo.map((r) => r.name);
+  const lastNameCol = patientTableInfo.find((c) => c.name === 'lastName');
+  if (lastNameCol && Number(lastNameCol.notnull) === 1) {
+    try {
+      await database.$executeRawUnsafe('PRAGMA foreign_keys = OFF');
+      await database.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "Patient_migration_tmp" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "mrNumber" TEXT NOT NULL DEFAULT '',
+          "firstName" TEXT NOT NULL,
+          "lastName" TEXT,
+          "weight" REAL,
+          "dateOfBirth" DATETIME,
+          "gender" TEXT,
+          "phone" TEXT,
+          "email" TEXT,
+          "address" TEXT,
+          "emergencyContactName" TEXT,
+          "emergencyContactPhone" TEXT,
+          "bloodGroup" TEXT,
+          "allergies" TEXT,
+          "chronicConditions" TEXT,
+          "primaryDoctorId" TEXT,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL,
+          FOREIGN KEY ("primaryDoctorId") REFERENCES "User"("id") ON DELETE SET NULL
+        )
+      `);
+      const tmpInfo = await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Patient_migration_tmp)');
+      const commonCols = patientTableInfo.filter((c) => tmpInfo.some((t) => t.name === c.name)).map((c) => `"${c.name}"`).join(', ');
+      await database.$executeRawUnsafe(`INSERT INTO "Patient_migration_tmp" (${commonCols}) SELECT ${commonCols} FROM "Patient"`);
+      await database.$executeRawUnsafe('DROP TABLE "Patient"');
+      await database.$executeRawUnsafe('ALTER TABLE "Patient_migration_tmp" RENAME TO "Patient"');
+      await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "Patient_lastName_firstName_idx" ON "Patient"("lastName", "firstName")');
+      await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "Patient_phone_idx" ON "Patient"("phone")');
+      await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "Patient_createdAt_idx" ON "Patient"("createdAt")');
+      await database.$executeRawUnsafe('CREATE UNIQUE INDEX IF NOT EXISTS "Patient_mrNumber_key" ON "Patient"("mrNumber")');
+      await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "Patient_mrNumber_idx" ON "Patient"("mrNumber")');
+      await database.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "Patient_primaryDoctorId_idx" ON "Patient"("primaryDoctorId")');
+    } catch (err) {
+      console.error('Failed to migrate Patient lastName column:', err);
+    } finally {
+      await database.$executeRawUnsafe('PRAGMA foreign_keys = ON');
+    }
+  }
   if (!patientCols.includes('bloodGroup')) await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "bloodGroup" TEXT');
   if (!patientCols.includes('allergies')) await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "allergies" TEXT');
   if (!patientCols.includes('chronicConditions')) await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "chronicConditions" TEXT');
+  if (!patientCols.includes('weight')) await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "weight" REAL');
   if (!patientCols.includes('mrNumber')) {
     await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "mrNumber" TEXT NOT NULL DEFAULT \'\'');
     const existing = await database.$queryRawUnsafe<{ id: string }[]>('SELECT id FROM "Patient" WHERE "mrNumber" = \'\' ORDER BY "createdAt" ASC');

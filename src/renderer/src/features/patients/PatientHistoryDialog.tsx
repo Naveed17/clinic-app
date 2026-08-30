@@ -110,7 +110,7 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
       const result = await window.clinic.ai.summarizePatient(
         {
           patientName: patient
-            ? `${patient.firstName} ${patient.lastName}`.trim()
+            ? [patient.firstName, patient.lastName].filter(Boolean).join(' ').trim()
             : undefined,
           visits,
         },
@@ -282,7 +282,7 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
   const patientAppointments = (appointments.data ?? []).filter((a) => a.patientId === patient.id);
   const patientInvoices = (invoices.data ?? []).filter((i) => i.patient.id === patient.id);
   const patientLab = (labOrders.data ?? []).filter((o) => o.patientId === patient.id);
-  const initials = `${patient.firstName[0]}${patient.lastName[0]}`.toUpperCase();
+  const initials = `${patient.firstName?.[0] ?? ''}${patient.lastName?.[0] ?? ''}`.toUpperCase() || 'P';
   const totalPaid = patientInvoices.reduce((sum, inv) => sum + Number(inv.amountPaid ?? 0), 0);
   const totalBilled = patientInvoices.reduce((sum, inv) => sum + Number(inv.total ?? 0), 0);
   const completedAppointments = patientAppointments.filter((a) => a.status === 'COMPLETED').length;
@@ -334,9 +334,12 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
                 </Avatar>
                 <Box>
                   <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                    <Typography variant="h6" fontWeight={900}>{patient.firstName} {patient.lastName}</Typography>
+                    <Typography variant="h6" fontWeight={900}>{patient.firstName} {patient.lastName || ''}</Typography>
                     {patient.mrNumber && (
                       <Chip label={`MR# ${patient.mrNumber}`} size="small" sx={{ height: 22, fontWeight: 700, bgcolor: alpha('#fff', 0.18), color: '#fff', borderRadius: 1 }} />
+                    )}
+                    {patient.weight != null && (
+                      <Chip label={`${patient.weight} kg`} size="small" sx={{ height: 22, fontWeight: 700, bgcolor: alpha('#fff', 0.18), color: '#fff', borderRadius: 1 }} />
                     )}
                   </Stack>
                   <Typography variant="body2" sx={{ opacity: 0.88, mt: 0.35 }}>Medical & treatment history</Typography>

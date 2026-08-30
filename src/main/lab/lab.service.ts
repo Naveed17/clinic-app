@@ -46,7 +46,7 @@ type LabOrderWithRelations = {
   patient: {
     id: string;
     firstName: string;
-    lastName: string;
+    lastName: string | null;
     mrNumber: string;
     dateOfBirth: Date | null;
     phone: string | null;
@@ -72,7 +72,7 @@ function serialize(order: LabOrderWithRelations) {
   return {
     ...order,
     tokenNumber: order.token?.tokenNumber ?? null,
-    patientName: `${order.patient.firstName} ${order.patient.lastName}`,
+    patientName: `${order.patient.firstName} ${order.patient.lastName || ''}`.trim(),
     orderedByName: resolvedOrderedByName,
     patientMrNumber: order.patient.mrNumber,
     patientDob: order.patient.dateOfBirth,

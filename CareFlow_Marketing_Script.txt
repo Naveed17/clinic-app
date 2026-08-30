@@ -1,0 +1,102 @@
+================================================================================
+                    CAREFLOW - CLINICAL APP CALLING & SALES SCRIPT
+================================================================================
+
+[ 1. SALAM & INTRODUCTION - Pehle 15 Seconds ]
+--------------------------------------------------------------------------------
+"Assalam-o-Alaikum Dr. Sahab / Manager Sahab!
+Mera naam [Aapka Naam] hai, main CareFlow Systems se baat kar raha hoon.
+Sir, kya aapke paas 2 minute hain? Main aapke clinic ke patient management 
+aur digital prescription ke hawale se ek boht mufeed cheez share karna chahta tha."
+
+
+[ 2. PROBLEM & HOOK - Clinic Ke 3 Aam Maslay ]
+--------------------------------------------------------------------------------
+"Doctor Sahab, aksar clinics mein teen baray maslay aate hain:
+ 1. Reception par mareezon ka rush control na hona aur parchiyan ghum jana.
+ 2. Har mareez ka purana record aur dawaiyan dhoondne mein waqt zaya hona.
+ 3. Online softwares ka internet band ya slow hone par thap ho jana.
+
+Humne khaas tor par 'CareFlow' software design kiya hai jo 100% OFFLINE
+(bina internet) aapke clinic ke computer mein chalta hai aur clinic ko 
+mukammal digital bana deta hai."
+
+
+[ 3. TOP FEATURES & KHUBIYAN - Main Selling Points ]
+--------------------------------------------------------------------------------
+"Sir, is mein aapko 6 baray faiday milte hain:
+
+ 1. Digital Prescription (Rx):
+    Sirf 1 minute mein computerized nuskha print ho jata hai. Dawaiyan,
+    test aur doses pehle se saved hote hain.
+
+ 2. Smart Token & Thermal Slip:
+    Receptionist 1-click se slip nikal kar de deta hai, jiss se clinic
+    mein rush aur be-nazmi khatam ho jati hai.
+
+ 3. Instant Patient History (EMR):
+    Mareez ka sirf mobile number likhein, uski pichli tamam visits aur
+    dawaiyan ek second mein samne aa jati hain.
+
+ 4. Clinic Internal Chat & Voice Notes (Offline):
+    Receptionist aur doctor aapas mein bina internet ke computer par
+    text aur WhatsApp-style voice messages bhej sakte hain.
+
+ 5. WhatsApp Integration:
+    Mareez ko appointment confirmation aur prescription direct uske
+    WhatsApp par bheji ja sakti hai.
+
+ 6. Daily Accounts & Billing Reports:
+    Shaam ko ek click par pata chal jata hai ke aaj kitne mareez aye
+    aur kitni OPD fee collect hui."
+
+
+[ 4. AAM SAWALAT KE JAWABAT - Objection Handling ]
+--------------------------------------------------------------------------------
+* Agar Doctor kahe: "Hamare paas internet ka issue rehta hai"
+  Jawab: "Sir, yahi hamari sab se bari khoobi hai! Yeh cloud par nahi balkay 
+          aapke clinic ke apne computer mein chalta hai. Net band bhi ho tab 
+          bhi 100% bina rukay chalega aur data aapke paas mehfooz rahega."
+
+* Agar Doctor kahe: "Hum hath se likhne (parchi) ke aadi hain"
+  Jawab: "Sir, bilkul theek hai, lekin CareFlow itna aasan hai ke aapka 
+          assistant ya receptionist 10 minute mein seekh jata hai. Is se 
+          aapka waqt bachega aur clinic ka standard barh jayega."
+
+* Agar Doctor kahe: "Price / Kharcha kitna hai?"
+  Jawab: "Sir, hamare paas koi heavy monthly charges nahi hain, boht munasib
+          one-time packages hain. Main pehle chahta hoon aap 10 minute iska
+          live demo dekh lein taake aapko khud pasand aaye."
+
+
+[ 5. CLOSING & DEMO BOOKING - Target ]
+--------------------------------------------------------------------------------
+"Doctor Sahab, main sirf 10–15 minute ke liye aapke clinic par aakar ya online
+screen share (AnyDesk / Zoom) par iska live demo dikha deta hoon. Aap khud dekh
+kar faisla karein.
+
+Kya kal shaam ya parson dopahar ka waqt munasib rahega?"
+
+
+================================================================================
+          CALL KE FORAN BAAD WHATSAPP PAR BHEJNE WALA MESSAGE
+================================================================================
+
+Assalam-o-Alaikum Dr. Sahab,
+Call par baat karne ka boht shukriya.
+
+CareFlow - Smart Clinic Management System
+
+✅ 100% Offline (Internet ki zaroorat nahi)
+✅ 1-Click Token & Thermal Slip (Rush control)
+✅ Fast Digital Prescription (Rx Printing)
+✅ Complete Patient Medical History (One search)
+✅ WhatsApp Integration for Patients
+✅ Doctor-Receptionist Offline Voice/Chat
+✅ Daily OPD Billing & Accounts Reports
+
+💡 Koi monthly recurring tension nahi — Data aapke apne computer par mehfooz.
+
+Aapke clinic ke liye 15-minute Free Demo schedule karne ke liye rabta karein:
+📞 [Aapka Naam & Mobile Number]
+================================================================================

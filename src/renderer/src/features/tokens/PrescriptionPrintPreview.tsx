@@ -216,8 +216,8 @@ const styles = StyleSheet.create({
 export interface PrescriptionPrintPreviewProps {
   token?: Token | null;
   prescription?: Prescription | null;
-  patient?: { firstName: string; lastName: string; mrNumber?: string | null; phone?: string | null; dateOfBirth?: string | Date | null } | null;
-  doctor?: { firstName: string; lastName: string } | null;
+  patient?: { firstName: string; lastName?: string | null; weight?: number | null; mrNumber?: string | null; phone?: string | null; dateOfBirth?: string | Date | null } | null;
+  doctor?: { firstName: string; lastName?: string | null } | null;
   onClose: () => void;
 }
 

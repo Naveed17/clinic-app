@@ -121,7 +121,7 @@ export function nextFreeSlot(opts: {
   excludeId?: string;
 }): { date: string; time: string; reason: SlotAdjustReason | null } | null {
   const from = opts.from ?? new Date();
-  const durationMin = Math.max(15, opts.durationMin || 30);
+  const durationMin = Math.max(15, opts.durationMin || 15);
   const fromDate = localDateStr(from);
   const fromEnd = new Date(from.getTime() + durationMin * 60_000);
   const requestedBusy = dayAppointments(opts.appointments, opts.providerId, fromDate, opts.excludeId)

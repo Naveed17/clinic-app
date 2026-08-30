@@ -129,7 +129,7 @@ function ReceiptDocument({
         <View style={styles.row}>
           <Text style={styles.metaLabel}>Patient</Text>
           <Text style={styles.metaValue}>
-            {invoice.patient.firstName} {invoice.patient.lastName}
+            {[invoice.patient.firstName, invoice.patient.lastName].filter(Boolean).join(' ')}
           </Text>
         </View>
         <View style={styles.row}>

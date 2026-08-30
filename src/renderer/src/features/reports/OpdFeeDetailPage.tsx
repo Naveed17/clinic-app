@@ -111,8 +111,8 @@ export function OpdFeeDetailPage(): React.JSX.Element {
   }
 
   const status = statusConfig[token.status] ?? { label: token.status, color: 'default' as const };
-  const patientLabel = `${token.patient.firstName} ${token.patient.lastName}`.trim();
-  const doctorLabel = `Dr. ${token.doctor.firstName} ${token.doctor.lastName}`.trim();
+  const patientLabel = [token.patient.firstName, token.patient.lastName].filter(Boolean).join(' ').trim();
+  const doctorLabel = ['Dr.', token.doctor.firstName, token.doctor.lastName].filter(Boolean).join(' ').trim();
   const fee = Number(token.consultationFee ?? 0);
   const discount = Number(token.feeDiscount ?? 0);
   const refunded = Number(token.feeRefunded ?? 0);

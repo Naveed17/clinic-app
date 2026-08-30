@@ -69,7 +69,7 @@ function EmptyState({ icon, title, subtitle }: { icon: React.ReactNode; title: s
 
 function PrescriptionsTabInline({ patientId, patient }: {
   patientId: string;
-  patient: { firstName: string; lastName: string; mrNumber?: string | null; phone?: string | null; dateOfBirth?: string | Date | null };
+  patient: { firstName: string; lastName?: string | null; mrNumber?: string | null; phone?: string | null; dateOfBirth?: string | Date | null };
 }): React.JSX.Element {
   const theme = useTheme();
   type PrintItem = { prescription: Prescription; doctor: { firstName: string; lastName: string } };
@@ -266,7 +266,7 @@ export function PatientProfilePage(): React.JSX.Element {
   const patientAppointments = (appointments.data ?? []).filter((a) => a.patientId === patient.id);
   const patientInvoices = (invoices.data ?? []).filter((i) => i.patient.id === patient.id);
   const patientLab = (labOrders.data ?? []).filter((o) => o.patientId === patient.id);
-  const initials = `${patient.firstName[0]}${patient.lastName[0]}`.toUpperCase();
+  const initials = `${patient.firstName?.[0] ?? ''}${patient.lastName?.[0] ?? ''}`.toUpperCase() || 'P';
   const totalPaid = patientInvoices.reduce((s, i) => s + Number(i.amountPaid ?? 0), 0);
   const totalBilled = patientInvoices.reduce((s, i) => s + Number(i.total), 0);
   const completedAppts = patientAppointments.filter((a) => a.status === 'COMPLETED').length;
@@ -315,11 +315,12 @@ export function PatientProfilePage(): React.JSX.Element {
                 Patient profile
               </Typography>
               <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: '-0.02em', mt: 0.25 }}>
-                {patient.firstName} {patient.lastName}
+                {patient.firstName} {patient.lastName || ''}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                 {patient.mrNumber ? `MR# ${patient.mrNumber}` : 'Medical record overview'}
                 {patient.phone ? ` · ${patient.phone}` : ''}
+                {patient.weight != null ? ` · ${patient.weight} kg` : ''}
               </Typography>
             </Box>
           </Stack>
@@ -522,10 +523,13 @@ export function PatientProfilePage(): React.JSX.Element {
                   {initials}
                 </Avatar>
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography fontWeight={900} fontSize={18} noWrap>{patient.firstName} {patient.lastName}</Typography>
+                  <Typography fontWeight={900} fontSize={18} noWrap>{patient.firstName} {patient.lastName || ''}</Typography>
                   <Stack direction="row" spacing={0.75} flexWrap="wrap" sx={{ mt: 0.75 }}>
                     {patient.mrNumber && (
                       <Chip label={`MR# ${patient.mrNumber}`} size="small" sx={{ height: 22, fontWeight: 700, bgcolor: alpha('#fff', 0.18), color: '#fff', borderRadius: 1 }} />
+                    )}
+                    {patient.weight != null && (
+                      <Chip label={`${patient.weight} kg`} size="small" sx={{ height: 22, fontWeight: 700, bgcolor: alpha('#fff', 0.18), color: '#fff', borderRadius: 1 }} />
                     )}
                     {patient.bloodGroup && (
                       <Chip label={patient.bloodGroup} size="small" sx={{ height: 22, fontWeight: 700, bgcolor: alpha('#fff', 0.18), color: '#fff', borderRadius: 1 }} />

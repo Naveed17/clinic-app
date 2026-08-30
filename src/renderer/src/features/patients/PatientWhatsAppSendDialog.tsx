@@ -70,7 +70,7 @@ export function PatientWhatsAppSendDialog({
     <Dialog open={open} onClose={sending ? undefined : onClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
       <FormDialogTitle
         title="Send WhatsApp"
-        subtitle={`${patient.firstName} ${patient.lastName}${phone ? ` · ${phone}` : ''}`}
+        subtitle={`${[patient.firstName, patient.lastName].filter(Boolean).join(' ')}${phone ? ` · ${phone}` : ''}`}
       />
       <DialogContent sx={dialogContentSx}>
         <Stack spacing={1.5} sx={{ mt: 0.5 }}>

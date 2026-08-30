@@ -33,7 +33,7 @@ export function registerTokenIpc(io?: SocketIOServer): void {
   ipcMain.handle('tokens:create', async (_, input) => {
     const token = await createToken(input);
     if (io) {
-      const patientName = `${token.patient.firstName} ${token.patient.lastName}`.trim();
+      const patientName = [token.patient.firstName, token.patient.lastName].filter(Boolean).join(' ').trim();
       const doctorName = token.doctor
         ? `${token.doctor.firstName} ${token.doctor.lastName}`.trim()
         : '';

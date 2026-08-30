@@ -117,7 +117,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
     const q = debouncedPatientQuery.trim().toLowerCase();
     if (!q) return patients.slice(0, 50);
     return patients.filter((p) => {
-      const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+      const name = `${p.firstName} ${p.lastName || ''}`.toLowerCase();
       const phone = (p.phone || '').toLowerCase();
       const mr = (p.mrNumber || '').toLowerCase();
       return name.includes(q) || phone.includes(q) || mr.includes(q);
@@ -168,10 +168,11 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   const mutation = useMutation({
     mutationFn: async () => {
       const startsAt = slotSearchFrom(date);
-      const endsAt = new Date(startsAt.getTime() + 30 * 60000);
+      const endsAt = new Date(startsAt.getTime() + 15 * 60000);
       const fee = parseFloat(consultationFee) || 0;
       const discount = parseFloat(feeDiscount) || 0;
-      const feeType = fee === 0 ? 'FREE' : discount > 0 ? 'HALF' : 'PAID';
+      const isHalf = fee > 0 && discount > 0 && Math.abs(discount - fee / 2) <= 1;
+      const feeType = fee === 0 || discount >= fee ? 'FREE' : isHalf ? 'HALF' : discount > 0 ? 'DISCOUNTED' : 'PAID';
       await appointmentsService.ensureSameDay({
         patientId,
         providerId: doctorId,
@@ -328,7 +329,7 @@ function FeeRefundDialog({ token, onClose }: { token: Token; onClose: () => void
     <Dialog open onClose={onClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
       <FormDialogTitle
         title={`Refund fee — Token #${String(token.tokenNumber).padStart(3, '0')}`}
-        subtitle={`Return consultation fee for ${token.patient.firstName} ${token.patient.lastName}.`}
+        subtitle={`Return consultation fee for ${[token.patient.firstName, token.patient.lastName].filter(Boolean).join(' ')}.`}
       />
       <DialogContent sx={dialogContentSx}>
         <Stack spacing={2} sx={{ mt: 1 }}>
@@ -425,7 +426,7 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
         </View>
         <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
         {token.patient.mrNumber ? <View style={ts.row}><Text style={ts.lbl}>MR #</Text><Text style={ts.val}>{token.patient.mrNumber}</Text></View> : null}
-        <View style={ts.row}><Text style={ts.lbl}>Patient</Text><Text style={ts.val}>{token.patient.firstName} {token.patient.lastName}</Text></View>
+        <View style={ts.row}><Text style={ts.lbl}>Patient</Text><Text style={ts.val}>{[token.patient.firstName, token.patient.lastName].filter(Boolean).join(' ')}</Text></View>
         {token.patient.age != null ? <View style={ts.row}><Text style={ts.lbl}>Age</Text><Text style={ts.val}>{String(token.patient.age)}</Text></View> : null}
         {token.patient.gender ? <View style={ts.row}><Text style={ts.lbl}>Gender</Text><Text style={ts.val}>{token.patient.gender}</Text></View> : null}
         <View style={ts.row}><Text style={ts.lbl}>Doctor</Text><Text style={ts.val}>Dr. {token.doctor.firstName} {token.doctor.lastName}</Text></View>
@@ -511,7 +512,7 @@ export function PrescriptionDialog({ token, onClose }: { token: Token; onClose: 
       <Dialog open onClose={onClose} maxWidth="md" fullWidth PaperProps={dialogPaperProps}>
         <FormDialogTitle
           title={`Prescription — Token #${String(token.tokenNumber).padStart(3, '0')}`}
-          subtitle={`${token.patient.firstName} ${token.patient.lastName} · Dr. ${token.doctor.firstName} ${token.doctor.lastName}`}
+          subtitle={`${[token.patient.firstName, token.patient.lastName].filter(Boolean).join(' ')} · Dr. ${[token.doctor.firstName, token.doctor.lastName].filter(Boolean).join(' ')}`}
         />
         <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
@@ -1487,7 +1488,7 @@ export function TokensPage(): React.JSX.Element {
       <ConfirmDialog
         open={Boolean(deleteToken)}
         title="Delete token?"
-        message={deleteToken ? `Delete token #${String(deleteToken.tokenNumber).padStart(3, '0')} for ${deleteToken.patient.firstName} ${deleteToken.patient.lastName}?` : ''}
+        message={deleteToken ? `Delete token #${String(deleteToken.tokenNumber).padStart(3, '0')} for ${[deleteToken.patient.firstName, deleteToken.patient.lastName].filter(Boolean).join(' ')}?` : ''}
         loading={deleteMutation.isPending}
         onClose={() => setDeleteToken(null)}
         onConfirm={() => deleteToken && deleteMutation.mutate(deleteToken.id)}

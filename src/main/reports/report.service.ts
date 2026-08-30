@@ -36,8 +36,8 @@ function roundMoney(n: number): number {
   return Math.round((Number(n) || 0) * 100) / 100;
 }
 
-function personName(person: { firstName: string; lastName: string }): string {
-  return `${person.firstName} ${person.lastName}`.trim();
+function personName(person: { firstName: string; lastName?: string | null }): string {
+  return `${person.firstName} ${person.lastName || ''}`.trim();
 }
 
 function displayInvoiceStatus(status: string, _amountPaid: number, hasRefund: boolean): string {
@@ -247,7 +247,7 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
     const doctorDefaultFee = roundMoney(Number(token.doctorConsultationFee));
     const apptType = String(token.appointmentFeeType || '').toUpperCase();
 
-    let feeType: 'PAID' | 'FREE' | 'HALF';
+    let feeType: 'PAID' | 'FREE' | 'HALF' | 'DISCOUNTED';
     let gross: number;
     let discounted = roundMoney(Number(token.feeDiscount));
     const refunded = roundMoney(Number(token.feeRefunded));
@@ -260,6 +260,9 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       feeType = 'HALF';
       gross = rawGross > 0 ? rawGross : (doctorDefaultFee > 0 ? doctorDefaultFee : 1000);
       if (discounted === 0) discounted = roundMoney(gross / 2);
+    } else if (apptType === 'DISCOUNTED') {
+      gross = rawGross > 0 ? rawGross : (doctorDefaultFee > 0 ? doctorDefaultFee : 1000);
+      feeType = 'DISCOUNTED';
     } else if (rawGross === 0 && (token.consultationFee !== null && token.consultationFee !== undefined)) {
       // Specifically recorded with 0 fee (e.g. walk-in free checkup)
       feeType = 'FREE';
@@ -267,10 +270,12 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       discounted = 0;
     } else if (rawGross > 0) {
       gross = rawGross;
-      feeType = discounted >= gross ? 'FREE' : discounted > 0 ? 'HALF' : 'PAID';
+      const isHalf = discounted > 0 && Math.abs(discounted - gross / 2) <= 1;
+      feeType = discounted >= gross ? 'FREE' : isHalf ? 'HALF' : discounted > 0 ? 'DISCOUNTED' : 'PAID';
     } else if (doctorDefaultFee > 0 && apptType === 'PAID') {
       gross = doctorDefaultFee;
-      feeType = discounted >= gross ? 'FREE' : discounted > 0 ? 'HALF' : 'PAID';
+      const isHalf = discounted > 0 && Math.abs(discounted - gross / 2) <= 1;
+      feeType = discounted >= gross ? 'FREE' : isHalf ? 'HALF' : discounted > 0 ? 'DISCOUNTED' : 'PAID';
     } else {
       gross = 0;
       feeType = 'FREE';

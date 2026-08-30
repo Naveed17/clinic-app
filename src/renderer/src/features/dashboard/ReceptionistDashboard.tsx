@@ -73,7 +73,8 @@ const statusColor: Record<string, 'default' | 'primary' | 'success' | 'error' | 
 /* ── Patient schema (minimal required fields) ── */
 const patientSchema = z.object({
   firstName: z.string().trim().min(1, 'Required'),
-  lastName: z.string().trim().min(1, 'Required'),
+  lastName: z.string().trim(),
+  weight: z.string().trim(),
   phone: z.string().trim(),
   ageValue: z.string(),
   ageUnit: z.enum(['years', 'months', 'days']),
@@ -81,7 +82,7 @@ const patientSchema = z.object({
   address: z.string().trim(),
 });
 type PatientForm = z.infer<typeof patientSchema>;
-const patientDefaults: PatientForm = { firstName: '', lastName: '', phone: '', ageValue: '', ageUnit: 'years', gender: '', address: '' };
+const patientDefaults: PatientForm = { firstName: '', lastName: '', weight: '', phone: '', ageValue: '', ageUnit: 'years', gender: '', address: '' };
 
 const VISIT_REASONS = ['Checkup', 'Follow-up', 'Urgent', 'Consultation', 'Vaccination'] as const;
 
@@ -89,10 +90,12 @@ function walkInPatientInput(values: PatientForm): PatientInput {
   const num = values.ageValue.trim() ? parseFloat(values.ageValue) : null;
   const dob = num != null && !Number.isNaN(num) ? ageToDateOfBirth(num, values.ageUnit) : null;
   const ageYears = values.ageUnit === 'years' ? (num != null ? Math.floor(num) : null) : (dob ? dateOfBirthToAge(dob) : null);
+  const weightNum = values.weight.trim() ? parseFloat(values.weight) : null;
 
   return {
     firstName: values.firstName,
-    lastName: values.lastName,
+    lastName: values.lastName.trim() || null,
+    weight: weightNum != null && !Number.isNaN(weightNum) ? weightNum : null,
     phone: values.phone || null,
     age: ageYears,
     dateOfBirth: dob ? dob.toISOString() : null,
@@ -204,10 +207,11 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
     mutationFn: async () => {
       if (!patientId || !doctorId) throw new Error('Select a patient and doctor first.');
       const startsAt = slotSearchFrom(todayStr);
-      const endsAt = new Date(startsAt.getTime() + 30 * 60000);
+      const endsAt = new Date(startsAt.getTime() + 15 * 60000);
       const fee = parseFloat(consultationFee) || 0;
       const discount = parseFloat(feeDiscount) || 0;
-      const feeType = fee === 0 ? 'FREE' : discount > 0 ? 'HALF' : 'PAID';
+      const isHalf = fee > 0 && discount > 0 && Math.abs(discount - fee / 2) <= 1;
+      const feeType = fee === 0 || discount >= fee ? 'FREE' : isHalf ? 'HALF' : discount > 0 ? 'DISCOUNTED' : 'PAID';
       await appointmentsService.ensureSameDay({
         patientId,
         providerId: doctorId,
@@ -284,7 +288,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
                   />
                   <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
                     <TextField label="First name" error={!!form.formState.errors.firstName} helperText={form.formState.errors.firstName?.message} {...form.register('firstName')} />
-                    <TextField label="Last name" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
+                    <TextField label="Last name (optional)" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
                   </Box>
                   <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '110px 130px minmax(0, 1fr)' }, alignItems: 'start' }}>
                     <TextField label="Age (optional)" type="number" slotProps={{ htmlInput: { min: 0, max: 150 } }} {...form.register('ageValue')} />
@@ -307,7 +311,10 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
                       )}
                     />
                   </Box>
-                  <TextField label="Address (optional)" {...form.register('address')} />
+                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+                    <TextField label="Weight (kg) (optional)" type="number" slotProps={{ htmlInput: { min: 0, max: 500, step: 0.1 } }} placeholder="e.g. 70" {...form.register('weight')} />
+                    <TextField label="Address (optional)" {...form.register('address')} />
+                  </Box>
                 </Stack>
               </Box>
             )}
@@ -499,7 +506,7 @@ function BookAppointmentModal({
   const [providerId, setProviderId] = useState('');
   const [date, setDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
-  const [duration, setDuration] = useState(30);
+  const [duration, setDuration] = useState(15);
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [done, setDone] = useState(false);
@@ -644,7 +651,7 @@ function BookAppointmentModal({
   function handleClose() {
     setStep(0); setPatientId(''); setPatientName(''); setUseExisting(false);
     setProviderId(''); setDate(new Date().toLocaleDateString('en-CA'));
-    setTime(new Date().toTimeString().slice(0, 5)); setDuration(30);
+    setTime(new Date().toTimeString().slice(0, 5)); setDuration(15);
     setReason(''); setNotes(''); setDone(false);
     setSlotNotice(null);
     form.reset(patientDefaults);
@@ -690,7 +697,7 @@ function BookAppointmentModal({
                   />
                   <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
                     <TextField label="First name" error={!!form.formState.errors.firstName} helperText={form.formState.errors.firstName?.message} {...form.register('firstName')} />
-                    <TextField label="Last name" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
+                    <TextField label="Last name (optional)" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
                   </Box>
                   <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '110px 130px minmax(0, 1fr)' }, alignItems: 'start' }}>
                     <TextField label="Age (optional)" type="number" slotProps={{ htmlInput: { min: 0, max: 150 } }} {...form.register('ageValue')} />
@@ -713,7 +720,10 @@ function BookAppointmentModal({
                       )}
                     />
                   </Box>
-                  <TextField label="Address (optional)" {...form.register('address')} />
+                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
+                    <TextField label="Weight (kg) (optional)" type="number" slotProps={{ htmlInput: { min: 0, max: 500, step: 0.1 } }} placeholder="e.g. 70" {...form.register('weight')} />
+                    <TextField label="Address (optional)" {...form.register('address')} />
+                  </Box>
                 </Stack>
               </Box>
             )}
@@ -1589,12 +1599,12 @@ export function ReceptionistDashboard(): React.JSX.Element {
                         }}
                       >
                         {a.patient.firstName[0]}
-                        {a.patient.lastName[0]}
+                        {a.patient.lastName?.[0] ?? ''}
                       </Avatar>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'nowrap' }}>
                           <Typography variant="body2" fontWeight={700} noWrap>
-                            {a.patient.firstName} {a.patient.lastName}
+                            {a.patient.firstName} {a.patient.lastName || ''}
                           </Typography>
                           {hasToken ? (
                             <Chip

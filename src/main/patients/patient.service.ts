@@ -12,7 +12,8 @@ export interface PatientListInput {
 
 export interface PatientInput {
   firstName: string;
-  lastName: string;
+  lastName?: string | null;
+  weight?: number | string | null;
   dateOfBirth?: string | null;
   age?: number | string | null;
   gender?: string | null;
@@ -47,9 +48,11 @@ function resolveDateOfBirth(input: PatientInput): Date | null {
 }
 
 function mapPatientInput(input: PatientInput): Omit<Prisma.PatientCreateInput, 'mrNumber'> {
+  const weightNum = input.weight != null && String(input.weight).trim() !== '' ? parseFloat(String(input.weight)) : null;
   const data = {
     firstName: input.firstName.trim(),
-    lastName: input.lastName.trim(),
+    lastName: input.lastName?.trim() || null,
+    weight: weightNum != null && !Number.isNaN(weightNum) ? weightNum : null,
     dateOfBirth: resolveDateOfBirth(input),
     gender: input.gender?.trim() || null,
     phone: toWhatsAppNumber(input.phone) || input.phone?.trim() || null,

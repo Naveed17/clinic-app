@@ -6,8 +6,9 @@ import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
 import CakeOutlinedIcon from '@mui/icons-material/CakeOutlined';
 import LocationOnOutlinedIcon from '@mui/icons-material/LocationOnOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import MoreVertOutlinedIcon from '@mui/icons-material/MoreVertOutlined';
 import {
-  Alert, Avatar, Box, Button, Chip, IconButton, Stack, Tooltip, Typography,
+  Alert, Avatar, Box, Button, Chip, Divider, IconButton, Popover, Stack, Tooltip, Typography,
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -44,6 +45,8 @@ export function PatientsPage(): React.JSX.Element {
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [deletePatient, setDeletePatient] = useState<Patient | undefined>();
   const [historyPatient, setHistoryPatient] = useState<Patient | undefined>();
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const [activeMenuPatient, setActiveMenuPatient] = useState<Patient | null>(null);
 
   const patientsQuery = useQuery({
     queryKey: ['patients', { page, rowsPerPage, search: debouncedSearch, providerId: isDoctor ? user?.id : undefined }],
@@ -80,8 +83,8 @@ export function PatientsPage(): React.JSX.Element {
     });
   }, [rawPatients]);
 
-  const getInitials = (first: string, last: string) =>
-    `${first[0] ?? ''}${last[0] ?? ''}`.toUpperCase();
+  const getInitials = (first: string, last?: string | null) =>
+    `${first?.[0] ?? ''}${last?.[0] ?? ''}`.toUpperCase() || 'P';
 
   const getAvatarColor = (name: string) => {
     const colors = [
@@ -140,7 +143,7 @@ export function PatientsPage(): React.JSX.Element {
             <TableCell>Address</TableCell>
             <TableCell>Emergency Contact</TableCell>
             <TableCell>Created At</TableCell>
-            <TableCell align="right">Actions</TableCell>
+            <TableCell align="right" sx={{ width: 64, pr: 2, whiteSpace: 'nowrap' }}>Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -152,7 +155,17 @@ export function PatientsPage(): React.JSX.Element {
             patients.map((patient) => {
               const color = getAvatarColor(patient.firstName);
               return (
-                <TableRow key={patient.id} sx={tableSx.row}>
+                <TableRow
+                  key={patient.id}
+                  hover
+                  onClick={() => {
+                    if (canViewRecords) navigate(`/patients/${patient.id}`);
+                  }}
+                  sx={{
+                    ...tableSx.row,
+                    cursor: canViewRecords ? 'pointer' : 'default',
+                  }}
+                >
                   {/* Avatar + Name + phone */}
                   <TableCell>
                     <Stack direction="row" alignItems="center" gap={1.25}>
@@ -166,10 +179,11 @@ export function PatientsPage(): React.JSX.Element {
                       </Avatar>
                       <Box>
                         <Typography fontSize={13.5} fontWeight={500} lineHeight={1.3}>
-                          {patient.firstName} {patient.lastName}
+                          {patient.firstName} {patient.lastName || ''}
                         </Typography>
                         <Typography fontSize={11.5} color="text.secondary">
                           {patient.phone?.trim() || '—'}
+                          {patient.weight != null ? ` · ${patient.weight} kg` : ''}
                         </Typography>
                       </Box>
                     </Stack>
@@ -317,29 +331,25 @@ export function PatientsPage(): React.JSX.Element {
                     </Box>
                   </TableCell>
 
-                  <TableCell align="right">
-                    <Stack direction="row" gap={0.5} justifyContent="flex-end">
-                      {canViewRecords && (
-                      <>
-                      <Tooltip title="View profile">
-                        <IconButton sx={actionBtnSx} onClick={() => navigate(`/patients/${patient.id}`)}><PersonOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
-                      </Tooltip>
-                      <Tooltip title="View history">
-                        <IconButton sx={actionBtnSx} onClick={() => setHistoryPatient(patient)}><HistoryOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
-                      </Tooltip>
-                      </>
-                      )}
-                      {canManagePatients && (
-                      <>
-                      <Tooltip title="Edit">
-                        <IconButton sx={actionBtnSx} onClick={() => openEdit(patient)}><EditOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton sx={{ ...actionBtnSx, '&:hover': { bgcolor: 'error.lighter', color: 'error.main' } }} onClick={() => setDeletePatient(patient)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton>
-                      </Tooltip>
-                      </>
-                      )}
-                    </Stack>
+                  <TableCell align="right" onClick={(e) => e.stopPropagation()} sx={{ width: 64, pr: 2 }}>
+                    <Tooltip title="Actions" placement="left">
+                      <IconButton
+                        size="small"
+                        sx={{
+                          ...actionBtnSx,
+                          border: '1px solid',
+                          borderColor: activeMenuPatient?.id === patient.id ? 'primary.main' : 'divider',
+                          bgcolor: activeMenuPatient?.id === patient.id ? alpha(theme.palette.primary.main, 0.12) : 'transparent',
+                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08), borderColor: 'primary.main' },
+                        }}
+                        onClick={(e) => {
+                          setMenuAnchor(e.currentTarget);
+                          setActiveMenuPatient(patient);
+                        }}
+                      >
+                        <MoreVertOutlinedIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               );
@@ -347,6 +357,98 @@ export function PatientsPage(): React.JSX.Element {
           )}
         </TableBody>
       </TablePageShell>
+
+      {/* Floating Action Popover (Right to Left) */}
+      <Popover
+        open={Boolean(menuAnchor && activeMenuPatient)}
+        anchorEl={menuAnchor}
+        onClose={() => { setMenuAnchor(null); setActiveMenuPatient(null); }}
+        anchorOrigin={{ vertical: 'center', horizontal: -8 }}
+        transformOrigin={{ vertical: 'center', horizontal: 'right' }}
+        slotProps={{
+          paper: {
+            sx: {
+              width: 'max-content',
+              maxWidth: 'none',
+              borderRadius: '8px',
+              boxShadow: (t) => t.palette.mode === 'dark'
+                ? '0 10px 30px rgba(0,0,0,0.6)'
+                : '0 8px 24px rgba(0,0,0,0.12)',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderLeft: '4px solid',
+              borderLeftColor: 'primary.main',
+              p: 0.5,
+              px: 0.75,
+              display: 'flex',
+              alignItems: 'center',
+              bgcolor: 'background.paper',
+              position: 'relative',
+              overflow: 'visible',
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: '50%',
+                right: -5,
+                transform: 'translateY(-50%) rotate(45deg)',
+                width: 8,
+                height: 8,
+                bgcolor: 'background.paper',
+                borderTop: '1px solid',
+                borderRight: '1px solid',
+                borderColor: 'divider',
+                pointerEvents: 'none',
+              },
+            },
+          },
+        }}
+      >
+        {activeMenuPatient && (() => {
+          const patient = activeMenuPatient;
+          const close = () => { setMenuAnchor(null); setActiveMenuPatient(null); };
+
+          return (
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              {canViewRecords && (
+                <>
+                  <Tooltip title="View profile" arrow placement="top">
+                    <IconButton sx={actionBtnSx} onClick={() => { close(); navigate(`/patients/${patient.id}`); }}>
+                      <PersonOutlinedIcon sx={{ fontSize: 17 }} />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="View history" arrow placement="top">
+                    <IconButton sx={actionBtnSx} onClick={() => { close(); setHistoryPatient(patient); }}>
+                      <HistoryOutlinedIcon sx={{ fontSize: 17 }} />
+                    </IconButton>
+                  </Tooltip>
+                </>
+              )}
+              {canManagePatients && (
+                <>
+                  <Tooltip title="Edit" arrow placement="top">
+                    <IconButton sx={actionBtnSx} onClick={() => { close(); openEdit(patient); }}>
+                      <EditOutlinedIcon sx={{ fontSize: 17 }} />
+                    </IconButton>
+                  </Tooltip>
+                  <Divider orientation="vertical" flexItem sx={{ my: 0.5, mx: 0.5 }} />
+                  <Tooltip title="Delete" arrow placement="top">
+                    <IconButton
+                      sx={{
+                        ...actionBtnSx,
+                        color: 'error.main',
+                        '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.1) },
+                      }}
+                      onClick={() => { close(); setDeletePatient(patient); }}
+                    >
+                      <DeleteOutlineIcon sx={{ fontSize: 17 }} />
+                    </IconButton>
+                  </Tooltip>
+                </>
+              )}
+            </Stack>
+          );
+        })()}
+      </Popover>
 
       <PatientDialog open={isDialogOpen} patient={dialogPatient} onClose={() => setDialogOpen(false)} />
       {canViewRecords && historyPatient && <PatientHistoryDialog patient={historyPatient} onClose={() => setHistoryPatient(undefined)} />}
@@ -356,7 +458,7 @@ export function PatientsPage(): React.JSX.Element {
         title="Delete patient?"
         message={
           deletePatient
-            ? `Delete ${deletePatient.firstName} ${deletePatient.lastName}? This also removes their appointments, tokens, prescriptions, invoices/payments, lab orders, and documents.`
+            ? `Delete ${[deletePatient.firstName, deletePatient.lastName].filter(Boolean).join(' ')}? This also removes their appointments, tokens, prescriptions, invoices/payments, lab orders, and documents.`
             : ''
         }
         confirmLabel="Delete"

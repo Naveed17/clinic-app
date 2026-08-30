@@ -47,9 +47,9 @@ export function TokenFeeFields({
   const payable = tokenChargedFee(fee, discount);
   const followUp = priorVisitsThisWeek > 0;
   const isFree = fee === 0 || (fee > 0 && discount >= fee);
-  const isHalf = fee > 0 && discount > 0 && discount < fee;
+  const isHalf = fee > 0 && discount > 0 && Math.abs(discount - fee / 2) <= 1;
 
-  const selectedMode = isFree ? 'free' : isHalf ? 'half' : 'paid';
+  const selectedMode = isFree ? 'free' : isHalf ? 'half' : discount === 0 && fee > 0 ? 'paid' : null;
 
   function handleModeChange(_e: React.MouseEvent<HTMLElement>, mode: string | null): void {
     if (!mode || disabled) return;

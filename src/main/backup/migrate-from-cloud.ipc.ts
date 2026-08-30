@@ -44,7 +44,7 @@ const LOCAL_COLUMNS: Record<string, string[]> = {
   DoctorSchedule: ['id', 'doctorId', 'dayOfWeek', 'startTime', 'endTime', 'isActive', 'createdAt', 'updatedAt'],
   DoctorAttendance: ['id', 'doctorId', 'date', 'checkInAt', 'checkOutAt', 'createdAt', 'updatedAt'],
   Patient: [
-    'id', 'mrNumber', 'firstName', 'lastName', 'dateOfBirth', 'phone', 'email', 'address',
+    'id', 'mrNumber', 'firstName', 'lastName', 'weight', 'dateOfBirth', 'phone', 'email', 'address',
     'emergencyContactName', 'emergencyContactPhone', 'bloodGroup', 'allergies', 'chronicConditions',
     'primaryDoctorId', 'createdAt', 'updatedAt',
   ],

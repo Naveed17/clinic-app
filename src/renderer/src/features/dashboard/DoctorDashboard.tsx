@@ -280,11 +280,11 @@ export function DoctorDashboard(): React.JSX.Element {
               >
                 <Stack direction="row" alignItems="center" spacing={2}>
                   <Avatar sx={{ width: 40, height: 40, fontSize: 13, fontWeight: 700, flexShrink: 0, bgcolor: alpha(color, 0.15), color }}>
-                    {appt.patient.firstName[0]}{appt.patient.lastName[0]}
+                    {appt.patient.firstName[0]}{appt.patient.lastName?.[0] ?? ''}
                   </Avatar>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography fontWeight={700} fontSize={14} noWrap>
-                      {appt.patient.firstName} {appt.patient.lastName}
+                      {appt.patient.firstName} {appt.patient.lastName || ''}
                       {appt.tokenNumber != null && Number(appt.tokenNumber) > 0 && (
                         <Box component="span" sx={{ color: 'primary.main', fontFamily: 'monospace', fontWeight: 800, ml: 0.75 }}>
                           #{String(appt.tokenNumber).padStart(3, '0')}

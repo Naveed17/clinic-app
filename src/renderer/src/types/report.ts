@@ -26,7 +26,7 @@ export interface OpdFeeRow {
   doctorId: string;
   doctorName: string;
   status: string;
-  feeType: 'PAID' | 'FREE' | 'HALF';
+  feeType: 'PAID' | 'FREE' | 'HALF' | 'DISCOUNTED' | string;
   consultationFee: number;
   feeDiscount: number;
   feeRefunded: number;

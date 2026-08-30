@@ -661,6 +661,8 @@ export function OpdReportsPage(): React.JSX.Element {
                               <Chip label="Free Checkup" size="small" color="success" variant="filled" sx={{ fontWeight: 700, fontSize: 11 }} />
                             ) : row.feeType === 'HALF' ? (
                               <Chip label="50% Off" size="small" color="warning" variant="filled" sx={{ fontWeight: 700, fontSize: 11 }} />
+                            ) : row.feeType === 'DISCOUNTED' || (row.feeDiscount > 0 && row.feeDiscount < row.consultationFee) ? (
+                              <Chip label={`Discount (Rs. ${row.feeDiscount})`} size="small" color="info" variant="filled" sx={{ fontWeight: 700, fontSize: 11 }} />
                             ) : (
                               <Chip label="Paid Visit" size="small" color="primary" variant="outlined" sx={{ fontWeight: 600, fontSize: 11 }} />
                             )}

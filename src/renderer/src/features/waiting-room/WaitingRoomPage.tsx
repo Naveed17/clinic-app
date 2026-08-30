@@ -35,7 +35,7 @@ import type { Appointment } from '@/types/appointment';
 import type { Patient } from '@/types/patient';
 import type { Token } from '@/types/token';
 
-const DEFAULT_CONSULT_MIN = 30;
+const DEFAULT_CONSULT_MIN = 15;
 const MIN_AVG_SAMPLES = 3;
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -731,11 +731,11 @@ export function WaitingRoomPage(): React.JSX.Element {
                       }}
                     >
                       {appt.patient.firstName[0]}
-                      {appt.patient.lastName[0]}
+                      {appt.patient.lastName?.[0] ?? ''}
                     </Avatar>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography variant="body2" fontWeight={700} noWrap>
-                        {appt.patient.firstName} {appt.patient.lastName}
+                        {appt.patient.firstName} {appt.patient.lastName || ''}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         {formatClock(appt.startsAt)}
@@ -781,7 +781,7 @@ export function WaitingRoomPage(): React.JSX.Element {
         <OrderLabDialog
           open
           patientId={labOrderToken.patientId}
-          patientName={`${labOrderToken.patient.firstName} ${labOrderToken.patient.lastName}`}
+          patientName={[labOrderToken.patient.firstName, labOrderToken.patient.lastName].filter(Boolean).join(' ')}
           orderedById={user.id}
           tokenId={labOrderToken.id}
           onClose={() => setLabOrderToken(null)}
@@ -796,7 +796,7 @@ export function WaitingRoomPage(): React.JSX.Element {
           <Typography variant="body2" color="text.secondary">
             Today is {todayDayName}. This day is marked as a holiday / off in Doctor Schedule.
             {pendingIssue
-              ? ` ${pendingIssue.patient.firstName} ${pendingIssue.patient.lastName} already has a booked appointment — issue a token to add them to the queue?`
+              ? ` ${[pendingIssue.patient.firstName, pendingIssue.patient.lastName].filter(Boolean).join(' ')} already has a booked appointment — issue a token to add them to the queue?`
               : ' A token cannot be issued for a walk-in today.'}
           </Typography>
         </DialogContent>

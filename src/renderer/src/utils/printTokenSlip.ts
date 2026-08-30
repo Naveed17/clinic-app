@@ -155,10 +155,10 @@ export function buildTokenSlipHtml(
   </div>
   <div class="stars">${stars}</div>
   ${mr}
-  <div class="row"><div class="lbl">Patient</div><div class="val">${escapeHtml(`${token.patient.firstName} ${token.patient.lastName}`.trim())}</div></div>
+  <div class="row"><div class="lbl">Patient</div><div class="val">${escapeHtml([token.patient.firstName, token.patient.lastName].filter(Boolean).join(' ').trim())}</div></div>
   ${age}
   ${gender}
-  <div class="row"><div class="lbl">Doctor</div><div class="val">${escapeHtml(`Dr. ${token.doctor.firstName} ${token.doctor.lastName}`.trim())}</div></div>
+  <div class="row"><div class="lbl">Doctor</div><div class="val">${escapeHtml(['Dr.', token.doctor.firstName, token.doctor.lastName].filter(Boolean).join(' ').trim())}</div></div>
   ${fee}
   <div class="row"><div class="lbl">Date</div><div class="val">${escapeHtml(date)}</div></div>
   <div class="row"><div class="lbl">Time</div><div class="val">${escapeHtml(time)}</div></div>

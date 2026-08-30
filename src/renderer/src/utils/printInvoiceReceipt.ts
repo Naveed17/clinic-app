@@ -182,7 +182,7 @@ export function buildInvoiceReceiptHtml(
   <div class="title">CASH RECEIPT</div>
   <div class="stars">${stars}</div>
   <div class="row muted"><div class="desc">Invoice #</div><div class="price" style="width:auto">${escapeHtml(invoice.invoiceNumber)}</div></div>
-  <div class="row muted"><div class="desc">Patient</div><div class="price" style="width:auto">${escapeHtml(`${invoice.patient.firstName} ${invoice.patient.lastName}`)}</div></div>
+  <div class="row muted"><div class="desc">Patient</div><div class="price" style="width:auto">${escapeHtml([invoice.patient.firstName, invoice.patient.lastName].filter(Boolean).join(' ').trim())}</div></div>
   <div class="row muted"><div class="desc">Date</div><div class="price" style="width:auto">${escapeHtml(new Date(invoice.createdAt).toLocaleDateString())}</div></div>
   <div class="row muted"><div class="desc">Time</div><div class="price" style="width:auto">${escapeHtml(new Date(invoice.createdAt).toLocaleTimeString())}</div></div>
   <div class="stars">${stars}</div>

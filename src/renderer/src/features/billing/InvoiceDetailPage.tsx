@@ -146,7 +146,7 @@ export function InvoiceDetailPage(): React.JSX.Element {
   const isVoid = invoice.status === 'VOID';
   const canPay = !isVoid && invoice.status !== 'PAID' && invoice.status !== 'REFUNDED' && balance > 0;
   const canRefund = !isVoid && paid > 0;
-  const patientLabel = `${invoice.patient.firstName} ${invoice.patient.lastName}`.trim();
+  const patientLabel = [invoice.patient.firstName, invoice.patient.lastName].filter(Boolean).join(' ').trim();
   const payments = paymentsQuery.data ?? [];
 
   const summaryCards = [

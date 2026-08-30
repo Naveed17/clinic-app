@@ -12,22 +12,27 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
 import RepeatOutlinedIcon from '@mui/icons-material/RepeatOutlined';
+import MoreVertOutlinedIcon from '@mui/icons-material/MoreVertOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
   Avatar,
   Box,
   Button,
+  Checkbox,
   Chip,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
+  Divider,
   FormControl,
   FormControlLabel,
   IconButton,
   InputLabel,
   MenuItem,
   Paper,
+  Popover,
   Stack,
   Switch,
   TextField,
@@ -106,7 +111,7 @@ const empty: FormValues = {
   tokenId: '',
   date: new Date().toISOString().slice(0, 10),
   time: new Date().toTimeString().slice(0, 5),
-  duration: 30,
+  duration: 15,
   reason: '',
   notes: '',
   recurring: false,
@@ -131,7 +136,7 @@ function appointmentValues(appointment?: Appointment): FormValues {
 }
 
 function personLabel(person: AppointmentPerson): string {
-  return `${person.firstName} ${person.lastName}`;
+  return [person.firstName, person.lastName].filter(Boolean).join(' ').trim();
 }
 
 function IssueTokenInline({ patientId, date, providerId, onIssued }: {
@@ -286,7 +291,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
 
   const doctors = useQuery({ queryKey: ['doctors'], queryFn: appointmentsService.doctors, staleTime: 5 * 60 * 1000, retry: 3 });
   function personLabel(person: AppointmentPerson): string {
-    return `${person.firstName} ${person.lastName}`;
+    return [person.firstName, person.lastName].filter(Boolean).join(' ').trim();
   }
   function feeLabel(fee?: number): string {
     return `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(fee) || 0)}`;
@@ -403,7 +408,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
       schedule,
       appointments: doctorAppts,
       providerId,
-      durationMin: duration || 30,
+      durationMin: duration || 15,
       from: slotSearchFrom(defaultDate),
     });
     if (!next) return;
@@ -553,7 +558,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
                           schedule,
                           appointments: doctorAppts,
                           providerId,
-                          durationMin: duration || 30,
+                          durationMin: duration || 15,
                           from: slotSearchFrom(dateStr),
                           excludeId: appointment?.id,
                         });
@@ -593,7 +598,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
                           schedule,
                           appointments: doctorAppts,
                           providerId,
-                          durationMin: duration || 30,
+                          durationMin: duration || 15,
                           from: new Date(`${date}T${picked}:00`),
                           excludeId: appointment?.id,
                         });
@@ -714,6 +719,70 @@ export function AppointmentsPage(): React.JSX.Element {
   const detailNavState = { from: `${location.pathname}${location.search}` };
 
   const [deleteTarget, setDeleteTarget] = useState<Appointment | undefined>();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkConfirmDelete, setBulkConfirmDelete] = useState(false);
+  const [isBulkLoading, setIsBulkLoading] = useState(false);
+
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const [activeMenuAppt, setActiveMenuAppt] = useState<Appointment | null>(null);
+
+  const handleBulkComplete = async () => {
+    if (selectedIds.size === 0) return;
+    setIsBulkLoading(true);
+    try {
+      await Promise.all([...selectedIds].map((id) => appointmentsService.updateStatus(id, 'COMPLETED')));
+      await queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setSelectedIds(new Set());
+    } catch (err) {
+      console.error('Failed bulk complete', err);
+    } finally {
+      setIsBulkLoading(false);
+    }
+  };
+
+  const handleBulkCheckIn = async () => {
+    if (selectedIds.size === 0) return;
+    setIsBulkLoading(true);
+    try {
+      await Promise.all([...selectedIds].map((id) => appointmentsService.updateStatus(id, 'CHECKED_IN')));
+      await queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setSelectedIds(new Set());
+    } catch (err) {
+      console.error('Failed bulk check in', err);
+    } finally {
+      setIsBulkLoading(false);
+    }
+  };
+
+  const handleBulkCancel = async () => {
+    if (selectedIds.size === 0) return;
+    setIsBulkLoading(true);
+    try {
+      await Promise.all([...selectedIds].map((id) => appointmentsService.cancel(id)));
+      await queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setSelectedIds(new Set());
+    } catch (err) {
+      console.error('Failed bulk cancel', err);
+    } finally {
+      setIsBulkLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setIsBulkLoading(true);
+    try {
+      await Promise.all([...selectedIds].map((id) => appointmentsService.delete(id)));
+      await queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setSelectedIds(new Set());
+      setBulkConfirmDelete(false);
+    } catch (err) {
+      console.error('Failed bulk delete', err);
+    } finally {
+      setIsBulkLoading(false);
+    }
+  };
+
   const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list, staleTime: 30_000 });
   const cancelMutation = useMutation({
     mutationFn: appointmentsService.cancel,
@@ -766,11 +835,6 @@ export function AppointmentsPage(): React.JSX.Element {
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(['appointments'], ctx.prev);
     },
-    onSuccess: (updated: Appointment) => {
-      if (updated?.status === 'CHECKED_IN') {
-        tokenPrint.printFor(updated);
-      }
-    },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['appointments'] });
       void queryClient.invalidateQueries({ queryKey: ['tokens'] });
@@ -816,61 +880,173 @@ export function AppointmentsPage(): React.JSX.Element {
   }, [allData, doctorFilter, statusFilter, feeTypeFilter, debouncedSearch]);
   const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
+  const visibleIds = useMemo(() => paginated.map((a) => a.id), [paginated]);
+  const isAllSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const isSomeSelected = visibleIds.some((id) => selectedIds.has(id)) && !isAllSelected;
+
+  const handleSelectAll = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (isAllSelected) {
+        visibleIds.forEach((id) => next.delete(id));
+      } else {
+        visibleIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const handleToggleRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const showDoctorFilter = user?.role !== 'doctor';
   const appointmentFilters = (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, width: '100%', flexShrink: 0, flexWrap: 'wrap' }}>
-      <SearchField
-        value={search}
-        onChange={(v) => { setSearch(v); setPage(0); }}
-        placeholder="Search patient, doctor, reason..."
-        sx={{ flexGrow: 1, maxWidth: 360, '& .MuiOutlinedInput-root': { borderRadius: 0.5 } }}
-      />
-      {showDoctorFilter && (
-        <FormControl size="small" sx={{ minWidth: 170, flexShrink: 0 }}>
-          <InputLabel>Doctor</InputLabel>
+    <Stack spacing={1.5} sx={{ width: '100%' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, width: '100%', flexShrink: 0, flexWrap: 'wrap' }}>
+        <SearchField
+          value={search}
+          onChange={(v) => { setSearch(v); setPage(0); }}
+          placeholder="Search patient, doctor, reason..."
+          sx={{ flexGrow: 1, maxWidth: 360, '& .MuiOutlinedInput-root': { borderRadius: 0.5 } }}
+        />
+        {showDoctorFilter && (
+          <FormControl size="small" sx={{ minWidth: 170, flexShrink: 0 }}>
+            <InputLabel>Doctor</InputLabel>
+            <Select
+              label="Doctor"
+              value={doctorFilter}
+              onChange={(e) => { setDoctorFilter(e.target.value); setPage(0); }}
+              sx={filterSelectSx}
+            >
+              <MenuItem value="ALL">All doctors</MenuItem>
+              {doctorOptions.map(([id, name]) => (
+                <MenuItem key={id} value={id}>{name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+        <FormControl size="small" sx={{ minWidth: 160, flexShrink: 0 }}>
+          <InputLabel>Status</InputLabel>
           <Select
-            label="Doctor"
-            value={doctorFilter}
-            onChange={(e) => { setDoctorFilter(e.target.value); setPage(0); }}
+            label="Status"
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
             sx={filterSelectSx}
           >
-            <MenuItem value="ALL">All doctors</MenuItem>
-            {doctorOptions.map(([id, name]) => (
-              <MenuItem key={id} value={id}>{name}</MenuItem>
+            <MenuItem value="ALL">All statuses</MenuItem>
+            <MenuItem value="NO_TOKEN">Without Token (Pending)</MenuItem>
+            {Object.entries(statusConfig).map(([value, cfg]) => (
+              <MenuItem key={value} value={value}>{cfg.label}</MenuItem>
             ))}
           </Select>
         </FormControl>
-      )}
-      <FormControl size="small" sx={{ minWidth: 160, flexShrink: 0 }}>
-        <InputLabel>Status</InputLabel>
-        <Select
-          label="Status"
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
-          sx={filterSelectSx}
+        <FormControl size="small" sx={{ minWidth: 150, flexShrink: 0 }}>
+          <InputLabel>Fee Type</InputLabel>
+          <Select
+            label="Fee Type"
+            value={feeTypeFilter}
+            onChange={(e) => { setFeeTypeFilter(e.target.value); setPage(0); }}
+            sx={filterSelectSx}
+          >
+            <MenuItem value="ALL">All fee types</MenuItem>
+            <MenuItem value="PAID">Paid Visit</MenuItem>
+            <MenuItem value="FREE">Free Checkup</MenuItem>
+            <MenuItem value="HALF">50% Discount</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
+      {/* Bulk Action Bar on Selection */}
+      <Collapse in={selectedIds.size > 0} unmountOnExit>
+        <Paper
+          elevation={0}
+          sx={{
+            p: 1.25,
+            px: 2,
+            borderRadius: '12px',
+            bgcolor: alpha(theme.palette.primary.main, 0.08),
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.22)}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 1.5,
+          }}
         >
-          <MenuItem value="ALL">All statuses</MenuItem>
-          <MenuItem value="NO_TOKEN">Without Token (Pending)</MenuItem>
-          {Object.entries(statusConfig).map(([value, cfg]) => (
-            <MenuItem key={value} value={value}>{cfg.label}</MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-      <FormControl size="small" sx={{ minWidth: 150, flexShrink: 0 }}>
-        <InputLabel>Fee Type</InputLabel>
-        <Select
-          label="Fee Type"
-          value={feeTypeFilter}
-          onChange={(e) => { setFeeTypeFilter(e.target.value); setPage(0); }}
-          sx={filterSelectSx}
-        >
-          <MenuItem value="ALL">All fee types</MenuItem>
-          <MenuItem value="PAID">Paid Visit</MenuItem>
-          <MenuItem value="FREE">Free Checkup</MenuItem>
-          <MenuItem value="HALF">50% Discount</MenuItem>
-        </Select>
-      </FormControl>
-    </Box>
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Chip
+              label={`${selectedIds.size} Selected`}
+              color="primary"
+              size="small"
+              sx={{ fontWeight: 800, borderRadius: '8px' }}
+            />
+            <Typography fontSize={13} fontWeight={500} color="text.secondary">
+              Bulk actions for selected rows:
+            </Typography>
+          </Stack>
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Button
+              size="small"
+              variant="contained"
+              color="success"
+              startIcon={<CheckCircleOutlinedIcon sx={{ fontSize: 16 }} />}
+              disabled={isBulkLoading}
+              onClick={handleBulkComplete}
+              sx={{ borderRadius: '8px', fontWeight: 700, textTransform: 'none', px: 1.5, boxShadow: 'none' }}
+            >
+              Mark Completed
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              color="primary"
+              startIcon={<LoginOutlinedIcon sx={{ fontSize: 16 }} />}
+              disabled={isBulkLoading}
+              onClick={handleBulkCheckIn}
+              sx={{ borderRadius: '8px', fontWeight: 700, textTransform: 'none', px: 1.5, boxShadow: 'none' }}
+            >
+              Check In All
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              color="warning"
+              startIcon={<CancelOutlinedIcon sx={{ fontSize: 16 }} />}
+              disabled={isBulkLoading}
+              onClick={handleBulkCancel}
+              sx={{ borderRadius: '8px', fontWeight: 700, textTransform: 'none', px: 1.5 }}
+            >
+              Cancel Selected
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteOutlineIcon sx={{ fontSize: 16 }} />}
+              disabled={isBulkLoading}
+              onClick={() => setBulkConfirmDelete(true)}
+              sx={{ borderRadius: '8px', fontWeight: 700, textTransform: 'none', px: 1.5 }}
+            >
+              Delete Selected
+            </Button>
+            <Button
+              size="small"
+              variant="text"
+              onClick={() => setSelectedIds(new Set())}
+              sx={{ borderRadius: '8px', textTransform: 'none', color: 'text.secondary', fontWeight: 600 }}
+            >
+              Deselect All
+            </Button>
+          </Stack>
+        </Paper>
+      </Collapse>
+    </Stack>
   );
 
 
@@ -954,6 +1130,15 @@ export function AppointmentsPage(): React.JSX.Element {
         >
           <TableHead sx={tableSx.head}>
             <TableRow>
+              <TableCell padding="checkbox" sx={{ width: 44, pl: 2 }}>
+                <Checkbox
+                  size="small"
+                  checked={isAllSelected}
+                  indeterminate={isSomeSelected}
+                  onChange={handleSelectAll}
+                  sx={{ p: '3px' }}
+                />
+              </TableCell>
               <TableCell sx={{ whiteSpace: 'nowrap' }}>Patient</TableCell>
               <TableCell sx={{ whiteSpace: 'nowrap' }}>Doctor</TableCell>
               <TableCell sx={{ whiteSpace: 'nowrap' }}>Token</TableCell>
@@ -962,25 +1147,38 @@ export function AppointmentsPage(): React.JSX.Element {
               <TableCell sx={{ whiteSpace: 'nowrap' }}>Fee Type</TableCell>
               <TableCell sx={{ whiteSpace: 'nowrap' }}>Status</TableCell>
               <TableCell sx={{ whiteSpace: 'nowrap' }}>Reason</TableCell>
-              {!isAdmin && <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>Actions</TableCell>}
+              {!isAdmin && <TableCell align="right" sx={{ width: 64, pr: 2, whiteSpace: 'nowrap' }}>Actions</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
             {appointments.isLoading ? (
-              <TableRowsSkeleton cols={isAdmin ? 8 : 9} />
+              <TableRowsSkeleton cols={isAdmin ? 9 : 10} />
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={isAdmin ? 8 : 9} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No appointments scheduled.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={isAdmin ? 9 : 10} sx={{ py: 6, textAlign: 'center', color: 'text.secondary', fontSize: 13 }}>No appointments scheduled.</TableCell></TableRow>
             ) : (
               paginated.map((a) => (
                 <TableRow
                   key={a.id}
-                  sx={{ ...tableSx.row, cursor: 'pointer' }}
+                  selected={selectedIds.has(a.id)}
+                  sx={{
+                    ...tableSx.row,
+                    cursor: 'pointer',
+                    ...(selectedIds.has(a.id) ? { bgcolor: alpha(theme.palette.primary.main, 0.06) } : {}),
+                  }}
                   onClick={() => navigate(`/appointments/${a.id}`, { state: detailNavState })}
                 >
+                  <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()} sx={{ width: 44, pl: 2 }}>
+                    <Checkbox
+                      size="small"
+                      checked={selectedIds.has(a.id)}
+                      onChange={() => handleToggleRow(a.id)}
+                      sx={{ p: '3px' }}
+                    />
+                  </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, whiteSpace: 'nowrap' }}>
                       <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'primary.main', flexShrink: 0 }}>
-                        {a.patient.firstName[0]}{a.patient.lastName[0]}
+                        {a.patient.firstName[0]}{a.patient.lastName?.[0] ?? ''}
                       </Avatar>
                       <Box sx={{ whiteSpace: 'nowrap' }}>
                         <Typography fontSize={13.5} fontWeight={500} sx={{ whiteSpace: 'nowrap' }}>{personLabel(a.patient)}</Typography>
@@ -1051,6 +1249,8 @@ export function AppointmentsPage(): React.JSX.Element {
                       <Chip label="Free Checkup" size="small" color="success" variant="filled" sx={{ fontWeight: 700, fontSize: 11 }} />
                     ) : a.feeType === 'HALF' ? (
                       <Chip label="50% Off" size="small" color="warning" variant="filled" sx={{ fontWeight: 700, fontSize: 11 }} />
+                    ) : a.feeType === 'DISCOUNTED' ? (
+                      <Chip label="Discounted" size="small" color="info" variant="filled" sx={{ fontWeight: 700, fontSize: 11 }} />
                     ) : (
                       <Chip label="Paid Visit" size="small" color="primary" variant="outlined" sx={{ fontWeight: 600, fontSize: 11 }} />
                     )}
@@ -1060,67 +1260,25 @@ export function AppointmentsPage(): React.JSX.Element {
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>{a.reason || '—'}</TableCell>
                   {!isAdmin && (
-                    <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                      <Stack direction="row" gap={0.5} justifyContent="flex-end">
-                        <Tooltip title="View details">
-                          <IconButton sx={actionBtnSx} onClick={() => navigate(`/appointments/${a.id}`, { state: detailNavState })}>
-                            <VisibilityOutlinedIcon sx={{ fontSize: 17 }} />
-                          </IconButton>
-                        </Tooltip>
-                        {a.tokenNumber ? (
-                          <Tooltip title="Print token"><span>
-                            <IconButton
-                              sx={actionBtnSx}
-                              loading={tokenPrint.printingId === a.id}
-                              onClick={() => tokenPrint.printFor(a)}
-                            >
-                              <PrintOutlinedIcon sx={{ fontSize: 17 }} />
-                            </IconButton>
-                          </span></Tooltip>
-                        ) : null}
-                        <Tooltip title="Edit"><span>
-                          <IconButton sx={actionBtnSx} disabled={['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status)} onClick={() => { setActive(a); setOpen(true); }}>
-                            <EditOutlinedIcon sx={{ fontSize: 17 }} />
-                          </IconButton>
-                        </span></Tooltip>
-                        {!a.tokenNumber && !['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status) && (
-                          <Tooltip title="Issue Token"><span>
-                            <IconButton
-                              sx={{
-                                ...actionBtnSx,
-                                color: 'primary.main',
-                                bgcolor: alpha(theme.palette.primary.main, 0.08),
-                                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.16) },
-                              }}
-                              loading={statusMutation.isPending && statusMutation.variables?.id === a.id}
-                              onClick={() => statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' })}
-                            >
-                              <ConfirmationNumberOutlinedIcon sx={{ fontSize: 17 }} />
-                            </IconButton>
-                          </span></Tooltip>
-                        )}
-                        {Boolean(a.tokenNumber) && a.status === 'SCHEDULED' && (
-                          <Tooltip title="Check In"><span>
-                            <IconButton
-                              sx={actionBtnSx}
-                              loading={statusMutation.isPending && statusMutation.variables?.id === a.id}
-                              onClick={() => statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' })}
-                            >
-                              <LoginOutlinedIcon sx={{ fontSize: 17 }} />
-                            </IconButton>
-                          </span></Tooltip>
-                        )}
-                        {a.status === 'CHECKED_IN' && (
-                          <Tooltip title="Mark Completed"><IconButton sx={actionBtnSx} loading={statusMutation.isPending && statusMutation.variables?.id === a.id} onClick={() => statusMutation.mutate({ id: a.id, status: 'COMPLETED' })}><CheckCircleOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                        )}
-                        {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
-                          <Tooltip title="No Show"><IconButton sx={actionBtnSx} loading={statusMutation.isPending && statusMutation.variables?.id === a.id} onClick={() => statusMutation.mutate({ id: a.id, status: 'NO_SHOW' })}><PersonOffOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                        )}
-                        {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
-                          <Tooltip title="Cancel"><IconButton sx={actionBtnSx} loading={cancelMutation.isPending && cancelMutation.variables === a.id} onClick={() => cancelMutation.mutate(a.id)}><CancelOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                        )}
-                        <Tooltip title="Delete"><IconButton sx={actionBtnSx} onClick={() => setDeleteTarget(a)}><DeleteOutlineIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
-                      </Stack>
+                    <TableCell align="right" onClick={(e) => e.stopPropagation()} sx={{ width: 64, pr: 2 }}>
+                      <Tooltip title="Actions" placement="left">
+                        <IconButton
+                          size="small"
+                          sx={{
+                            ...actionBtnSx,
+                            border: '1px solid',
+                            borderColor: activeMenuAppt?.id === a.id ? 'primary.main' : 'divider',
+                            bgcolor: activeMenuAppt?.id === a.id ? alpha(theme.palette.primary.main, 0.12) : 'transparent',
+                            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08), borderColor: 'primary.main' },
+                          }}
+                          onClick={(e) => {
+                            setMenuAnchor(e.currentTarget);
+                            setActiveMenuAppt(a);
+                          }}
+                        >
+                          <MoreVertOutlinedIcon sx={{ fontSize: 18 }} />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                   )}
                 </TableRow>
@@ -1129,6 +1287,166 @@ export function AppointmentsPage(): React.JSX.Element {
           </TableBody>
         </TablePageShell>
       )}
+
+      {/* Floating Action Popover (Right to Left) */}
+      <Popover
+        open={Boolean(menuAnchor && activeMenuAppt)}
+        anchorEl={menuAnchor}
+        onClose={() => { setMenuAnchor(null); setActiveMenuAppt(null); }}
+        anchorOrigin={{ vertical: 'center', horizontal: -8 }}
+        transformOrigin={{ vertical: 'center', horizontal: 'right' }}
+        slotProps={{
+          paper: {
+            sx: {
+              width: 'max-content',
+              maxWidth: 'none',
+              borderRadius: '8px',
+              boxShadow: (t) => t.palette.mode === 'dark'
+                ? '0 10px 30px rgba(0,0,0,0.6)'
+                : '0 8px 24px rgba(0,0,0,0.12)',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderLeft: '4px solid',
+              borderLeftColor: 'primary.main',
+              p: 0.5,
+              px: 0.75,
+              display: 'flex',
+              alignItems: 'center',
+              bgcolor: 'background.paper',
+              position: 'relative',
+              overflow: 'visible',
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: '50%',
+                right: -5,
+                transform: 'translateY(-50%) rotate(45deg)',
+                width: 8,
+                height: 8,
+                bgcolor: 'background.paper',
+                borderTop: '1px solid',
+                borderRight: '1px solid',
+                borderColor: 'divider',
+                pointerEvents: 'none',
+              },
+            },
+          },
+        }}
+      >
+        {activeMenuAppt && (() => {
+          const a = activeMenuAppt;
+          const close = () => { setMenuAnchor(null); setActiveMenuAppt(null); };
+          return (
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              <Tooltip title="View details" arrow placement="top">
+                <IconButton sx={actionBtnSx} onClick={() => { close(); navigate(`/appointments/${a.id}`, { state: detailNavState }); }}>
+                  <VisibilityOutlinedIcon sx={{ fontSize: 17 }} />
+                </IconButton>
+              </Tooltip>
+              {a.tokenNumber ? (
+                <Tooltip title="Print token" arrow placement="top">
+                  <IconButton
+                    sx={actionBtnSx}
+                    loading={tokenPrint.printingId === a.id}
+                    onClick={() => { close(); tokenPrint.printFor(a); }}
+                  >
+                    <PrintOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </Tooltip>
+              ) : null}
+              {!a.tokenNumber && !['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status) && (
+                <Tooltip title="Issue Token" arrow placement="top">
+                  <IconButton
+                    sx={{
+                      ...actionBtnSx,
+                      color: 'primary.main',
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) },
+                    }}
+                    loading={statusMutation.isPending && statusMutation.variables?.id === a.id}
+                    onClick={() => { close(); statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' }); }}
+                  >
+                    <ConfirmationNumberOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+              {Boolean(a.tokenNumber) && a.status === 'SCHEDULED' && (
+                <Tooltip title="Check In" arrow placement="top">
+                  <IconButton
+                    sx={actionBtnSx}
+                    loading={statusMutation.isPending && statusMutation.variables?.id === a.id}
+                    onClick={() => { close(); statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' }); }}
+                  >
+                    <LoginOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+              <Tooltip title="Edit" arrow placement="top">
+                <span>
+                  <IconButton
+                    sx={actionBtnSx}
+                    disabled={['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status)}
+                    onClick={() => { close(); setActive(a); setOpen(true); }}
+                  >
+                    <EditOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              {['CHECKED_IN', 'SCHEDULED'].includes(a.status) && (
+                <Tooltip title="Mark Completed" arrow placement="top">
+                  <IconButton
+                    sx={{ ...actionBtnSx, color: 'success.main' }}
+                    loading={statusMutation.isPending && statusMutation.variables?.id === a.id}
+                    onClick={() => { close(); statusMutation.mutate({ id: a.id, status: 'COMPLETED' }); }}
+                  >
+                    <CheckCircleOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+              {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
+                <Tooltip title="No Show" arrow placement="top">
+                  <IconButton
+                    sx={{ ...actionBtnSx, color: 'warning.main' }}
+                    loading={statusMutation.isPending && statusMutation.variables?.id === a.id}
+                    onClick={() => { close(); statusMutation.mutate({ id: a.id, status: 'NO_SHOW' }); }}
+                  >
+                    <PersonOffOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+              {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
+                <Tooltip title="Cancel appointment" arrow placement="top">
+                  <IconButton
+                    sx={{ ...actionBtnSx, color: 'text.secondary' }}
+                    loading={cancelMutation.isPending && cancelMutation.variables === a.id}
+                    onClick={() => { close(); cancelMutation.mutate(a.id); }}
+                  >
+                    <CancelOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+              <Divider orientation="vertical" flexItem sx={{ my: 0.5, mx: 0.5 }} />
+              <Tooltip title="Delete" arrow placement="top">
+                <IconButton
+                  sx={{ ...actionBtnSx, color: 'error.main', '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.1) } }}
+                  onClick={() => { close(); setDeleteTarget(a); }}
+                >
+                  <DeleteOutlineIcon sx={{ fontSize: 17 }} />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          );
+        })()}
+      </Popover>
+
+      <ConfirmDialog
+        open={bulkConfirmDelete}
+        title={`Delete ${selectedIds.size} appointments?`}
+        message={`Are you sure you want to delete ${selectedIds.size} selected appointment(s)? This action cannot be undone.`}
+        loading={isBulkLoading}
+        onClose={() => setBulkConfirmDelete(false)}
+        onConfirm={handleBulkDelete}
+      />
       <AppointmentDialog
         appointment={active}
         open={open}

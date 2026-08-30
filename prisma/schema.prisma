@@ -141,7 +141,8 @@ model Patient {
   id                    String    @id @default(uuid())
   mrNumber              String    @unique
   firstName             String
-  lastName              String
+  lastName              String?
+  weight                Float?
   dateOfBirth           DateTime?
   gender                String?
   phone                 String?

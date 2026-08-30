@@ -49,8 +49,8 @@ const statusConfig: Record<string, { label: string; color: 'default' | 'primary'
   NO_SHOW: { label: 'No Show', color: 'error' },
 };
 
-function personName(first: string, last: string): string {
-  return `${first} ${last}`.trim();
+function personName(first?: string | null, last?: string | null): string {
+  return [first, last].filter(Boolean).join(' ').trim();
 }
 
 export function AppointmentDetailPage(): React.JSX.Element {

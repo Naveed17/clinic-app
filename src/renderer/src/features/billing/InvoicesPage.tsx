@@ -7,6 +7,7 @@ import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import MoreVertOutlinedIcon from '@mui/icons-material/MoreVertOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
@@ -24,6 +25,7 @@ import {
   InputLabel,
   MenuItem,
   Paper,
+  Popover,
   Skeleton,
   Stack,
   TextField,
@@ -70,7 +72,7 @@ const PAYMENT_METHODS = ['CASH', 'CARD', 'BANK_TRANSFER', 'MOBILE_WALLET', 'OTHE
 
 const money = (value: number) =>
   `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
-const personLabel = (person: InvoicePerson) => `${person.firstName} ${person.lastName}`;
+const personLabel = (person: InvoicePerson) => [person.firstName, person.lastName].filter(Boolean).join(' ').trim();
 
 /* ── Payment History Dialog ── */
 function PaymentHistoryDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }): React.JSX.Element {
@@ -318,7 +320,7 @@ const defaults: FormValues = { patientId: '', discount: 0, notes: '', items: [{ 
 type InvoicePatientOption = InvoicePerson & { mrNumber?: string; inputLabel?: string };
 
 const filterPatients = createFilterOptions<InvoicePatientOption>({
-  stringify: (p) => `${p.firstName} ${p.lastName} ${p.mrNumber ?? ''} ${p.phone ?? ''}`,
+  stringify: (p) => `${p.firstName || ''} ${p.lastName || ''} ${p.mrNumber ?? ''} ${p.phone ?? ''}`,
 });
 
 const ADD_NEW = '__add_new__';
@@ -637,6 +639,8 @@ export function InvoicesPage(): React.JSX.Element {
   const [historyInvoice, setHistoryInvoice] = useState<Invoice | undefined>();
   const [voidInvoice, setVoidInvoice] = useState<Invoice | undefined>();
   const [deleteInvoice, setDeleteInvoice] = useState<Invoice | undefined>();
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const [activeMenuInvoice, setActiveMenuInvoice] = useState<Invoice | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -670,7 +674,7 @@ export function InvoicesPage(): React.JSX.Element {
     const q = debouncedSearch.toLowerCase();
     return (
       inv.invoiceNumber.toLowerCase().includes(q) ||
-      `${inv.patient.firstName} ${inv.patient.lastName}`.toLowerCase().includes(q)
+      personLabel(inv.patient).toLowerCase().includes(q)
     );
   });
   const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
@@ -732,7 +736,7 @@ export function InvoicesPage(): React.JSX.Element {
             <TableCell>Status</TableCell>
             <TableCell align="right">Total</TableCell>
             <TableCell align="right">Paid</TableCell>
-            <TableCell align="right">Actions</TableCell>
+            <TableCell align="right" sx={{ width: 64, pr: 2, whiteSpace: 'nowrap' }}>Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -743,12 +747,6 @@ export function InvoicesPage(): React.JSX.Element {
           ) : (
             paginated.map((invoice) => {
               const cfg = statusConfig[invoice.status] ?? { label: invoice.status, color: 'default' as const };
-              const isVoid = invoice.status === 'VOID';
-              const paid = Number(invoice.amountPaid ?? 0);
-              const total = Number(invoice.total);
-              const balance = Math.max(0, total - paid);
-              const canPay = !isAdmin && !isVoid && invoice.status !== 'PAID' && invoice.status !== 'REFUNDED' && balance > 0;
-              const canRefund = !isAdmin && !isVoid && paid > 0;
               return (
                 <TableRow
                   key={invoice.id}
@@ -759,7 +757,7 @@ export function InvoicesPage(): React.JSX.Element {
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
                       <Avatar sx={{ width: 34, height: 34, fontSize: 13, fontWeight: 700, bgcolor: 'primary.main' }}>
-                        {invoice.patient.firstName[0]}{invoice.patient.lastName[0]}
+                        {invoice.patient.firstName[0]}{invoice.patient.lastName?.[0] ?? ''}
                       </Avatar>
                       <Box>
                         <Typography fontSize={13.5} fontWeight={600}>{personLabel(invoice.patient)}</Typography>
@@ -790,55 +788,25 @@ export function InvoicesPage(): React.JSX.Element {
                   <TableCell><Chip label={cfg.label} color={cfg.color} size="small" sx={chipSx} /></TableCell>
                   <TableCell align="right"><Typography fontSize={13.5} fontWeight={700}>{money(invoice.total)}</Typography></TableCell>
                   <TableCell align="right">{money(Number(invoice.amountPaid ?? 0))}</TableCell>
-                  <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                    <Stack direction="row" gap={0.5} justifyContent="flex-end">
-                      <Tooltip title="View details">
-                        <IconButton sx={actionBtnSx} onClick={() => navigate(`/billing/${invoice.id}`)}>
-                          <VisibilityOutlinedIcon sx={{ fontSize: 17 }} />
-                        </IconButton>
-                      </Tooltip>
-                      {!isAdmin && canPay && (
-                        <Tooltip title="Record Payment">
-                          <IconButton sx={actionBtnSx} onClick={() => setPaymentInvoice(invoice)}><PaymentOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
-                        </Tooltip>
-                      )}
-                      {canRefund && (
-                        <Tooltip title="Refund">
-                          <IconButton sx={actionBtnSx} onClick={() => setRefundInvoice(invoice)}>
-                            <UndoOutlinedIcon sx={{ fontSize: 17 }} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      <Tooltip title="Payment History">
-                        <IconButton sx={actionBtnSx} onClick={() => setHistoryInvoice(invoice)}>
-                          <HistoryOutlinedIcon sx={{ fontSize: 17 }} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Print invoice">
-                        <span>
-                          <IconButton
-                            sx={actionBtnSx}
-                            loading={printingId === invoice.id}
-                            disabled={printingId === invoice.id}
-                            onClick={() => void handlePrintInvoice(invoice)}
-                          >
-                            <PrintOutlinedIcon sx={{ fontSize: 17 }} />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                      {!isAdmin && invoice.status !== 'VOID' && invoice.status !== 'PAID' && invoice.status !== 'REFUNDED' && (
-                        <Tooltip title="Void Invoice">
-                          <IconButton sx={actionBtnSx} onClick={() => setVoidInvoice(invoice)}><BlockOutlinedIcon sx={{ fontSize: 17 }} /></IconButton>
-                        </Tooltip>
-                      )}
-                      {!isAdmin && (
-                        <Tooltip title="Delete invoice">
-                          <IconButton sx={actionBtnSx} color="error" onClick={() => setDeleteInvoice(invoice)}>
-                            <DeleteOutlineIcon sx={{ fontSize: 17 }} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Stack>
+                  <TableCell align="right" onClick={(e) => e.stopPropagation()} sx={{ width: 64, pr: 2 }}>
+                    <Tooltip title="Actions" placement="left">
+                      <IconButton
+                        size="small"
+                        sx={{
+                          ...actionBtnSx,
+                          border: '1px solid',
+                          borderColor: activeMenuInvoice?.id === invoice.id ? 'primary.main' : 'divider',
+                          bgcolor: activeMenuInvoice?.id === invoice.id ? alpha(theme.palette.primary.main, 0.12) : 'transparent',
+                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08), borderColor: 'primary.main' },
+                        }}
+                        onClick={(e) => {
+                          setMenuAnchor(e.currentTarget);
+                          setActiveMenuInvoice(invoice);
+                        }}
+                      >
+                        <MoreVertOutlinedIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               );
@@ -846,6 +814,134 @@ export function InvoicesPage(): React.JSX.Element {
           )}
         </TableBody>
       </TablePageShell>
+
+      {/* Floating Action Popover (Right to Left) */}
+      <Popover
+        open={Boolean(menuAnchor && activeMenuInvoice)}
+        anchorEl={menuAnchor}
+        onClose={() => { setMenuAnchor(null); setActiveMenuInvoice(null); }}
+        anchorOrigin={{ vertical: 'center', horizontal: -8 }}
+        transformOrigin={{ vertical: 'center', horizontal: 'right' }}
+        slotProps={{
+          paper: {
+            sx: {
+              width: 'max-content',
+              maxWidth: 'none',
+              borderRadius: '8px',
+              boxShadow: (t) => t.palette.mode === 'dark'
+                ? '0 10px 30px rgba(0,0,0,0.6)'
+                : '0 8px 24px rgba(0,0,0,0.12)',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderLeft: '4px solid',
+              borderLeftColor: 'primary.main',
+              p: 0.5,
+              px: 0.75,
+              display: 'flex',
+              alignItems: 'center',
+              bgcolor: 'background.paper',
+              position: 'relative',
+              overflow: 'visible',
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: '50%',
+                right: -5,
+                transform: 'translateY(-50%) rotate(45deg)',
+                width: 8,
+                height: 8,
+                bgcolor: 'background.paper',
+                borderTop: '1px solid',
+                borderRight: '1px solid',
+                borderColor: 'divider',
+                pointerEvents: 'none',
+              },
+            },
+          },
+        }}
+      >
+        {activeMenuInvoice && (() => {
+          const invoice = activeMenuInvoice;
+          const isVoid = invoice.status === 'VOID';
+          const paid = Number(invoice.amountPaid ?? 0);
+          const total = Number(invoice.total);
+          const balance = Math.max(0, total - paid);
+          const canPay = !isAdmin && !isVoid && invoice.status !== 'PAID' && invoice.status !== 'REFUNDED' && balance > 0;
+          const canRefund = !isAdmin && !isVoid && paid > 0;
+          const close = () => { setMenuAnchor(null); setActiveMenuInvoice(null); };
+
+          return (
+            <Stack direction="row" spacing={0.5} alignItems="center">
+              <Tooltip title="View details" arrow placement="top">
+                <IconButton sx={actionBtnSx} onClick={() => { close(); navigate(`/billing/${invoice.id}`); }}>
+                  <VisibilityOutlinedIcon sx={{ fontSize: 17 }} />
+                </IconButton>
+              </Tooltip>
+
+              {!isAdmin && canPay && (
+                <Tooltip title="Record Payment" arrow placement="top">
+                  <IconButton sx={{ ...actionBtnSx, color: 'primary.main' }} onClick={() => { close(); setPaymentInvoice(invoice); }}>
+                    <PaymentOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+
+              {canRefund && (
+                <Tooltip title="Refund" arrow placement="top">
+                  <IconButton sx={actionBtnSx} onClick={() => { close(); setRefundInvoice(invoice); }}>
+                    <UndoOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+
+              <Tooltip title="Payment History" arrow placement="top">
+                <IconButton sx={actionBtnSx} onClick={() => { close(); setHistoryInvoice(invoice); }}>
+                  <HistoryOutlinedIcon sx={{ fontSize: 17 }} />
+                </IconButton>
+              </Tooltip>
+
+              <Tooltip title="Print invoice" arrow placement="top">
+                <span>
+                  <IconButton
+                    sx={actionBtnSx}
+                    loading={printingId === invoice.id}
+                    disabled={printingId === invoice.id}
+                    onClick={() => { close(); void handlePrintInvoice(invoice); }}
+                  >
+                    <PrintOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
+
+              {!isAdmin && invoice.status !== 'VOID' && invoice.status !== 'PAID' && invoice.status !== 'REFUNDED' && (
+                <Tooltip title="Void Invoice" arrow placement="top">
+                  <IconButton sx={{ ...actionBtnSx, color: 'warning.main' }} onClick={() => { close(); setVoidInvoice(invoice); }}>
+                    <BlockOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+
+              {!isAdmin && (
+                <>
+                  <Divider orientation="vertical" flexItem sx={{ my: 0.5, mx: 0.5 }} />
+                  <Tooltip title="Delete invoice" arrow placement="top">
+                    <IconButton
+                      sx={{
+                        ...actionBtnSx,
+                        color: 'error.main',
+                        '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.1) },
+                      }}
+                      onClick={() => { close(); setDeleteInvoice(invoice); }}
+                    >
+                      <DeleteOutlineIcon sx={{ fontSize: 17 }} />
+                    </IconButton>
+                  </Tooltip>
+                </>
+              )}
+            </Stack>
+          );
+        })()}
+      </Popover>
       <InvoiceDialog
         open={open}
         onClose={() => setOpen(false)}

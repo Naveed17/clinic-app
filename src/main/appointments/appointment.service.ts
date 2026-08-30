@@ -445,45 +445,6 @@ export async function cancelAppointment(id: string) {
 }
 
 export async function updateAppointmentStatus(id: string, status: AppointmentStatus) {
-  const existingAppt = await getAppointmentById(id);
-
-  if (existingAppt && ['CHECKED_IN', 'COMPLETED'].includes(status)) {
-    const visitAt = new Date(existingAppt.startsAt);
-    if (!Number.isNaN(visitAt.getTime())) {
-      const dateStr = visitAt.toISOString().slice(0, 10);
-      const existingToken = await getPrisma().token.findFirst({
-        where: {
-          patientId: existingAppt.patientId,
-          doctorId: existingAppt.providerId,
-          date: dateStr,
-        },
-      });
-
-      if (!existingToken) {
-        try {
-          const doctor = await getPrisma().user.findUnique({
-            where: { id: existingAppt.providerId },
-            select: { doctorProfile: { select: { consultationFee: true } } },
-          });
-          const fee = (existingAppt as unknown as { feeType?: string }).feeType === 'FREE' ? 0 : Number(doctor?.doctorProfile?.consultationFee ?? 0);
-          const newToken = await createToken({
-            patientId: existingAppt.patientId,
-            doctorId: existingAppt.providerId,
-            date: dateStr,
-            reason: existingAppt.reason ?? undefined,
-            consultationFee: fee,
-            feeDiscount: 0,
-          });
-          if (status === 'COMPLETED') {
-            await updateTokenStatus(newToken.id, 'DONE');
-          }
-        } catch (err) {
-          console.error('Failed to auto-create token for appointment checkin/complete:', err);
-        }
-      }
-    }
-  }
-
   await getPrisma().appointment.update({ where: { id }, data: { status } });
   const appointment = await getAppointmentById(id);
   if (status === 'COMPLETED' && appointment) {

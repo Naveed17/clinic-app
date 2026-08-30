@@ -512,7 +512,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
     const a = laid.appt;
     const start = new Date(a.startsAt);
     const color = STATUS_COLOR[a.status] ?? theme.palette.primary.main;
-    const initials = `${a.patient.firstName[0] ?? ''}${a.patient.lastName[0] ?? ''}`.toUpperCase();
+    const initials = `${a.patient.firstName[0] ?? ''}${a.patient.lastName?.[0] ?? ''}`.toUpperCase();
     const tall = laid.height >= 78;
     const tok = tokenNum(a.tokenNumber);
 
@@ -1195,7 +1195,7 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                 const end = new Date(a.endsAt);
                 const mins = Math.round((end.getTime() - start.getTime()) / 60000);
                 const next = NEXT_STATUS[a.status];
-                const initials = `${a.patient.firstName[0]}${a.patient.lastName[0]}`.toUpperCase();
+                const initials = `${a.patient.firstName[0] ?? ''}${a.patient.lastName?.[0] ?? ''}`.toUpperCase();
                 const color = STATUS_COLOR[a.status];
                 const tok = tokenNum(a.tokenNumber);
 

@@ -468,7 +468,7 @@ export function OpdReportDocument({
                     </Text>
                     <Text style={[styles.td, { width: '17%', paddingRight: 4 }]}>{row.patientName}</Text>
                     <Text style={[styles.td, { width: '15%', paddingRight: 4 }]}>{row.doctorName}</Text>
-                    <Text style={[styles.td, { width: '10%', paddingRight: 4 }]}>{row.feeType === 'FREE' ? 'Free' : row.feeType === 'HALF' ? '50% Off' : 'Paid'}</Text>
+                    <Text style={[styles.td, { width: '10%', paddingRight: 4 }]}>{row.feeType === 'FREE' ? 'Free' : row.feeType === 'HALF' ? '50% Off' : row.feeType === 'DISCOUNTED' ? 'Discount' : 'Paid'}</Text>
                     <Text style={[styles.td, { width: '10%', paddingRight: 4 }]}>{statusLabel(row.status)}</Text>
                     <Text style={[styles.num, { width: '10%' }]}>{money(row.consultationFee)}</Text>
                     <Text style={[styles.num, { width: '10%' }]}>{money(row.feeDiscount)}</Text>

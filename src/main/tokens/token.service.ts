@@ -181,8 +181,8 @@ export async function listPrescriptionFeed(date: string): Promise<PrescriptionFe
   const db = getPrisma();
   const rows = await db.$queryRawUnsafe<PrescriptionFeedItem[]>(`
     SELECT pr.id, pr.tokenId, t.tokenNumber,
-           p.firstName || ' ' || p.lastName AS patientName,
-           u.firstName || ' ' || u.lastName AS doctorName,
+           TRIM(p.firstName || ' ' || COALESCE(p.lastName, '')) AS patientName,
+           TRIM(u.firstName || ' ' || COALESCE(u.lastName, '')) AS doctorName,
            pr.createdAt
     FROM "Prescription" pr
     JOIN "Token" t ON t.id = pr.tokenId
@@ -205,9 +205,9 @@ export async function listPharmacyQueue(date: string): Promise<PharmacyQueueItem
       t.date,
       t.patientId,
       t.doctorId,
-      p.firstName || ' ' || p.lastName AS patientName,
+      TRIM(p.firstName || ' ' || COALESCE(p.lastName, '')) AS patientName,
       p.mrNumber AS patientMrNumber,
-      u.firstName || ' ' || u.lastName AS doctorName,
+      TRIM(u.firstName || ' ' || COALESCE(u.lastName, '')) AS doctorName,
       pr.diagnosis,
       pr.medicines,
       pr.tests,
@@ -397,7 +397,8 @@ export async function createToken(input: TokenInput) {
         feeDiscount,
         token.id,
       );
-      const derivedFeeType = consultationFee === 0 ? 'FREE' : feeDiscount > 0 ? 'HALF' : 'PAID';
+      const isHalf = consultationFee > 0 && feeDiscount > 0 && Math.abs(feeDiscount - consultationFee / 2) <= 1;
+      const derivedFeeType = consultationFee === 0 || feeDiscount >= consultationFee ? 'FREE' : isHalf ? 'HALF' : feeDiscount > 0 ? 'DISCOUNTED' : 'PAID';
       await getPrisma().$executeRawUnsafe(
         `UPDATE "Appointment" SET "feeType" = ? WHERE "patientId" = ? AND "providerId" = ? AND "startsAt" LIKE ?`,
         derivedFeeType,
