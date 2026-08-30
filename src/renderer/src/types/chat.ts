@@ -25,6 +25,8 @@ export type ChatMessage = {
   message: string;
   createdAt: string;
   senderAvatar?: string | null;
+  audioData?: string | null;
+  audioDuration?: number | null;
 };
 
 export type ChatMessageInput = {
@@ -32,6 +34,8 @@ export type ChatMessageInput = {
   senderId?: string;
   senderName?: string;
   role?: string;
-  message: string;
+  message?: string;
   senderAvatar?: string | null;
+  audioData?: string | null;
+  audioDuration?: number | null;
 };

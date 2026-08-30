@@ -10,6 +10,7 @@ import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
 import TableRowsOutlinedIcon from '@mui/icons-material/TableRowsOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
 import RepeatOutlinedIcon from '@mui/icons-material/RepeatOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -765,6 +766,11 @@ export function AppointmentsPage(): React.JSX.Element {
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(['appointments'], ctx.prev);
     },
+    onSuccess: (updated: Appointment) => {
+      if (updated?.status === 'CHECKED_IN') {
+        tokenPrint.printFor(updated);
+      }
+    },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['appointments'] });
       void queryClient.invalidateQueries({ queryKey: ['tokens'] });
@@ -1061,22 +1067,48 @@ export function AppointmentsPage(): React.JSX.Element {
                             <VisibilityOutlinedIcon sx={{ fontSize: 17 }} />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Print token"><span>
-                          <IconButton
-                            sx={actionBtnSx}
-                            loading={tokenPrint.printingId === a.id}
-                            onClick={() => tokenPrint.printFor(a)}
-                          >
-                            <PrintOutlinedIcon sx={{ fontSize: 17 }} />
-                          </IconButton>
-                        </span></Tooltip>
+                        {a.tokenNumber ? (
+                          <Tooltip title="Print token"><span>
+                            <IconButton
+                              sx={actionBtnSx}
+                              loading={tokenPrint.printingId === a.id}
+                              onClick={() => tokenPrint.printFor(a)}
+                            >
+                              <PrintOutlinedIcon sx={{ fontSize: 17 }} />
+                            </IconButton>
+                          </span></Tooltip>
+                        ) : null}
                         <Tooltip title="Edit"><span>
                           <IconButton sx={actionBtnSx} disabled={['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status)} onClick={() => { setActive(a); setOpen(true); }}>
                             <EditOutlinedIcon sx={{ fontSize: 17 }} />
                           </IconButton>
                         </span></Tooltip>
-                        {a.status === 'SCHEDULED' && (
-                          <Tooltip title="Check In"><IconButton sx={actionBtnSx} loading={statusMutation.isPending && statusMutation.variables?.id === a.id} onClick={() => statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' })}><LoginOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>
+                        {!a.tokenNumber && !['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(a.status) && (
+                          <Tooltip title="Issue Token"><span>
+                            <IconButton
+                              sx={{
+                                ...actionBtnSx,
+                                color: 'primary.main',
+                                bgcolor: alpha(theme.palette.primary.main, 0.08),
+                                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.16) },
+                              }}
+                              loading={statusMutation.isPending && statusMutation.variables?.id === a.id}
+                              onClick={() => statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' })}
+                            >
+                              <ConfirmationNumberOutlinedIcon sx={{ fontSize: 17 }} />
+                            </IconButton>
+                          </span></Tooltip>
+                        )}
+                        {Boolean(a.tokenNumber) && a.status === 'SCHEDULED' && (
+                          <Tooltip title="Check In"><span>
+                            <IconButton
+                              sx={actionBtnSx}
+                              loading={statusMutation.isPending && statusMutation.variables?.id === a.id}
+                              onClick={() => statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' })}
+                            >
+                              <LoginOutlinedIcon sx={{ fontSize: 17 }} />
+                            </IconButton>
+                          </span></Tooltip>
                         )}
                         {a.status === 'CHECKED_IN' && (
                           <Tooltip title="Mark Completed"><IconButton sx={actionBtnSx} loading={statusMutation.isPending && statusMutation.variables?.id === a.id} onClick={() => statusMutation.mutate({ id: a.id, status: 'COMPLETED' })}><CheckCircleOutlinedIcon sx={{ fontSize: 17 }} /></IconButton></Tooltip>

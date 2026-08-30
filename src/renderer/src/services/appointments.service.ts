@@ -13,7 +13,7 @@ export const appointmentsService = {
   /** Token/walk-in: reuse same patient+doctor+day appointment instead of duplicating. */
   ensureSameDay: (input: AppointmentInput) => clinic.appointments.ensureSameDay(input),
   update: (id: string, input: AppointmentInput) => clinic.appointments.update(id, input),
-  updateStatus: (id: string, status: Appointment['status']) => clinic.appointments.updateStatus(id, status),
+  updateStatus: (id: string, status: Appointment['status']) => clinic.appointments.updateStatus(id, status) as Promise<Appointment>,
   delete: (id: string) => clinic.appointments.delete(id),
   cancel: (id: string) => clinic.appointments.cancel(id),
 };

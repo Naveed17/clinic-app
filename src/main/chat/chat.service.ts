@@ -33,6 +33,8 @@ export type ChatMessage = {
   message: string;
   createdAt: string;
   senderAvatar?: string | null;
+  audioData?: string | null;
+  audioDuration?: number | null;
 };
 
 export type ChatMessageInput = {
@@ -41,6 +43,8 @@ export type ChatMessageInput = {
   senderName?: string;
   role?: string;
   message?: string;
+  audioData?: string | null;
+  audioDuration?: number | null;
 };
 
 function asIso(value: unknown): string {
@@ -65,6 +69,8 @@ function mapRow(row: Record<string, unknown>): ChatMessage {
     message: String(row.message || ''),
     createdAt: asIso(row.createdAt),
     senderAvatar: asAvatar(row.senderAvatar),
+    audioData: row.audioData ? String(row.audioData) : null,
+    audioDuration: row.audioDuration != null ? Number(row.audioDuration) : null,
   };
 }
 
@@ -137,6 +143,7 @@ export async function listChatMessages(roomId = TEAM_CHAT_ROOM): Promise<ChatMes
   const db = getPrisma();
   const rows = await db.$queryRawUnsafe<Array<Record<string, unknown>>>(
     `SELECT m.id, m."roomId", m."senderId", m."senderName", m.role, m.message, m."createdAt",
+            m."audioData", m."audioDuration",
             COALESCE(NULLIF(u.avatar, ''), dp.avatar) AS "senderAvatar"
        FROM "ChatMessage" m
        LEFT JOIN "User" u ON u.id = m."senderId"
@@ -151,9 +158,14 @@ export async function listChatMessages(roomId = TEAM_CHAT_ROOM): Promise<ChatMes
 }
 
 export async function createChatMessage(input: ChatMessageInput): Promise<ChatMessage> {
-  const message = String(input.message || '').trim();
-  if (!message) throw new Error('Message text is required.');
-  if (message.length > MAX_MESSAGE) throw new Error('Message is too long.');
+  const rawMessage = String(input.message || '').trim();
+  const audioData = input.audioData ? String(input.audioData).trim() : null;
+  const audioDuration = input.audioDuration != null ? Math.max(0, Number(input.audioDuration)) : null;
+
+  if (!rawMessage && !audioData) throw new Error('Message text or voice note is required.');
+  if (rawMessage.length > MAX_MESSAGE) throw new Error('Message is too long.');
+
+  const message = rawMessage || (audioData ? '🎤 Voice message' : '');
   const senderId = String(input.senderId || '').trim();
   const roomId = assertChatRoom(String(input.roomId || TEAM_CHAT_ROOM), senderId);
   const row: ChatMessage = {
@@ -165,11 +177,13 @@ export async function createChatMessage(input: ChatMessageInput): Promise<ChatMe
     message,
     createdAt: new Date().toISOString(),
     senderAvatar: await lookupSenderAvatar(senderId),
+    audioData,
+    audioDuration,
   };
   await getPrisma().$executeRawUnsafe(
     `INSERT INTO "ChatMessage"
-      ("id", "roomId", "senderId", "senderName", "role", "message", "createdAt")
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ("id", "roomId", "senderId", "senderName", "role", "message", "createdAt", "audioData", "audioDuration")
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     row.id,
     row.roomId,
     row.senderId,
@@ -177,6 +191,8 @@ export async function createChatMessage(input: ChatMessageInput): Promise<ChatMe
     row.role,
     row.message,
     row.createdAt,
+    row.audioData,
+    row.audioDuration,
   );
   return row;
 }

@@ -58,7 +58,9 @@ export function createChatRouter(io: SocketIOServer): Router {
         senderId: String(body.senderId || req.user?.userId || ''),
         senderName: String(body.senderName || ''),
         role: String(body.role || req.user?.role || ''),
-        message: String(body.message || ''),
+        message: typeof body.message === 'string' ? body.message : '',
+        audioData: typeof body.audioData === 'string' ? body.audioData : undefined,
+        audioDuration: typeof body.audioDuration === 'number' ? body.audioDuration : undefined,
       });
       io.emit('chat:message', message);
       emitDataChange(io, 'chat', 'created');

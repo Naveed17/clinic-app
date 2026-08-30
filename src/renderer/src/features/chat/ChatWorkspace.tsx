@@ -2,7 +2,10 @@ import ChatOutlinedIcon from '@mui/icons-material/ChatOutlined';
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
+import MicNoneOutlinedIcon from '@mui/icons-material/MicNoneOutlined';
+import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import {
+  Alert,
   Badge,
   Box,
   IconButton,
@@ -18,6 +21,8 @@ import { DoctorAvatar, avatarFallbackFromRole } from '@/components/DoctorAvatar'
 import { useAuth } from '@/features/auth/AuthContext';
 import { chatService, type ChatInboxItem, type ChatMessage, type ChatStaff } from '@/services/chat.service';
 import { realtimeService } from '@/services/realtime.service';
+import { VoiceNotePlayer } from './VoiceNotePlayer';
+import { useAudioRecorder } from './useAudioRecorder';
 import {
   CHAT_ROOM_STORAGE,
   TEAM_CHAT_ROOM,
@@ -179,14 +184,26 @@ export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspac
     ? `${others.filter((p) => online.has(p.id)).length} online · everyone in this clinic`
     : `${roleLabel(selectedStaff?.role)}${selectedStaff && online.has(selectedStaff.id) ? ' · Online' : ''}`;
 
+  const {
+    isRecording,
+    recordingDuration,
+    error: recorderError,
+    clearError: clearRecorderError,
+    startRecording,
+    stopRecording,
+    cancelRecording,
+  } = useAudioRecorder();
+
   const send = useMutation({
-    mutationFn: (message: string) =>
+    mutationFn: (input: { message?: string; audioData?: string; audioDuration?: number }) =>
       chatService.send({
         roomId,
         senderId: me,
         senderName: user?.name || 'Staff',
         role: user?.role || '',
-        message,
+        message: input.message,
+        audioData: input.audioData,
+        audioDuration: input.audioDuration,
       }),
     onSuccess: (created) => {
       queryClient.setQueryData<ChatMessage[]>(['chat', roomId], (prev) => {
@@ -244,7 +261,19 @@ export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspac
   function submit(): void {
     const text = draft.trim();
     if (!text || send.isPending) return;
-    send.mutate(text);
+    send.mutate({ message: text });
+  }
+
+  async function handleSendVoiceNote(): Promise<void> {
+    const res = await stopRecording();
+    if (res?.audioData) {
+      send.mutate({
+        message: draft.trim() || undefined,
+        audioData: res.audioData,
+        audioDuration: res.duration,
+      });
+      setDraft('');
+    }
   }
 
   return (
@@ -522,9 +551,25 @@ export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspac
                           },
                         }}
                       >
-                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                          {item.message}
-                        </Typography>
+                        {item.audioData ? (
+                          <VoiceNotePlayer
+                            audioSrc={item.audioData}
+                            duration={item.audioDuration}
+                            isMine={mine}
+                          />
+                        ) : null}
+                        {item.message && (!item.audioData || item.message !== '🎤 Voice message') ? (
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                              mt: item.audioData ? 0.75 : 0,
+                            }}
+                          >
+                            {item.message}
+                          </Typography>
+                        ) : null}
                       </Box>
                     </Box>
                     {mine && (
@@ -543,53 +588,176 @@ export function ChatWorkspace({ variant = 'page', onUnreadChange }: ChatWorkspac
           <div ref={bottomRef} />
         </Box>
 
+        {recorderError ? (
+          <Box sx={{ px: compact ? 1.25 : 2, pt: 1 }}>
+            <Alert severity="warning" onClose={clearRecorderError} sx={{ py: 0, px: 1.5, fontSize: 12 }}>
+              {recorderError}
+            </Alert>
+          </Box>
+        ) : null}
+
         <Box sx={{ px: compact ? 1.25 : 2, py: 1.25, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <TextField
-              fullWidth
-              size="small"
-              multiline
-              minRows={1}
-              maxRows={4}
-              placeholder={isTeamRoom(roomId) ? 'Message the team…' : `Message ${headerTitle}…`}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '10px',
+          {isRecording ? (
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%' }}>
+              <IconButton
+                size="small"
+                color="error"
+                title="Discard recording"
+                onClick={cancelRecording}
+                sx={{
+                  width: 40,
+                  height: 40,
+                  flexShrink: 0,
+                  bgcolor: alpha(theme.palette.error.main, 0.08),
+                  color: 'error.main',
+                  '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.18) },
+                }}
+              >
+                <DeleteOutlineOutlinedIcon fontSize="small" />
+              </IconButton>
+
+              <Box
+                sx={{
+                  flexGrow: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.25,
+                  px: 1.75,
                   py: 1,
-                  px: 1.5,
-                  fontSize: 13.5,
-                  lineHeight: 1.4,
-                },
-                '& .MuiOutlinedInput-input': {
-                  p: 0,
-                },
-              }}
-            />
-            <IconButton
-              color="primary"
-              disabled={!canSend}
-              onClick={() => submit()}
-              sx={{
-                width: 40,
-                height: 40,
-                flexShrink: 0,
-                bgcolor: 'primary.main',
-                color: 'primary.contrastText',
-                '&:hover': { bgcolor: 'primary.dark' },
-                '&.Mui-disabled': { bgcolor: 'action.disabledBackground' },
-              }}
-            >
-              <SendOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Stack>
+                  borderRadius: '10px',
+                  bgcolor: alpha(theme.palette.error.main, 0.06),
+                  border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: '50%',
+                    bgcolor: 'error.main',
+                    boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.25)',
+                    animation: 'pulseRec 1.2s infinite ease-in-out',
+                    '@keyframes pulseRec': {
+                      '0%': { transform: 'scale(0.85)', opacity: 1 },
+                      '50%': { transform: 'scale(1.3)', opacity: 0.35 },
+                      '100%': { transform: 'scale(0.85)', opacity: 1 },
+                    },
+                  }}
+                />
+                <Typography variant="body2" sx={{ fontWeight: 700, color: 'error.main', fontSize: 13.5 }}>
+                  {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
+                </Typography>
+
+                {/* Animated soundwave bars */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: '3px', height: 20, mx: 1 }}>
+                  {[8, 16, 12, 20, 14, 18, 10, 22, 15, 19, 11, 17].map((h, i) => (
+                    <Box
+                      key={i}
+                      sx={{
+                        width: 2.5,
+                        height: `${h}px`,
+                        borderRadius: '2px',
+                        bgcolor: 'error.main',
+                        animation: `wavePulse 0.8s ease-in-out infinite alternate`,
+                        animationDelay: `${(i % 5) * 0.15}s`,
+                        '@keyframes wavePulse': {
+                          '0%': { transform: 'scaleY(0.35)', opacity: 0.5 },
+                          '100%': { transform: 'scaleY(1)', opacity: 1 },
+                        },
+                      }}
+                    />
+                  ))}
+                </Box>
+
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto', display: { xs: 'none', sm: 'inline' } }}>
+                  Recording audio...
+                </Typography>
+              </Box>
+
+              <IconButton
+                color="primary"
+                title="Send voice message"
+                onClick={() => void handleSendVoiceNote()}
+                disabled={send.isPending}
+                sx={{
+                  width: 40,
+                  height: 40,
+                  flexShrink: 0,
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                  '&:hover': { bgcolor: 'primary.dark' },
+                }}
+              >
+                <SendOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Stack>
+          ) : (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <TextField
+                fullWidth
+                size="small"
+                multiline
+                minRows={1}
+                maxRows={4}
+                placeholder={isTeamRoom(roomId) ? 'Message the team…' : `Message ${headerTitle}…`}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    submit();
+                  }
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '10px',
+                    py: 1,
+                    px: 1.5,
+                    fontSize: 13.5,
+                    lineHeight: 1.4,
+                  },
+                  '& .MuiOutlinedInput-input': {
+                    p: 0,
+                  },
+                }}
+              />
+              <IconButton
+                color="primary"
+                title="Record voice message"
+                onClick={() => void startRecording()}
+                disabled={send.isPending || !me}
+                sx={{
+                  width: 40,
+                  height: 40,
+                  flexShrink: 0,
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+                  color: 'primary.main',
+                  bgcolor: alpha(theme.palette.primary.main, 0.05),
+                  '&:hover': {
+                    bgcolor: alpha(theme.palette.primary.main, 0.14),
+                  },
+                }}
+              >
+                <MicNoneOutlinedIcon fontSize="small" />
+              </IconButton>
+              <IconButton
+                color="primary"
+                disabled={!canSend}
+                onClick={() => submit()}
+                sx={{
+                  width: 40,
+                  height: 40,
+                  flexShrink: 0,
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                  '&:hover': { bgcolor: 'primary.dark' },
+                  '&.Mui-disabled': { bgcolor: 'action.disabledBackground' },
+                }}
+              >
+                <SendOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Stack>
+          )}
         </Box>
       </Box>
     </Box>

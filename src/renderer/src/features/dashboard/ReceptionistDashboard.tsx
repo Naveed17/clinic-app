@@ -38,6 +38,7 @@ import { realtimeService, type RealtimeNotification } from '@/services/realtime.
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
 import { TokenPrintPreview } from '@/features/tokens/TokensPage';
 import { printTokenSlip } from '@/utils/printTokenSlip';
+import { usePrintAppointmentToken, loadTokenForAppointment } from '@/features/appointments/printAppointmentToken';
 import { InvoiceDialog } from '@/features/billing/InvoicesPage';
 import { AppointmentWhatsAppDialog } from '@/features/appointments/AppointmentWhatsAppDialog';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -1209,9 +1210,11 @@ function DayStrip({
 export function ReceptionistDashboard(): React.JSX.Element {
   const theme = useTheme();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { user } = useAuth();
   const { can } = useLicense();
   const showBilling = can('billing');
+  const tokenPrint = usePrintAppointmentToken();
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [apptDialogOpen, setApptDialogOpen] = useState(false);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
@@ -1220,6 +1223,31 @@ export function ReceptionistDashboard(): React.JSX.Element {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
+  });
+
+  const issueTokenMutation = useMutation({
+    mutationFn: async (appointment: Appointment) => {
+      const updated = await appointmentsService.updateStatus(appointment.id, 'CHECKED_IN');
+      return { appointment, updated };
+    },
+    onSuccess: async ({ appointment, updated }) => {
+      await qc.invalidateQueries({ queryKey: ['appointments'] });
+      await qc.invalidateQueries({ queryKey: ['tokens'] });
+      try {
+        const apptToPrint = updated ?? appointment;
+        tokenPrint.printFor(apptToPrint);
+        const token = await loadTokenForAppointment(apptToPrint);
+        if (token) {
+          void printTokenSlip(token, { silent: true }).catch(() => {});
+        }
+      } catch {
+        // ignore printer errors
+      }
+    },
+    meta: {
+      toast: 'Token issued & patient checked in!',
+      errorToast: 'Failed to issue token.',
+    },
   });
 
   const { data: appointments = [], isLoading } = useQuery({
@@ -1521,59 +1549,132 @@ export function ReceptionistDashboard(): React.JSX.Element {
                   '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
                 }}
               >
-                {selectedDayAppts.slice(0, 20).map((a) => (
-                  <Box
-                    key={a.id}
-                    onClick={() => navigate(`/appointments/${a.id}`)}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 2,
-                      p: 1.5,
-                      borderRadius: 1,
-                      cursor: 'pointer',
-                      bgcolor: alpha(theme.palette.primary.main, 0.03),
-                      border: `1px solid ${theme.palette.divider}`,
-                      borderLeft: '4px solid',
-                      borderLeftColor:
-                        statusColor[a.status] && statusColor[a.status] !== 'default'
-                          ? `${statusColor[a.status]}.main`
-                          : 'divider',
-                      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.07) },
-                    }}
-                  >
-                    <Avatar
+                {selectedDayAppts.slice(0, 20).map((a) => {
+                  const hasToken = Boolean(a.tokenNumber);
+                  const canIssueToken = !hasToken && !['CANCELLED', 'COMPLETED'].includes(a.status);
+                  const isPending = issueTokenMutation.isPending && issueTokenMutation.variables?.id === a.id;
+
+                  return (
+                    <Box
+                      key={a.id}
+                      onClick={() => navigate(`/appointments/${a.id}`)}
                       sx={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 1,
-                        bgcolor: alpha(theme.palette.primary.main, 0.12),
-                        color: 'primary.main',
-                        fontSize: 12,
-                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        p: 1.5,
+                        borderRadius: 1.5,
+                        cursor: 'pointer',
+                        bgcolor: alpha(theme.palette.primary.main, 0.03),
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderLeft: '4px solid',
+                        borderLeftColor:
+                          statusColor[a.status] && statusColor[a.status] !== 'default'
+                            ? `${statusColor[a.status]}.main`
+                            : 'divider',
+                        transition: 'all 0.15s ease',
+                        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.07) },
                       }}
                     >
-                      {a.patient.firstName[0]}
-                      {a.patient.lastName[0]}
-                    </Avatar>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" fontWeight={700} noWrap>
-                        {a.patient.firstName} {a.patient.lastName}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {new Date(a.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        {' · Dr. '}
-                        {a.provider.firstName} {a.provider.lastName}
-                      </Typography>
+                      <Avatar
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 1,
+                          bgcolor: alpha(theme.palette.primary.main, 0.12),
+                          color: 'primary.main',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {a.patient.firstName[0]}
+                        {a.patient.lastName[0]}
+                      </Avatar>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'nowrap' }}>
+                          <Typography variant="body2" fontWeight={700} noWrap>
+                            {a.patient.firstName} {a.patient.lastName}
+                          </Typography>
+                          {hasToken ? (
+                            <Chip
+                              size="small"
+                              label={`Token #${String(a.tokenNumber).padStart(2, '0')}`}
+                              color="primary"
+                              variant="filled"
+                              sx={{
+                                height: 20,
+                                fontSize: 10.5,
+                                fontWeight: 800,
+                                fontFamily: 'monospace',
+                                borderRadius: '4px',
+                                flexShrink: 0,
+                              }}
+                            />
+                          ) : null}
+                        </Box>
+                        <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                          {new Date(a.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {' · Dr. '}
+                          {a.provider.firstName} {a.provider.lastName}
+                        </Typography>
+                      </Box>
+
+                      {/* Right Action buttons */}
+                      <Box
+                        onClick={(e) => e.stopPropagation()}
+                        sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}
+                      >
+                        {canIssueToken ? (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="primary"
+                            startIcon={<ConfirmationNumberOutlinedIcon sx={{ fontSize: 15 }} />}
+                            disabled={isPending}
+                            onClick={() => issueTokenMutation.mutate(a)}
+                            sx={{
+                              borderRadius: 1.5,
+                              fontWeight: 700,
+                              fontSize: 11.5,
+                              py: 0.4,
+                              px: 1.25,
+                              boxShadow: 'none',
+                              whiteSpace: 'nowrap',
+                              '&:hover': {
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                              },
+                            }}
+                          >
+                            {isPending ? 'Issuing...' : 'Issue Token'}
+                          </Button>
+                        ) : null}
+
+                        {hasToken ? (
+                          <IconButton
+                            size="small"
+                            title="Print token slip"
+                            onClick={() => tokenPrint.printFor(a)}
+                            sx={{
+                              color: 'text.secondary',
+                              p: 0.5,
+                              '&:hover': { color: 'primary.main', bgcolor: alpha(theme.palette.primary.main, 0.08) },
+                            }}
+                          >
+                            <PrintOutlinedIcon sx={{ fontSize: 17 }} />
+                          </IconButton>
+                        ) : null}
+
+                        <Chip
+                          size="small"
+                          label={a.status.replace('_', ' ')}
+                          color={statusColor[a.status]}
+                          sx={{ borderRadius: 1, fontSize: 10, fontWeight: 600 }}
+                        />
+                      </Box>
                     </Box>
-                    <Chip
-                      size="small"
-                      label={a.status.replace('_', ' ')}
-                      color={statusColor[a.status]}
-                      sx={{ borderRadius: 1, fontSize: 10 }}
-                    />
-                  </Box>
-                ))}
+                  );
+                })}
               </Stack>
             )}
             {selectedDayAppts.length > 20 && (
@@ -1667,10 +1768,27 @@ export function ReceptionistDashboard(): React.JSX.Element {
                 alt=""
                 sx={{ width: 44, height: 44, objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))' }}
               />
-              <Box sx={{ minWidth: 0 }}>
-                <Typography variant="caption" sx={{ opacity: 0.85, fontWeight: 700 }}>
-                  {isSelectedToday ? 'Up next' : 'Featured'}
-                </Typography>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                  <Typography variant="caption" sx={{ opacity: 0.85, fontWeight: 700 }}>
+                    {isSelectedToday ? 'Up next' : 'Featured'}
+                  </Typography>
+                  {nextAppt.tokenNumber ? (
+                    <Chip
+                      size="small"
+                      label={`Token #${String(nextAppt.tokenNumber).padStart(2, '0')}`}
+                      sx={{
+                        height: 20,
+                        bgcolor: 'rgba(255, 255, 255, 0.22)',
+                        color: '#ffffff',
+                        fontSize: 10.5,
+                        fontWeight: 800,
+                        fontFamily: 'monospace',
+                        borderRadius: '4px',
+                      }}
+                    />
+                  ) : null}
+                </Box>
                 <Typography fontWeight={800} fontSize={15} sx={{ mt: 0.15 }} noWrap>
                   {nextAppt.patient.firstName} {nextAppt.patient.lastName}
                 </Typography>
@@ -1681,6 +1799,32 @@ export function ReceptionistDashboard(): React.JSX.Element {
                   {' · Dr. '}
                   {nextAppt.provider.firstName} {nextAppt.provider.lastName}
                 </Typography>
+                {nextAppt.status === 'SCHEDULED' && !nextAppt.tokenNumber && isSelectedToday && (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    disabled={issueTokenMutation.isPending && issueTokenMutation.variables?.id === nextAppt.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      issueTokenMutation.mutate(nextAppt);
+                    }}
+                    startIcon={<ConfirmationNumberOutlinedIcon sx={{ fontSize: 14 }} />}
+                    sx={{
+                      mt: 1,
+                      bgcolor: '#ffffff',
+                      color: 'primary.dark',
+                      fontWeight: 800,
+                      fontSize: 11,
+                      py: 0.3,
+                      px: 1.2,
+                      borderRadius: 1.5,
+                      boxShadow: 'none',
+                      '&:hover': { bgcolor: alpha('#ffffff', 0.92) },
+                    }}
+                  >
+                    {issueTokenMutation.isPending && issueTokenMutation.variables?.id === nextAppt.id ? 'Issuing...' : 'Issue Token'}
+                  </Button>
+                )}
               </Box>
             </Paper>
           )}
@@ -1761,6 +1905,9 @@ export function ReceptionistDashboard(): React.JSX.Element {
           void navigate('/billing');
         }}
       />
+      {tokenPrint.printToken && (
+        <TokenPrintPreview token={tokenPrint.printToken} onClose={tokenPrint.closePrint} />
+      )}
     </>
   );
 }

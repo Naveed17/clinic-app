@@ -610,12 +610,24 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
       "senderName" TEXT NOT NULL,
       "role" TEXT NOT NULL DEFAULT '',
       "message" TEXT NOT NULL,
-      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "audioData" TEXT,
+      "audioDuration" REAL
     )
   `);
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "ChatMessage_roomId_createdAt_idx" ON "ChatMessage"("roomId", "createdAt")',
   );
+
+  const chatCols = (
+    await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(ChatMessage)')
+  ).map((r) => r.name);
+  if (!chatCols.includes('audioData')) {
+    await database.$executeRawUnsafe('ALTER TABLE "ChatMessage" ADD COLUMN "audioData" TEXT');
+  }
+  if (!chatCols.includes('audioDuration')) {
+    await database.$executeRawUnsafe('ALTER TABLE "ChatMessage" ADD COLUMN "audioDuration" REAL');
+  }
 
   // Migrate legacy flat stock/price into MedicineBatch (one-time, when old columns still exist)
   if (medCols.includes('stock') || medCols.includes('price')) {

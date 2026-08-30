@@ -52,7 +52,7 @@ export async function startBackendServer(port = Number(process.env.CLINIC_API_PO
   });
 
   app.use(cors({ origin: true, credentials: true }));
-  app.use(express.json({ limit: '2mb' }));
+  app.use(express.json({ limit: '10mb' }));
   app.get('/health', (_req, res) => {
     res.json({ ok: true, service: 'clinic-backend' });
   });
