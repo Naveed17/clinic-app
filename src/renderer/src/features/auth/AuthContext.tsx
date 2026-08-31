@@ -9,13 +9,14 @@ export interface AuthUser {
   name: string;
   email: string;
   role: UserRole;
-  avatar: string;
+  avatar?: string | null;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   login: (email: string, password: string) => Promise<boolean | string>;
   logout: () => void;
+  updateAvatar: (avatar: string | null) => Promise<void>;
 }
 
 const STORAGE_KEY = 'clinic-auth-user';
@@ -86,6 +87,19 @@ export function AuthProvider({ children }: PropsWithChildren): React.JSX.Element
     return () => clearTimeout(timer);
   }, [user, logout]);
 
+  // Sync avatar from directory if available
+  useEffect(() => {
+    if (!user) return;
+    void window.clinic?.auth.directory?.().then((users) => {
+      const found = users?.find((u) => u.id === user.id);
+      if (found && found.avatar && found.avatar !== user.avatar) {
+        const updated: AuthUser = { ...user, avatar: found.avatar };
+        setUser(updated);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      }
+    });
+  }, [user?.id]);
+
   const value = useMemo<AuthContextValue>(() => ({
     user,
     login: async (email, password) => {
@@ -106,6 +120,15 @@ export function AuthProvider({ children }: PropsWithChildren): React.JSX.Element
       return true;
     },
     logout,
+    updateAvatar: async (avatar: string | null) => {
+      if (!user) return;
+      await window.clinic?.auth.updateAvatar(user.id, avatar);
+      const updatedUser: AuthUser = { ...user, avatar };
+      setUser(updatedUser);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
+      await queryClient.invalidateQueries({ queryKey: ['doctors'] });
+    },
   }), [user, logout, queryClient]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

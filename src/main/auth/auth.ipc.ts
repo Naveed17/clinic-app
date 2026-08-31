@@ -28,6 +28,8 @@ export function registerAuthIpc(): void {
         lastName: true,
         email: true,
         role: true,
+        avatar: true,
+        doctorProfile: { select: { avatar: true } },
         isActive: true,
         passwordHash: true,
       },
@@ -48,13 +50,14 @@ export function registerAuthIpc(): void {
     }
 
     const token = signToken({ userId: user.id, role });
+    const userAvatar = user.avatar?.trim() || user.doctorProfile?.avatar?.trim() || null;
     return {
       token,
       id: user.id,
       name: `${user.firstName} ${user.lastName}`.trim(),
       email: user.email,
       role,
-      avatar: `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase(),
+      avatar: userAvatar,
     };
   });
 
@@ -74,5 +77,19 @@ export function registerAuthIpc(): void {
       data: { passwordHash: bcrypt.hashSync(newPassword, 10) },
     });
     return { ok: true };
+  });
+
+  ipcMain.handle('auth:update-avatar', async (_e, userId: string, avatar: string | null) => {
+    await ensureDatabaseReady();
+    const prisma = getPrisma();
+    await prisma.$executeRawUnsafe('UPDATE "User" SET "avatar" = ? WHERE id = ?', avatar, userId);
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true, doctorProfile: { select: { id: true } } },
+    });
+    if (user?.role === 'DOCTOR' && user.doctorProfile) {
+      await prisma.doctorProfile.update({ where: { userId }, data: { avatar } });
+    }
+    return { ok: true, avatar };
   });
 }

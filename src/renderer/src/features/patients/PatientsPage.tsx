@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useNavigate } from 'react-router-dom';
 import { tableSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
@@ -47,6 +47,43 @@ export function PatientsPage(): React.JSX.Element {
   const [historyPatient, setHistoryPatient] = useState<Patient | undefined>();
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [activeMenuPatient, setActiveMenuPatient] = useState<Patient | null>(null);
+  const closeMenuTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMenuOpen = (anchor: HTMLElement, patient: Patient) => {
+    if (closeMenuTimeoutRef.current) {
+      clearTimeout(closeMenuTimeoutRef.current);
+      closeMenuTimeoutRef.current = null;
+    }
+    setMenuAnchor(anchor);
+    setActiveMenuPatient(patient);
+  };
+
+  const handleMenuClose = () => {
+    if (closeMenuTimeoutRef.current) {
+      clearTimeout(closeMenuTimeoutRef.current);
+    }
+    closeMenuTimeoutRef.current = setTimeout(() => {
+      setMenuAnchor(null);
+      setActiveMenuPatient(null);
+    }, 200);
+  };
+
+  const handleMenuCloseImmediate = () => {
+    if (closeMenuTimeoutRef.current) {
+      clearTimeout(closeMenuTimeoutRef.current);
+      closeMenuTimeoutRef.current = null;
+    }
+    setMenuAnchor(null);
+    setActiveMenuPatient(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (closeMenuTimeoutRef.current) {
+        clearTimeout(closeMenuTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const patientsQuery = useQuery({
     queryKey: ['patients', { page, rowsPerPage, search: debouncedSearch, providerId: isDoctor ? user?.id : undefined }],
@@ -332,24 +369,24 @@ export function PatientsPage(): React.JSX.Element {
                   </TableCell>
 
                   <TableCell align="right" onClick={(e) => e.stopPropagation()} sx={{ width: 64, pr: 2 }}>
-                    <Tooltip title="Actions" placement="left">
-                      <IconButton
-                        size="small"
-                        sx={{
-                          ...actionBtnSx,
-                          border: '1px solid',
-                          borderColor: activeMenuPatient?.id === patient.id ? 'primary.main' : 'divider',
-                          bgcolor: activeMenuPatient?.id === patient.id ? alpha(theme.palette.primary.main, 0.12) : 'transparent',
-                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08), borderColor: 'primary.main' },
-                        }}
-                        onClick={(e) => {
-                          setMenuAnchor(e.currentTarget);
-                          setActiveMenuPatient(patient);
-                        }}
-                      >
-                        <MoreVertOutlinedIcon sx={{ fontSize: 18 }} />
-                      </IconButton>
-                    </Tooltip>
+                    <IconButton
+                      size="small"
+                      sx={{
+                        ...actionBtnSx,
+                        border: '1px solid',
+                        borderColor: activeMenuPatient?.id === patient.id ? 'primary.main' : 'divider',
+                        bgcolor: activeMenuPatient?.id === patient.id ? alpha(theme.palette.primary.main, 0.12) : 'transparent',
+                        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08), borderColor: 'primary.main' },
+                      }}
+                      onMouseEnter={(e) => handleMenuOpen(e.currentTarget, patient)}
+                      onMouseLeave={handleMenuClose}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMenuOpen(e.currentTarget, patient);
+                      }}
+                    >
+                      <MoreVertOutlinedIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               );
@@ -362,12 +399,23 @@ export function PatientsPage(): React.JSX.Element {
       <Popover
         open={Boolean(menuAnchor && activeMenuPatient)}
         anchorEl={menuAnchor}
-        onClose={() => { setMenuAnchor(null); setActiveMenuPatient(null); }}
+        onClose={handleMenuCloseImmediate}
+        disableRestoreFocus
+        disableScrollLock
+        sx={{ pointerEvents: 'none' }}
         anchorOrigin={{ vertical: 'center', horizontal: -8 }}
         transformOrigin={{ vertical: 'center', horizontal: 'right' }}
         slotProps={{
           paper: {
+            onMouseEnter: () => {
+              if (closeMenuTimeoutRef.current) {
+                clearTimeout(closeMenuTimeoutRef.current);
+                closeMenuTimeoutRef.current = null;
+              }
+            },
+            onMouseLeave: handleMenuClose,
             sx: {
+              pointerEvents: 'auto',
               width: 'max-content',
               maxWidth: 'none',
               borderRadius: '8px',
@@ -385,6 +433,15 @@ export function PatientsPage(): React.JSX.Element {
               bgcolor: 'background.paper',
               position: 'relative',
               overflow: 'visible',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: -8,
+                bottom: -8,
+                right: -16,
+                width: 24,
+                pointerEvents: 'auto',
+              },
               '&::after': {
                 content: '""',
                 position: 'absolute',
@@ -405,7 +462,7 @@ export function PatientsPage(): React.JSX.Element {
       >
         {activeMenuPatient && (() => {
           const patient = activeMenuPatient;
-          const close = () => { setMenuAnchor(null); setActiveMenuPatient(null); };
+          const close = handleMenuCloseImmediate;
 
           return (
             <Stack direction="row" spacing={0.5} alignItems="center">

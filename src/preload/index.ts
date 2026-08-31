@@ -1064,6 +1064,10 @@ const api = {
       }
       return ipc('auth:change-password', userId, current, next);
     },
+    updateAvatar: async (userId: string, avatar: string | null) => {
+      await settingsReady;
+      return ipc('auth:update-avatar', userId, avatar);
+    },
   },
 };
 

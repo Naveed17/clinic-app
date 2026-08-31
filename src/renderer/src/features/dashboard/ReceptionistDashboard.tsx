@@ -70,48 +70,10 @@ const statusColor: Record<string, 'default' | 'primary' | 'success' | 'error' | 
   SCHEDULED: 'primary', CHECKED_IN: 'warning', COMPLETED: 'success', CANCELLED: 'error', NO_SHOW: 'default',
 };
 
-/* ── Patient schema (minimal required fields) ── */
-const patientSchema = z.object({
-  firstName: z.string().trim().min(1, 'Required'),
-  lastName: z.string().trim(),
-  weight: z.string().trim(),
-  phone: z.string().trim(),
-  ageValue: z.string(),
-  ageUnit: z.enum(['years', 'months', 'days']),
-  gender: z.string(),
-  address: z.string().trim(),
-});
-type PatientForm = z.infer<typeof patientSchema>;
-const patientDefaults: PatientForm = { firstName: '', lastName: '', weight: '', phone: '', ageValue: '', ageUnit: 'years', gender: '', address: '' };
-
 const VISIT_REASONS = ['Checkup', 'Follow-up', 'Urgent', 'Consultation', 'Vaccination'] as const;
 
-function walkInPatientInput(values: PatientForm): PatientInput {
-  const num = values.ageValue.trim() ? parseFloat(values.ageValue) : null;
-  const dob = num != null && !Number.isNaN(num) ? ageToDateOfBirth(num, values.ageUnit) : null;
-  const ageYears = values.ageUnit === 'years' ? (num != null ? Math.floor(num) : null) : (dob ? dateOfBirthToAge(dob) : null);
-  const weightNum = values.weight.trim() ? parseFloat(values.weight) : null;
-
-  return {
-    firstName: values.firstName,
-    lastName: values.lastName.trim() || null,
-    weight: weightNum != null && !Number.isNaN(weightNum) ? weightNum : null,
-    phone: values.phone || null,
-    age: ageYears,
-    dateOfBirth: dob ? dob.toISOString() : null,
-    gender: values.gender || null,
-    email: null,
-    address: values.address || null,
-    emergencyContactName: null,
-    emergencyContactPhone: null,
-    bloodGroup: null,
-    allergies: null,
-    chronicConditions: null,
-  };
-}
-
 /* ── Merged Walk-in Modal ── */
-const STEPS = ['Register Patient', 'Issue Token', 'Print Token'];
+const STEPS = ['Select Patient', 'Issue Token', 'Print Token'];
 
 function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
@@ -124,33 +86,9 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   const [reason, setReason] = useState('');
   const [consultationFee, setConsultationFee] = useState('');
   const [feeDiscount, setFeeDiscount] = useState('');
-  const [useExisting, setUseExisting] = useState(false);
-  const [patientQuery, setPatientQuery] = useState('');
-  const debouncedPatientQuery = useDebounce(patientQuery, 150);
   const [previewToken, setPreviewToken] = useState<Token | null>(null);
   const [previewAutoPrint, setPreviewAutoPrint] = useState(false);
 
-  const form = useForm<PatientForm>({ resolver: zodResolver(patientSchema), defaultValues: patientDefaults });
-
-  const { data: patients = [], isLoading: isPatientsLoading, isFetching: isPatientsFetching } = useQuery<TokenPerson[]>({
-    queryKey: ['token-patients'],
-    queryFn: () => window.clinic.tokens.patients(),
-    enabled: open,
-    staleTime: 60_000,
-  });
-
-  const isPatientSearching = isPatientsFetching || isPatientsLoading || patientQuery.trim() !== debouncedPatientQuery.trim();
-
-  const filteredPatients = useMemo(() => {
-    const q = debouncedPatientQuery.trim().toLowerCase();
-    if (!q) return patients.slice(0, 50);
-    return patients.filter((p) => {
-      const name = `${p.firstName} ${p.lastName}`.toLowerCase();
-      const phone = (p.phone || '').toLowerCase();
-      const mr = (p.mrNumber || '').toLowerCase();
-      return name.includes(q) || phone.includes(q) || mr.includes(q);
-    }).slice(0, 50);
-  }, [patients, debouncedPatientQuery]);
   const { data: doctors = [] } = useQuery<TokenPerson[]>({
     queryKey: ['token-doctors'],
     queryFn: () => window.clinic.tokens.doctors(),
@@ -158,7 +96,6 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
     staleTime: 60_000,
   });
 
-  const selectedPatient = useMemo(() => patients.find((p) => p.id === patientId) ?? null, [patients, patientId]);
   const selectedDoctor = useMemo(() => doctors.find((d) => d.id === doctorId) ?? null, [doctors, doctorId]);
   const todayStr = new Date().toLocaleDateString('en-CA');
   const {
@@ -185,22 +122,12 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
     setConsultationFee(String(Number(selectedDoctor.consultationFee ?? 0)));
     setFeeDiscount('');
   }, [open, selectedDoctor, reason]);
+
   const { data: weekVisits } = useQuery({
     queryKey: ['token-week-visits', patientId, doctorId, todayStr],
     queryFn: () =>
       window.clinic.tokens.weekVisits(patientId, doctorId, todayStr).catch(() => ({ count: 0 })),
     enabled: open && step === 1 && Boolean(patientId && doctorId),
-  });
-
-  const createPatientMutation = useMutation({
-    mutationFn: (values: PatientForm) => patientsService.create(walkInPatientInput(values)),
-    onSuccess: async (patient) => {
-      await qc.invalidateQueries({ queryKey: ['patients'] });
-      await qc.invalidateQueries({ queryKey: ['token-patients'] });
-      setPatientId(patient.id);
-      setStep(1);
-    },
-    meta: { toast: 'Patient created', errorToast: 'Could not register patient.' },
   });
 
   const tokenMutation = useMutation({
@@ -247,77 +174,32 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   function handleClose() {
     setStep(0); setPatientId(''); setDoctorId(''); setReason('');
     setConsultationFee(''); setFeeDiscount('');
-    setCreatedToken(null); setUseExisting(false);
+    setCreatedToken(null);
     setPreviewToken(null);
     setPreviewAutoPrint(false);
-    form.reset(patientDefaults);
     onClose();
   }
 
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" PaperProps={dialogPaperProps} {...telInputDialogProps}>
-      <FormDialogTitle title="Walk-in Registration" subtitle="Register a patient and issue a token." />
+      <FormDialogTitle title="Walk-in Registration" subtitle="Register or select a patient and issue a token." />
       <DialogContent sx={dialogContentSx}>
         <Stepper activeStep={step} sx={{ mb: 3 }}>
           {STEPS.map((label) => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}
         </Stepper>
 
-        {/* Step 0 — Register Patient */}
+        {/* Step 0 — Select / Add Patient */}
         {step === 0 && (
-          <Stack spacing={2}>
-            {createPatientMutation.isError && <Alert severity="error">Could not register patient.</Alert>}
-            <Stack direction="row" gap={1}>
-              <Button size="small" variant={!useExisting ? 'contained' : 'outlined'} onClick={() => setUseExisting(false)}>New Patient</Button>
-              <Button size="small" variant={useExisting ? 'contained' : 'outlined'} onClick={() => setUseExisting(true)}>Existing Patient</Button>
-            </Stack>
-            {useExisting ? (
-              <PatientAutocomplete
-                value={patientId}
-                onChange={(id) => setPatientId(id)}
-                label="Search patient"
-              />
-            ) : (
-              <Box component="form" id="patient-form" onSubmit={form.handleSubmit((v) => createPatientMutation.mutate(v))}>
-                <Stack spacing={2}>
-                  <Controller
-                    name="gender"
-                    control={form.control}
-                    render={({ field }) => (
-                      <GenderRadioGroup value={field.value} onChange={field.onChange} optional />
-                    )}
-                  />
-                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
-                    <TextField label="First name" error={!!form.formState.errors.firstName} helperText={form.formState.errors.firstName?.message} {...form.register('firstName')} />
-                    <TextField label="Last name (optional)" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
-                  </Box>
-                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '110px 130px minmax(0, 1fr)' }, alignItems: 'start' }}>
-                    <TextField label="Age (optional)" type="number" slotProps={{ htmlInput: { min: 0, max: 150 } }} {...form.register('ageValue')} />
-                    <Controller
-                      name="ageUnit"
-                      control={form.control}
-                      render={({ field }) => (
-                        <TextField select fullWidth label="Unit" value={field.value || 'years'} onChange={field.onChange}>
-                          <MenuItem value="years">Years</MenuItem>
-                          <MenuItem value="months">Months</MenuItem>
-                          <MenuItem value="days">Days</MenuItem>
-                        </TextField>
-                      )}
-                    />
-                    <Controller
-                      name="phone"
-                      control={form.control}
-                      render={({ field }) => (
-                        <PhoneInputField label="Phone (optional)" value={field.value ?? ''} onChange={field.onChange} />
-                      )}
-                    />
-                  </Box>
-                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-                    <TextField label="Weight (kg) (optional)" type="number" slotProps={{ htmlInput: { min: 0, max: 500, step: 0.1 } }} placeholder="e.g. 70" {...form.register('weight')} />
-                    <TextField label="Address (optional)" {...form.register('address')} />
-                  </Box>
-                </Stack>
-              </Box>
-            )}
+          <Stack spacing={2} sx={{ py: 1.5 }}>
+            <Typography variant="body2" color="text.secondary">
+              Search a patient by name, phone or MR#, or click "+ Add new patient" to register.
+            </Typography>
+            <PatientAutocomplete
+              value={patientId}
+              onChange={(id) => setPatientId(id)}
+              label="Patient"
+              autoFocus
+            />
           </Stack>
         )}
 
@@ -433,12 +315,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
 
       <DialogActions sx={dialogActionsSx}>
         <Button onClick={handleClose} sx={dialogCancelBtnSx}>Close</Button>
-        {step === 0 && !useExisting && (
-          <SubmitButton form="patient-form" type="submit" loading={createPatientMutation.isPending}>
-            Next
-          </SubmitButton>
-        )}
-        {step === 0 && useExisting && (
+        {step === 0 && (
           <SubmitButton disabled={!patientId} onClick={() => setStep(1)}>
             Next
           </SubmitButton>
@@ -483,7 +360,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
 }
 
 /* ── Book Appointment Modal (patient → appointment, no token) ── */
-const APPT_STEPS = ['Add Patient', 'Create Appointment'];
+const APPT_STEPS = ['Select Patient', 'Create Appointment'];
 
 function BookAppointmentModal({
   open,
@@ -500,9 +377,6 @@ function BookAppointmentModal({
   const [step, setStep] = useState(0);
   const [patientId, setPatientId] = useState('');
   const [patientName, setPatientName] = useState('');
-  const [useExisting, setUseExisting] = useState(false);
-  const [patientQuery, setPatientQuery] = useState('');
-  const debouncedPatientQuery = useDebounce(patientQuery, 150);
   const [providerId, setProviderId] = useState('');
   const [date, setDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
@@ -512,27 +386,13 @@ function BookAppointmentModal({
   const [done, setDone] = useState(false);
   const [slotNotice, setSlotNotice] = useState<SlotAdjustReason | null>(null);
 
-  const form = useForm<PatientForm>({ resolver: zodResolver(patientSchema), defaultValues: patientDefaults });
-
-  const { data: patients = [], isLoading: isPatientsLoading, isFetching: isPatientsFetching } = useQuery<TokenPerson[]>({
+  const { data: patients = [] } = useQuery<TokenPerson[]>({
     queryKey: ['token-patients'],
     queryFn: () => window.clinic.tokens.patients(),
     enabled: open,
     staleTime: 60_000,
   });
 
-  const isPatientSearching = isPatientsFetching || isPatientsLoading || patientQuery.trim() !== debouncedPatientQuery.trim();
-
-  const filteredPatients = useMemo(() => {
-    const q = debouncedPatientQuery.trim().toLowerCase();
-    if (!q) return patients.slice(0, 50);
-    return patients.filter((p) => {
-      const name = `${p.firstName} ${p.lastName}`.toLowerCase();
-      const phone = (p.phone || '').toLowerCase();
-      const mr = (p.mrNumber || '').toLowerCase();
-      return name.includes(q) || phone.includes(q) || mr.includes(q);
-    }).slice(0, 50);
-  }, [patients, debouncedPatientQuery]);
   const { data: doctors = [] } = useQuery<AppointmentPerson[]>({
     queryKey: ['doctors'],
     queryFn: appointmentsService.doctors,
@@ -587,18 +447,6 @@ function BookAppointmentModal({
     setSlotNotice((prev) => (prev !== next.reason ? next.reason : prev));
   }, [open, providerId, duration, schedule, doctorAppts]);
 
-  const createPatientMutation = useMutation({
-    mutationFn: (values: PatientForm) => patientsService.create(walkInPatientInput(values)),
-    onSuccess: async (patient) => {
-      await qc.invalidateQueries({ queryKey: ['patients'] });
-      await qc.invalidateQueries({ queryKey: ['token-patients'] });
-      setPatientId(patient.id);
-      setPatientName(`${patient.firstName} ${patient.lastName}`);
-      setStep(1);
-    },
-    meta: { toast: 'Patient created', errorToast: 'Could not register patient.' },
-  });
-
   const appointmentMutation = useMutation({
     mutationFn: () => {
       const startsAt = new Date(`${date}T${time}:00`);
@@ -649,12 +497,11 @@ function BookAppointmentModal({
   });
 
   function handleClose() {
-    setStep(0); setPatientId(''); setPatientName(''); setUseExisting(false);
+    setStep(0); setPatientId(''); setPatientName('');
     setProviderId(''); setDate(new Date().toLocaleDateString('en-CA'));
     setTime(new Date().toTimeString().slice(0, 5)); setDuration(15);
     setReason(''); setNotes(''); setDone(false);
     setSlotNotice(null);
-    form.reset(patientDefaults);
     onClose();
   }
 
@@ -668,65 +515,21 @@ function BookAppointmentModal({
           {APPT_STEPS.map((label) => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}
         </Stepper>
 
-        {/* Step 0 — Add Patient */}
+        {/* Step 0 — Select / Add Patient */}
         {step === 0 && !done && (
-          <Stack spacing={2}>
-            {createPatientMutation.isError && <Alert severity="error">Could not register patient.</Alert>}
-            <Stack direction="row" gap={1}>
-              <Button size="small" variant={!useExisting ? 'contained' : 'outlined'} onClick={() => setUseExisting(false)}>New Patient</Button>
-              <Button size="small" variant={useExisting ? 'contained' : 'outlined'} onClick={() => setUseExisting(true)}>Existing Patient</Button>
-            </Stack>
-            {useExisting ? (
-              <PatientAutocomplete
-                value={patientId}
-                onChange={(id, p) => {
-                  setPatientId(id);
-                  setPatientName(p ? `${p.firstName} ${p.lastName}` : '');
-                }}
-                label="Search patient"
-              />
-            ) : (
-              <Box component="form" id="book-patient-form" onSubmit={form.handleSubmit((v) => createPatientMutation.mutate(v))}>
-                <Stack spacing={2}>
-                  <Controller
-                    name="gender"
-                    control={form.control}
-                    render={({ field }) => (
-                      <GenderRadioGroup value={field.value} onChange={field.onChange} optional />
-                    )}
-                  />
-                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
-                    <TextField label="First name" error={!!form.formState.errors.firstName} helperText={form.formState.errors.firstName?.message} {...form.register('firstName')} />
-                    <TextField label="Last name (optional)" error={!!form.formState.errors.lastName} helperText={form.formState.errors.lastName?.message} {...form.register('lastName')} />
-                  </Box>
-                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '110px 130px minmax(0, 1fr)' }, alignItems: 'start' }}>
-                    <TextField label="Age (optional)" type="number" slotProps={{ htmlInput: { min: 0, max: 150 } }} {...form.register('ageValue')} />
-                    <Controller
-                      name="ageUnit"
-                      control={form.control}
-                      render={({ field }) => (
-                        <TextField select fullWidth label="Unit" value={field.value || 'years'} onChange={field.onChange}>
-                          <MenuItem value="years">Years</MenuItem>
-                          <MenuItem value="months">Months</MenuItem>
-                          <MenuItem value="days">Days</MenuItem>
-                        </TextField>
-                      )}
-                    />
-                    <Controller
-                      name="phone"
-                      control={form.control}
-                      render={({ field }) => (
-                        <PhoneInputField label="Phone (optional)" value={field.value ?? ''} onChange={field.onChange} />
-                      )}
-                    />
-                  </Box>
-                  <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
-                    <TextField label="Weight (kg) (optional)" type="number" slotProps={{ htmlInput: { min: 0, max: 500, step: 0.1 } }} placeholder="e.g. 70" {...form.register('weight')} />
-                    <TextField label="Address (optional)" {...form.register('address')} />
-                  </Box>
-                </Stack>
-              </Box>
-            )}
+          <Stack spacing={2} sx={{ py: 1.5 }}>
+            <Typography variant="body2" color="text.secondary">
+              Search a patient by name, phone or MR#, or click "+ Add new patient" to register.
+            </Typography>
+            <PatientAutocomplete
+              value={patientId}
+              onChange={(id, p) => {
+                setPatientId(id);
+                setPatientName(p ? `${p.firstName} ${p.lastName ?? ''}`.trim() : '');
+              }}
+              label="Patient"
+              autoFocus
+            />
           </Stack>
         )}
 
@@ -905,12 +708,7 @@ function BookAppointmentModal({
 
       <DialogActions sx={dialogActionsSx}>
         <Button onClick={handleClose} sx={dialogCancelBtnSx}>{done ? 'Done' : 'Close'}</Button>
-        {step === 0 && !done && !useExisting && (
-          <SubmitButton form="book-patient-form" type="submit" loading={createPatientMutation.isPending}>
-            Next
-          </SubmitButton>
-        )}
-        {step === 0 && !done && useExisting && (
+        {step === 0 && !done && (
           <SubmitButton disabled={!patientId} onClick={() => setStep(1)}>
             Next
           </SubmitButton>

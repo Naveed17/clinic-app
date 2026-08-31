@@ -13,6 +13,7 @@ import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
 import RepeatOutlinedIcon from '@mui/icons-material/RepeatOutlined';
 import MoreVertOutlinedIcon from '@mui/icons-material/MoreVertOutlined';
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
@@ -45,7 +46,7 @@ import {
   TablePagination,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
@@ -64,6 +65,7 @@ import { formatTableDate } from '@/utils/formatDate';
 import { playNotificationSound } from '@/utils/sound';
 import { dateOfBirthToAge } from '@shared/patientAge';
 import { PatientAutocomplete } from '@/components/PatientAutocomplete';
+import { InvoiceDialog } from '@/features/billing/InvoicesPage';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
@@ -522,7 +524,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
                 <TextField
                   label="Token"
                   fullWidth
-                  value={tokenForPatient ? `#${String(tokenForPatient.tokenNumber).padStart(3, '0')} — ${tokenForPatient.patient.firstName} ${tokenForPatient.patient.lastName}` : ''}
+                  value={tokenForPatient ? `#${String(tokenForPatient.tokenNumber).padStart(3, '0')} — ${tokenForPatient.patient.firstName} ${tokenForPatient.patient.lastName ?? ''}`.trim() : ''}
                   placeholder={patientId && date ? 'No token found for this patient on selected date' : 'Select patient and date first'}
                   InputProps={{ readOnly: true }}
                   error={!!form.formState.errors.tokenId}
@@ -722,9 +724,47 @@ export function AppointmentsPage(): React.JSX.Element {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkConfirmDelete, setBulkConfirmDelete] = useState(false);
   const [isBulkLoading, setIsBulkLoading] = useState(false);
+  const [invoiceAppt, setInvoiceAppt] = useState<Appointment | null>(null);
 
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [activeMenuAppt, setActiveMenuAppt] = useState<Appointment | null>(null);
+  const closeMenuTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMenuOpen = (anchor: HTMLElement, appt: Appointment) => {
+    if (closeMenuTimeoutRef.current) {
+      clearTimeout(closeMenuTimeoutRef.current);
+      closeMenuTimeoutRef.current = null;
+    }
+    setMenuAnchor(anchor);
+    setActiveMenuAppt(appt);
+  };
+
+  const handleMenuClose = () => {
+    if (closeMenuTimeoutRef.current) {
+      clearTimeout(closeMenuTimeoutRef.current);
+    }
+    closeMenuTimeoutRef.current = setTimeout(() => {
+      setMenuAnchor(null);
+      setActiveMenuAppt(null);
+    }, 200);
+  };
+
+  const handleMenuCloseImmediate = () => {
+    if (closeMenuTimeoutRef.current) {
+      clearTimeout(closeMenuTimeoutRef.current);
+      closeMenuTimeoutRef.current = null;
+    }
+    setMenuAnchor(null);
+    setActiveMenuAppt(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (closeMenuTimeoutRef.current) {
+        clearTimeout(closeMenuTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleBulkComplete = async () => {
     if (selectedIds.size === 0) return;
@@ -1261,24 +1301,24 @@ export function AppointmentsPage(): React.JSX.Element {
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>{a.reason || '—'}</TableCell>
                   {!isAdmin && (
                     <TableCell align="right" onClick={(e) => e.stopPropagation()} sx={{ width: 64, pr: 2 }}>
-                      <Tooltip title="Actions" placement="left">
-                        <IconButton
-                          size="small"
-                          sx={{
-                            ...actionBtnSx,
-                            border: '1px solid',
-                            borderColor: activeMenuAppt?.id === a.id ? 'primary.main' : 'divider',
-                            bgcolor: activeMenuAppt?.id === a.id ? alpha(theme.palette.primary.main, 0.12) : 'transparent',
-                            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08), borderColor: 'primary.main' },
-                          }}
-                          onClick={(e) => {
-                            setMenuAnchor(e.currentTarget);
-                            setActiveMenuAppt(a);
-                          }}
-                        >
-                          <MoreVertOutlinedIcon sx={{ fontSize: 18 }} />
-                        </IconButton>
-                      </Tooltip>
+                      <IconButton
+                        size="small"
+                        sx={{
+                          ...actionBtnSx,
+                          border: '1px solid',
+                          borderColor: activeMenuAppt?.id === a.id ? 'primary.main' : 'divider',
+                          bgcolor: activeMenuAppt?.id === a.id ? alpha(theme.palette.primary.main, 0.12) : 'transparent',
+                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08), borderColor: 'primary.main' },
+                        }}
+                        onMouseEnter={(e) => handleMenuOpen(e.currentTarget, a)}
+                        onMouseLeave={handleMenuClose}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMenuOpen(e.currentTarget, a);
+                        }}
+                      >
+                        <MoreVertOutlinedIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
                     </TableCell>
                   )}
                 </TableRow>
@@ -1292,12 +1332,23 @@ export function AppointmentsPage(): React.JSX.Element {
       <Popover
         open={Boolean(menuAnchor && activeMenuAppt)}
         anchorEl={menuAnchor}
-        onClose={() => { setMenuAnchor(null); setActiveMenuAppt(null); }}
+        onClose={handleMenuCloseImmediate}
+        disableRestoreFocus
+        disableScrollLock
+        sx={{ pointerEvents: 'none' }}
         anchorOrigin={{ vertical: 'center', horizontal: -8 }}
         transformOrigin={{ vertical: 'center', horizontal: 'right' }}
         slotProps={{
           paper: {
+            onMouseEnter: () => {
+              if (closeMenuTimeoutRef.current) {
+                clearTimeout(closeMenuTimeoutRef.current);
+                closeMenuTimeoutRef.current = null;
+              }
+            },
+            onMouseLeave: handleMenuClose,
             sx: {
+              pointerEvents: 'auto',
               width: 'max-content',
               maxWidth: 'none',
               borderRadius: '8px',
@@ -1315,6 +1366,15 @@ export function AppointmentsPage(): React.JSX.Element {
               bgcolor: 'background.paper',
               position: 'relative',
               overflow: 'visible',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: -8,
+                bottom: -8,
+                right: -16,
+                width: 24,
+                pointerEvents: 'auto',
+              },
               '&::after': {
                 content: '""',
                 position: 'absolute',
@@ -1335,7 +1395,7 @@ export function AppointmentsPage(): React.JSX.Element {
       >
         {activeMenuAppt && (() => {
           const a = activeMenuAppt;
-          const close = () => { setMenuAnchor(null); setActiveMenuAppt(null); };
+          const close = handleMenuCloseImmediate;
           return (
             <Stack direction="row" spacing={0.5} alignItems="center">
               <Tooltip title="View details" arrow placement="top">
@@ -1403,6 +1463,26 @@ export function AppointmentsPage(): React.JSX.Element {
                   </IconButton>
                 </Tooltip>
               )}
+              {['CHECKED_IN', 'COMPLETED'].includes(a.status) && (
+                <Tooltip title="Create Invoice" arrow placement="top">
+                  <IconButton
+                    sx={{
+                      ...actionBtnSx,
+                      color: a.status === 'COMPLETED' ? 'success.main' : 'primary.main',
+                      bgcolor: alpha(a.status === 'COMPLETED' ? theme.palette.success.main : theme.palette.primary.main, 0.1),
+                      '&:hover': {
+                        bgcolor: alpha(a.status === 'COMPLETED' ? theme.palette.success.main : theme.palette.primary.main, 0.2),
+                      },
+                    }}
+                    onClick={() => {
+                      close();
+                      setInvoiceAppt(a);
+                    }}
+                  >
+                    <ReceiptLongOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
               {['SCHEDULED', 'CHECKED_IN'].includes(a.status) && (
                 <Tooltip title="No Show" arrow placement="top">
                   <IconButton
@@ -1464,6 +1544,21 @@ export function AppointmentsPage(): React.JSX.Element {
       />
       {tokenPrint.printToken && (
         <TokenPrintPreview token={tokenPrint.printToken} onClose={tokenPrint.closePrint} />
+      )}
+      {invoiceAppt && (
+        <InvoiceDialog
+          open={Boolean(invoiceAppt)}
+          onClose={() => setInvoiceAppt(null)}
+          tokenId={invoiceAppt.tokenId ?? null}
+          initialValues={{
+            patientId: invoiceAppt.patientId,
+          }}
+          onCreated={() => {
+            void queryClient.invalidateQueries({ queryKey: ['appointments'] });
+            void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+            setInvoiceAppt(null);
+          }}
+        />
       )}
     </Box>
   );

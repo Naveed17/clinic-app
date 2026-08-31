@@ -1,6 +1,6 @@
 {
   "name": "care-flow",
-  "version": "1.0.66",
+  "version": "1.0.67",
   "repository": {
     "type": "git",
     "url": "https://github.com/Naveed17/clinic-app.git"
@@ -53,7 +53,13 @@
     "nsis": {
       "oneClick": false,
       "allowElevation": true,
-      "allowToChangeInstallationDirectory": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "src/main/assets/icons/icon.ico",
+      "uninstallerIcon": "src/main/assets/icons/icon.ico",
+      "installerHeader": "build/installerHeader.bmp",
+      "installerHeaderIcon": "src/main/assets/icons/icon.ico",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/uninstallerSidebar.bmp",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "deleteAppDataOnUninstall": false,

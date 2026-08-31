@@ -29,7 +29,17 @@ export function createAuthRouter(): Router {
     }
     const user = await getPrisma().user.findUnique({
       where: { email: email.trim().toLowerCase() },
-      select: { id: true, firstName: true, lastName: true, email: true, role: true, isActive: true, passwordHash: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        role: true,
+        avatar: true,
+        doctorProfile: { select: { avatar: true } },
+        isActive: true,
+        passwordHash: true,
+      },
     });
     if (!user || !user.isActive || !user.passwordHash || !bcrypt.compareSync(password, user.passwordHash)) {
       res.status(401).json({ error: 'Invalid email or password.' });
@@ -48,13 +58,14 @@ export function createAuthRouter(): Router {
     }
 
     const token = signToken({ userId: user.id, role });
+    const userAvatar = user.avatar?.trim() || user.doctorProfile?.avatar?.trim() || null;
     res.json({
       token,
       id: user.id,
       name: `${user.firstName} ${user.lastName}`.trim(),
       email: user.email,
       role,
-      avatar: `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase(),
+      avatar: userAvatar,
     });
   }));
 

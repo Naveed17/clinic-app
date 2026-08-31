@@ -6,6 +6,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import PhotoCameraOutlinedIcon from '@mui/icons-material/PhotoCameraOutlined';
 import {
   Alert,
   AppBar,
@@ -35,7 +36,7 @@ import {
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useColorMode } from '@/app/colorMode';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicenseModules } from '@/features/auth/LicenseModulesContext';
@@ -43,6 +44,8 @@ import { getNavItems } from './navigation';
 import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
 import { GlobalSearchModal } from '@/components/GlobalSearchModal';
 import { showAppToast } from '@/components/AppToast';
+import { DoctorAvatar, avatarFallbackFromRole } from '@/components/DoctorAvatar';
+import { fileToAvatarDataUrl } from '@/utils/avatarImage';
 import {
   FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
   dialogPaperProps,
@@ -58,7 +61,8 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
   const theme = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, updateAvatar } = useAuth();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const modules = useLicenseModules();
   const navItems = user ? getNavItems(user.role, modules) : [];
   const [notificationCount, setNotificationCount] = useState(0);
@@ -305,29 +309,60 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
             }}
           />
           <Tooltip title={user?.name ?? ''}>
-            <Avatar
-              sx={{ width: 34, height: 34, bgcolor: 'primary.main', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+            <Box
+              component="span"
               onClick={(e) => setAvatarAnchor(e.currentTarget)}
+              sx={{
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                borderRadius: '50%',
+                transition: 'transform 0.15s ease',
+                '&:hover': { transform: 'scale(1.05)' },
+              }}
             >
-              {user?.avatar ?? 'U'}
-            </Avatar>
+              <DoctorAvatar
+                src={user?.avatar}
+                name={user?.name}
+                size={34}
+                fallback={avatarFallbackFromRole(user?.role)}
+              />
+            </Box>
           </Tooltip>
 
           <Menu anchorEl={avatarAnchor} open={Boolean(avatarAnchor)} onClose={() => setAvatarAnchor(null)}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-            slotProps={{ paper: { sx: { mt: 1, minWidth: 180, borderRadius: 1, boxShadow: '0 4px 20px rgba(0,0,0,0.12)' } } }}
+            slotProps={{ paper: { sx: { mt: 1, minWidth: 210, borderRadius: 1.5, p: 0.5, boxShadow: '0 8px 30px rgba(0,0,0,0.15)' } } }}
           >
-            <Box sx={{ px: 2, py: 1 }}>
-              <Typography variant="subtitle2" fontWeight={700}>{user?.name}</Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>{user?.role}</Typography>
+            <Box sx={{ px: 2, py: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <DoctorAvatar
+                src={user?.avatar}
+                name={user?.name}
+                size={40}
+                fallback={avatarFallbackFromRole(user?.role)}
+              />
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="subtitle2" fontWeight={700} noWrap>{user?.name}</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>{user?.role}</Typography>
+              </Box>
             </Box>
-            <Divider />
-            <MenuItem onClick={() => { setAvatarAnchor(null); setPwDialogOpen(true); }} sx={{ fontSize: 14, }}>
-              <LockOutlinedIcon fontSize="small" sx={{ mr: 1 }} /> Change Password
+            <Divider sx={{ my: 0.5 }} />
+            <MenuItem
+              onClick={() => {
+                setAvatarAnchor(null);
+                avatarInputRef.current?.click();
+              }}
+              sx={{ fontSize: 13.5, borderRadius: 1 }}
+            >
+              <PhotoCameraOutlinedIcon fontSize="small" sx={{ mr: 1.25, color: 'text.secondary' }} /> Change Photo
             </MenuItem>
-            <MenuItem onClick={() => { setAvatarAnchor(null); handleLogout(); }} sx={{ color: 'error.main', fontSize: 14, }}>
-              <LogoutOutlinedIcon fontSize="small" sx={{ mr: 1 }} /> Logout
+            <MenuItem onClick={() => { setAvatarAnchor(null); setPwDialogOpen(true); }} sx={{ fontSize: 13.5, borderRadius: 1 }}>
+              <LockOutlinedIcon fontSize="small" sx={{ mr: 1.25, color: 'text.secondary' }} /> Change Password
+            </MenuItem>
+            <Divider sx={{ my: 0.5 }} />
+            <MenuItem onClick={() => { setAvatarAnchor(null); handleLogout(); }} sx={{ color: 'error.main', fontSize: 13.5, borderRadius: 1 }}>
+              <LogoutOutlinedIcon fontSize="small" sx={{ mr: 1.25 }} /> Logout
             </MenuItem>
           </Menu>
 
@@ -351,6 +386,25 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
               <LogoutOutlinedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (!file) return;
+              void fileToAvatarDataUrl(file)
+                .then(async (dataUrl) => {
+                  await updateAvatar(dataUrl);
+                  showAppToast({ message: 'Profile photo updated', type: 'success' });
+                })
+                .catch((err: unknown) => {
+                  showAppToast({ message: err instanceof Error ? err.message : 'Unable to use that image', type: 'error' });
+                });
+            }}
+          />
         </Box>
       </Toolbar>
     </AppBar >

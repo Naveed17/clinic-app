@@ -92,13 +92,23 @@ function toPatientInput(values: PatientFormValues, primaryDoctorId?: string | nu
   };
 }
 
-interface PatientDialogProps {
+export interface PatientDialogProps {
   patient?: Patient;
   open: boolean;
   onClose: () => void;
+  onCreated?: (patient: Patient) => void;
+  initialValues?: Partial<PatientFormValues>;
+  zIndex?: number;
 }
 
-export function PatientDialog({ patient, open, onClose }: PatientDialogProps): React.JSX.Element {
+export function PatientDialog({
+  patient,
+  open,
+  onClose,
+  onCreated,
+  initialValues,
+  zIndex,
+}: PatientDialogProps): React.JSX.Element {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isEditing = Boolean(patient);
@@ -114,8 +124,13 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
         ? patientsService.update(patient.id, toPatientInput(values))
         : patientsService.create(toPatientInput(values, linkDoctorId));
     },
-    onSuccess: async () => {
+    onSuccess: async (savedPatient) => {
       await queryClient.invalidateQueries({ queryKey: ['patients'] });
+      await queryClient.invalidateQueries({ queryKey: ['token-patients'] });
+      await queryClient.invalidateQueries({ queryKey: ['invoice-patients'] });
+      if (savedPatient && !patient) {
+        onCreated?.(savedPatient as Patient);
+      }
       onClose();
     },
     meta: {
@@ -125,13 +140,27 @@ export function PatientDialog({ patient, open, onClose }: PatientDialogProps): R
   });
 
   useEffect(() => {
-    if (open) form.reset(toFormValues(patient));
-  }, [form, open, patient]);
+    if (open) {
+      form.reset({
+        ...emptyFormValues,
+        ...toFormValues(patient),
+        ...initialValues,
+      });
+    }
+  }, [form, open, patient, initialValues]);
 
   const { errors } = form.formState;
 
   return (
-    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps} {...telInputDialogProps}>
+    <Dialog
+      fullWidth
+      maxWidth="sm"
+      open={open}
+      onClose={onClose}
+      PaperProps={dialogPaperProps}
+      sx={zIndex ? { zIndex } : undefined}
+      {...telInputDialogProps}
+    >
       <FormDialogTitle
         title={isEditing ? 'Edit patient' : 'Add patient'}
         subtitle={isEditing ? 'Update patient details and medical info.' : 'Register a new patient in the clinic.'}

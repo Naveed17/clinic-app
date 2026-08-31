@@ -43,12 +43,13 @@ import {
 import { useFieldArray, useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useNavigate } from 'react-router-dom';
 import { invoicesService } from '@/services/invoices.service';
 import { patientsService } from '@/services/patients.service';
 import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
+import { PatientAutocomplete } from '@/components/PatientAutocomplete';
 import { GenderRadioGroup } from '@/components/GenderRadioGroup';
 import { ageToDateOfBirth, dateOfBirthToAge, type AgeUnit } from '@shared/patientAge';
 import type { Invoice, InvoiceInput, InvoicePerson, InvoiceUpdateInput, Payment } from '@/types/invoice';
@@ -317,14 +318,6 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 const defaults: FormValues = { patientId: '', discount: 0, notes: '', items: [{ description: '', quantity: 1, unitPrice: 0 }] };
 
-type InvoicePatientOption = InvoicePerson & { mrNumber?: string; inputLabel?: string };
-
-const filterPatients = createFilterOptions<InvoicePatientOption>({
-  stringify: (p) => `${p.firstName || ''} ${p.lastName || ''} ${p.mrNumber ?? ''} ${p.phone ?? ''}`,
-});
-
-const ADD_NEW = '__add_new__';
-
 export function InvoiceDialog({
   open,
   onClose,
@@ -348,15 +341,6 @@ export function InvoiceDialog({
   const client = useQueryClient();
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: defaults });
   const fields = useFieldArray({ control: form.control, name: 'items' });
-  const patients = useQuery({ queryKey: ['invoice-patients'], queryFn: invoicesService.patients });
-  const [patientInput, setPatientInput] = useState('');
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [quickFirst, setQuickFirst] = useState('');
-  const [quickLast, setQuickLast] = useState('');
-  const [quickAge, setQuickAge] = useState('');
-  const [quickAgeUnit, setQuickAgeUnit] = useState<AgeUnit>('years');
-  const [quickGender, setQuickGender] = useState('');
-  const [quickError, setQuickError] = useState('');
 
   const createMutation = useMutation({
     mutationFn: (values: FormValues) =>
@@ -388,44 +372,6 @@ export function InvoiceDialog({
     meta: { toast: 'Invoice updated', errorToast: 'Unable to update the invoice.' },
   });
 
-  const quickPatientMutation = useMutation({
-    mutationFn: (input: { firstName: string; lastName: string; age?: string; ageUnit?: AgeUnit; gender?: string }) => {
-      const num = input.age?.trim() ? parseFloat(input.age) : null;
-      const unit = input.ageUnit || 'years';
-      const dob = num != null && !Number.isNaN(num) ? ageToDateOfBirth(num, unit) : null;
-      const ageYears = unit === 'years' ? (num != null ? Math.floor(num) : null) : (dob ? dateOfBirthToAge(dob) : null);
-
-      return patientsService.create({
-        firstName: input.firstName,
-        lastName: input.lastName,
-        age: ageYears,
-        dateOfBirth: dob ? dob.toISOString() : null,
-        gender: input.gender || null,
-        phone: null,
-        email: null,
-        address: null,
-        emergencyContactName: null,
-        emergencyContactPhone: null,
-        bloodGroup: null,
-        allergies: null,
-        chronicConditions: null,
-      });
-    },
-    onSuccess: async (patient) => {
-      await client.invalidateQueries({ queryKey: ['invoice-patients'] });
-      await client.invalidateQueries({ queryKey: ['patients'] });
-      form.setValue('patientId', patient.id);
-      setQuickAddOpen(false);
-      setQuickFirst('');
-      setQuickLast('');
-      setQuickAge('');
-      setQuickAgeUnit('years');
-      setQuickGender('');
-      setQuickError('');
-    },
-    onError: (err) => setQuickError(err instanceof Error ? err.message : 'Could not add patient.'),
-  });
-
 
   useEffect(() => {
     if (!open) return;
@@ -454,9 +400,6 @@ export function InvoiceDialog({
     });
   }, [form, open, initialValues, invoice]);
 
-  const patientOptions = (patients.data ?? []) as InvoicePatientOption[];
-  const selectedPatientId = form.watch('patientId');
-  const selectedPatient = patientOptions.find((p) => p.id === selectedPatientId) ?? null;
   const items = form.watch('items');
   const discount = form.watch('discount');
   const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
@@ -464,86 +407,31 @@ export function InvoiceDialog({
   const errors = form.formState.errors;
   const mutation = isEdit ? updateMutation : createMutation;
 
-  const autocompleteOptions: InvoicePatientOption[] = [
-    { id: ADD_NEW, firstName: '+ Add new patient…', lastName: '', inputLabel: '+ Add new patient…' },
-    ...patientOptions,
-  ];
-
   return (
-    <>
-      <Dialog fullWidth maxWidth="md" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
-        <FormDialogTitle
-          title={isEdit ? `Edit Invoice — ${invoice?.invoiceNumber ?? ''}` : 'Create Invoice'}
-          subtitle={isEdit ? 'Update medicines and adjust the bill total.' : 'Bill a patient for medicines and services.'}
-        />
-        <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))} sx={dialogFormSx}>
-          <DialogContent sx={dialogContentSx}>
-            <Stack spacing={2.5}>
-              {mutation.isError && <Alert severity="error">{mutation.error instanceof Error ? mutation.error.message : `Unable to ${isEdit ? 'update' : 'create'} the invoice.`}</Alert>}
-              {isEdit ? (
-                <TextField
-                  fullWidth
-                  label="Patient"
-                  value={personLabel(invoice!.patient)}
-                  disabled
-                />
-              ) : (
-                <Autocomplete
-                  options={autocompleteOptions}
-                  filterOptions={(opts, state) => {
-                    const filtered = filterPatients(opts.filter((o) => o.id !== ADD_NEW), state).slice(0, 50);
-                    return [
-                      opts.find((o) => o.id === ADD_NEW)!,
-                      ...filtered,
-                    ];
-                  }}
-                  getOptionLabel={(p) => p.inputLabel ?? personLabel(p)}
-                  value={selectedPatient}
-                  inputValue={patientInput}
-                  onInputChange={(_, value, reason) => {
-                    if (reason === 'input') setPatientInput(value);
-                  }}
-                  onChange={(_, option) => {
-                    if (!option) {
-                      form.setValue('patientId', '');
-                      return;
-                    }
-                    if (option.id === ADD_NEW) {
-                      const parts = patientInput.trim().split(/\s+/);
-                      setQuickFirst(parts[0] ?? '');
-                      setQuickLast(parts.slice(1).join(' ') || 'Patient');
-                      setQuickAddOpen(true);
-                      return;
-                    }
-
-                    form.setValue('patientId', option.id);
-                    setPatientInput(personLabel(option));
-                  }}
-                  isOptionEqualToValue={(o, v) => o.id === v.id}
-                  renderOption={(props, option) => (
-                    <Box component="li" {...props} key={option.id}>
-                      {option.id === ADD_NEW ? (
-                        <Typography fontSize={13.5} fontWeight={700} color="primary.main">{option.inputLabel}</Typography>
-                      ) : (
-                        <Box>
-                          <Typography fontSize={13.5} fontWeight={600}>{personLabel(option)}</Typography>
-                          <Typography fontSize={11.5} color="text.secondary">
-                            {[option.mrNumber, option.phone].filter(Boolean).join(' · ') || '—'}
-                          </Typography>
-                        </Box>
-                      )}
-                    </Box>
-                  )}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Patient"
-                      error={Boolean(errors.patientId)}
-                      helperText={errors.patientId?.message ?? 'Type to search, or add a new patient'}
-                    />
-                  )}
-                />
-              )}
+    <Dialog fullWidth maxWidth="md" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
+      <FormDialogTitle
+        title={isEdit ? `Edit Invoice — ${invoice?.invoiceNumber ?? ''}` : 'Create Invoice'}
+        subtitle={isEdit ? 'Update medicines and adjust the bill total.' : 'Bill a patient for medicines and services.'}
+      />
+      <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))} sx={dialogFormSx}>
+        <DialogContent sx={dialogContentSx}>
+          <Stack spacing={2.5}>
+            {mutation.isError && <Alert severity="error">{mutation.error instanceof Error ? mutation.error.message : `Unable to ${isEdit ? 'update' : 'create'} the invoice.`}</Alert>}
+            {isEdit ? (
+              <TextField
+                fullWidth
+                label="Patient"
+                value={personLabel(invoice!.patient)}
+                disabled
+              />
+            ) : (
+              <PatientAutocomplete
+                value={form.watch('patientId')}
+                onChange={(id) => form.setValue('patientId', id, { shouldValidate: true })}
+                error={Boolean(errors.patientId)}
+                helperText={errors.patientId?.message}
+              />
+            )}
               <Typography fontWeight={700} variant="subtitle2">Items</Typography>
               {fields.fields.map((field, index) => {
                 const qty = Number(form.watch(`items.${index}.quantity`)) || 0;
@@ -592,38 +480,6 @@ export function InvoiceDialog({
           </DialogActions>
         </Box>
       </Dialog>
-      <Dialog open={quickAddOpen} onClose={() => setQuickAddOpen(false)} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
-        <FormDialogTitle title="Add patient" subtitle="Quick-register a patient for this invoice." />
-        <DialogContent sx={dialogContentSx}>
-          <Stack spacing={2}>
-            {quickError && <Alert severity="error">{quickError}</Alert>}
-            <GenderRadioGroup value={quickGender} onChange={setQuickGender} optional />
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr' }}>
-              <TextField label="First name" fullWidth value={quickFirst} onChange={(e) => setQuickFirst(e.target.value)} />
-              <TextField label="Last name" fullWidth value={quickLast} onChange={(e) => setQuickLast(e.target.value)} />
-            </Box>
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '110px 130px' }}>
-              <TextField label="Age" type="number" value={quickAge} onChange={(e) => setQuickAge(e.target.value)} slotProps={{ htmlInput: { min: 0, max: 150 } }} />
-              <TextField select label="Unit" value={quickAgeUnit} onChange={(e) => setQuickAgeUnit(e.target.value as AgeUnit)}>
-                <MenuItem value="years">Years</MenuItem>
-                <MenuItem value="months">Months</MenuItem>
-                <MenuItem value="days">Days</MenuItem>
-              </TextField>
-            </Box>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={dialogActionsSx}>
-          <Button onClick={() => setQuickAddOpen(false)} sx={dialogCancelBtnSx}>Cancel</Button>
-          <SubmitButton
-            loading={quickPatientMutation.isPending}
-            disabled={!quickFirst.trim() || !quickLast.trim()}
-            onClick={() => quickPatientMutation.mutate({ firstName: quickFirst.trim(), lastName: quickLast.trim(), age: quickAge, ageUnit: quickAgeUnit, gender: quickGender })}
-          >
-            Add patient
-          </SubmitButton>
-        </DialogActions>
-      </Dialog>
-    </>
   );
 }
 
@@ -641,6 +497,43 @@ export function InvoicesPage(): React.JSX.Element {
   const [deleteInvoice, setDeleteInvoice] = useState<Invoice | undefined>();
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [activeMenuInvoice, setActiveMenuInvoice] = useState<Invoice | null>(null);
+  const closeMenuTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMenuOpen = (anchor: HTMLElement, invoice: Invoice) => {
+    if (closeMenuTimeoutRef.current) {
+      clearTimeout(closeMenuTimeoutRef.current);
+      closeMenuTimeoutRef.current = null;
+    }
+    setMenuAnchor(anchor);
+    setActiveMenuInvoice(invoice);
+  };
+
+  const handleMenuClose = () => {
+    if (closeMenuTimeoutRef.current) {
+      clearTimeout(closeMenuTimeoutRef.current);
+    }
+    closeMenuTimeoutRef.current = setTimeout(() => {
+      setMenuAnchor(null);
+      setActiveMenuInvoice(null);
+    }, 200);
+  };
+
+  const handleMenuCloseImmediate = () => {
+    if (closeMenuTimeoutRef.current) {
+      clearTimeout(closeMenuTimeoutRef.current);
+      closeMenuTimeoutRef.current = null;
+    }
+    setMenuAnchor(null);
+    setActiveMenuInvoice(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (closeMenuTimeoutRef.current) {
+        clearTimeout(closeMenuTimeoutRef.current);
+      }
+    };
+  }, []);
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -789,24 +682,24 @@ export function InvoicesPage(): React.JSX.Element {
                   <TableCell align="right"><Typography fontSize={13.5} fontWeight={700}>{money(invoice.total)}</Typography></TableCell>
                   <TableCell align="right">{money(Number(invoice.amountPaid ?? 0))}</TableCell>
                   <TableCell align="right" onClick={(e) => e.stopPropagation()} sx={{ width: 64, pr: 2 }}>
-                    <Tooltip title="Actions" placement="left">
-                      <IconButton
-                        size="small"
-                        sx={{
-                          ...actionBtnSx,
-                          border: '1px solid',
-                          borderColor: activeMenuInvoice?.id === invoice.id ? 'primary.main' : 'divider',
-                          bgcolor: activeMenuInvoice?.id === invoice.id ? alpha(theme.palette.primary.main, 0.12) : 'transparent',
-                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08), borderColor: 'primary.main' },
-                        }}
-                        onClick={(e) => {
-                          setMenuAnchor(e.currentTarget);
-                          setActiveMenuInvoice(invoice);
-                        }}
-                      >
-                        <MoreVertOutlinedIcon sx={{ fontSize: 18 }} />
-                      </IconButton>
-                    </Tooltip>
+                    <IconButton
+                      size="small"
+                      sx={{
+                        ...actionBtnSx,
+                        border: '1px solid',
+                        borderColor: activeMenuInvoice?.id === invoice.id ? 'primary.main' : 'divider',
+                        bgcolor: activeMenuInvoice?.id === invoice.id ? alpha(theme.palette.primary.main, 0.12) : 'transparent',
+                        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08), borderColor: 'primary.main' },
+                      }}
+                      onMouseEnter={(e) => handleMenuOpen(e.currentTarget, invoice)}
+                      onMouseLeave={handleMenuClose}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMenuOpen(e.currentTarget, invoice);
+                      }}
+                    >
+                      <MoreVertOutlinedIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               );
@@ -819,12 +712,23 @@ export function InvoicesPage(): React.JSX.Element {
       <Popover
         open={Boolean(menuAnchor && activeMenuInvoice)}
         anchorEl={menuAnchor}
-        onClose={() => { setMenuAnchor(null); setActiveMenuInvoice(null); }}
+        onClose={handleMenuCloseImmediate}
+        disableRestoreFocus
+        disableScrollLock
+        sx={{ pointerEvents: 'none' }}
         anchorOrigin={{ vertical: 'center', horizontal: -8 }}
         transformOrigin={{ vertical: 'center', horizontal: 'right' }}
         slotProps={{
           paper: {
+            onMouseEnter: () => {
+              if (closeMenuTimeoutRef.current) {
+                clearTimeout(closeMenuTimeoutRef.current);
+                closeMenuTimeoutRef.current = null;
+              }
+            },
+            onMouseLeave: handleMenuClose,
             sx: {
+              pointerEvents: 'auto',
               width: 'max-content',
               maxWidth: 'none',
               borderRadius: '8px',
@@ -842,6 +746,15 @@ export function InvoicesPage(): React.JSX.Element {
               bgcolor: 'background.paper',
               position: 'relative',
               overflow: 'visible',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: -8,
+                bottom: -8,
+                right: -16,
+                width: 24,
+                pointerEvents: 'auto',
+              },
               '&::after': {
                 content: '""',
                 position: 'absolute',
@@ -868,7 +781,7 @@ export function InvoicesPage(): React.JSX.Element {
           const balance = Math.max(0, total - paid);
           const canPay = !isAdmin && !isVoid && invoice.status !== 'PAID' && invoice.status !== 'REFUNDED' && balance > 0;
           const canRefund = !isAdmin && !isVoid && paid > 0;
-          const close = () => { setMenuAnchor(null); setActiveMenuInvoice(null); };
+          const close = handleMenuCloseImmediate;
 
           return (
             <Stack direction="row" spacing={0.5} alignItems="center">
