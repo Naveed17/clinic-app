@@ -32,6 +32,7 @@ import { SetupWizard } from '@/features/auth/SetupWizard';
 import { useState, useEffect, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import { CircularProgress } from '@mui/material';
+import careflowLogo from '@/assets/careflow-logo.png';
 
 const router = createHashRouter([
   {
@@ -270,8 +271,92 @@ export function AppRouter(): React.JSX.Element {
 
   if (gate === null || (gate.state === 'ok' && setupDone === null)) {
     return (
-      <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default' }}>
-        <CircularProgress />
+      <Box
+        sx={{
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: 'background.default',
+          color: 'text.primary',
+          userSelect: 'none',
+        }}
+      >
+        {/* Real CareFlow App Logo */}
+        <Box
+          sx={{
+            width: 74,
+            height: 74,
+            mb: 2.5,
+            borderRadius: 3.5,
+            bgcolor: 'background.paper',
+            border: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: 1.2,
+            boxShadow: 2,
+          }}
+        >
+          <Box
+            component="img"
+            src={careflowLogo}
+            alt="CareFlow"
+            sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
+        </Box>
+
+        {/* Brand Title: CareFlow */}
+        <Box
+          sx={{
+            fontSize: 26,
+            fontWeight: 800,
+            color: 'text.primary',
+            lineHeight: 1.15,
+            letterSpacing: '-0.02em',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          Care<Box component="span" sx={{ color: 'primary.main' }}>Flow</Box>
+        </Box>
+
+        {/* Subtitle */}
+        <Box
+          sx={{
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            color: 'text.secondary',
+            mt: 0.6,
+            mb: 3.5,
+          }}
+        >
+          Clinic Management System
+        </Box>
+
+        {/* Matte Primary Emerald Spinner */}
+        <CircularProgress
+          size={36}
+          thickness={3.6}
+          color="primary"
+        />
+
+        {/* Status Text */}
+        <Box
+          sx={{
+            fontSize: 12.5,
+            fontWeight: 500,
+            color: 'text.secondary',
+            mt: 2,
+            letterSpacing: '0.02em',
+          }}
+        >
+          Starting CareFlow...
+        </Box>
       </Box>
     );
   }

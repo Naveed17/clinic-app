@@ -149,7 +149,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
               width: 38,
               height: 38,
               borderRadius: 2,
-              bgcolor: '#fff',
+              bgcolor: 'background.paper',
               border: '1px solid',
               borderColor: 'divider',
               display: 'flex',

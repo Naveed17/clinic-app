@@ -1434,10 +1434,10 @@ export function TokensPage(): React.JSX.Element {
                       sx={{
                         borderRadius: 2,
                         fontWeight: 800,
-                        bgcolor: '#fff',
-                        color: theme.palette.primary.dark,
+                        bgcolor: 'common.white',
+                        color: 'primary.dark',
                         boxShadow: 'none',
-                        '&:hover': { bgcolor: alpha('#fff', 0.9), boxShadow: 'none' },
+                        '&:hover': { bgcolor: alpha(theme.palette.common.white, 0.9), boxShadow: 'none' },
                       }}
                     >
                       Done

@@ -163,17 +163,17 @@ export function LabDashboard(): React.JSX.Element {
   const heroFilledSx = {
     borderRadius: 2,
     fontWeight: 700,
-    bgcolor: '#fff',
-    color: theme.palette.primary.dark,
+    bgcolor: 'common.white',
+    color: 'primary.dark',
     boxShadow: 'none',
-    '&:hover': { bgcolor: alpha('#fff', 0.92), boxShadow: 'none' },
+    '&:hover': { bgcolor: alpha(theme.palette.common.white, 0.92), boxShadow: 'none' },
   } as const;
   const heroOutlineSx = {
     borderRadius: 2,
     fontWeight: 700,
-    borderColor: alpha('#fff', 0.5),
-    color: '#fff',
-    '&:hover': { borderColor: '#fff', bgcolor: alpha('#fff', 0.08) },
+    borderColor: alpha(theme.palette.common.white, 0.5),
+    color: 'common.white',
+    '&:hover': { borderColor: theme.palette.common.white, bgcolor: alpha(theme.palette.common.white, 0.08) },
   } as const;
 
   const softCard = {

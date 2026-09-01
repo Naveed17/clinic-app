@@ -46,7 +46,6 @@ import { registerScheduleIpc } from './doctors/schedule.ipc';
 import { seedDefaultAdmin } from './auth/seed';
 import { initAutoUpdater } from './updater';
 import { registerWhatsAppIpc } from './whatsapp/whatsapp.ipc';
-import { initSplashIpc, createSplashWindow, updateSplashProgress, closeSplashWindow } from './splash';
 
 let backendServer: BackendServer | undefined;
 
@@ -123,7 +122,6 @@ function createWindow(): void {
   });
 
   window.on('ready-to-show', () => {
-    closeSplashWindow();
     window.show();
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
@@ -160,9 +158,6 @@ function createWindow(): void {
 
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.careflow.app');
-  initSplashIpc();
-  createSplashWindow();
-  updateSplashProgress(12, 'Starting clinic services...');
 
   if (app.isPackaged && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'clinic-secret-key')) {
     console.warn('[CareFlow] JWT_SECRET is not set — using insecure default. Set JWT_SECRET before production deploy.');
@@ -170,7 +165,6 @@ app.whenReady().then(async () => {
 
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window));
   try {
-    updateSplashProgress(28, 'Checking database & license settings...');
     // Pull online/local flag from license API (or cache) BEFORE starting SQLite/LAN.
     try {
       await isLicenseActivated();
@@ -185,7 +179,6 @@ app.whenReady().then(async () => {
       (meta.databaseMode === 'online' && Boolean(meta.clinicalApiUrl || settings.clinicalApiUrl));
 
     if (online) {
-      updateSplashProgress(55, 'Connecting to cloud database...');
       // Online = Vercel Nest API → Neon Postgres only (no local SQLite / LAN).
       const clinicalOrigin = resolveOnlineApiOrigin(settings.clinicalApiUrl || meta.clinicalApiUrl);
       saveDatabaseModeSettings({
@@ -198,7 +191,6 @@ app.whenReady().then(async () => {
       process.env.CLINIC_API_URL = clinicalOrigin;
       console.log('[CareFlow] Online mode → Neon via', process.env.CLINIC_API_URL, settings.schemaId || meta.schemaId);
     } else if (settings.serverMode === 'lan-client' && settings.clientApiUrl) {
-      updateSplashProgress(50, 'Connecting to clinic LAN server...');
       // Verify remote server is reachable before committing to client mode
       const reachable = await new Promise<boolean>((resolve) => {
         const { request } = require('node:http') as typeof import('node:http');
@@ -223,10 +215,8 @@ app.whenReady().then(async () => {
         // NOTE: saveSettings intentionally NOT called here so lan-client setting
         // is preserved — next restart will retry the remote server automatically
         console.warn('LAN server unreachable, falling back to local mode (settings kept)');
-        updateSplashProgress(60, 'Initializing local database...');
         await initializeDatabase();
         await seedDefaultAdmin();
-        updateSplashProgress(75, 'Starting backend server...');
         backendServer = await startBackendServer(environment.apiPort);
         process.env.CLINIC_API_URL = backendServer.url;
         // Background mein retry karta raho — jab server mile toh renderer reload hoga
@@ -234,11 +224,8 @@ app.whenReady().then(async () => {
       }
     } else {
       // Server or local mode — start local backend
-      updateSplashProgress(45, 'Initializing clinic database...');
       await initializeDatabase();
-      updateSplashProgress(65, 'Setting up admin accounts...');
       await seedDefaultAdmin();
-      updateSplashProgress(80, 'Starting backend server...');
       backendServer = await startBackendServer(environment.apiPort);
       process.env.CLINIC_API_URL = backendServer.url;
       if (settings.serverMode === 'lan-server') {
@@ -248,7 +235,6 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.error('Backend initialization failed:', error);
   }
-  updateSplashProgress(92, 'Registering clinic modules...');
   registerLicenseIpc();
   registerBackupIpc();
   registerDocumentsIpc();
@@ -274,7 +260,6 @@ app.whenReady().then(async () => {
     startDiscoveryListener();
   }
   initAutoUpdater();
-  updateSplashProgress(100, 'CareFlow is ready!');
   createWindow();
 
   app.on('activate', () => {

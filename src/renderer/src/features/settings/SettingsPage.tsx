@@ -791,7 +791,7 @@ export function SettingsPage(): React.JSX.Element {
                           borderRadius: 2,
                           border: '1px solid',
                           borderColor: 'divider',
-                          bgcolor: '#fff',
+                          bgcolor: 'background.paper',
                           overflow: 'hidden',
                           p: 0.5,
                           flexShrink: 0,

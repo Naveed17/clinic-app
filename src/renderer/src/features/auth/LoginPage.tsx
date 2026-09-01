@@ -323,7 +323,7 @@ export function LoginPage(): React.JSX.Element {
               width: 42,
               height: 42,
               borderRadius: 2.5,
-              bgcolor: '#fff',
+              bgcolor: 'background.paper',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
