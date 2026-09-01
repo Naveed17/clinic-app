@@ -70,7 +70,7 @@ import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, 
 import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogFormSx, dialogPaperProps,
+  dialogFormSx, dialogPaperProps, telInputDialogProps,
 } from '@/components/DialogUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
@@ -422,7 +422,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   const { errors } = form.formState;
 
   return (
-    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
+    <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} PaperProps={dialogPaperProps} {...telInputDialogProps}>
       <FormDialogTitle
         title={appointment ? 'Update appointment' : 'Create appointment'}
         subtitle={appointment ? 'Edit schedule, doctor, and visit details.' : 'Book a new patient visit.'}

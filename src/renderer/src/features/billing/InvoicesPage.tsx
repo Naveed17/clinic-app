@@ -38,7 +38,7 @@ import {
 } from '@mui/material';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogFormSx, dialogPaperProps,
+  dialogFormSx, dialogPaperProps, telInputDialogProps,
 } from '@/components/DialogUI';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -408,7 +408,7 @@ export function InvoiceDialog({
   const mutation = isEdit ? updateMutation : createMutation;
 
   return (
-    <Dialog fullWidth maxWidth="md" open={open} onClose={onClose} PaperProps={dialogPaperProps}>
+    <Dialog fullWidth maxWidth="md" open={open} onClose={onClose} PaperProps={dialogPaperProps} {...telInputDialogProps}>
       <FormDialogTitle
         title={isEdit ? `Edit Invoice — ${invoice?.invoiceNumber ?? ''}` : 'Create Invoice'}
         subtitle={isEdit ? 'Update medicines and adjust the bill total.' : 'Bill a patient for medicines and services.'}

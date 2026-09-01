@@ -13,7 +13,7 @@ import {
   Typography,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDebounce } from '@/hooks/useDebounce';
 import type { TokenPerson } from '@/types/token';
 import { dateOfBirthToAge } from '@shared/patientAge';
@@ -51,6 +51,7 @@ export function PatientAutocomplete({
   allowAddNew = true,
   onBlur,
 }: PatientAutocompleteProps): React.JSX.Element {
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query, 150);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -99,19 +100,38 @@ export function PatientAutocomplete({
           })
           .slice(0, 50);
 
+    const withRecent =
+      recentlyCreated && !list.some((p) => p.id === recentlyCreated.id)
+        ? [recentlyCreated, ...list]
+        : list;
+
     if (allowAddNew) {
-      return [addNewOption, ...list];
+      return [addNewOption, ...withRecent];
     }
-    return list;
-  }, [patients, debouncedQuery, allowAddNew, addNewOption]);
+    return withRecent;
+  }, [patients, debouncedQuery, allowAddNew, addNewOption, recentlyCreated]);
 
   const handleOpenAdd = (nameHint?: string) => {
     const raw = (nameHint ?? query).trim();
-    const parts = raw ? raw.split(/\s+/) : [];
-    setAddInitialValues({
-      firstName: parts[0] || '',
-      lastName: parts.slice(1).join(' ') || '',
-    });
+    const digitsOnly = raw.replace(/\D/g, '');
+    const isPhoneNumber =
+      digitsOnly.length >= 7 &&
+      (raw.startsWith('+') || raw.startsWith('0') || /^\d[\d\s-]*$/.test(raw));
+
+    if (isPhoneNumber) {
+      setAddInitialValues({
+        firstName: '',
+        lastName: '',
+        phone: raw,
+      });
+    } else {
+      const parts = raw ? raw.split(/\s+/) : [];
+      setAddInitialValues({
+        firstName: parts[0] || '',
+        lastName: parts.slice(1).join(' ') || '',
+        phone: '',
+      });
+    }
     setAddDialogOpen(true);
   };
 
@@ -145,6 +165,7 @@ export function PatientAutocomplete({
           }
           if (p.id === ADD_NEW_ID) {
             handleOpenAdd(query);
+            setQuery('');
             return;
           }
           onChange(p.id, p);
@@ -347,6 +368,10 @@ export function PatientAutocomplete({
               age: created.age ?? null,
               dateOfBirth: created.dateOfBirth ?? null,
             } as unknown as TokenPerson;
+            queryClient.setQueryData<TokenPerson[]>(['token-patients'], (old = []) => [
+              tokenPerson,
+              ...old.filter((p) => p.id !== tokenPerson.id),
+            ]);
             setRecentlyCreated(tokenPerson);
             onChange(created.id, tokenPerson);
             setQuery('');

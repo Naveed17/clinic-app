@@ -54,7 +54,7 @@ import { MedicineAutocomplete } from '@/components/MedicineAutocomplete';
 import { PatientAutocomplete } from '@/components/PatientAutocomplete';
 import {
   ConfirmDialog, FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
-  dialogPaperProps,
+  dialogPaperProps, telInputDialogProps,
 } from '@/components/DialogUI';
 import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
 import { printTokenSlip } from '@/utils/printTokenSlip';
@@ -205,7 +205,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   });
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps}>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" PaperProps={dialogPaperProps} {...telInputDialogProps}>
       <FormDialogTitle title="Issue Token" subtitle="Create a queue token for a patient visit." />
       <DialogContent sx={dialogContentSx}>
         <Stack spacing={2} sx={{ mt: 1 }}>

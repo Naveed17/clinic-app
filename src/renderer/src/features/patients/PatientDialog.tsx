@@ -8,7 +8,7 @@ import {
   dialogFormSx, dialogPaperProps, telInputDialogProps,
 } from '@/components/DialogUI';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -27,7 +27,7 @@ const patientSchema = z.object({
   gender: z.string(),
   phone: z.string().trim(),
   email: z.string().trim().refine(
-    (value) => !value || z.email().safeParse(value).success,
+    (value) => !value || z.string().email().safeParse(value).success,
     'Enter a valid email address.',
   ),
   address: z.string().trim(),
@@ -44,6 +44,13 @@ const emptyFormValues: PatientFormValues = {
   firstName: '', lastName: '', weight: '', ageValue: '', ageUnit: 'years', gender: '', phone: '',
   email: '', address: '', emergencyContactName: '', emergencyContactPhone: '',
   bloodGroup: '', allergies: '', chronicConditions: '',
+};
+
+const selectMenuProps = {
+  sx: { zIndex: 2500 },
+  disableAutoFocusItem: true,
+  disableEnforceFocus: true,
+  disableRestoreFocus: true,
 };
 
 function toFormValues(patient?: Patient): PatientFormValues {
@@ -139,15 +146,20 @@ export function PatientDialog({
     },
   });
 
+  const isInitializedRef = useRef(false);
+
   useEffect(() => {
-    if (open) {
+    if (open && !isInitializedRef.current) {
+      isInitializedRef.current = true;
       form.reset({
         ...emptyFormValues,
         ...toFormValues(patient),
         ...initialValues,
       });
+    } else if (!open) {
+      isInitializedRef.current = false;
     }
-  }, [form, open, patient, initialValues]);
+  }, [open, patient, initialValues, form]);
 
   const { errors } = form.formState;
 
@@ -165,7 +177,20 @@ export function PatientDialog({
         title={isEditing ? 'Edit patient' : 'Add patient'}
         subtitle={isEditing ? 'Update patient details and medical info.' : 'Register a new patient in the clinic.'}
       />
-      <Box component="form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))} sx={dialogFormSx}>
+      <Box
+        component="form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit(
+            (values) => mutation.mutate(values),
+            (formErrors) => {
+              console.warn('Patient form validation failed:', formErrors);
+            },
+          )(e);
+        }}
+        sx={dialogFormSx}
+      >
         <DialogContent sx={dialogContentSx}>
           <Stack spacing={2.25} sx={{ pt: 0.5 }}>
             {mutation.isError && <Alert severity="error">Unable to save the patient. Please try again.</Alert>}
@@ -198,6 +223,7 @@ export function PatientDialog({
                     label="Unit"
                     value={field.value || 'years'}
                     onChange={field.onChange}
+                    SelectProps={{ MenuProps: selectMenuProps }}
                   >
                     <MenuItem value="years">Years</MenuItem>
                     <MenuItem value="months">Months</MenuItem>
@@ -247,7 +273,7 @@ export function PatientDialog({
 
             <Typography color="text.secondary" variant="subtitle2">Medical Information</Typography>
             <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' } }}>
-              <TextField select fullWidth label="Blood Group" {...form.register('bloodGroup')}>
+              <TextField select fullWidth label="Blood Group" {...form.register('bloodGroup')} SelectProps={{ MenuProps: selectMenuProps }}>
                 <MenuItem value="">— Unknown —</MenuItem>
                 {['A+','A-','B+','B-','AB+','AB-','O+','O-'].map((bg) => (
                   <MenuItem key={bg} value={bg}>{bg}</MenuItem>
