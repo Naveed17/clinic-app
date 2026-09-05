@@ -180,17 +180,11 @@ export async function printTokenSlip(
   options?: { silent?: boolean },
 ): Promise<void> {
   let tokenToPrint = token;
-  if (tokenToPrint.patient?.weight == null && tokenToPrint.patientId && window.clinic?.patients?.getOne) {
+  if (tokenToPrint.patient?.weight == null && tokenToPrint.id && window.clinic?.tokens?.getById) {
     try {
-      const p = await window.clinic.patients.getOne(tokenToPrint.patientId);
-      if (p?.weight != null) {
-        tokenToPrint = {
-          ...tokenToPrint,
-          patient: {
-            ...tokenToPrint.patient,
-            weight: Number(p.weight),
-          },
-        };
+      const fresh = await window.clinic.tokens.getById(tokenToPrint.id);
+      if (fresh?.patient?.weight != null) {
+        tokenToPrint = fresh;
       }
     } catch {
       // ignore fallback error
