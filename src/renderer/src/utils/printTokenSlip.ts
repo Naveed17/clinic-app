@@ -72,6 +72,9 @@ export function buildTokenSlipHtml(
   const gender = token.patient.gender
     ? `<div class="row"><div class="lbl">Gender</div><div class="val">${escapeHtml(token.patient.gender)}</div></div>`
     : '';
+  const weight = token.patient.weight != null && Number(token.patient.weight) > 0
+    ? `<div class="row"><div class="lbl">Weight</div><div class="val">${escapeHtml(String(token.patient.weight))} kg</div></div>`
+    : '';
 
   return `<!DOCTYPE html>
 <html data-paper="pos80">
@@ -158,6 +161,7 @@ export function buildTokenSlipHtml(
   <div class="row"><div class="lbl">Patient</div><div class="val">${escapeHtml([token.patient.firstName, token.patient.lastName].filter(Boolean).join(' ').trim())}</div></div>
   ${age}
   ${gender}
+  ${weight}
   <div class="row"><div class="lbl">Doctor</div><div class="val">${escapeHtml(['Dr.', token.doctor.firstName, token.doctor.lastName].filter(Boolean).join(' ').trim())}</div></div>
   ${fee}
   <div class="row"><div class="lbl">Date</div><div class="val">${escapeHtml(date)}</div></div>
@@ -175,10 +179,27 @@ export async function printTokenSlip(
   token: Token,
   options?: { silent?: boolean },
 ): Promise<void> {
+  let tokenToPrint = token;
+  if (tokenToPrint.patient?.weight == null && tokenToPrint.patientId && window.clinic?.patients?.getOne) {
+    try {
+      const p = await window.clinic.patients.getOne(tokenToPrint.patientId);
+      if (p?.weight != null) {
+        tokenToPrint = {
+          ...tokenToPrint,
+          patient: {
+            ...tokenToPrint.patient,
+            weight: Number(p.weight),
+          },
+        };
+      }
+    } catch {
+      // ignore fallback error
+    }
+  }
   const settings = (await window.clinic?.settings.get?.()) ?? {};
   const logoSrc = await getCareflowLogoDataUrl();
   const html = buildTokenSlipHtml(
-    token,
+    tokenToPrint,
     {
       clinicName: settings.clinicName,
       clinicAddress: settings.clinicAddress,

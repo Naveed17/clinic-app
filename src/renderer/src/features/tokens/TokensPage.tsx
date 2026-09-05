@@ -429,6 +429,9 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
         <View style={ts.row}><Text style={ts.lbl}>Patient</Text><Text style={ts.val}>{[token.patient.firstName, token.patient.lastName].filter(Boolean).join(' ')}</Text></View>
         {token.patient.age != null ? <View style={ts.row}><Text style={ts.lbl}>Age</Text><Text style={ts.val}>{String(token.patient.age)}</Text></View> : null}
         {token.patient.gender ? <View style={ts.row}><Text style={ts.lbl}>Gender</Text><Text style={ts.val}>{token.patient.gender}</Text></View> : null}
+        {token.patient.weight != null && Number(token.patient.weight) > 0 ? (
+          <View style={ts.row}><Text style={ts.lbl}>Weight</Text><Text style={ts.val}>{String(token.patient.weight)} kg</Text></View>
+        ) : null}
         <View style={ts.row}><Text style={ts.lbl}>Doctor</Text><Text style={ts.val}>Dr. {token.doctor.firstName} {token.doctor.lastName}</Text></View>
         {Number(token.consultationFee ?? 0) > 0 ? (
           <>
@@ -653,6 +656,7 @@ export function TokenPrintPreview({
     freshToken.tokenNumber,
     freshToken.patient.age ?? '',
     freshToken.patient.gender ?? '',
+    freshToken.patient.weight ?? '',
     clinic?.clinicName ?? '',
     clinic?.clinicAddress ?? '',
     clinic?.clinicPhone ?? '',

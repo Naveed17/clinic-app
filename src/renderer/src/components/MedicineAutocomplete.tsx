@@ -1,5 +1,5 @@
 import MedicationOutlinedIcon from '@mui/icons-material/MedicationOutlined';
-import { Autocomplete, Box, IconButton, TextField, Tooltip, Typography } from '@mui/material';
+import { Autocomplete, Box, IconButton, TextField, Tooltip, Typography, type SxProps, type Theme } from '@mui/material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import type { Medicine } from '@/types/medicine';
@@ -13,13 +13,15 @@ interface Props {
   value: string;
   onChange: (name: string, price: number) => void;
   label?: string;
+  placeholder?: string;
   size?: 'small' | 'medium';
+  sx?: SxProps<Theme>;
 }
 
 const money = (value: number) =>
   `Rs. ${new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(value) || 0)}`;
 
-export function MedicineAutocomplete({ value, onChange, label = 'Medicine', size = 'medium' }: Props) {
+export function MedicineAutocomplete({ value, onChange, label = 'Medicine', placeholder, size = 'medium', sx }: Props) {
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
@@ -54,9 +56,11 @@ export function MedicineAutocomplete({ value, onChange, label = 'Medicine', size
     return (
       <TextField
         label={label}
+        placeholder={placeholder}
         size={size}
         value={value}
         onChange={(e) => onChange(e.target.value, 0)}
+        sx={sx}
       />
     );
   }
@@ -66,6 +70,7 @@ export function MedicineAutocomplete({ value, onChange, label = 'Medicine', size
       <Autocomplete
         freeSolo
         options={filtered}
+        sx={sx}
         getOptionLabel={(m) => (typeof m === 'string' ? m : formatMedicineDisplayName(m.name, m.mg))}
         value={selected}
         inputValue={inputValue}
@@ -106,7 +111,9 @@ export function MedicineAutocomplete({ value, onChange, label = 'Medicine', size
           <TextField
             {...params}
             label={label}
+            placeholder={placeholder}
             size={size}
+            sx={sx}
             InputProps={{
               ...params.InputProps,
               endAdornment: (

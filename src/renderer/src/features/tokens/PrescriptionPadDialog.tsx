@@ -25,8 +25,10 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
-import type { Token } from '@/types/token';
+import type { Token, PrescriptionMedicine } from '@/types/token';
 import type { Patient } from '@/types/patient';
+import MedicationOutlinedIcon from '@mui/icons-material/MedicationOutlined';
+import { PrescriptionMedicinesDialog } from './PrescriptionMedicinesDialog';
 import {
   PAD_BLUE,
   PAD_INK,
@@ -118,6 +120,118 @@ function plainTextToHtml(text: string): string {
     .join('');
 }
 
+function convertWordsToDigits(text: string): string {
+  return text
+    .replace(/\bthree\s+times\s+daily\b/gi, '3 times daily')
+    .replace(/\btwo\s+times\s+daily\b/gi, '2 times daily')
+    .replace(/\btwice\s+daily\b/gi, '2 times daily')
+    .replace(/\bfour\s+times\s+daily\b/gi, '4 times daily')
+    .replace(/\bone\s+time\s+daily\b/gi, '1 time daily')
+    .replace(/\bonce\s+daily\b/gi, '1 time daily')
+    .replace(/\bthree\s+tablets?\b/gi, '3 tablets')
+    .replace(/\btwo\s+tablets?\b/gi, '2 tablets')
+    .replace(/\bone\s+tablet\b/gi, '1 tablet')
+    .replace(/\bthree\s+days\b/gi, '3 days')
+    .replace(/\btwo\s+days\b/gi, '2 days')
+    .replace(/\bone\s+day\b/gi, '1 day')
+    .replace(/\bfive\s+days\b/gi, '5 days')
+    .replace(/\bseven\s+days\b/gi, '7 days')
+    .replace(/\bten\s+days\b/gi, '10 days')
+    .replace(/\bfourteen\s+days\b/gi, '14 days');
+}
+
+function humanizeDosageText(m: PrescriptionMedicine): string {
+  const d = m.dosage.trim().toLowerCase();
+  let doseStr = m.dosage.trim();
+  if (d === '1-0-1' || d === '1+0+1' || d === 'bd') {
+    doseStr = '1 tablet 2 times daily (morning & night)';
+  } else if (d === '1-1-1' || d === '1+1+1' || d === 'tds') {
+    doseStr = '1 tablet 3 times daily (morning, afternoon & night)';
+  } else if (d === '1-0-0' || d === '1+0+0' || d === 'od') {
+    doseStr = '1 tablet 1 time daily in the morning';
+  } else if (d === '0-0-1' || d === '0+0+1') {
+    doseStr = '1 tablet 1 time daily at bedtime';
+  } else if (d === '1 tab bd') {
+    doseStr = '1 tablet 2 times daily';
+  } else if (d === '1 tab od') {
+    doseStr = '1 tablet 1 time daily in the morning';
+  } else if (d === '1 tab tds') {
+    doseStr = '1 tablet 3 times daily';
+  } else if (d === 'sos') {
+    doseStr = 'as needed for pain or fever';
+  }
+
+  const instructions = m.instructions.trim();
+  const duration = m.duration.trim();
+
+  let text = doseStr;
+  if (instructions) {
+    text += ` ${instructions.toLowerCase().startsWith('after') || instructions.toLowerCase().startsWith('before') || instructions.toLowerCase().startsWith('with') ? instructions : `after meals`}`;
+  }
+  if (duration) {
+    text += ` for ${duration.toLowerCase().startsWith('for') ? duration.slice(3).trim() : duration}`;
+  }
+  if (d === 'sos' && !text.includes('needed')) {
+    text += ' as needed';
+  }
+
+  return convertWordsToDigits(text);
+}
+
+function formatMedicinesToRxHtml(meds: PrescriptionMedicine[], sourceHtml: string): string {
+  const activeMeds = meds.filter((m) => m.name.trim());
+  if (activeMeds.length === 0) return sourceHtml;
+
+  // Extract AI-generated bullets from sourceHtml if present
+  const adviceIndex = sourceHtml.search(/<p>\s*<strong>\s*(?:General\s+)?Advice/i);
+  const medsPart = adviceIndex !== -1 ? sourceHtml.slice(0, adviceIndex) : sourceHtml;
+  const aiBullets = medsPart.match(/<li[\s\S]*?<\/li>/gi) || [];
+
+  const matchedItems: string[] = [];
+
+  for (const med of activeMeds) {
+    const medCore = med.name
+      .toLowerCase()
+      .replace(/^(?:tab|cap|syr|inj|tablet|capsule|syrup)\.?\s*/i, '')
+      .trim()
+      .split(/[\s(]/)[0];
+
+    // Find matching AI bullet with rich clinical details
+    const foundAiBullet = aiBullets.find((b) => {
+      const plain = b.replace(/<[^>]*>/g, '').toLowerCase();
+      return medCore.length >= 2 && plain.includes(medCore);
+    });
+
+    if (foundAiBullet) {
+      matchedItems.push(convertWordsToDigits(foundAiBullet));
+    } else {
+      const details = humanizeDosageText(med);
+      matchedItems.push(`<li><strong>${escapeHtml(med.name)}</strong> — ${escapeHtml(details)}.</li>`);
+    }
+  }
+
+  const rxHeader = '<p><strong>Prescribed Medications:</strong></p>';
+  const rxList = `<ul>${matchedItems.join('')}</ul>`;
+
+  let adviceSection = '';
+  const adviceRegex = /(<p>\s*<strong>\s*(?:General\s+)?Advice:?\s*<\/strong>\s*<\/p>[\s\S]*)/i;
+  const match = sourceHtml.match(adviceRegex);
+  if (match && match[1]) {
+    adviceSection = match[1].trim();
+  } else {
+    const match2 = sourceHtml.match(/(<strong>\s*(?:General\s+)?Advice:?\s*<\/strong>[\s\S]*)/i);
+    if (match2 && match2[1]) {
+      adviceSection = `<p>${match2[1].trim()}`;
+    }
+  }
+
+  if (!adviceSection) {
+    adviceSection = '<p><strong>General Advice:</strong></p><ul><li>Take medications as advised by your doctor.</li><li>Follow up if symptoms persist or worsen.</li></ul>';
+  }
+
+  return `${rxHeader}${rxList}${adviceSection}`;
+}
+
 const underlineFieldSx = {
   '& .MuiInputBase-root': {
     color: `${PAD_INK} !important`,
@@ -166,6 +280,10 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
   const [error, setError] = useState<string | null>(null);
   const [savedHint, setSavedHint] = useState(false);
   const [bodyTextForPdf, setBodyTextForPdf] = useState('');
+  const [medicines, setMedicines] = useState<PrescriptionMedicine[]>(() => {
+    return Array.isArray(token.prescription?.medicines) ? token.prescription.medicines : [];
+  });
+  const [medsDialogOpen, setMedsDialogOpen] = useState(false);
 
   const initialHtml = useMemo(() => {
     const parsed = parsePadMeta(token.prescription?.advice ?? '');
@@ -277,7 +395,7 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
       }
       await window.clinic.tokens.upsertPrescription(token.id, {
         diagnosis: diagnosis || 'Rx',
-        medicines: [],
+        medicines,
         tests: token.prescription?.tests ?? [],
         advice: `${meta}\n${html}`.trim(),
         thumbName,
@@ -350,6 +468,14 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
     if (ok) setPdfOpen(true);
   }
 
+  function handleApplyMedicines(newMeds: PrescriptionMedicine[], aiHtml?: string): void {
+    setMedicines(newMeds);
+    if (!editor) return;
+    const currentHtml = editor.getHTML();
+    const nextHtml = formatMedicinesToRxHtml(newMeds, aiHtml || currentHtml);
+    editor.commands.setContent(nextHtml);
+  }
+
   const labelSx = { fontWeight: 700, color: `${PAD_BLUE} !important`, fontSize: 13, flexShrink: 0, minWidth: 108 };
 
   return (
@@ -400,23 +526,6 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
               <Typography variant="caption" color="error" sx={{ maxWidth: 220 }} noWrap title={error}>
                 {error}
               </Typography>
-            )}
-            {can('ai') && (
-              <Tooltip title="Draft Rx/advice with Groq AI (edit before save)">
-                <span>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="secondary"
-                    startIcon={<AutoAwesomeOutlinedIcon />}
-                    loading={aiLoading}
-                    disabled={!editor || aiLoading || saving}
-                    onClick={() => void handleAiSuggest()}
-                  >
-                    AI Suggest
-                  </Button>
-                </span>
-              </Tooltip>
             )}
             <Button
               size="small"
@@ -551,20 +660,41 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
             </Box>
 
             {/* Toolbar */}
-            <Stack direction="row" spacing={0.5} sx={{ px: 5, pt: 1 }}>
-              {[
-                { title: 'Bold', icon: <FormatBoldIcon fontSize="small" />, run: () => editor?.chain().focus().toggleBold().run(), active: editor?.isActive('bold') },
-                { title: 'Bullets', icon: <FormatListBulletedIcon fontSize="small" />, run: () => editor?.chain().focus().toggleBulletList().run(), active: editor?.isActive('bulletList') },
-                { title: 'Numbers', icon: <FormatListNumberedIcon fontSize="small" />, run: () => editor?.chain().focus().toggleOrderedList().run(), active: editor?.isActive('orderedList') },
-                { title: 'Undo', icon: <UndoIcon fontSize="small" />, run: () => editor?.chain().focus().undo().run() },
-                { title: 'Redo', icon: <RedoIcon fontSize="small" />, run: () => editor?.chain().focus().redo().run() },
-              ].map((b) => (
-                <Tooltip key={b.title} title={b.title}>
-                  <IconButton size="small" disabled={!editor} onClick={b.run} sx={{ color: b.active ? PAD_BLUE : '#64748b' }}>
-                    {b.icon}
-                  </IconButton>
-                </Tooltip>
-              ))}
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 5, pt: 1 }}>
+              <Stack direction="row" spacing={0.5}>
+                {[
+                  { title: 'Bold', icon: <FormatBoldIcon fontSize="small" />, run: () => editor?.chain().focus().toggleBold().run(), active: editor?.isActive('bold') },
+                  { title: 'Bullets', icon: <FormatListBulletedIcon fontSize="small" />, run: () => editor?.chain().focus().toggleBulletList().run(), active: editor?.isActive('bulletList') },
+                  { title: 'Numbers', icon: <FormatListNumberedIcon fontSize="small" />, run: () => editor?.chain().focus().toggleOrderedList().run(), active: editor?.isActive('orderedList') },
+                  { title: 'Undo', icon: <UndoIcon fontSize="small" />, run: () => editor?.chain().focus().undo().run() },
+                  { title: 'Redo', icon: <RedoIcon fontSize="small" />, run: () => editor?.chain().focus().redo().run() },
+                ].map((b) => (
+                  <Tooltip key={b.title} title={b.title}>
+                    <IconButton size="small" disabled={!editor} onClick={b.run} sx={{ color: b.active ? PAD_BLUE : '#64748b' }}>
+                      {b.icon}
+                    </IconButton>
+                  </Tooltip>
+                ))}
+              </Stack>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<MedicationOutlinedIcon />}
+                onClick={() => setMedsDialogOpen(true)}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  fontSize: 12.5,
+                  color: PAD_BLUE,
+                  borderColor: PAD_BLUE,
+                  borderRadius: 1,
+                  py: 0.35,
+                  px: 1.25,
+                  '&:hover': { bgcolor: 'rgba(30, 58, 95, 0.05)', borderColor: PAD_BLUE },
+                }}
+              >
+                Prescribe Medicines {medicines.filter((m) => m.name.trim()).length > 0 ? `(${medicines.filter((m) => m.name.trim()).length})` : ''}
+              </Button>
             </Stack>
 
             {/* Rx body */}
@@ -699,6 +829,18 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
           </Box>
         </Box>
       </Dialog>
+
+      {medsDialogOpen && (
+        <PrescriptionMedicinesDialog
+          open
+          onClose={() => setMedsDialogOpen(false)}
+          initialMedicines={medicines}
+          diagnosis={diagnosis}
+          patientAge={patientAge}
+          patientSex={patientSex}
+          onApply={handleApplyMedicines}
+        />
+      )}
 
       {pdfOpen && (
         <PrescriptionPadPdfPreview

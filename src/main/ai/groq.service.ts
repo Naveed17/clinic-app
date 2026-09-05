@@ -7,6 +7,12 @@ export type SuggestPrescriptionInput = {
   sex?: string;
   currentText?: string;
   patientName?: string;
+  medicines?: Array<{
+    name: string;
+    dosage?: string;
+    duration?: string;
+    instructions?: string;
+  }>;
 };
 
 export type InterpretLabInput = {
@@ -156,12 +162,23 @@ export async function suggestPrescription(
   input: SuggestPrescriptionInput,
   onDelta?: (chunk: string) => void,
 ): Promise<{ ok: true; html: string } | { ok: false; error: string }> {
-  const system = `You are a clinical drafting assistant for a doctor in Pakistan.
+  const activeMeds = (input.medicines || []).filter((m) => m.name?.trim());
+  const hasPrescribedMeds = activeMeds.length > 0;
+
+  const system = hasPrescribedMeds
+    ? `You are a clinical drafting assistant for a doctor in Pakistan.
+Return ONLY simple HTML using <p>, <ul>, <ol>, <li>, <strong> — no markdown fences, no scripts.
+CRITICAL STRICT RULES:
+1. Output ONLY the EXACT medicines prescribed by the doctor below: [${activeMeds.map((m) => m.name).join(', ')}]. The doctor has prescribed EXACTLY ${activeMeds.length} medicine(s). You are STRICTLY FORBIDDEN from adding ANY other medicines (do NOT add PPIs, Risek, omeprazole, multivitamins, Surbex, pain killers, or any extra drug). Output EXACTLY ${activeMeds.length} bullet item(s) in the medication list.
+2. For each prescribed medicine, write rich, professional clinical instructions using NUMERIC DIGITS (1, 2, 3, etc.) instead of words for quantities, counts, and frequencies (e.g. write "1 tablet 3 times daily after meals for 3 days as needed", NEVER write "three times daily"; write "1 tablet 2 times daily", "for 5 days", etc.).
+3. Below the medication list, include a "<p><strong>Advice:</strong></p>" section with 2-3 concise clinical advice bullets for the patient.
+4. Never include patient demographics (name, age, sex) in the draft — start directly with the medication list.`
+    : `You are a clinical drafting assistant for a doctor in Pakistan.
 Return ONLY simple HTML using <p>, <ul>, <ol>, <li>, <strong> — no markdown fences, no scripts.
 Draft a prescription body with medication bullets and 1-3 advice lines.
 CRITICAL RULES:
-1. Include EVERY single medicine mentioned or provided in the input (e.g. Panadol, Citanew, Alp, Synflex). Never omit or drop any medicine.
-2. EVERY medicine MUST have complete adult dosing, frequency, and timing (e.g. "1 tablet once daily in the morning after breakfast"). If the input provides only a medicine name like "Citanew", automatically supply standard, safe adult clinical dosing for it.
+1. Include EVERY single medicine mentioned or provided in the input. Never omit or drop any medicine.
+2. EVERY medicine MUST have complete adult dosing, frequency, and timing.
 This is a DRAFT for the doctor to edit — never claim it is a final order.
 If diagnosis is vague, keep suggestions conservative and generic.
 Prefer English medical terms; brief Urdu advice line is OK if helpful.
@@ -172,11 +189,24 @@ Never include patient name, age, sex, MR number, or any demographics in the outp
     input.sex ? `sex ${input.sex}` : '',
   ].filter(Boolean);
 
+  const prescribedMedsText =
+    input.medicines && input.medicines.filter((m) => m.name?.trim()).length > 0
+      ? `DOCTOR-PRESCRIBED MEDICINES (STRICT: Include EXACTLY these medicines with the specified dosages and durations; do NOT omit or replace them):\n` +
+        input.medicines
+          .filter((m) => m.name?.trim())
+          .map(
+            (m) =>
+              `- ${m.name}: Dosage: ${m.dosage || 'Standard clinical dose'}, Duration: ${m.duration || 'As directed'}${m.instructions ? `, Instructions: ${m.instructions}` : ''}`,
+          )
+          .join('\n')
+      : '';
+
   const user = [
     contextBits.length
       ? `Clinical context for dosing only (do NOT print name/age/sex in the draft): ${contextBits.join(', ')}`
       : '',
     `Diagnosis / complaint: ${input.diagnosis?.trim() || '(not specified)'}`,
+    prescribedMedsText,
     input.currentText?.trim()
       ? `Existing pad text (improve or extend):\n${input.currentText.trim()}`
       : 'No existing pad text.',
@@ -191,6 +221,7 @@ Never include patient name, age, sex, MR number, or any demographics in the outp
       age: input.age,
       sex: input.sex,
       currentText: input.currentText,
+      medicines: input.medicines,
     },
   });
   if (!result.ok) return result;

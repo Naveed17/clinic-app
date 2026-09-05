@@ -171,6 +171,12 @@ declare global {
             sex?: string;
             currentText?: string;
             patientName?: string;
+            medicines?: Array<{
+              name: string;
+              dosage?: string;
+              duration?: string;
+              instructions?: string;
+            }>;
           },
           onDelta?: (delta: string) => void,
         ) => Promise<{ ok: boolean; html?: string; error?: string }>;
