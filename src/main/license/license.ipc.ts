@@ -69,6 +69,7 @@ type LicenseCache = {
   databaseMode?: DatabaseMode;
   clinicalApiUrl?: string | null;
   schemaId?: string | null;
+  updatesEnabled?: boolean;
   lastGate?: 'ok' | 'blocked';
   lastReason?: string;
 };
@@ -159,11 +160,12 @@ function asLicenseType(value: unknown): 'monthly' | 'annual' | 'lifetime' | unde
 
 function saveLicenseCache(
   key: string,
-  expiresAt: string | null,
+  expiresAt?: string | null,
   extra?: {
     databaseMode?: DatabaseMode;
     clinicalApiUrl?: string | null;
     schemaId?: string | null;
+    updatesEnabled?: boolean;
     licenseType?: 'monthly' | 'annual' | 'lifetime';
     lastGate?: 'ok' | 'blocked';
     lastReason?: string;
@@ -173,13 +175,15 @@ function saveLicenseCache(
     const existing = getLicenseCache(key);
     const cache: LicenseCache = {
       key,
-      expiresAt,
+      expiresAt: expiresAt !== undefined ? expiresAt : (existing?.expiresAt ?? null),
       licenseType: extra?.licenseType ?? existing?.licenseType,
       activatedAt: existing?.activatedAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       databaseMode: extra?.databaseMode ?? existing?.databaseMode ?? 'local',
       clinicalApiUrl: extra?.clinicalApiUrl ?? existing?.clinicalApiUrl ?? null,
       schemaId: extra?.schemaId ?? existing?.schemaId ?? null,
+      updatesEnabled:
+        extra?.updatesEnabled !== undefined ? extra.updatesEnabled : existing?.updatesEnabled !== false,
       lastGate: extra?.lastGate ?? existing?.lastGate,
       lastReason: extra?.lastGate === 'ok' ? undefined : (extra?.lastReason ?? existing?.lastReason),
     };
@@ -286,6 +290,7 @@ type LicenseApiExtras = {
   schemaId?: string | null;
   onlineDatabase?: boolean;
   localDatabase?: boolean;
+  updatesEnabled?: boolean;
   licenseType?: string;
 };
 
@@ -304,6 +309,8 @@ function applyDatabaseModeFromApi(key: string, data: LicenseApiExtras & { expire
     databaseMode,
     clinicalApiUrl: databaseMode === 'online' ? clinicalApiUrl || null : null,
     schemaId: schemaId || null,
+    updatesEnabled:
+      data.updatesEnabled !== undefined ? Boolean(data.updatesEnabled) : existing?.updatesEnabled !== false,
     licenseType: asLicenseType(data.licenseType),
     lastGate: 'ok',
   });
@@ -459,12 +466,61 @@ export function getLicenseRuntimeMeta(): {
   };
 }
 
+export async function checkUpdatesAllowed(): Promise<{ allowed: boolean; reason?: string }> {
+  const savedKey = getSavedKey();
+  if (!savedKey) {
+    return { allowed: false, reason: 'Please activate your license to receive software updates.' };
+  }
+
+  const hwid = getHWID();
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/license/updates-allowed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: savedKey, hwid }),
+    });
+
+    if (response.ok) {
+      const data = (await response.json()) as {
+        ok?: boolean;
+        allowed?: boolean;
+        updatesEnabled?: boolean;
+        message?: string;
+      };
+      const isAllowed = data.updatesEnabled !== false && data.allowed !== false;
+      saveLicenseCache(savedKey, undefined, { updatesEnabled: isAllowed });
+      if (!isAllowed) {
+        return {
+          allowed: false,
+          reason:
+            data.message || 'Application updates have been disabled for this license by the administrator.',
+        };
+      }
+      return { allowed: true };
+    }
+  } catch {
+    // Network / offline fallback - check cache
+  }
+
+  const cache = getLicenseCache(savedKey);
+  if (cache && cache.updatesEnabled === false) {
+    return {
+      allowed: false,
+      reason: 'Application updates have been disabled for this license by the administrator.',
+    };
+  }
+
+  return { allowed: true };
+}
+
 // ── IPC ───────────────────────────────────────────────────────────────────────
 export function registerLicenseIpc(): void {
   ipcMain.handle('license:status', () => isLicenseActivated());
   ipcMain.handle('license:gate', () => getLicenseGate());
   ipcMain.handle('license:support', () => getCareFlowSupport());
   ipcMain.handle('license:modules', () => getLicenseModules());
+  ipcMain.handle('license:check-updates-allowed', () => checkUpdatesAllowed());
   ipcMain.handle('license:database-mode', () => {
     const meta = getLicenseRuntimeMeta();
     return {

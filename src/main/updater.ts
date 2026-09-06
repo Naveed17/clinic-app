@@ -1,6 +1,7 @@
 import { autoUpdater } from 'electron-updater';
 import { ipcMain, BrowserWindow, app } from 'electron';
 import { is } from '@electron-toolkit/utils';
+import { checkUpdatesAllowed } from './license/license.ipc';
 
 let _isChecking = false;
 let _isDownloading = false;
@@ -54,6 +55,12 @@ export function initAutoUpdater(): void {
     if (is.dev) {
       console.log('[AutoUpdater] Dev mode check requested. Version:', app.getVersion());
       return 'latest';
+    }
+
+    const check = await checkUpdatesAllowed();
+    if (!check.allowed) {
+      console.log('[AutoUpdater] Updates blocked by license:', check.reason);
+      return { disabled: true, error: check.reason || 'Updates are disabled for this license.' };
     }
 
     if (_isChecking || _isDownloading) {
@@ -147,15 +154,25 @@ export function initAutoUpdater(): void {
   });
 
   if (!is.dev) {
-    setTimeout(() => {
+    setTimeout(async () => {
       if (!_isChecking && !_isDownloading) {
+        const check = await checkUpdatesAllowed();
+        if (!check.allowed) {
+          console.log('[AutoUpdater] Skipping startup check — updates disabled for license:', check.reason);
+          return;
+        }
         console.log('[AutoUpdater] Running startup background check...');
         void autoUpdater.checkForUpdates();
       }
     }, 30 * 1000);
 
-    setInterval(() => {
+    setInterval(async () => {
       if (!_isChecking && !_isDownloading) {
+        const check = await checkUpdatesAllowed();
+        if (!check.allowed) {
+          console.log('[AutoUpdater] Skipping periodic check — updates disabled for license');
+          return;
+        }
         void autoUpdater.checkForUpdates();
       }
     }, 4 * 60 * 60 * 1000);

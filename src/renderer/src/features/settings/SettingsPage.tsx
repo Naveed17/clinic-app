@@ -416,6 +416,12 @@ export function SettingsPage(): React.JSX.Element {
       } else if (res === 'latest') {
         setUpdateStatus('latest');
         setToastMessage({ msg: `You are on the latest version (v${currentVersion}).`, severity: 'success' });
+      } else if (typeof res === 'object' && (res as any)?.disabled) {
+        setUpdateStatus('idle');
+        setToastMessage({
+          msg: (res as any).error || 'Updates are disabled for this license.',
+          severity: 'warning',
+        });
       } else if (typeof res === 'object' && res?.error) {
         setUpdateStatus('error');
         setToastMessage({ msg: `Update check failed: ${res.error}`, severity: 'error' });
