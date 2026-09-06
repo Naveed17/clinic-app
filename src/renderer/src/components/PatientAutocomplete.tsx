@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined';
 import PersonAddAlt1OutlinedIcon from '@mui/icons-material/PersonAddAlt1Outlined';
 import {
@@ -53,27 +53,42 @@ export function PatientAutocomplete({
 }: PatientAutocompleteProps): React.JSX.Element {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
-  const debouncedQuery = useDebounce(query, 150);
+  const debouncedQuery = useDebounce(query, query.trim() ? 1000 : 0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addInitialValues, setAddInitialValues] = useState<Partial<PatientFormValues>>({});
   const [recentlyCreated, setRecentlyCreated] = useState<TokenPerson | null>(null);
+  const [selectedPatientObj, setSelectedPatientObj] = useState<TokenPerson | null>(null);
+
+  const targetPatientId = typeof value === 'string' ? value : value?.id;
 
   const { data: patients = [], isLoading, isFetching } = useQuery<TokenPerson[]>({
-    queryKey: ['token-patients'],
-    queryFn: () => window.clinic.tokens.patients(),
-    staleTime: 60_000,
+    queryKey: ['token-patients', debouncedQuery, targetPatientId],
+    queryFn: () => window.clinic.tokens.patients(debouncedQuery, targetPatientId),
+    staleTime: debouncedQuery ? 15_000 : 60_000,
   });
+
+  useEffect(() => {
+    if (!value) {
+      setSelectedPatientObj(null);
+    } else if (typeof value === 'object') {
+      setSelectedPatientObj(value);
+    } else {
+      const found = patients.find((p) => p.id === value);
+      if (found) setSelectedPatientObj(found);
+    }
+  }, [value, patients]);
 
   const isSearching = isFetching || isLoading || query.trim() !== debouncedQuery.trim();
 
   const selectedPatient = useMemo(() => {
     if (!value) return null;
     if (typeof value === 'object') return value;
+    if (selectedPatientObj && selectedPatientObj.id === value) return selectedPatientObj;
     const found = patients.find((p) => p.id === value);
     if (found) return found;
     if (recentlyCreated && recentlyCreated.id === value) return recentlyCreated;
     return null;
-  }, [patients, value, recentlyCreated]);
+  }, [patients, value, recentlyCreated, selectedPatientObj]);
 
   const addNewOption: TokenPerson = useMemo(() => {
     const trimmed = query.trim();
@@ -87,18 +102,7 @@ export function PatientAutocomplete({
   }, [query]);
 
   const filteredPatients = useMemo(() => {
-    const q = debouncedQuery.trim().toLowerCase();
-    const list = !q
-      ? patients.slice(0, 50)
-      : patients
-          .filter((p) => {
-            const last = p.lastName ?? '';
-            const name = `${p.firstName ?? ''} ${last}`.trim().toLowerCase();
-            const phone = (p.phone || '').toLowerCase();
-            const mr = (p.mrNumber || '').toLowerCase();
-            return name.includes(q) || phone.includes(q) || mr.includes(q);
-          })
-          .slice(0, 50);
+    const list = patients.slice(0, 50);
 
     const withRecent =
       recentlyCreated && !list.some((p) => p.id === recentlyCreated.id)
@@ -109,7 +113,7 @@ export function PatientAutocomplete({
       return [addNewOption, ...withRecent];
     }
     return withRecent;
-  }, [patients, debouncedQuery, allowAddNew, addNewOption, recentlyCreated]);
+  }, [patients, allowAddNew, addNewOption, recentlyCreated]);
 
   const handleOpenAdd = (nameHint?: string) => {
     const raw = (nameHint ?? query).trim();
@@ -160,6 +164,7 @@ export function PatientAutocomplete({
         value={selectedPatient}
         onChange={(_, p) => {
           if (!p) {
+            setSelectedPatientObj(null);
             onChange('', null);
             return;
           }
@@ -168,6 +173,7 @@ export function PatientAutocomplete({
             setQuery('');
             return;
           }
+          setSelectedPatientObj(p);
           onChange(p.id, p);
         }}
         isOptionEqualToValue={(o, v) => o.id === v.id}
@@ -368,11 +374,9 @@ export function PatientAutocomplete({
               age: created.age ?? null,
               dateOfBirth: created.dateOfBirth ?? null,
             } as unknown as TokenPerson;
-            queryClient.setQueryData<TokenPerson[]>(['token-patients'], (old = []) => [
-              tokenPerson,
-              ...old.filter((p) => p.id !== tokenPerson.id),
-            ]);
+            queryClient.invalidateQueries({ queryKey: ['token-patients'] });
             setRecentlyCreated(tokenPerson);
+            setSelectedPatientObj(tokenPerson);
             onChange(created.id, tokenPerson);
             setQuery('');
           }}

@@ -58,7 +58,7 @@ declare global {
         list: (date: string) => Promise<unknown>;
         listPrescriptions: (date: string) => Promise<unknown>;
         doctors: () => Promise<unknown>;
-        patients: () => Promise<unknown>;
+        patients: (search?: string, includePatientId?: string) => Promise<unknown>;
         weekVisits: (patientId: string, doctorId: string, date: string) => Promise<unknown>;
         create: (input: unknown) => Promise<unknown>;
         updateStatus: (id: string, status: string) => Promise<unknown>;

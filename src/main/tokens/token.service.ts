@@ -281,24 +281,47 @@ export async function listTokenDoctors() {
   }));
 }
 
-export async function listTokenPatients(search?: string) {
+export async function listTokenPatients(search?: string, includePatientId?: string) {
   const query = search?.trim();
-  const where: Prisma.PatientWhereInput = query
+  const words = query ? query.split(/\s+/).filter(Boolean) : [];
+  const where: Prisma.PatientWhereInput = words.length > 0
     ? {
-        OR: [
-          { firstName: { contains: query } },
-          { lastName: { contains: query } },
-          { phone: { contains: query } },
-          { mrNumber: { contains: query } },
-        ],
+        AND: words.map((w) => ({
+          OR: [
+            { firstName: { contains: w } },
+            { lastName: { contains: w } },
+            { phone: { contains: w } },
+            { mrNumber: { contains: w } },
+          ],
+        })),
       }
     : {};
-  const rows = await getPrisma().patient.findMany({
+  const rows = (await getPrisma().patient.findMany({
     where,
     select: { id: true, firstName: true, lastName: true, mrNumber: true, gender: true, dateOfBirth: true, phone: true, weight: true },
     orderBy: { createdAt: 'desc' },
     take: query ? 50 : 100,
-  } as unknown as Prisma.PatientFindManyArgs);
+  } as unknown as Prisma.PatientFindManyArgs)) as Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    mrNumber: string | null;
+    gender: string | null;
+    dateOfBirth: Date | null;
+    phone: string | null;
+    weight: number | null;
+  }>;
+
+  if (includePatientId && !rows.some((r) => r.id === includePatientId)) {
+    const extra = await getPrisma().patient.findUnique({
+      where: { id: includePatientId },
+      select: { id: true, firstName: true, lastName: true, mrNumber: true, gender: true, dateOfBirth: true, phone: true, weight: true },
+    });
+    if (extra) {
+      rows.unshift(extra as unknown as (typeof rows)[0]);
+    }
+  }
+
   return rows.map((row) => mapPatientPerson(row as Parameters<typeof mapPatientPerson>[0]));
 }
 

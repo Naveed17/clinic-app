@@ -26,7 +26,14 @@ export function createTokensRouter(io: SocketIOServer): Router {
     res.json(await listTokens(date));
   }));
   router.get('/doctors', asyncHandler(async (_req, res) => res.json(await listTokenDoctors())));
-  router.get('/patients', asyncHandler(async (_req, res) => res.json(await listTokenPatients())));
+  router.get(
+    '/patients',
+    asyncHandler(async (req, res) => {
+      const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+      const includePatientId = typeof req.query.includePatientId === 'string' ? req.query.includePatientId : undefined;
+      res.json(await listTokenPatients(search, includePatientId));
+    }),
+  );
   router.get('/prescriptions', asyncHandler(async (req, res) => {
     const date = String(req.query.date ?? new Date().toISOString().slice(0, 10));
     res.json(await listPrescriptionFeed(date));

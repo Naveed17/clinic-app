@@ -599,7 +599,19 @@ const api = {
         'tokens:get-by-id', tokenId,
       ),
     doctors: () => call(() => request('/api/tokens/doctors'), 'tokens:doctors'),
-    patients: () => call(() => request('/api/tokens/patients'), 'tokens:patients'),
+    patients: (search?: string, includePatientId?: string) =>
+      call(
+        () => {
+          const params = new URLSearchParams();
+          if (search) params.set('search', search);
+          if (includePatientId) params.set('includePatientId', includePatientId);
+          const qs = params.toString();
+          return request(`/api/tokens/patients${qs ? `?${qs}` : ''}`);
+        },
+        'tokens:patients',
+        search,
+        includePatientId,
+      ),
     weekVisits: (patientId: string, doctorId: string, date: string) =>
       call(
         () =>

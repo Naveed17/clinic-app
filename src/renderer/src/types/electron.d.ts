@@ -45,7 +45,7 @@ declare global {
         list: (date: string) => Promise<Token[]>;
         listPrescriptions: (date: string) => Promise<import('./token').PrescriptionFeedItem[]>;
         doctors: () => Promise<TokenPerson[]>;
-        patients: () => Promise<TokenPerson[]>;
+        patients: (search?: string, includePatientId?: string) => Promise<TokenPerson[]>;
         weekVisits: (patientId: string, doctorId: string, date: string) => Promise<{ count: number }>;
         create: (input: TokenInput) => Promise<Token>;
         updateStatus: (id: string, status: string) => Promise<Token>;
