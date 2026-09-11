@@ -882,8 +882,8 @@ export function AppointmentsPage(): React.JSX.Element {
       if (ctx?.prev) queryClient.setQueryData(['appointments'], ctx.prev);
     },
     onSuccess: (_result, { id, status }) => {
-      // Auto-navigate to consultation page when appointment is checked in
-      if (status === 'CHECKED_IN') {
+      // Auto-navigate to consultation page when appointment is checked in only for doctors
+      if (status === 'CHECKED_IN' && user?.role === 'doctor') {
         navigate(`/consultation/${id}`);
       }
     },

@@ -110,8 +110,8 @@ export function AppointmentDetailPage(): React.JSX.Element {
     mutationFn: (status: Appointment['status']) => appointmentsService.updateStatus(id!, status),
     onSuccess: async (_, status) => {
       await invalidate();
-      // Auto-navigate to consultation page when checked in
-      if (status === 'CHECKED_IN' && id) {
+      // Auto-navigate to consultation page when checked in only for doctors
+      if (status === 'CHECKED_IN' && id && user?.role === 'doctor') {
         navigate(`/consultation/${id}`);
       }
     },
@@ -326,7 +326,7 @@ export function AppointmentDetailPage(): React.JSX.Element {
                 Check in
               </Button>
             )}
-            {appointment.status === 'CHECKED_IN' && (
+            {appointment.status === 'CHECKED_IN' && user?.role === 'doctor' && (
               <Button
                 startIcon={<StethoscopeIcon />}
                 variant="contained"

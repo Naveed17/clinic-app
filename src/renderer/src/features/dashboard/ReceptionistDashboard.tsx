@@ -9,10 +9,15 @@ import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumb
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import MeetingRoomOutlinedIcon from '@mui/icons-material/MeetingRoomOutlined';
+import LaunchOutlinedIcon from '@mui/icons-material/LaunchOutlined';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import PlayArrowOutlinedIcon from '@mui/icons-material/PlayArrowOutlined';
+import LocalHospitalOutlinedIcon from '@mui/icons-material/LocalHospitalOutlined';
 import {
   Alert, Autocomplete, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent,
   Divider, FormControl, IconButton, InputLabel, MenuItem, Paper, Select, Skeleton,
-  Step, StepLabel, Stepper, Stack, TextField, Typography, Chip, Avatar,
+  Step, StepLabel, Stepper, Stack, TextField, Typography, Chip, Avatar, Tooltip,
 } from '@mui/material';
 import {
   FormDialogTitle, SubmitButton, dialogActionsSx, dialogCancelBtnSx, dialogContentSx,
@@ -52,6 +57,11 @@ import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { LiveClock } from '@/components/LiveClock';
 import { nextFreeSlot, doctorOfflineReason, slotSearchFrom, type SlotAdjustReason } from '@/utils/appointmentSlot';
 import { ageToDateOfBirth, dateOfBirthToAge } from '@shared/patientAge';
+import {
+  ConsultationClock,
+  getConsultationStartMs,
+  clearConsultationStartMs,
+} from '@/features/appointments/ConsultationClock';
 import imgMask from '@/assets/dashboard/clinic-mask.svg';
 import imgCapsule from '@/assets/dashboard/clinic-capsule.svg';
 import imgVirus from '@/assets/dashboard/clinic-virus.svg';
@@ -901,6 +911,536 @@ function AttentionStat({
   );
 }
 
+/* ─── Active Consultation In Progress Block ────────────────────────────────── */
+
+function ActiveConsultationBlock({
+  activeConsultations,
+  currentConsultation,
+  activeDoctorId,
+  setActiveDoctorId,
+  nextAppt,
+  nowMs,
+  onComplete,
+  isCompleting,
+  onStartNext,
+  isStartingNext,
+  onOpenConsultation,
+}: {
+  activeConsultations: Appointment[];
+  currentConsultation: Appointment | null;
+  activeDoctorId: string | null;
+  setActiveDoctorId: (id: string) => void;
+  nextAppt: Appointment | null;
+  nowMs: number;
+  onComplete: (apptId: string) => void;
+  isCompleting: boolean;
+  onStartNext: (appt: Appointment) => void;
+  isStartingNext: boolean;
+  onOpenConsultation: (apptId: string) => void;
+}): React.JSX.Element {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
+  const consultationStartMs = useMemo(() => {
+    if (!currentConsultation) return 0;
+    return getConsultationStartMs(currentConsultation, null, nowMs);
+  }, [currentConsultation, nowMs]);
+
+  const slotDurationMs = useMemo(() => {
+    if (!currentConsultation?.startsAt || !currentConsultation?.endsAt) return 15 * 60_000;
+    const s = new Date(currentConsultation.startsAt).getTime();
+    const e = new Date(currentConsultation.endsAt).getTime();
+    const diff = e - s;
+    return diff > 0 ? diff : 15 * 60_000;
+  }, [currentConsultation?.startsAt, currentConsultation?.endsAt]);
+
+  const hasActive = Boolean(currentConsultation);
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: { xs: 2.5, md: 3 },
+        borderRadius: '24px',
+        bgcolor: isDark
+          ? alpha(theme.palette.background.paper, 0.7)
+          : alpha(theme.palette.background.paper, 0.95),
+        border: `1px solid ${
+          hasActive
+            ? alpha(theme.palette.success.main, isDark ? 0.35 : 0.28)
+            : theme.palette.divider
+        }`,
+        borderLeft: `5px solid ${hasActive ? theme.palette.success.main : theme.palette.grey[400]}`,
+        boxShadow: hasActive
+          ? `0 8px 30px ${alpha(theme.palette.success.main, isDark ? 0.16 : 0.08)}, 0 2px 8px ${alpha(theme.palette.common.black, 0.04)}`
+          : `0 4px 18px ${alpha(theme.palette.common.black, 0.04)}`,
+        position: 'relative',
+        overflow: 'hidden',
+        backdropFilter: 'blur(12px)',
+        transition: 'all 0.3s ease',
+      }}
+    >
+      {/* Top row: Status Header Badge & Action Buttons */}
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        gap={2}
+        sx={{ mb: activeConsultations.length > 1 ? 1.75 : 2.5 }}
+      >
+        {/* Left: Status Badge */}
+        {hasActive ? (
+          <Box
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.8,
+              px: 1.5,
+              py: 0.6,
+              borderRadius: '10px',
+              bgcolor: alpha(theme.palette.success.main, isDark ? 0.2 : 0.12),
+              border: `1px solid ${alpha(theme.palette.success.main, 0.35)}`,
+            }}
+          >
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                bgcolor: 'success.main',
+                animation: 'activePulse 1.4s ease-in-out infinite',
+                '@keyframes activePulse': {
+                  '0%, 100%': { opacity: 1, transform: 'scale(1)' },
+                  '50%': { opacity: 0.4, transform: 'scale(1.5)' },
+                },
+              }}
+            />
+            <Typography sx={{ fontSize: 11.5, fontWeight: 900, color: 'success.main', letterSpacing: '0.08em' }}>
+              CONSULTATION IN PROGRESS · LIVE
+            </Typography>
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.8,
+              px: 1.5,
+              py: 0.6,
+              borderRadius: '10px',
+              bgcolor: alpha(theme.palette.grey[500], isDark ? 0.2 : 0.1),
+              border: `1px solid ${alpha(theme.palette.grey[500], 0.25)}`,
+            }}
+          >
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                bgcolor: isDark ? theme.palette.grey[400] : theme.palette.grey[500],
+              }}
+            />
+            <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: 'text.secondary', letterSpacing: '0.08em' }}>
+              CHAMBER STANDBY · READY
+            </Typography>
+          </Box>
+        )}
+
+        {/* Right: Action buttons (Fixed width, never wrapped, modern aesthetic) */}
+        {hasActive && currentConsultation && (
+          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ flexShrink: 0 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => onOpenConsultation(currentConsultation.id)}
+              startIcon={<LaunchOutlinedIcon sx={{ fontSize: 16 }} />}
+              sx={{
+                borderRadius: '12px',
+                fontWeight: 700,
+                fontSize: 12.5,
+                textTransform: 'none',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                py: 0.8,
+                px: 1.8,
+                color: 'text.primary',
+                borderColor: theme.palette.divider,
+                bgcolor: alpha(theme.palette.text.primary, isDark ? 0.05 : 0.03),
+                '&:hover': {
+                  bgcolor: alpha(theme.palette.text.primary, isDark ? 0.1 : 0.06),
+                  borderColor: alpha(theme.palette.primary.main, 0.4),
+                },
+                transition: 'all 0.2s ease',
+              }}
+            >
+              View Details
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              disabled={isCompleting}
+              onClick={() => onComplete(currentConsultation.id)}
+              startIcon={<CheckCircleOutlineIcon sx={{ fontSize: 16 }} />}
+              sx={{
+                borderRadius: '12px',
+                fontWeight: 800,
+                fontSize: 12.5,
+                textTransform: 'none',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                py: 0.8,
+                px: 2,
+                background: isDark
+                  ? `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`
+                  : `linear-gradient(135deg, #10b981 0%, #059669 100%)`,
+                color: '#ffffff',
+                boxShadow: `0 4px 14px ${alpha(theme.palette.success.main, 0.35)}`,
+                '&:hover': {
+                  background: isDark
+                    ? `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`
+                    : `linear-gradient(135deg, #059669 0%, #047857 100%)`,
+                  boxShadow: `0 6px 18px ${alpha(theme.palette.success.main, 0.45)}`,
+                  transform: 'translateY(-1px)',
+                },
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {isCompleting ? 'Completing...' : 'Complete Visit'}
+            </Button>
+          </Stack>
+        )}
+      </Stack>
+
+      {/* Row 2: Dedicated Multiple Active Doctors Chambers Switcher Strip */}
+      {hasActive && activeConsultations.length > 1 && (
+        <Box
+          sx={{
+            mb: 2.2,
+            p: 1,
+            px: 1.5,
+            borderRadius: '14px',
+            bgcolor: alpha(theme.palette.primary.main, isDark ? 0.07 : 0.035),
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.25,
+            overflowX: 'auto',
+            '&::-webkit-scrollbar': { height: 4 },
+            '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: 11,
+              fontWeight: 800,
+              color: 'text.secondary',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            Active Chambers ({activeConsultations.length}):
+          </Typography>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'nowrap' }}>
+            {activeConsultations.map((a) => {
+              const isSelected = currentConsultation?.id === a.id;
+              return (
+                <Chip
+                  key={a.id}
+                  clickable
+                  size="small"
+                  onClick={() => setActiveDoctorId(a.providerId)}
+                  label={`Dr. ${a.provider.firstName} ${a.tokenNumber ? `· Token #${String(a.tokenNumber).padStart(2, '0')}` : ''}`}
+                  color={isSelected ? 'success' : 'default'}
+                  variant={isSelected ? 'filled' : 'outlined'}
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: 11.5,
+                    borderRadius: '8px',
+                    height: 28,
+                    px: 0.5,
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    cursor: 'pointer',
+                    ...(isSelected
+                      ? {
+                          bgcolor: theme.palette.success.main,
+                          color: '#ffffff',
+                          boxShadow: `0 2px 8px ${alpha(theme.palette.success.main, 0.35)}`,
+                        }
+                      : {
+                          borderColor: theme.palette.divider,
+                        }),
+                  }}
+                />
+              );
+            })}
+          </Stack>
+        </Box>
+      )}
+
+      {/* Main Content Grid: Patient info on left, Live Sync Clock on right */}
+      {hasActive && currentConsultation ? (
+        <Box
+          sx={{
+            display: 'grid',
+            gap: 2.5,
+            gridTemplateColumns: { xs: '1fr', md: '1.4fr 1fr' },
+            alignItems: 'center',
+          }}
+        >
+          {/* Patient & Doctor Clinical Info */}
+          <Stack spacing={1.5} sx={{ minWidth: 0 }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar
+                sx={{
+                  width: { xs: 52, sm: 58 },
+                  height: { xs: 52, sm: 58 },
+                  borderRadius: '16px',
+                  bgcolor: alpha(theme.palette.primary.main, 0.12),
+                  color: 'primary.main',
+                  fontSize: 22,
+                  fontWeight: 900,
+                  border: `2px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+                  boxShadow: `0 4px 14px ${alpha(theme.palette.primary.main, 0.15)}`,
+                  flexShrink: 0,
+                }}
+              >
+                {currentConsultation.patient.firstName?.[0]}
+                {currentConsultation.patient.lastName?.[0] ?? ''}
+              </Avatar>
+
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                  <Typography
+                    sx={{
+                      fontSize: { xs: 18, sm: 22 },
+                      fontWeight: 900,
+                      letterSpacing: '-0.02em',
+                      color: 'text.primary',
+                      lineHeight: 1.2,
+                    }}
+                    noWrap
+                  >
+                    {currentConsultation.patient.firstName} {currentConsultation.patient.lastName}
+                  </Typography>
+
+                  {currentConsultation.tokenNumber && (
+                    <Box
+                      sx={{
+                        px: 1,
+                        py: 0.25,
+                        borderRadius: '6px',
+                        bgcolor: alpha(theme.palette.warning.main, 0.14),
+                        border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`,
+                        color: theme.palette.warning.dark,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 0.4,
+                      }}
+                    >
+                      <ConfirmationNumberOutlinedIcon sx={{ fontSize: 13, color: 'warning.main' }} />
+                      <Typography sx={{ fontSize: 11, fontWeight: 800 }}>
+                        Token #{String(currentConsultation.tokenNumber).padStart(3, '0')}
+                      </Typography>
+                    </Box>
+                  )}
+                </Stack>
+
+                <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" sx={{ mt: 0.6 }}>
+                  <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, color: 'primary.main' }}>
+                    <LocalHospitalOutlinedIcon sx={{ fontSize: 14 }} />
+                    <Typography sx={{ fontSize: 12.5, fontWeight: 700 }}>
+                      Dr. {currentConsultation.provider.firstName} {currentConsultation.provider.lastName}
+                    </Typography>
+                  </Box>
+
+                  <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>·</Typography>
+
+                  <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}>
+                    <AccessTimeOutlinedIcon sx={{ fontSize: 14 }} />
+                    <Typography sx={{ fontSize: 12, fontWeight: 600 }}>
+                      {new Date(currentConsultation.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {' – '}
+                      {new Date(currentConsultation.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Typography>
+                  </Box>
+
+                  {currentConsultation.patient.phone && (
+                    <>
+                      <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>·</Typography>
+                      <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'text.secondary' }}>
+                        {currentConsultation.patient.phone}
+                      </Typography>
+                    </>
+                  )}
+                </Stack>
+              </Box>
+            </Stack>
+
+            {/* Reason & Notes glass strip */}
+            <Box
+              sx={{
+                p: 1.25,
+                px: 1.75,
+                borderRadius: '12px',
+                bgcolor: alpha(theme.palette.primary.main, isDark ? 0.08 : 0.04),
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+              }}
+            >
+              <Typography sx={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: 'primary.main', letterSpacing: '0.04em', flexShrink: 0 }}>
+                Reason:
+              </Typography>
+              <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: 'text.primary' }} noWrap>
+                {currentConsultation.reason || 'General OPD Consultation & Checkup'}
+                {currentConsultation.notes ? ` — ${currentConsultation.notes}` : ''}
+              </Typography>
+            </Box>
+          </Stack>
+
+          {/* Synchronized Consultation Digital Clock Container */}
+          <Box
+            sx={{
+              p: { xs: 2, sm: 2.5 },
+              borderRadius: '20px',
+              bgcolor: isDark
+                ? alpha(theme.palette.background.paper, 0.8)
+                : alpha(theme.palette.common.white, 0.85),
+              backdropFilter: 'blur(20px)',
+              border: `1px solid ${isDark ? alpha('#fff', 0.12) : alpha(theme.palette.success.main, 0.22)}`,
+              boxShadow: isDark
+                ? `0 10px 28px ${alpha(theme.palette.common.black, 0.35)}, inset 0 1px 1px ${alpha('#fff', 0.1)}`
+                : `0 8px 24px ${alpha(theme.palette.success.main, 0.12)}, inset 0 1px 2px #fff`,
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <ConsultationClock
+              startedAtMs={consultationStartMs}
+              slotDurationMs={slotDurationMs}
+              nowMs={nowMs}
+              size="medium"
+            />
+          </Box>
+        </Box>
+      ) : (
+        /* Standby / Zero Timer state */
+        <Box
+          sx={{
+            display: 'grid',
+            gap: 2.5,
+            gridTemplateColumns: { xs: '1fr', md: '1.4fr 1fr' },
+            alignItems: 'center',
+          }}
+        >
+          {/* Left: Standby chamber info & Next patient cue */}
+          <Stack spacing={1.5}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Box
+                sx={{
+                  width: 46,
+                  height: 46,
+                  borderRadius: '14px',
+                  bgcolor: alpha(theme.palette.primary.main, 0.08),
+                  color: 'primary.main',
+                  display: 'grid',
+                  placeItems: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <MeetingRoomOutlinedIcon sx={{ fontSize: 24 }} />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 16, fontWeight: 800, color: 'text.primary' }}>
+                  Doctor Chambers Ready
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                  No patient currently inside. When a patient is checked in, live consultation timer starts automatically.
+                </Typography>
+              </Box>
+            </Stack>
+
+            {/* Next in Queue Quick Action */}
+            {nextAppt && nextAppt.status === 'SCHEDULED' ? (
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: '14px',
+                  bgcolor: alpha(theme.palette.primary.main, 0.05),
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 1.5,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', color: 'primary.main', letterSpacing: '0.05em' }}>
+                    Next In Queue
+                  </Typography>
+                  <Typography sx={{ fontSize: 13, fontWeight: 800, color: 'text.primary' }} noWrap>
+                    {nextAppt.patient.firstName} {nextAppt.patient.lastName}
+                    {nextAppt.tokenNumber ? ` · Token #${nextAppt.tokenNumber}` : ''}
+                  </Typography>
+                  <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>
+                    Dr. {nextAppt.provider.firstName} {nextAppt.provider.lastName} · {new Date(nextAppt.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Typography>
+                </Box>
+
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={isStartingNext}
+                  onClick={() => onStartNext(nextAppt)}
+                  startIcon={<PlayArrowOutlinedIcon sx={{ fontSize: 16 }} />}
+                  sx={{
+                    borderRadius: '10px',
+                    fontWeight: 800,
+                    fontSize: 12,
+                    textTransform: 'none',
+                    py: 0.7,
+                    px: 1.75,
+                    boxShadow: 'none',
+                  }}
+                >
+                  {isStartingNext ? 'Starting...' : 'Check In & Start'}
+                </Button>
+              </Box>
+            ) : null}
+          </Stack>
+
+          {/* Right: Zero Timer in Frosted Glass Box */}
+          <Box
+            sx={{
+              p: { xs: 2, sm: 2.5 },
+              borderRadius: '20px',
+              bgcolor: isDark
+                ? alpha(theme.palette.background.paper, 0.45)
+                : alpha(theme.palette.grey[100], 0.7),
+              border: `1px solid ${theme.palette.divider}`,
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <ConsultationClock isIdle={true} size="medium" />
+          </Box>
+        </Box>
+      )}
+    </Paper>
+  );
+}
+
 function DayStrip({
   selected,
   onSelect,
@@ -1103,9 +1643,56 @@ export function ReceptionistDashboard(): React.JSX.Element {
     [appointments, selectedDate],
   );
 
-  const checkedIn = todaysAppts.filter((a) => a.status === 'CHECKED_IN').length;
+  const checkedIn = appointments.filter((a) => a.status === 'CHECKED_IN').length;
   const completedToday = todaysAppts.filter((a) => a.status === 'COMPLETED').length;
-  const nowMs = Date.now();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  const activeConsultations = useMemo(
+    () =>
+      appointments
+        .filter((a) => a.status === 'CHECKED_IN')
+        .sort((a, b) => {
+          const aTime = new Date(a.updatedAt || a.startsAt).getTime();
+          const bTime = new Date(b.updatedAt || b.startsAt).getTime();
+          return bTime - aTime;
+        }),
+    [appointments],
+  );
+  const [activeDoctorId, setActiveDoctorId] = useState<string | null>(null);
+  const currentConsultation =
+    activeConsultations.find((a) => a.providerId === activeDoctorId) ??
+    activeConsultations[0] ??
+    null;
+
+  const completeConsultationMutation = useMutation({
+    mutationFn: (apptId: string) => appointmentsService.updateStatus(apptId, 'COMPLETED'),
+    onSuccess: async (_res, apptId) => {
+      clearConsultationStartMs(apptId);
+      await qc.invalidateQueries({ queryKey: ['appointments'] });
+      await qc.invalidateQueries({ queryKey: ['tokens'] });
+    },
+    meta: {
+      toast: 'Consultation completed ✓',
+      errorToast: 'Failed to complete consultation',
+    },
+  });
+
+  const startConsultationMutation = useMutation({
+    mutationFn: (apptId: string) => appointmentsService.updateStatus(apptId, 'CHECKED_IN'),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['appointments'] });
+      await qc.invalidateQueries({ queryKey: ['tokens'] });
+    },
+    meta: {
+      toast: 'Patient checked in & consultation started ✓',
+      errorToast: 'Failed to start consultation.',
+    },
+  });
+
   const waitingNow = tokens.filter((token) => token.status === 'WAITING').length;
   const lateArrivals = todaysAppts.filter(
     (a) => a.status === 'SCHEDULED' && new Date(a.startsAt).getTime() <= nowMs,
@@ -1123,7 +1710,9 @@ export function ReceptionistDashboard(): React.JSX.Element {
   }).length;
   const todayBillLabel = `Rs. ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 0 }).format(todayBilled)}`;
 
-  const nextAppt = selectedDayAppts.find((a) => a.status === 'SCHEDULED' || a.status === 'CHECKED_IN') ?? selectedDayAppts[0];
+  const nextAppt =
+    selectedDayAppts.find((a) => a.status === 'SCHEDULED') ??
+    (selectedDayAppts.length > 0 && selectedDayAppts[0].status !== 'COMPLETED' ? selectedDayAppts[0] : null);
 
   const doctorStats = useMemo(() => {
     return doctors.slice(0, 6).map((doc) => {
@@ -1237,6 +1826,27 @@ export function ReceptionistDashboard(): React.JSX.Element {
               ))}
             </Box>
           </Paper>
+
+          {/* ── Active Consultation In Progress Block ── */}
+          <ActiveConsultationBlock
+            activeConsultations={activeConsultations}
+            currentConsultation={currentConsultation}
+            activeDoctorId={activeDoctorId}
+            setActiveDoctorId={setActiveDoctorId}
+            nextAppt={nextAppt}
+            nowMs={nowMs}
+            onComplete={(apptId) => completeConsultationMutation.mutate(apptId)}
+            isCompleting={completeConsultationMutation.isPending}
+            onStartNext={(appt) => startConsultationMutation.mutate(appt.id)}
+            isStartingNext={startConsultationMutation.isPending}
+            onOpenConsultation={(apptId) => {
+              if (user?.role === 'doctor') {
+                navigate(`/consultation/${apptId}`);
+              } else {
+                navigate(`/appointments/${apptId}`);
+              }
+            }}
+          />
 
           {/* Attention strip — no outer box */}
           <Box>

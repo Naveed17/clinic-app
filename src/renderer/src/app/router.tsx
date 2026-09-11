@@ -92,7 +92,7 @@ const router = createHashRouter([
               {
                 path: '/consultation/:id',
                 element: (
-                  <RouteAccessGate route="/appointments">
+                  <RouteAccessGate route="/consultation/:id">
                     <ConsultationPage />
                   </RouteAccessGate>
                 ),

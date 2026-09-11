@@ -56,6 +56,12 @@ import type { Appointment } from '@/types/appointment';
 import type { Patient } from '@/types/patient';
 import type { Token, Prescription } from '@/types/token';
 import type { LabOrder } from '@/types/lab';
+import {
+  ConsultationClock,
+  getConsultationStartMs,
+  clearConsultationStartMs,
+  formatElapsed,
+} from './ConsultationClock';
 
 /* ─── Helpers ──────────────────────────────────────────────────────────────── */
 
@@ -74,14 +80,6 @@ function calcAge(dob: Date | string | null | undefined): string {
   return age >= 0 ? `${age} yrs` : '';
 }
 
-function formatElapsed(fromMs: number, nowMs: number): { mins: number; h: number; m: number; display: string } {
-  const totalMins = Math.max(0, Math.floor((nowMs - fromMs) / 60_000));
-  const h = Math.floor(totalMins / 60);
-  const m = totalMins % 60;
-  const display = h > 0 ? `${h}h ${m}m` : `${totalMins}m`;
-  return { mins: totalMins, h, m, display };
-}
-
 function formatClock(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
@@ -94,231 +92,6 @@ function initials(first?: string | null, last?: string | null): string {
   return [(first ?? '')[0], (last ?? '')[0]].filter(Boolean).join('').toUpperCase();
 }
 
-/* ─── Live Consultation Timer (Countdown + Overtime + Option C) ──────────────── */
-
-function TimerPlus({ visible = false, color = 'inherit' }: { visible?: boolean; color?: string }): React.JSX.Element {
-  return (
-    <Box
-      component="span"
-      sx={{
-        width: { xs: '14px', md: '18px' },
-        mr: { xs: '1px', md: '2px' },
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 0.3s ease',
-      }}
-    >
-      <Typography
-        component="span"
-        fontWeight={900}
-        fontSize={{ xs: 26, md: 36 }}
-        sx={{
-          lineHeight: 1,
-          color,
-          fontFamily: 'inherit',
-        }}
-      >
-        +
-      </Typography>
-    </Box>
-  );
-}
-
-function TimerDigit({ char, color = 'inherit' }: { char: string; color?: string }): React.JSX.Element {
-  return (
-    <Box
-      component="span"
-      sx={{
-        width: { xs: '24px', md: '30px' },
-        mx: { xs: '0.5px', md: '1.2px' },
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        fontVariantNumeric: 'tabular-nums',
-        fontFeatureSettings: '"tnum"',
-      }}
-    >
-      <Typography
-        component="span"
-        fontWeight={800}
-        fontSize={{ xs: 28, md: 38 }}
-        sx={{
-          lineHeight: 1,
-          color,
-          fontFamily: 'inherit',
-        }}
-      >
-        {char}
-      </Typography>
-    </Box>
-  );
-}
-
-function TimerColon({ showDots, color = 'inherit' }: { showDots: boolean; color?: string }): React.JSX.Element {
-  return (
-    <Box
-      component="span"
-      sx={{
-        width: { xs: '12px', md: '16px' },
-        mx: { xs: '2px', md: '4px' },
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-      }}
-    >
-      <Typography
-        component="span"
-        fontWeight={800}
-        fontSize={{ xs: 28, md: 38 }}
-        sx={{
-          lineHeight: 1,
-          color,
-          fontFamily: 'inherit',
-          opacity: showDots ? 1 : 0.18,
-          transition: 'opacity 0.15s linear',
-        }}
-      >
-        :
-      </Typography>
-    </Box>
-  );
-}
-
-function ConsultationClock({
-  startedAtMs,
-  nowMs,
-  slotDurationMs,
-}: {
-  startedAtMs: number;
-  nowMs: number;
-  slotDurationMs: number;
-}): React.JSX.Element {
-  const theme = useTheme();
-
-  const elapsedSecs = Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
-  const slotSecs = Math.max(60, Math.floor(slotDurationMs / 1000));
-  const remainingSecs = slotSecs - elapsedSecs;
-
-  const isOvertime = remainingSecs < 0;
-  const isWarning = !isOvertime && remainingSecs <= 3 * 60; // last 3 mins
-
-  const displaySecs = isOvertime ? Math.abs(remainingSecs) : remainingSecs;
-  const hours = Math.floor(displaySecs / 3600);
-  const minutes = Math.floor((displaySecs % 3600) / 60);
-  const seconds = displaySecs % 60;
-
-  const hh = String(hours).padStart(2, '0');
-  const mm = String(minutes).padStart(2, '0');
-  const ss = String(seconds).padStart(2, '0');
-  const showDots = seconds % 2 === 0;
-
-  const isDark = theme.palette.mode === 'dark';
-
-  // Dynamic status-based color:
-  // Light mode on frosted glass: rich high-contrast tones (darker red, amber, forest green)
-  // Dark mode on emerald glass: luminous glowing tones (coral red, amber gold, mint green)
-  const timerColor = isOvertime
-    ? (isDark ? theme.palette.error.light : theme.palette.error.dark)
-    : isWarning
-      ? (isDark ? theme.palette.warning.light : theme.palette.warning.dark)
-      : (isDark ? theme.palette.success.light : theme.palette.primary.dark);
-
-  const statusLabel = isOvertime
-    ? 'OVERTIME'
-    : isWarning
-      ? 'ENDING SOON'
-      : 'TIME REMAINING';
-
-  // Option C: Total elapsed display
-  const elapsedMinutes = Math.floor(elapsedSecs / 60);
-  const elapsedRemainderSeconds = elapsedSecs % 60;
-  const elapsedDisplay = `${elapsedMinutes}m ${String(elapsedRemainderSeconds).padStart(2, '0')}s`;
-  const slotMins = Math.round(slotSecs / 60);
-
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="center"
-        className="digital-clock"
-        sx={{
-          userSelect: 'none',
-          whiteSpace: 'nowrap',
-          color: timerColor,
-          transition: 'color 0.4s ease',
-        }}
-      >
-        <TimerPlus visible={isOvertime} color="inherit" />
-        <TimerDigit char={hh[0]} color="inherit" />
-        <TimerDigit char={hh[1]} color="inherit" />
-        <TimerColon showDots={showDots} color="inherit" />
-        <TimerDigit char={mm[0]} color="inherit" />
-        <TimerDigit char={mm[1]} color="inherit" />
-        <TimerColon showDots={showDots} color="inherit" />
-        <TimerDigit char={ss[0]} color="inherit" />
-        <TimerDigit char={ss[1]} color="inherit" />
-      </Stack>
-
-      <Box
-        sx={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 0.6,
-          px: 1.2,
-          py: 0.3,
-          borderRadius: '8px',
-          bgcolor: alpha(timerColor, isDark ? 0.18 : 0.12),
-          border: `1px solid ${alpha(timerColor, isDark ? 0.35 : 0.28)}`,
-          mt: 0.3,
-        }}
-      >
-        <Box
-          sx={{
-            width: 5,
-            height: 5,
-            borderRadius: '50%',
-            bgcolor: timerColor,
-            animation: isOvertime || isWarning ? 'pulseTimer 1.2s infinite' : 'none',
-            '@keyframes pulseTimer': {
-              '0%, 100%': { opacity: 1, transform: 'scale(1)' },
-              '50%': { opacity: 0.3, transform: 'scale(1.4)' },
-            },
-          }}
-        />
-        <Typography
-          sx={{
-            fontSize: 10,
-            fontWeight: 900,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: timerColor,
-          }}
-        >
-          {statusLabel}
-        </Typography>
-      </Box>
-
-      {/* Option C: Subtitle showing Slot and Total Elapsed */}
-      <Typography
-        sx={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: isDark ? alpha(theme.palette.common.white, 0.8) : alpha(theme.palette.primary.dark, 0.9),
-          letterSpacing: '0.02em',
-          mt: 0.2,
-        }}
-      >
-        Slot: {slotMins}m · Elapsed: {elapsedDisplay}
-      </Typography>
-    </Box>
-  );
-}
 
 /* ─── Dark Stat Card ────────────────────────────────────────────────────────── */
 
@@ -891,6 +664,7 @@ export function ConsultationPage(): React.JSX.Element {
   const completeMutation = useMutation({
     mutationFn: () => appointmentsService.updateStatus(id!, 'COMPLETED'),
     onSuccess: async () => {
+      if (id) clearConsultationStartMs(id);
       await invalidate();
     },
     meta: { toast: 'Consultation completed ✓', errorToast: 'Could not complete.' },
@@ -951,40 +725,8 @@ export function ConsultationPage(): React.JSX.Element {
       ? `${patient.age} yrs`
       : '';
   const consultationStartMs = useMemo(() => {
-    if (!appointment) return Date.now();
-    const storageKey = `consultation_start_${appointment.id}`;
-    const stored = sessionStorage.getItem(storageKey);
-    if (stored) {
-      const ms = Number(stored);
-      if (!Number.isNaN(ms) && ms > 0 && ms <= nowMs) return ms;
-    }
-
-    if (currentToken?.createdAt) {
-      const tMs = new Date(currentToken.createdAt).getTime();
-      if (!Number.isNaN(tMs) && tMs > 0 && tMs <= nowMs) {
-        sessionStorage.setItem(storageKey, String(tMs));
-        return tMs;
-      }
-    }
-
-    if (appointment.updatedAt) {
-      const uMs = new Date(appointment.updatedAt).getTime();
-      if (!Number.isNaN(uMs) && uMs > 0 && uMs <= nowMs) {
-        sessionStorage.setItem(storageKey, String(uMs));
-        return uMs;
-      }
-    }
-
-    const sMs = new Date(appointment.startsAt).getTime();
-    if (!Number.isNaN(sMs) && sMs > 0 && sMs <= nowMs) {
-      sessionStorage.setItem(storageKey, String(sMs));
-      return sMs;
-    }
-
-    const fallbackMs = Date.now();
-    sessionStorage.setItem(storageKey, String(fallbackMs));
-    return fallbackMs;
-  }, [appointment?.id, appointment?.updatedAt, appointment?.startsAt, currentToken?.createdAt]);
+    return getConsultationStartMs(appointment, currentToken, nowMs);
+  }, [appointment, currentToken, nowMs]);
 
   const slotDurationMs = useMemo(() => {
     if (!appointment?.startsAt || !appointment?.endsAt) return 15 * 60_000;
@@ -1018,6 +760,19 @@ export function ConsultationPage(): React.JSX.Element {
           ))}
         </Box>
         <StatCardsSkeleton count={3} />
+      </Box>
+    );
+  }
+
+  if (user?.role !== 'doctor') {
+    return (
+      <Box sx={{ p: 4 }}>
+        <Alert severity="error" sx={{ borderRadius: 2 }}>
+          Access restricted. Only doctors have access to the clinical consultation room.
+        </Alert>
+        <Button sx={{ mt: 2 }} startIcon={<ArrowBackOutlinedIcon />} onClick={() => navigate('/dashboard')}>
+          Return to Dashboard
+        </Button>
       </Box>
     );
   }
