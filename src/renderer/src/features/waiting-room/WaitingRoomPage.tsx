@@ -14,6 +14,7 @@ import {
 import { alpha, useTheme } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { showAppToast } from '@/components/AppToast';
 import {
   dialogActionsSx,
@@ -108,6 +109,7 @@ export function WaitingRoomPage(): React.JSX.Element {
   const canOrderLab = can('labDashboard');
   const qc = useQueryClient();
   const theme = useTheme();
+  const navigate = useNavigate();
   const date = todayStr();
 
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -232,9 +234,13 @@ export function WaitingRoomPage(): React.JSX.Element {
       if (appt.status === 'CHECKED_IN') return appt;
       return appointmentsService.updateStatus(appt.id, 'CHECKED_IN');
     },
-    onSuccess: async () => {
+    onSuccess: async (appt) => {
       await qc.invalidateQueries({ queryKey: ['appointments'] });
       await qc.invalidateQueries({ queryKey: ['tokens'] });
+      // Navigate to consultation page for the current token's appointment
+      if (appt?.id) {
+        navigate(`/consultation/${appt.id}`);
+      }
     },
     meta: { silent: true },
   });
@@ -447,6 +453,18 @@ export function WaitingRoomPage(): React.JSX.Element {
                     >
                       Complete
                     </Button>
+                    {visitStarted && (() => {
+                      const linked = linkedAppointment(currentToken, appointments);
+                      return linked ? (
+                        <Button
+                          variant="contained"
+                          onClick={() => navigate(`/consultation/${linked.id}`)}
+                          sx={{ ...heroFilledSx, bgcolor: '#fff', color: 'success.dark', '&:hover': { bgcolor: '#f1f8f4' } }}
+                        >
+                          Open Consultation
+                        </Button>
+                      ) : null;
+                    })()}
                     <Button
                       variant="outlined"
                       onClick={() => setPrescriptionToken(currentToken)}

@@ -13,6 +13,7 @@ import NotesOutlinedIcon from '@mui/icons-material/NotesOutlined';
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
 import RepeatOutlinedIcon from '@mui/icons-material/RepeatOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import StethoscopeIcon from '@mui/icons-material/HealingOutlined';
 import {
   Alert,
   Box,
@@ -107,9 +108,16 @@ export function AppointmentDetailPage(): React.JSX.Element {
 
   const statusMutation = useMutation({
     mutationFn: (status: Appointment['status']) => appointmentsService.updateStatus(id!, status),
-    onSuccess: () => void invalidate(),
+    onSuccess: async (_, status) => {
+      await invalidate();
+      // Auto-navigate to consultation page when checked in
+      if (status === 'CHECKED_IN' && id) {
+        navigate(`/consultation/${id}`);
+      }
+    },
     meta: { toast: 'Appointment updated', errorToast: 'Could not update status.' },
   });
+
 
   const cancelMutation = useMutation({
     mutationFn: () => appointmentsService.cancel(id!),
@@ -316,6 +324,17 @@ export function AppointmentDetailPage(): React.JSX.Element {
                 onClick={() => statusMutation.mutate('CHECKED_IN')}
               >
                 Check in
+              </Button>
+            )}
+            {appointment.status === 'CHECKED_IN' && (
+              <Button
+                startIcon={<StethoscopeIcon />}
+                variant="contained"
+                color="success"
+                sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                onClick={() => navigate(`/consultation/${appointment.id}`)}
+              >
+                Start Consultation
               </Button>
             )}
             {appointment.status === 'CHECKED_IN' && (

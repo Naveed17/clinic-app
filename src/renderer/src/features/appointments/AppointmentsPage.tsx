@@ -255,12 +255,13 @@ function IssueTokenInline({ patientId, date, providerId, onIssued }: {
   );
 }
 
-export function AppointmentDialog({ appointment, open, onClose, defaultDate, defaultProviderId, onSuccess, onCreatedAppointment }: {
+export function AppointmentDialog({ appointment, open, onClose, defaultDate, defaultProviderId, defaultPatientId, onSuccess, onCreatedAppointment }: {
   appointment?: Appointment;
   open: boolean;
   onClose: () => void;
   defaultDate?: string;
   defaultProviderId?: string;
+  defaultPatientId?: string;
   onSuccess?: () => void;
   onCreatedAppointment?: (appt: Appointment) => void;
 }): React.JSX.Element {
@@ -400,9 +401,14 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
     if (appointment) {
       form.reset(appointmentValues(appointment));
     } else {
-      form.reset({ ...empty, date: defaultDate ?? empty.date, providerId: defaultProviderId ?? empty.providerId });
+      form.reset({
+        ...empty,
+        date: defaultDate ?? empty.date,
+        providerId: defaultProviderId ?? empty.providerId,
+        patientId: defaultPatientId ?? empty.patientId,
+      });
     }
-  }, [appointment, defaultDate, defaultProviderId, form, open]);
+  }, [appointment, defaultDate, defaultProviderId, defaultPatientId, form, open]);
 
   useEffect(() => {
     if (!open || appointment || !providerId) return;
@@ -875,12 +881,19 @@ export function AppointmentsPage(): React.JSX.Element {
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(['appointments'], ctx.prev);
     },
+    onSuccess: (_result, { id, status }) => {
+      // Auto-navigate to consultation page when appointment is checked in
+      if (status === 'CHECKED_IN') {
+        navigate(`/consultation/${id}`);
+      }
+    },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['appointments'] });
       void queryClient.invalidateQueries({ queryKey: ['tokens'] });
     },
     meta: { silent: true },
   });
+
 
   const allData = user?.role === 'doctor'
     ? (appointments.data ?? []).filter((a) => a.providerId === user.id)
@@ -1145,7 +1158,7 @@ export function AppointmentsPage(): React.JSX.Element {
               onDateClick={isAdmin ? undefined : (date) => { setActive(undefined); setDefaultDate(date); setOpen(true); }}
               onAppointmentClick={isAdmin ? undefined : (appt) => navigate(`/appointments/${appt.id}`, { state: detailNavState })}
               readOnly={isAdmin}
-              hideCheckIn={user?.role !== 'doctor'}
+              hideCheckIn={false}
             />
           </Paper>
         </Box>

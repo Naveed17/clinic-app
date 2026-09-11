@@ -6,6 +6,7 @@ import { PatientsPage } from '@/features/patients/PatientsPage';
 import { PatientProfilePage } from '@/features/patients/PatientProfilePage';
 import { AppointmentsPage } from '@/features/appointments/AppointmentsPage';
 import { AppointmentDetailPage } from '@/features/appointments/AppointmentDetailPage';
+import { ConsultationPage } from '@/features/appointments/ConsultationPage';
 import { InvoicesPage } from '@/features/billing/InvoicesPage';
 import { InvoiceDetailPage } from '@/features/billing/InvoiceDetailPage';
 import { OpdReportsPage } from '@/features/reports/OpdReportsPage';
@@ -85,6 +86,14 @@ const router = createHashRouter([
                 element: (
                   <RouteAccessGate route="/appointments">
                     <AppointmentDetailPage />
+                  </RouteAccessGate>
+                ),
+              },
+              {
+                path: '/consultation/:id',
+                element: (
+                  <RouteAccessGate route="/appointments">
+                    <ConsultationPage />
                   </RouteAccessGate>
                 ),
               },

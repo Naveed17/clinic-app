@@ -15,6 +15,8 @@ export interface Appointment {
   startsAt: string;
   endsAt: string;
   status: 'SCHEDULED' | 'CHECKED_IN' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+  createdAt?: string;
+  updatedAt?: string;
   reason: string | null;
   notes: string | null;
   feeType?: 'PAID' | 'FREE' | 'HALF' | string | null;

@@ -197,6 +197,10 @@ export function DoctorDashboard(): React.JSX.Element {
     onSuccess: async (_data, variables) => {
       await qc.invalidateQueries({ queryKey: ['appointments'] });
       await qc.invalidateQueries({ queryKey: ['tokens'] });
+      if (variables.status === 'CHECKED_IN') {
+        navigate(`/consultation/${variables.id}`);
+        return;
+      }
       if (variables.status !== 'COMPLETED') return;
       const appt =
         variables.appt ??

@@ -251,9 +251,10 @@ const underlineFieldSx = {
 interface PrescriptionPadDialogProps {
   token: Token;
   onClose: () => void;
+  onSaved?: () => void;
 }
 
-export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogProps): React.JSX.Element {
+export function PrescriptionPadDialog({ token, onClose, onSaved }: PrescriptionPadDialogProps): React.JSX.Element {
   const { user } = useAuth();
   const { can } = useLicense();
   const brandLogo = useClinicBrandLogo();
@@ -403,6 +404,7 @@ export function PrescriptionPadDialog({ token, onClose }: PrescriptionPadDialogP
       });
       setSavedHint(true);
       setTimeout(() => setSavedHint(false), 2000);
+      onSaved?.();
       return true;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save prescription');

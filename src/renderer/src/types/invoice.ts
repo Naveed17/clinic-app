@@ -24,6 +24,7 @@ export interface InvoiceItem {
 }
 export interface Invoice {
   id: string;
+  patientId?: string;
   invoiceNumber: string;
   status: 'DRAFT' | 'ISSUED' | 'PARTIALLY_PAID' | 'PAID' | 'REFUNDED' | 'VOID';
   patient: InvoicePerson;

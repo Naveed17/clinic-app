@@ -24,6 +24,7 @@ import { useLicense } from '@/features/auth/LicenseModulesContext';
 import type { Patient } from '@/types/patient';
 import { PatientDialog } from './PatientDialog';
 import { PatientHistoryDialog } from './PatientHistoryDialog';
+import { AppointmentDialog } from '@/features/appointments/AppointmentsPage';
 import { calcAgeLabel, getAgeDisplayParts } from '@shared/patientAge';
 import { formatTableDate } from '@/utils/formatDate';
 
@@ -45,6 +46,7 @@ export function PatientsPage(): React.JSX.Element {
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [deletePatient, setDeletePatient] = useState<Patient | undefined>();
   const [historyPatient, setHistoryPatient] = useState<Patient | undefined>();
+  const [appointmentPatient, setAppointmentPatient] = useState<Patient | undefined>();
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [activeMenuPatient, setActiveMenuPatient] = useState<Patient | null>(null);
   const closeMenuTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -473,6 +475,13 @@ export function PatientsPage(): React.JSX.Element {
                       <PersonOutlinedIcon sx={{ fontSize: 17 }} />
                     </IconButton>
                   </Tooltip>
+                  {!isLabTech && (
+                    <Tooltip title="Book appointment" arrow placement="top">
+                      <IconButton sx={actionBtnSx} onClick={() => { close(); setAppointmentPatient(patient); }}>
+                        <CalendarMonthOutlinedIcon sx={{ fontSize: 17 }} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                   <Tooltip title="View history" arrow placement="top">
                     <IconButton sx={actionBtnSx} onClick={() => { close(); setHistoryPatient(patient); }}>
                       <HistoryOutlinedIcon sx={{ fontSize: 17 }} />
@@ -509,6 +518,17 @@ export function PatientsPage(): React.JSX.Element {
 
       <PatientDialog open={isDialogOpen} patient={dialogPatient} onClose={() => setDialogOpen(false)} />
       {canViewRecords && historyPatient && <PatientHistoryDialog patient={historyPatient} onClose={() => setHistoryPatient(undefined)} />}
+      {appointmentPatient && (
+        <AppointmentDialog
+          open={Boolean(appointmentPatient)}
+          defaultPatientId={appointmentPatient.id}
+          defaultProviderId={isDoctor ? user?.id : undefined}
+          onClose={() => setAppointmentPatient(undefined)}
+          onSuccess={() => {
+            void queryClient.invalidateQueries({ queryKey: ['appointments'] });
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={Boolean(deletePatient)}
