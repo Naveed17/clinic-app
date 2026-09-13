@@ -36,6 +36,7 @@ export function usePrintAppointmentToken() {
   return {
     printToken,
     closePrint: () => setPrintToken(null),
+    openTokenPreview: (token: Token) => setPrintToken(token),
     printFor: (appointment: Appointment) => mutation.mutate(appointment),
     printingId: mutation.isPending ? (mutation.variables?.id ?? null) : null,
   };

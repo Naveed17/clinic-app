@@ -44,6 +44,12 @@ declare global {
         upsertPrescription: any;
         list: (date: string) => Promise<Token[]>;
         listPrescriptions: (date: string) => Promise<import('./token').PrescriptionFeedItem[]>;
+        prescriptionsByPatient: (patientId: string) => Promise<Array<{
+          prescription: import('./token').Prescription;
+          doctor: { firstName: string; lastName: string };
+          tokenNumber?: number;
+          date?: string;
+        }>>;
         doctors: () => Promise<TokenPerson[]>;
         patients: (search?: string, includePatientId?: string) => Promise<TokenPerson[]>;
         weekVisits: (patientId: string, doctorId: string, date: string) => Promise<{ count: number }>;

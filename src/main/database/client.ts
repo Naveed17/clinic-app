@@ -140,6 +140,7 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
     await database.$executeRawUnsafe('PRAGMA synchronous = NORMAL');
     await database.$executeRawUnsafe('PRAGMA temp_store = MEMORY');
     await database.$executeRawUnsafe('PRAGMA cache_size = -64000');
+    await database.$executeRawUnsafe('PRAGMA busy_timeout = 10000');
   } catch {
     /* Ignore pragma errors on non-SQLite backends */
   }

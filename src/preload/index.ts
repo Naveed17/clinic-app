@@ -593,6 +593,11 @@ const api = {
         () => request(`/api/tokens/prescriptions?date=${date}`),
         'tokens:list-prescriptions', date,
       ),
+    prescriptionsByPatient: (patientId: string) =>
+      call(
+        () => request(`/api/tokens/prescriptions-by-patient?patientId=${encodeURIComponent(patientId)}`),
+        'tokens:prescriptions-by-patient', patientId,
+      ),
     getById: (tokenId: string) =>
       call(
         () => request(`/api/tokens/${tokenId}`),

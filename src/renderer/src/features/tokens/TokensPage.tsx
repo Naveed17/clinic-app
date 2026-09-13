@@ -1486,7 +1486,12 @@ export function TokensPage(): React.JSX.Element {
         </Box>
       </Stack>
 
-      <IssueTokenDialog open={dialogOpen} onClose={() => setDialogOpen(false)} date={date} />
+      <IssueTokenDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        date={date}
+        onSuccess={(token) => setPrintToken(token)}
+      />
       {printToken && <TokenPrintPreview token={printToken} onClose={() => setPrintToken(null)} />}
       {refundToken && <FeeRefundDialog token={refundToken} onClose={() => setRefundToken(null)} />}
       <ConfirmDialog

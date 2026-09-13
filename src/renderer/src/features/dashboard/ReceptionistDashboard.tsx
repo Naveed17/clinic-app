@@ -43,7 +43,7 @@ import { realtimeService, type RealtimeNotification } from '@/services/realtime.
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
 import { TokenPrintPreview } from '@/features/tokens/TokensPage';
 import { printTokenSlip } from '@/utils/printTokenSlip';
-import { usePrintAppointmentToken, loadTokenForAppointment } from '@/features/appointments/printAppointmentToken';
+import { usePrintAppointmentToken, loadTokenForAppointment, appointmentLocalDate } from '@/features/appointments/printAppointmentToken';
 import { InvoiceDialog } from '@/features/billing/InvoicesPage';
 import { AppointmentWhatsAppDialog } from '@/features/appointments/AppointmentWhatsAppDialog';
 import { useAuth } from '@/features/auth/AuthContext';
@@ -174,9 +174,13 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
       await qc.invalidateQueries({ queryKey: ['appointments'] });
       setCreatedToken(token);
       setStep(2);
-      void printTokenSlip(token, { silent: true }).catch(() => {
-        /* keep Token Issued step even if printer fails */
-      });
+      try {
+        await printTokenSlip(token, { silent: true });
+      } catch {
+        // Fallback to print preview dialog if silent thermal printing fails
+        setPreviewAutoPrint(true);
+        setPreviewToken(token);
+      }
     },
     meta: { silent: true },
   });
@@ -919,7 +923,6 @@ function ActiveConsultationBlock({
   activeDoctorId,
   setActiveDoctorId,
   nextAppt,
-  nowMs,
   onComplete,
   isCompleting,
   onStartNext,
@@ -931,7 +934,6 @@ function ActiveConsultationBlock({
   activeDoctorId: string | null;
   setActiveDoctorId: (id: string) => void;
   nextAppt: Appointment | null;
-  nowMs: number;
   onComplete: (apptId: string) => void;
   isCompleting: boolean;
   onStartNext: (appt: Appointment) => void;
@@ -943,8 +945,8 @@ function ActiveConsultationBlock({
 
   const consultationStartMs = useMemo(() => {
     if (!currentConsultation) return 0;
-    return getConsultationStartMs(currentConsultation, null, nowMs);
-  }, [currentConsultation, nowMs]);
+    return getConsultationStartMs(currentConsultation, null);
+  }, [currentConsultation]);
 
   const slotDurationMs = useMemo(() => {
     if (!currentConsultation?.startsAt || !currentConsultation?.endsAt) return 15 * 60_000;
@@ -1325,7 +1327,6 @@ function ActiveConsultationBlock({
             <ConsultationClock
               startedAtMs={consultationStartMs}
               slotDurationMs={slotDurationMs}
-              nowMs={nowMs}
               size="medium"
             />
           </Box>
@@ -1573,31 +1574,6 @@ export function ReceptionistDashboard(): React.JSX.Element {
     return d;
   });
 
-  const issueTokenMutation = useMutation({
-    mutationFn: async (appointment: Appointment) => {
-      const updated = await appointmentsService.updateStatus(appointment.id, 'CHECKED_IN');
-      return { appointment, updated };
-    },
-    onSuccess: async ({ appointment, updated }) => {
-      await qc.invalidateQueries({ queryKey: ['appointments'] });
-      await qc.invalidateQueries({ queryKey: ['tokens'] });
-      try {
-        const apptToPrint = updated ?? appointment;
-        tokenPrint.printFor(apptToPrint);
-        const token = await loadTokenForAppointment(apptToPrint);
-        if (token) {
-          void printTokenSlip(token, { silent: true }).catch(() => {});
-        }
-      } catch {
-        // ignore printer errors
-      }
-    },
-    meta: {
-      toast: 'Token issued & patient checked in!',
-      errorToast: 'Failed to issue token.',
-    },
-  });
-
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments'],
     queryFn: appointmentsService.list,
@@ -1626,12 +1602,48 @@ export function ReceptionistDashboard(): React.JSX.Element {
     staleTime: 30_000,
   });
 
+  const issueTokenMutation = useMutation({
+    mutationFn: async (appointment: Appointment) => {
+      const apptDate = appointmentLocalDate(appointment.startsAt);
+      let token = await loadTokenForAppointment(appointment);
+      if (!token) {
+        const doctor = doctors.find((d) => d.id === appointment.providerId);
+        const consultationFee = Number(doctor?.consultationFee ?? 0);
+        token = (await window.clinic.tokens.create({
+          patientId: appointment.patientId,
+          doctorId: appointment.providerId,
+          date: apptDate,
+          reason: appointment.reason || null,
+          notes: appointment.notes || null,
+          consultationFee,
+        })) as Token;
+      }
+      if (appointment.status !== 'CHECKED_IN') {
+        await appointmentsService.updateStatus(appointment.id, 'CHECKED_IN');
+      }
+      return token;
+    },
+    onSuccess: async (token: Token) => {
+      await qc.invalidateQueries({ queryKey: ['appointments'] });
+      await qc.invalidateQueries({ queryKey: ['tokens'] });
+      if (token) {
+        void printTokenSlip(token, { silent: true }).catch(() => {
+          tokenPrint.openTokenPreview(token);
+        });
+      }
+    },
+    meta: {
+      toast: 'Token issued & patient checked in!',
+      errorToast: 'Failed to issue token.',
+    },
+  });
+
   const today = new Date();
   const todaysAppts = useMemo(
     () =>
       appointments
         .filter((a) => sameDay(new Date(a.startsAt), today) && a.status !== 'CANCELLED')
-        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
+        .sort((a, b) => new Date(a.startsAt).getTime() - new Date(a.startsAt).getTime()),
     [appointments, today.getFullYear(), today.getMonth(), today.getDate()],
   );
 
@@ -1647,7 +1659,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
   const completedToday = todaysAppts.filter((a) => a.status === 'COMPLETED').length;
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
-    const t = window.setInterval(() => setNowMs(Date.now()), 1000);
+    const t = window.setInterval(() => setNowMs(Date.now()), 30_000);
     return () => window.clearInterval(t);
   }, []);
 
@@ -1834,7 +1846,6 @@ export function ReceptionistDashboard(): React.JSX.Element {
             activeDoctorId={activeDoctorId}
             setActiveDoctorId={setActiveDoctorId}
             nextAppt={nextAppt}
-            nowMs={nowMs}
             onComplete={(apptId) => completeConsultationMutation.mutate(apptId)}
             isCompleting={completeConsultationMutation.isPending}
             onStartNext={(appt) => startConsultationMutation.mutate(appt.id)}

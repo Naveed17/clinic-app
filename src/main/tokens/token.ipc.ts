@@ -10,6 +10,7 @@ import {
   listTokenDoctors,
   listTokenPatients,
   listPrescriptionFeed,
+  listPrescriptionsForPatient,
   listTokens,
   updateTokenStatus,
   upsertPrescription,
@@ -25,6 +26,9 @@ export function registerTokenIpc(io?: SocketIOServer): void {
   ipcMain.handle('tokens:list', (_, date: string) => listTokens(date));
   ipcMain.handle('tokens:get-by-id', (_, tokenId: string) => getTokenById(tokenId));
   ipcMain.handle('tokens:list-prescriptions', (_, date: string) => listPrescriptionFeed(date));
+  ipcMain.handle('tokens:prescriptions-by-patient', (_, patientId: string) =>
+    listPrescriptionsForPatient(patientId)
+  );
   ipcMain.handle('tokens:doctors', () => listTokenDoctors());
   ipcMain.handle('tokens:patients', (_, search?: string, includePatientId?: string) =>
     listTokenPatients(search, includePatientId),

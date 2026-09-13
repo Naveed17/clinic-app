@@ -68,32 +68,8 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
   const [summaryLoading, setSummaryLoading] = useState(false);
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['tokens-all-prescriptions', patientId],
-    queryFn: async () => {
-      const today = new Date();
-      const results: Array<{
-        prescription: Prescription;
-        doctor: { firstName: string; lastName: string };
-        tokenNumber?: number;
-        date?: string;
-      }> = [];
-      for (let i = 0; i < 90; i++) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().slice(0, 10);
-        const dayTokens = await window.clinic.tokens.list(dateStr);
-        for (const t of dayTokens) {
-          if (t.patientId === patientId && t.prescription) {
-            results.push({
-              prescription: t.prescription,
-              doctor: t.doctor ?? { firstName: '', lastName: '' },
-              tokenNumber: t.tokenNumber,
-              date: t.date,
-            });
-          }
-        }
-      }
-      return results;
-    },
+    queryFn: () => window.clinic.tokens.prescriptionsByPatient(patientId),
+    enabled: Boolean(patientId),
   });
 
   async function handleSummarize(): Promise<void> {

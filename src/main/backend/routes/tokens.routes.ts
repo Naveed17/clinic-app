@@ -11,6 +11,7 @@ import {
   listTokenDoctors,
   listTokenPatients,
   listPrescriptionFeed,
+  listPrescriptionsForPatient,
   listTokens,
   updateTokenStatus,
   upsertPrescription,
@@ -37,6 +38,10 @@ export function createTokensRouter(io: SocketIOServer): Router {
   router.get('/prescriptions', asyncHandler(async (req, res) => {
     const date = String(req.query.date ?? new Date().toISOString().slice(0, 10));
     res.json(await listPrescriptionFeed(date));
+  }));
+  router.get('/prescriptions-by-patient', asyncHandler(async (req, res) => {
+    const patientId = String(req.query.patientId ?? '');
+    res.json(await listPrescriptionsForPatient(patientId));
   }));
   router.get('/for-patient', asyncHandler(async (req, res) => {
     const { patientId, date, doctorId } = req.query as { patientId: string; date: string; doctorId?: string };

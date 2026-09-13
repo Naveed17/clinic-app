@@ -196,6 +196,31 @@ export async function listPrescriptionFeed(date: string): Promise<PrescriptionFe
   return rows;
 }
 
+export async function listPrescriptionsForPatient(patientId: string) {
+  const db = getPrisma();
+  await ensurePrescriptionPharmacyColumns(db);
+  const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(`
+    SELECT pr.*, pr.id as prescriptionId, pr.createdAt as prescriptionCreatedAt,
+           t.tokenNumber, t.date,
+           u.firstName as doctorFirstName, u.lastName as doctorLastName
+    FROM "Prescription" pr
+    JOIN "Token" t ON t.id = pr.tokenId
+    JOIN "User" u ON u.id = t.doctorId
+    WHERE t.patientId = ?
+    ORDER BY pr.createdAt DESC
+  `, patientId);
+
+  return rows.map((r) => ({
+    prescription: mapPrescription(r.tokenId, r),
+    doctor: {
+      firstName: (r.doctorFirstName as string) || '',
+      lastName: (r.doctorLastName as string) || '',
+    },
+    tokenNumber: r.tokenNumber != null ? Number(r.tokenNumber) : undefined,
+    date: r.date ? String(r.date) : undefined,
+  }));
+}
+
 export async function listPharmacyQueue(date: string): Promise<PharmacyQueueItem[]> {
   const db = getPrisma();
   await ensurePrescriptionPharmacyColumns(db);
@@ -424,12 +449,14 @@ export async function createToken(input: TokenInput) {
       );
       const isHalf = consultationFee > 0 && feeDiscount > 0 && Math.abs(feeDiscount - consultationFee / 2) <= 1;
       const derivedFeeType = consultationFee === 0 || feeDiscount >= consultationFee ? 'FREE' : isHalf ? 'HALF' : feeDiscount > 0 ? 'DISCOUNTED' : 'PAID';
+      const { dayStart, dayEnd } = localDayBoundsFromDateStr(input.date);
       await getPrisma().$executeRawUnsafe(
-        `UPDATE "Appointment" SET "feeType" = ? WHERE "patientId" = ? AND "providerId" = ? AND "startsAt" LIKE ?`,
+        `UPDATE "Appointment" SET "feeType" = ? WHERE "patientId" = ? AND "providerId" = ? AND "startsAt" >= ? AND "startsAt" <= ?`,
         derivedFeeType,
         input.patientId,
         input.doctorId,
-        `${input.date}%`,
+        dayStart.toISOString(),
+        dayEnd.toISOString(),
       );
       return mapTokenRecord({
         ...token,

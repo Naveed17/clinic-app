@@ -43,7 +43,9 @@ function slotForDate(schedule: DoctorDaySlot[], dateStr: string): DoctorDaySlot 
 
 /** Null when the doctor has no working hours that calendar day (including unsaved / all-Off schedule). */
 export function doctorOfflineReason(schedule: DoctorDaySlot[], dateStr: string): string | null {
-  if (!dateStr) return null;
+  if (!dateStr || !schedule || schedule.length === 0) return null;
+  // If schedule has no active days configured at all, treat as unconfigured/flexible rather than blocking
+  if (!schedule.some((s) => s.isActive)) return null;
   const day = new Date(`${dateStr}T12:00:00`).getDay();
   if (Number.isNaN(day)) return null;
   if (slotForDate(schedule, dateStr)) return null;

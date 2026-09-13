@@ -160,6 +160,41 @@ function StatCard({ label, value, note, icon, accentColor }: {
   );
 }
 
+function DurationStatCard({
+  consultationStartMs,
+  status,
+  accentColor,
+}: {
+  consultationStartMs: number;
+  status?: string;
+  accentColor: string;
+}): React.JSX.Element {
+  const [elapsed, setElapsed] = useState(() =>
+    status === 'CHECKED_IN' ? formatElapsed(consultationStartMs, Date.now()) : null,
+  );
+
+  useEffect(() => {
+    if (status !== 'CHECKED_IN' || !consultationStartMs) {
+      setElapsed(null);
+      return;
+    }
+    const t = window.setInterval(() => {
+      setElapsed(formatElapsed(consultationStartMs, Date.now()));
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [consultationStartMs, status]);
+
+  return (
+    <StatCard
+      label="Duration"
+      value={elapsed?.display ?? '—'}
+      note="Time in consultation"
+      icon={<MonitorHeartOutlinedIcon sx={{ fontSize: 20 }} />}
+      accentColor={accentColor}
+    />
+  );
+}
+
 /* ─── Info Row ─────────────────────────────────────────────────────────────── */
 
 function InfoRow({ icon, label, value, highlight }: {
@@ -341,32 +376,8 @@ function PrescriptionsTab({ patientId, patient }: { patientId: string; patient?:
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['tokens-all-prescriptions', patientId],
-    queryFn: async () => {
-      const today = new Date();
-      const results: Array<{
-        prescription: Prescription;
-        doctor: { firstName: string; lastName: string };
-        tokenNumber?: number;
-        date?: string;
-      }> = [];
-      for (let i = 0; i < 90; i++) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().slice(0, 10);
-        const dayTokens = await window.clinic.tokens.list(dateStr);
-        for (const t of dayTokens) {
-          if (t.patientId === patientId && t.prescription) {
-            results.push({
-              prescription: t.prescription,
-              doctor: t.doctor ?? { firstName: '', lastName: '' },
-              tokenNumber: t.tokenNumber,
-              date: t.date,
-            });
-          }
-        }
-      }
-      return results;
-    },
+    queryFn: () => window.clinic.tokens.prescriptionsByPatient(patientId),
+    enabled: Boolean(patientId),
   });
 
   if (isLoading) return <Box sx={{ p: 2 }}><ListCardsSkeleton count={4} /></Box>;
@@ -602,18 +613,11 @@ export function ConsultationPage(): React.JSX.Element {
   const qc = useQueryClient();
   const tokenPrint = usePrintAppointmentToken();
 
-  const [nowMs, setNowMs] = useState(() => Date.now());
   const [tab, setTab] = useState(0);
   const [rxToken, setRxToken] = useState<Token | null>(null);
   const [labOpen, setLabOpen] = useState(false);
   const [patient, setPatient] = useState<Patient | undefined>();
   const [currentToken, setCurrentToken] = useState<Token | null>(null);
-
-  /* 1-second tick */
-  useEffect(() => {
-    const t = window.setInterval(() => setNowMs(Date.now()), 1000);
-    return () => window.clearInterval(t);
-  }, []);
 
   /* Appointment */
   const query = useQuery({
@@ -725,8 +729,8 @@ export function ConsultationPage(): React.JSX.Element {
       ? `${patient.age} yrs`
       : '';
   const consultationStartMs = useMemo(() => {
-    return getConsultationStartMs(appointment, currentToken, nowMs);
-  }, [appointment, currentToken, nowMs]);
+    return getConsultationStartMs(appointment, currentToken);
+  }, [appointment, currentToken]);
 
   const slotDurationMs = useMemo(() => {
     if (!appointment?.startsAt || !appointment?.endsAt) return 15 * 60_000;
@@ -735,11 +739,6 @@ export function ConsultationPage(): React.JSX.Element {
     const diff = e - s;
     return diff > 0 ? diff : 15 * 60_000;
   }, [appointment?.startsAt, appointment?.endsAt]);
-
-  const elapsed =
-    appointment?.status === 'CHECKED_IN'
-      ? formatElapsed(consultationStartMs, nowMs)
-      : null;
 
   const patientVisits = useMemo(
     () =>
@@ -1124,7 +1123,6 @@ export function ConsultationPage(): React.JSX.Element {
             >
               <ConsultationClock
                 startedAtMs={consultationStartMs}
-                nowMs={nowMs}
                 slotDurationMs={slotDurationMs}
               />
             </Box>
@@ -1154,11 +1152,9 @@ export function ConsultationPage(): React.JSX.Element {
             icon={<AccessTimeOutlinedIcon sx={{ fontSize: 20 }} />}
             accentColor={theme.palette.info.main}
           />
-          <StatCard
-            label="Duration"
-            value={elapsed?.display ?? '—'}
-            note="Time in consultation"
-            icon={<MonitorHeartOutlinedIcon sx={{ fontSize: 20 }} />}
+          <DurationStatCard
+            consultationStartMs={consultationStartMs}
+            status={appointment.status}
             accentColor={theme.palette.success.main}
           />
           <StatCard

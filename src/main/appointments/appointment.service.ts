@@ -47,8 +47,9 @@ export async function listAppointments(date?: string) {
   const db = getPrisma();
   let whereClause = {};
   if (date) {
-    const startOfDay = new Date(`${date}T00:00:00.000Z`);
-    const endOfDay = new Date(`${date}T23:59:59.999Z`);
+    const [y, m, d] = date.split('-').map(Number);
+    const startOfDay = new Date(y, m - 1, d, 0, 0, 0, 0);
+    const endOfDay = new Date(y, m - 1, d, 23, 59, 59, 999);
     whereClause = {
       startsAt: {
         gte: startOfDay,
@@ -92,7 +93,7 @@ export async function listAppointments(date?: string) {
   }
 
   return appointments.map((a) => {
-    const dateStr = a.startsAt.toISOString().slice(0, 10);
+    const dateStr = a.startsAt.toLocaleDateString('en-CA');
     const token = tokenMap.get(`${a.patientId}_${a.providerId}_${dateStr}`);
     const resolvedFeeType = (a as unknown as { feeType?: string }).feeType ?? token?.feeType ?? 'PAID';
     return {
@@ -177,7 +178,7 @@ async function getAppointmentById(id: string) {
   });
   if (!a) return null;
 
-  const dateStr = a.startsAt.toISOString().slice(0, 10);
+  const dateStr = a.startsAt.toLocaleDateString('en-CA');
   const token = await db.token.findFirst({
     where: { patientId: a.patientId, doctorId: a.providerId, date: dateStr },
     orderBy: { tokenNumber: 'desc' },
