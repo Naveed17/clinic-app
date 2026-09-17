@@ -1143,7 +1143,7 @@ export function StatisticsPage(): React.JSX.Element {
                     cx?: number;
                     cy?: number;
                     index?: number;
-                    payload?: ReasonTrendPoint;
+                    payload?: ClinicStatisticsReasonPoint;
                   }) => {
                     const { cx, cy, index, payload } = props;
                     if (cx == null || cy == null || index !== activeReasonIdx || !payload) {

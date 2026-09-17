@@ -440,7 +440,7 @@ export interface ClinicStatistics {
   };
   monthlyAppointments: { month: string; appointments: number }[];
   monthlyRevenue: { month: string; revenue: number }[];
-  statusCounts: { name: string; value: number }[];
+  statusCounts: Record<string, number>;
   reasonYears: number[];
   reasonTrends: {
     byYear: Record<number, { label: string; fullLabel: string; total: number; topReason: string; topCount: number }[]>;
