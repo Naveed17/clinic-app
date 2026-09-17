@@ -33,61 +33,13 @@ import TrendingUpOutlinedIcon from '@mui/icons-material/TrendingUpOutlined';
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import { useQuery } from '@tanstack/react-query';
 import { StatCardsSkeleton } from '@/components/LoadingUI';
-import { appointmentsService } from '@/services/appointments.service';
-import { invoicesService } from '@/services/invoices.service';
-import { patientsService } from '@/services/patients.service';
-import type { Appointment } from '@/types/appointment';
-import type { Invoice } from '@/types/invoice';
+import { reportsService } from '@/services/reports.service';
+import type { ClinicStatistics, ClinicStatisticsReasonPoint } from '@/types/report';
 
 type OverviewRange = 'weekly' | 'monthly' | 'yearly';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-function startOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function sameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
 function money(v: number): string {
   return `Rs. ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 0 }).format(v)}`;
-}
-
-function dayOrdinal(n: number): string {
-  const j = n % 10;
-  const k = n % 100;
-  if (j === 1 && k !== 11) return `${n}st`;
-  if (j === 2 && k !== 12) return `${n}nd`;
-  if (j === 3 && k !== 13) return `${n}rd`;
-  return `${n}th`;
-}
-
-type ReasonTrendPoint = {
-  label: string;
-  fullLabel: string;
-  total: number;
-  topReason: string;
-  topCount: number;
-};
-
-function topReasonFromList(list: Appointment[]): { topReason: string; topCount: number } {
-  const counts: Record<string, number> = {};
-  list.forEach((a) => {
-    const raw = (a.reason && a.reason.trim()) || 'Unspecified';
-    counts[raw] = (counts[raw] ?? 0) + 1;
-  });
-  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  if (!entries.length) return { topReason: '—', topCount: 0 };
-  return { topReason: entries[0][0], topCount: entries[0][1] };
 }
 
 /** Rounded vertical highlight band for Overview (ReferenceLine can't round corners). */
@@ -132,63 +84,6 @@ function OverviewActiveBand(props: {
       style={{ pointerEvents: 'none' }}
     />
   );
-}
-
-function buildOverview(
-  range: OverviewRange,
-  appointments: Appointment[],
-  invoices: Invoice[],
-): { label: string; appointments: number; revenue: number }[] {
-  const now = new Date();
-
-  if (range === 'weekly') {
-    return Array.from({ length: 7 }, (_, i) => {
-      const day = startOfDay(now);
-      day.setDate(day.getDate() - (6 - i));
-      const appts = appointments.filter((a) => sameDay(new Date(a.startsAt), day)).length;
-      const revenue = invoices
-        .filter((inv) => sameDay(new Date(inv.createdAt), day))
-        .reduce((s, inv) => s + Number(inv.total || 0), 0);
-      return {
-        label: `${WEEKDAYS[day.getDay()]} ${day.getDate()}`,
-        appointments: appts,
-        revenue,
-      };
-    });
-  }
-
-  if (range === 'monthly') {
-    return Array.from({ length: 12 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
-      const y = d.getFullYear();
-      const m = d.getMonth();
-      const appts = appointments.filter((a) => {
-        const t = new Date(a.startsAt);
-        return t.getFullYear() === y && t.getMonth() === m;
-      }).length;
-      const revenue = invoices
-        .filter((inv) => {
-          const t = new Date(inv.createdAt);
-          return t.getFullYear() === y && t.getMonth() === m;
-        })
-        .reduce((s, inv) => s + Number(inv.total || 0), 0);
-      return {
-        label: `${MONTHS[m]} ${String(y).slice(2)}`,
-        appointments: appts,
-        revenue,
-      };
-    });
-  }
-
-  // yearly — last 5 calendar years including current
-  return Array.from({ length: 5 }, (_, i) => {
-    const y = now.getFullYear() - (4 - i);
-    const appts = appointments.filter((a) => new Date(a.startsAt).getFullYear() === y).length;
-    const revenue = invoices
-      .filter((inv) => new Date(inv.createdAt).getFullYear() === y)
-      .reduce((s, inv) => s + Number(inv.total || 0), 0);
-    return { label: String(y), appointments: appts, revenue };
-  });
 }
 
 function StatCard({
@@ -323,25 +218,16 @@ export function StatisticsPage(): React.JSX.Element {
   const [reasonYearMenuEl, setReasonYearMenuEl] = useState<null | HTMLElement>(null);
   const [activeReasonIdx, setActiveReasonIdx] = useState(0);
 
-  const { data: appointments = [], isLoading: apptsLoading } = useQuery({
-    queryKey: ['appointments'],
-    queryFn: appointmentsService.list,
+  const { data: stats, isLoading: statsLoading } = useQuery<ClinicStatistics>({
+    queryKey: ['reports:stats'],
+    queryFn: reportsService.stats,
   });
-  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
-    queryKey: ['invoices'],
-    queryFn: invoicesService.list,
-  });
-  const { data: patientsData, isLoading: patientsLoading } = useQuery({
-    queryKey: ['patients', { page: 1, pageSize: 1, search: '' }],
-    queryFn: () => patientsService.list({ page: 1, pageSize: 1, search: '' }),
-  });
-  const statsLoading = apptsLoading || invoicesLoading || patientsLoading;
 
   const year = new Date().getFullYear();
 
   const overviewData = useMemo(
-    () => buildOverview(overviewRange, appointments as Appointment[], invoices as Invoice[]),
-    [overviewRange, appointments, invoices],
+    () => (stats?.overview ? stats.overview[overviewRange] : []),
+    [stats, overviewRange],
   );
 
   useEffect(() => {
@@ -363,86 +249,36 @@ export function StatisticsPage(): React.JSX.Element {
       : 0;
 
   const monthlyAppts = useMemo(
-    () =>
-      MONTHS.map((month, i) => ({
-        month,
-        appointments: (appointments as Appointment[]).filter((a) => {
-          const d = new Date(a.startsAt);
-          return d.getFullYear() === year && d.getMonth() === i;
-        }).length,
-      })),
-    [appointments, year],
+    () => stats?.monthlyAppointments ?? [],
+    [stats],
   );
 
   const monthlyRevenue = useMemo(
-    () =>
-      MONTHS.map((month, i) => ({
-        month,
-        revenue: (invoices as Invoice[])
-          .filter((inv) => {
-            const d = new Date(inv.createdAt);
-            return d.getFullYear() === year && d.getMonth() === i;
-          })
-          .reduce((sum, inv) => sum + Number(inv.total || 0), 0),
-      })),
-    [invoices, year],
+    () => stats?.monthlyRevenue ?? [],
+    [stats],
   );
 
-  const statusCounts: Record<string, number> = {};
-  (appointments as Appointment[]).forEach((a) => {
-    statusCounts[a.status] = (statusCounts[a.status] ?? 0) + 1;
-  });
-  const pieData = Object.entries(statusCounts).map(([name, value]) => ({
-    name: name.replace(/_/g, ' '),
-    value,
-  }));
+  const pieData = useMemo(
+    () =>
+      Object.entries(stats?.statusCounts ?? {}).map(([name, value]) => ({
+        name: name.replace(/_/g, ' '),
+        value,
+      })),
+    [stats?.statusCounts],
+  );
 
-  const reasonYears = useMemo(() => {
-    const set = new Set<number>([new Date().getFullYear()]);
-    (appointments as Appointment[]).forEach((a) => {
-      set.add(new Date(a.startsAt).getFullYear());
-    });
-    return Array.from(set).sort((a, b) => b - a);
-  }, [appointments]);
+  const reasonYears = useMemo(
+    () => stats?.reasonYears ?? [new Date().getFullYear()],
+    [stats?.reasonYears],
+  );
 
-  const reasonTrendData = useMemo((): ReasonTrendPoint[] => {
-    const list = appointments as Appointment[];
+  const reasonTrendData = useMemo((): ClinicStatisticsReasonPoint[] => {
+    if (!stats?.reasonTrends) return [];
     if (reasonView === 'year') {
-      return MONTHS.map((month, i) => {
-        const inMonth = list.filter((a) => {
-          const d = new Date(a.startsAt);
-          return d.getFullYear() === reasonYear && d.getMonth() === i;
-        });
-        const top = topReasonFromList(inMonth);
-        return {
-          label: month,
-          fullLabel: new Date(reasonYear, i, 1).toLocaleString('en', { month: 'long' }),
-          total: inMonth.length,
-          ...top,
-        };
-      });
+      return stats.reasonTrends.byYear[reasonYear] ?? [];
     }
-
-    const now = new Date();
-    const monthIdx = reasonYear === now.getFullYear() ? now.getMonth() : 11;
-    const daysInMonth = new Date(reasonYear, monthIdx + 1, 0).getDate();
-    const monthName = new Date(reasonYear, monthIdx, 1).toLocaleString('en', { month: 'long' });
-
-    return Array.from({ length: daysInMonth }, (_, i) => {
-      const day = i + 1;
-      const inDay = list.filter((a) => {
-        const d = new Date(a.startsAt);
-        return d.getFullYear() === reasonYear && d.getMonth() === monthIdx && d.getDate() === day;
-      });
-      const top = topReasonFromList(inDay);
-      return {
-        label: String(day),
-        fullLabel: `${dayOrdinal(day)} of ${monthName}`,
-        total: inDay.length,
-        ...top,
-      };
-    });
-  }, [appointments, reasonView, reasonYear]);
+    return stats.reasonTrends.byMonth[reasonYear] ?? [];
+  }, [stats, reasonView, reasonYear]);
 
   useEffect(() => {
     if (!reasonTrendData.length) {
@@ -458,11 +294,12 @@ export function StatisticsPage(): React.JSX.Element {
 
   const activeReasonPoint = reasonTrendData[activeReasonIdx] ?? reasonTrendData[0];
 
-  const totalRevenue = (invoices as Invoice[]).reduce((s, inv) => s + Number(inv.total || 0), 0);
-  const completedAppts = (appointments as Appointment[]).filter((a) => a.status === 'COMPLETED').length;
-  const completionPct = appointments.length
-    ? Math.round((completedAppts / appointments.length) * 100)
-    : 0;
+  const totalAppointments = stats?.totalAppointments ?? 0;
+  const completedAppts = stats?.completedAppointments ?? 0;
+  const completionPct = stats?.completionRate ?? 0;
+  const totalRevenue = stats?.totalRevenue ?? 0;
+  const totalPatients = stats?.totalPatients ?? 0;
+
   const green = theme.palette.primary.main;
   const greenDeep = theme.palette.primary.dark || '#15803d';
   const blue = theme.palette.secondary.main;
@@ -530,15 +367,15 @@ export function StatisticsPage(): React.JSX.Element {
       >
         <StatCard
           label="Total Appointments"
-          value={appointments.length}
+          value={totalAppointments.toLocaleString()}
           note="All time"
           color={theme.palette.primary.main}
           icon={<CalendarMonthOutlinedIcon fontSize="small" />}
         />
         <StatCard
           label="Completed"
-          value={completedAppts}
-          note={`${appointments.length ? Math.round((completedAppts / appointments.length) * 100) : 0}% completion rate`}
+          value={completedAppts.toLocaleString()}
+          note={`${completionPct}% completion rate`}
           color={theme.palette.success.main}
           icon={<TrendingUpOutlinedIcon fontSize="small" />}
         />
@@ -551,7 +388,7 @@ export function StatisticsPage(): React.JSX.Element {
         />
         <StatCard
           label="Total Patients"
-          value={patientsData?.total ?? 0}
+          value={totalPatients.toLocaleString()}
           note="Registered patients"
           color={theme.palette.warning.main}
           icon={<GroupOutlinedIcon fontSize="small" />}
@@ -1384,7 +1221,7 @@ export function StatisticsPage(): React.JSX.Element {
         </Paper>
 
         <ChartCard title="Completion Audit" subtitle="Radial status · all-time appointments">
-          {appointments.length === 0 ? (
+          {totalAppointments === 0 ? (
             <Box sx={{ display: 'grid', minHeight: 220, placeItems: 'center' }}>
               <Typography variant="body2" color="text.secondary">
                 No data yet.
@@ -1532,7 +1369,7 @@ export function StatisticsPage(): React.JSX.Element {
 
               <Stack spacing={0.85} sx={{ mt: 1.5 }}>
                 {pieData.map((entry, i) => {
-                  const pct = Math.round((entry.value / appointments.length) * 100);
+                  const pct = Math.round((entry.value / (totalAppointments || 1)) * 100);
                   return (
                     <Box key={entry.name} sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
                       <Box

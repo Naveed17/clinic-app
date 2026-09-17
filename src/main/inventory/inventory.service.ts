@@ -21,11 +21,18 @@ async function loadMedicineMgMap(ids: string[]): Promise<Map<string, number | nu
   return map;
 }
 
-async function attachMg<T extends { id: string; name: string }>(
+async function attachMg<T extends { id: string; name: string; mg?: unknown }>(
   rows: T[],
 ): Promise<Array<T & { mg: number | null }>> {
-  const mgById = await loadMedicineMgMap(rows.map((r) => r.id));
-  return rows.map((row) => ({ ...row, mg: mgById.get(row.id) ?? null }));
+  const needsLookup = rows.filter((r) => r.mg === undefined);
+  if (needsLookup.length === 0) {
+    return rows.map((row) => ({ ...row, mg: normalizeMedicineMg(row.mg as number | null) }));
+  }
+  const mgById = await loadMedicineMgMap(needsLookup.map((r) => r.id));
+  return rows.map((row) => ({
+    ...row,
+    mg: row.mg !== undefined ? normalizeMedicineMg(row.mg as number | null) : (mgById.get(row.id) ?? null),
+  }));
 }
 
 async function createMedicine(

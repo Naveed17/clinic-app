@@ -166,7 +166,7 @@ export async function listTokens(date: string) {
     SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber, p.gender as patientGender, p.dateOfBirth as patientDob, p.weight as patientWeight,
            u.id as doctorObjId, u.firstName as doctorFirstName, u.lastName as doctorLastName,
            pr.id as prescriptionId, pr.diagnosis, pr.medicines, pr.tests, pr.advice,
-           pr.thumbName, pr.thumbnail, pr.pharmacyStatus, pr.dispensedAt, pr.invoiceId,
+           pr.thumbName, NULL as thumbnail, pr.pharmacyStatus, pr.dispensedAt, pr.invoiceId,
            pr.createdAt as prescriptionCreatedAt,
            CASE WHEN pr.id IS NOT NULL THEN 1 ELSE 0 END as prescriptionRaw
     FROM "Token" t

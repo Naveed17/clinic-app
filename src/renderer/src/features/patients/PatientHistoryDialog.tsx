@@ -247,17 +247,25 @@ export function PatientHistoryDialog({ patient, onClose }: { patient: Patient; o
   const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
   const showLab = can('labDashboard');
 
-  const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list, enabled: can('managePatients') });
-  const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list, enabled: can('managePatients') });
+  const appointments = useQuery({
+    queryKey: ['appointments-patient', patient.id],
+    queryFn: () => appointmentsService.listByPatient(patient.id),
+    enabled: can('managePatients') && Boolean(patient.id),
+  });
+  const invoices = useQuery({
+    queryKey: ['invoices-patient', patient.id],
+    queryFn: () => invoicesService.listByPatient(patient.id),
+    enabled: can('managePatients') && Boolean(patient.id),
+  });
   const labOrders = useQuery<LabOrder[]>({
-    queryKey: ['lab-orders'],
-    queryFn: () => window.clinic.lab.list() as Promise<LabOrder[]>,
-    enabled: can('managePatients') && showLab,
+    queryKey: ['lab-orders-patient', patient.id],
+    queryFn: () => window.clinic.lab.listByPatient(patient.id),
+    enabled: can('managePatients') && showLab && Boolean(patient.id),
   });
   if (!can('managePatients')) return null;
-  const patientAppointments = (appointments.data ?? []).filter((a) => a.patientId === patient.id);
-  const patientInvoices = (invoices.data ?? []).filter((i) => i.patient.id === patient.id);
-  const patientLab = (labOrders.data ?? []).filter((o) => o.patientId === patient.id);
+  const patientAppointments = appointments.data ?? [];
+  const patientInvoices = invoices.data ?? [];
+  const patientLab = labOrders.data ?? [];
   const initials = `${patient.firstName?.[0] ?? ''}${patient.lastName?.[0] ?? ''}`.toUpperCase() || 'P';
   const totalPaid = patientInvoices.reduce((sum, inv) => sum + Number(inv.amountPaid ?? 0), 0);
   const totalBilled = patientInvoices.reduce((sum, inv) => sum + Number(inv.total ?? 0), 0);

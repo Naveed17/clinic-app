@@ -53,7 +53,7 @@ export function PatientAutocomplete({
 }: PatientAutocompleteProps): React.JSX.Element {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState('');
-  const debouncedQuery = useDebounce(query, query.trim() ? 1000 : 0);
+  const debouncedQuery = useDebounce(query, query.trim() ? 200 : 0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addInitialValues, setAddInitialValues] = useState<Partial<PatientFormValues>>({});
   const [recentlyCreated, setRecentlyCreated] = useState<TokenPerson | null>(null);

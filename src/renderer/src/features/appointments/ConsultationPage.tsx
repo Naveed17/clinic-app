@@ -568,11 +568,8 @@ function BillingTab({ patientId }: { patientId: string }): React.JSX.Element {
 function LabTab({ patientId }: { patientId: string }): React.JSX.Element {
   const { data: labOrders = [], isLoading } = useQuery<LabOrder[]>({
     queryKey: ['lab-orders-patient', patientId],
-    queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const all: LabOrder[] = await (window as any).clinic.lab.list();
-      return all.filter((o) => o.patientId === patientId);
-    },
+    queryFn: () => (patientId ? window.clinic.lab.listByPatient(patientId) : Promise.resolve([])),
+    enabled: Boolean(patientId),
   });
 
   const sorted = useMemo(

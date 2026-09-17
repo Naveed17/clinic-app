@@ -855,13 +855,15 @@ export function InvoicesPage(): React.JSX.Element {
           );
         })()}
       </Popover>
-      <InvoiceDialog
-        open={open}
-        onClose={() => setOpen(false)}
-        onCreated={(invoice) => {
-          void handlePrintInvoice(invoice);
-        }}
-      />
+      {open && (
+        <InvoiceDialog
+          open={open}
+          onClose={() => setOpen(false)}
+          onCreated={(invoice) => {
+            void handlePrintInvoice(invoice);
+          }}
+        />
+      )}
       {paymentInvoice && <PaymentDialog invoice={paymentInvoice} onClose={() => setPaymentInvoice(undefined)} />}
       {refundInvoice && <RefundDialog invoice={refundInvoice} onClose={() => setRefundInvoice(undefined)} />}
       {historyInvoice && <PaymentHistoryDialog invoice={historyInvoice} onClose={() => setHistoryInvoice(undefined)} />}

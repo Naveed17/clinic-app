@@ -7,6 +7,7 @@ import {
   getLabOrder,
   labPatients,
   listLabOrders,
+  listLabOrdersByPatient,
   listLabOrdersByToken,
   saveLabResult,
   updateLabOrderStatus,
@@ -23,6 +24,10 @@ export function createLabRouter(io: SocketIOServer): Router {
 
   router.get('/', labRecordReaders, async (_req, res) => {
     res.json(await listLabOrders());
+  });
+
+  router.get('/patient/:patientId', labRecordReaders, async (req, res) => {
+    res.json(await listLabOrdersByPatient(String(req.params.patientId)));
   });
 
   router.get('/patients', labStaff, async (_req, res) => {

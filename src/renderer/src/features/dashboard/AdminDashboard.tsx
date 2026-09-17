@@ -600,8 +600,9 @@ function MiniCalendarWidget({ appointments }: { appointments: Appointment[] }): 
   );
 }
 
-const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'success' | 'default' }> = {
+const statusConfig: Record<string, { label: string; color: 'warning' | 'primary' | 'success' | 'default' | 'info' }> = {
   WAITING: { label: 'Waiting', color: 'warning' },
+  IN_PROGRESS: { label: 'In Progress', color: 'primary' },
   DONE: { label: 'Completed', color: 'success' },
   SKIPPED: { label: 'Skipped', color: 'default' },
 };
@@ -724,8 +725,8 @@ function TokenQueuePanel(): React.JSX.Element {
             </Box>
 
             <Chip
-              label={statusConfig[current.status].label}
-              color={statusConfig[current.status].color}
+              label={statusConfig[current.status]?.label ?? current.status}
+              color={statusConfig[current.status]?.color ?? 'default'}
               sx={{ fontWeight: 800, px: 1, borderRadius: '12px' }}
             />
           </Stack>
@@ -744,10 +745,10 @@ function TokenQueuePanel(): React.JSX.Element {
         <Box onScroll={handleScroll} sx={{ maxHeight: 460, overflowY: 'auto', pr: 0.5 }}>
           <Stack spacing={1.2}>
             {displayedTokens.map((token: Token) => {
-              const cfg = statusConfig[token.status];
+              const cfg = statusConfig[token.status] ?? { label: token.status, color: 'default' };
               const isDone = token.status === 'DONE' || token.status === 'SKIPPED';
               const chipColorKey = cfg.color === 'default' ? 'action' : cfg.color;
-              const mainColor = cfg.color === 'default' ? theme.palette.action.active : theme.palette[cfg.color].main;
+              const mainColor = cfg.color === 'default' ? theme.palette.action.active : ((theme.palette as any)[cfg.color]?.main || theme.palette.primary.main);
 
               return (
                 <Paper

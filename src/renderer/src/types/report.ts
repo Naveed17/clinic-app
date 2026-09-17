@@ -81,3 +81,38 @@ export interface OpdReportInput {
   dateTo?: string;
   doctorId?: string;
 }
+
+export interface ClinicStatisticsOverviewPoint {
+  label: string;
+  appointments: number;
+  revenue: number;
+}
+
+export interface ClinicStatisticsReasonPoint {
+  label: string;
+  fullLabel: string;
+  total: number;
+  topReason: string;
+  topCount: number;
+}
+
+export interface ClinicStatistics {
+  totalAppointments: number;
+  completedAppointments: number;
+  completionRate: number;
+  totalRevenue: number;
+  totalPatients: number;
+  overview: {
+    weekly: ClinicStatisticsOverviewPoint[];
+    monthly: ClinicStatisticsOverviewPoint[];
+    yearly: ClinicStatisticsOverviewPoint[];
+  };
+  monthlyAppointments: { month: string; appointments: number }[];
+  monthlyRevenue: { month: string; revenue: number }[];
+  statusCounts: Record<string, number>;
+  reasonYears: number[];
+  reasonTrends: {
+    byYear: Record<number, ClinicStatisticsReasonPoint[]>;
+    byMonth: Record<number, ClinicStatisticsReasonPoint[]>;
+  };
+}

@@ -420,7 +420,7 @@ export function UsersPage(): React.JSX.Element {
           )}
         </TableBody>
       </TablePageShell>
-      <UserDialog open={isDialogOpen} user={dialogUser} onClose={() => setDialogOpen(false)} />
+      {isDialogOpen && <UserDialog open={isDialogOpen} user={dialogUser} onClose={() => setDialogOpen(false)} />}
       <ConfirmDialog
         open={Boolean(deleteUser)}
         title="Delete user?"

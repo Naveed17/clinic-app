@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createPatient, deletePatient, listPatients, updatePatient } from '../../patients/patient.service';
+import { createPatient, deletePatient, getPatient, listPatients, updatePatient } from '../../patients/patient.service';
 import type { PatientInput, PatientListInput } from '../../patients/patient.service';
 import { asyncHandler } from '../utils/async-handler';
 import { requireRole } from '../middleware/auth';
@@ -20,6 +20,19 @@ export function createPatientsRouter(io: SocketIOServer): Router {
         providerId: typeof req.query.providerId === 'string' ? req.query.providerId : undefined,
       };
       res.json(await listPatients(input));
+    }),
+  );
+
+  router.get(
+    '/:id',
+    requireRole(['admin', 'doctor', 'receptionist', 'lab_technician']),
+    asyncHandler(async (req, res) => {
+      const patient = await getPatient(String(req.params.id));
+      if (!patient) {
+        res.status(404).json({ error: 'Patient not found' });
+        return;
+      }
+      res.json(patient);
     }),
   );
 

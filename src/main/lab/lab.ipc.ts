@@ -2,7 +2,7 @@ import { ipcMain } from 'electron';
 import type { Server as SocketIOServer } from 'socket.io';
 import { isLicenseModuleEnabled } from '../license/license.ipc';
 import { emitDataChange, emitNotification } from '../backend/realtime';
-import { createLabOrder, getLabOrder, labPatients, listLabOrders, listLabOrdersByToken, saveLabResult, updateLabOrderStatus } from './lab.service';
+import { createLabOrder, getLabOrder, labPatients, listLabOrders, listLabOrdersByPatient, listLabOrdersByToken, saveLabResult, updateLabOrderStatus } from './lab.service';
 
 function assertLabAddon(): void {
   if (!isLicenseModuleEnabled('labDashboard')) {
@@ -47,6 +47,10 @@ export function registerLabIpc(io?: SocketIOServer): void {
   ipcMain.handle('lab:list', (_e, limit?: number) => {
     assertLabAddon();
     return listLabOrders(limit);
+  });
+  ipcMain.handle('lab:list-by-patient', (_e, patientId: string) => {
+    assertLabAddon();
+    return listLabOrdersByPatient(patientId);
   });
   ipcMain.handle('lab:get', (_e, id: string) => {
     assertLabAddon();

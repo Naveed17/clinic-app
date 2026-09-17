@@ -1,6 +1,7 @@
 import type { InvoiceInput } from '@/types/invoice';
 export const invoicesService = {
   list: () => window.clinic.invoices.list(),
+  listByPatient: (patientId: string) => window.clinic.invoices.listByPatient(patientId),
   get: (id: string) => window.clinic.invoices.get(id),
   patients: () => window.clinic.invoices.patients(),
   create: (input: InvoiceInput) => window.clinic.invoices.create(input),

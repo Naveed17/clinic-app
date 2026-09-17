@@ -33,6 +33,7 @@ declare global {
         }>;
       };
       patients: {
+        get: (id: string) => Promise<Patient | null>;
         list: (input: PatientListInput) => Promise<{ data: Patient[]; total: number }>;
         create: (input: PatientInput) => Promise<Patient>;
         update: (id: string, input: PatientInput) => Promise<Patient>;
@@ -60,6 +61,7 @@ declare global {
       };
       appointments: {
         list: () => Promise<Appointment[]>;
+        listByPatient: (patientId: string) => Promise<Appointment[]>;
         get: (id: string) => Promise<Appointment | null>;
         patients: () => Promise<AppointmentPerson[]>;
         doctors: () => Promise<AppointmentPerson[]>;
@@ -72,6 +74,7 @@ declare global {
       };
       invoices: {
         list: () => Promise<Invoice[]>;
+        listByPatient: (patientId: string) => Promise<Invoice[]>;
         get: (id: string) => Promise<Invoice | null>;
         patients: () => Promise<InvoicePerson[]>;
         create: (input: InvoiceInput) => Promise<Invoice>;
@@ -265,6 +268,7 @@ declare global {
       };
       lab: {
         listByToken: (tokenId: string) => Promise<LabOrder[]>;
+        listByPatient: (patientId: string) => Promise<LabOrder[]>;
         list: () => Promise<LabOrder[]>;
         get: (id: string) => Promise<LabOrder | null>;
         patients: () => Promise<{ id: string; firstName: string; lastName: string }[]>;

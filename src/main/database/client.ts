@@ -114,23 +114,31 @@ export async function ensureDatabaseReady(): Promise<PrismaClient> {
   return db;
 }
 
+let prescriptionColumnsChecked = false;
+
 /** Idempotent — safe to call before pharmacy queue / dispense queries. */
 export async function ensurePrescriptionPharmacyColumns(
   database: PrismaClient = getPrisma(),
 ): Promise<void> {
-  const cols = (
-    await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Prescription)')
-  ).map((r) => r.name);
-  if (!cols.includes('pharmacyStatus')) {
-    await database.$executeRawUnsafe(
-      `ALTER TABLE "Prescription" ADD COLUMN "pharmacyStatus" TEXT NOT NULL DEFAULT 'PENDING'`,
-    );
-  }
-  if (!cols.includes('dispensedAt')) {
-    await database.$executeRawUnsafe('ALTER TABLE "Prescription" ADD COLUMN "dispensedAt" DATETIME');
-  }
-  if (!cols.includes('invoiceId')) {
-    await database.$executeRawUnsafe('ALTER TABLE "Prescription" ADD COLUMN "invoiceId" TEXT');
+  if (prescriptionColumnsChecked) return;
+  try {
+    const cols = (
+      await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Prescription)')
+    ).map((r) => r.name);
+    if (!cols.includes('pharmacyStatus')) {
+      await database.$executeRawUnsafe(
+        `ALTER TABLE "Prescription" ADD COLUMN "pharmacyStatus" TEXT NOT NULL DEFAULT 'PENDING'`,
+      );
+    }
+    if (!cols.includes('dispensedAt')) {
+      await database.$executeRawUnsafe('ALTER TABLE "Prescription" ADD COLUMN "dispensedAt" DATETIME');
+    }
+    if (!cols.includes('invoiceId')) {
+      await database.$executeRawUnsafe('ALTER TABLE "Prescription" ADD COLUMN "invoiceId" TEXT');
+    }
+    prescriptionColumnsChecked = true;
+  } catch {
+    // Ignore if table does not exist yet during initial boot
   }
 }
 

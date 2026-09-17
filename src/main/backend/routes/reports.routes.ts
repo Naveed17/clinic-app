@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { isOpdReportsLicensed } from '../../license/license.ipc';
-import { getOpdDailyReport, getReportSummary } from '../../reports/report.service';
+import { getClinicStatistics, getOpdDailyReport, getReportSummary } from '../../reports/report.service';
 import { asyncHandler } from '../utils/async-handler';
 import { requireRole } from '../middleware/auth';
 
@@ -20,6 +20,14 @@ export function createReportsRouter(): Router {
     requireRole(['admin', 'doctor', 'receptionist', 'lab_technician']),
     asyncHandler(async (_req, res) => {
       res.json(await getReportSummary());
+    }),
+  );
+
+  router.get(
+    '/stats',
+    requireRole(['admin', 'doctor', 'receptionist']),
+    asyncHandler(async (_req, res) => {
+      res.json(await getClinicStatistics());
     }),
   );
 

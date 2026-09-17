@@ -6,6 +6,7 @@ const clinic = (window as any).clinic;
 
 export const appointmentsService = {
   list: () => clinic.appointments.list() as Promise<Appointment[]>,
+  listByPatient: (patientId: string) => clinic.appointments.listByPatient(patientId) as Promise<Appointment[]>,
   get: (id: string) => clinic.appointments.get(id) as Promise<Appointment | null>,
   patients: () => clinic.appointments.patients(),
   doctors: () => clinic.appointments.doctors(),

@@ -80,8 +80,84 @@ export async function listAppointments(date?: string) {
     take: date ? undefined : 200,
   });
 
+  const patientIds = Array.from(new Set(appointments.map((a) => a.patientId)));
   const tokens = await db.token.findMany({
-    where: date ? { date } : undefined,
+    where: date
+      ? { date }
+      : patientIds.length > 0
+        ? { patientId: { in: patientIds } }
+        : { id: '__none__' },
+    select: { id: true, tokenNumber: true, patientId: true, doctorId: true, date: true, consultationFee: true },
+  });
+
+  const tokenMap = new Map<string, { id: string; tokenNumber: number; feeType: string }>();
+  for (const t of tokens) {
+    const fee = Number(t.consultationFee ?? 0);
+    const tokenFeeType = fee === 0 ? 'FREE' : 'PAID';
+    tokenMap.set(`${t.patientId}_${t.doctorId}_${t.date}`, { id: t.id, tokenNumber: t.tokenNumber, feeType: tokenFeeType });
+  }
+
+  return appointments.map((a) => {
+    const dateStr = a.startsAt.toLocaleDateString('en-CA');
+    const token = tokenMap.get(`${a.patientId}_${a.providerId}_${dateStr}`);
+    const resolvedFeeType = (a as unknown as { feeType?: string }).feeType ?? token?.feeType ?? 'PAID';
+    return {
+      id: a.id,
+      patientId: a.patientId,
+      providerId: a.providerId,
+      startsAt: a.startsAt.toISOString(),
+      endsAt: a.endsAt.toISOString(),
+      status: a.status,
+      createdAt: a.createdAt.toISOString(),
+      updatedAt: a.updatedAt.toISOString(),
+      reason: a.reason,
+      notes: a.notes,
+      feeType: token?.feeType === 'FREE' ? 'FREE' : resolvedFeeType,
+      recurrenceRule: a.recurrenceRule,
+      parentId: a.parentId,
+      tokenId: token?.id ?? null,
+      tokenNumber: token?.tokenNumber ?? null,
+      patient: {
+        id: a.patient.id,
+        firstName: a.patient.firstName,
+        lastName: a.patient.lastName,
+        role: 'patient',
+        phone: a.patient.phone ?? null,
+      },
+      provider: {
+        id: a.provider.id,
+        firstName: a.provider.firstName,
+        lastName: a.provider.lastName,
+        role: String(a.provider.role),
+        avatar: a.provider.avatar || a.provider.doctorProfile?.avatar || null,
+      },
+    };
+  });
+}
+
+export async function listAppointmentsByPatient(patientId: string) {
+  const db = getPrisma();
+  const appointments = await db.appointment.findMany({
+    where: { patientId },
+    include: {
+      patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
+      provider: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          avatar: true,
+          doctorProfile: { select: { avatar: true } },
+        },
+      },
+    },
+    orderBy: { startsAt: 'desc' },
+    take: 100,
+  });
+
+  const tokens = await db.token.findMany({
+    where: { patientId },
     select: { id: true, tokenNumber: true, patientId: true, doctorId: true, date: true, consultationFee: true },
   });
 

@@ -343,7 +343,7 @@ export function DoctorsPage(): React.JSX.Element {
           )}
         </TableBody>
       </TablePageShell>
-      <DoctorDialog open={isDialogOpen} doctor={dialogDoctor} onClose={() => setDialogOpen(false)} />
+      {isDialogOpen && <DoctorDialog open={isDialogOpen} doctor={dialogDoctor} onClose={() => setDialogOpen(false)} />}
       <ConfirmDialog
         open={Boolean(deleteDoctor)}
         title="Delete doctor?"

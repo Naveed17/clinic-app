@@ -268,6 +268,11 @@ async function ensureSocket(): Promise<Socket> {
 
 const api = {
   patients: {
+    get: (id: string) =>
+      call(
+        () => request(`/api/patients/${encodeURIComponent(id)}`),
+        'patients:get', id,
+      ),
     list: (input: unknown) =>
       call(
         () => request(`/api/patients?${toQueryString(input)}`),
@@ -291,6 +296,12 @@ const api = {
   },
   appointments: {
     list: () => call(() => request('/api/appointments'), 'appointments:list'),
+    listByPatient: (patientId: string) =>
+      call(
+        () => request(`/api/appointments/patient/${encodeURIComponent(patientId)}`),
+        'appointments:list-by-patient',
+        patientId,
+      ),
     get: (id: string) =>
       call(() => request(`/api/appointments/${encodeURIComponent(id)}`), 'appointments:get', id),
     patients: () => call(() => request('/api/appointments/patients'), 'appointments:patients'),
@@ -333,6 +344,12 @@ const api = {
   },
   invoices: {
     list: () => call(() => request('/api/invoices'), 'invoices:list'),
+    listByPatient: (patientId: string) =>
+      call(
+        () => request(`/api/invoices/patient/${encodeURIComponent(patientId)}`),
+        'invoices:list-by-patient',
+        patientId,
+      ),
     get: (id: string) =>
       call(() => request(`/api/invoices/${encodeURIComponent(id)}`), 'invoices:get', id),
     patients: () => call(() => request('/api/invoices/patients'), 'invoices:patients'),
@@ -374,6 +391,7 @@ const api = {
   },
   reports: {
     summary: () => call(() => request('/api/reports/summary'), 'reports:summary'),
+    stats: () => call(() => request('/api/reports/stats'), 'reports:stats'),
     opd: (input: unknown) =>
       call(
         () => request(`/api/reports/opd?${toQueryString(input)}`),
@@ -656,6 +674,12 @@ const api = {
   },
   lab: {
     list: () => call(() => request('/api/lab'), 'lab:list'),
+    listByPatient: (patientId: string) =>
+      call(
+        () => request(`/api/lab/patient/${encodeURIComponent(patientId)}`),
+        'lab:list-by-patient',
+        patientId,
+      ),
     get: (id: string) =>
       call(() => request(`/api/lab/${encodeURIComponent(id)}`), 'lab:get', id),
     listByToken: (tokenId: string) =>

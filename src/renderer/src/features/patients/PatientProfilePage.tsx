@@ -210,17 +210,26 @@ export function PatientProfilePage(): React.JSX.Element {
   const tokenPrint = usePrintAppointmentToken();
 
   const patientsQuery = useQuery({
-    queryKey: ['patients', { page: 1, pageSize: 1, id }],
-    queryFn: () => patientsService.list({ page: 1, pageSize: 1000, search: '' }),
+    queryKey: ['patient', id],
+    queryFn: () => (id ? patientsService.get(id) : null),
+    enabled: Boolean(id),
   });
-  const patient = (patientsQuery.data?.data ?? []).find((p) => p.id === id);
+  const patient = patientsQuery.data ?? null;
 
-  const appointments = useQuery({ queryKey: ['appointments'], queryFn: appointmentsService.list });
-  const invoices = useQuery({ queryKey: ['invoices'], queryFn: invoicesService.list, enabled: showBilling });
+  const appointments = useQuery({
+    queryKey: ['appointments-patient', id],
+    queryFn: () => (id ? appointmentsService.listByPatient(id) : []),
+    enabled: Boolean(id),
+  });
+  const invoices = useQuery({
+    queryKey: ['invoices-patient', id],
+    queryFn: () => (id ? invoicesService.listByPatient(id) : []),
+    enabled: showBilling && Boolean(id),
+  });
   const labOrders = useQuery<LabOrder[]>({
-    queryKey: ['lab-orders'],
-    queryFn: () => window.clinic.lab.list() as Promise<LabOrder[]>,
-    enabled: showLab,
+    queryKey: ['lab-orders-patient', id],
+    queryFn: () => (id ? window.clinic.lab.listByPatient(id) : Promise.resolve([])),
+    enabled: showLab && Boolean(id),
   });
 
   const softCard = {
@@ -250,9 +259,9 @@ export function PatientProfilePage(): React.JSX.Element {
     );
   }
 
-  const patientAppointments = (appointments.data ?? []).filter((a) => a.patientId === patient.id);
-  const patientInvoices = (invoices.data ?? []).filter((i) => i.patient.id === patient.id);
-  const patientLab = (labOrders.data ?? []).filter((o) => o.patientId === patient.id);
+  const patientAppointments = appointments.data ?? [];
+  const patientInvoices = invoices.data ?? [];
+  const patientLab = labOrders.data ?? [];
   const initials = `${patient.firstName?.[0] ?? ''}${patient.lastName?.[0] ?? ''}`.toUpperCase() || 'P';
   const totalPaid = patientInvoices.reduce((s, i) => s + Number(i.amountPaid ?? 0), 0);
   const totalBilled = patientInvoices.reduce((s, i) => s + Number(i.total), 0);

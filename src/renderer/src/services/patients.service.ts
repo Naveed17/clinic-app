@@ -9,6 +9,7 @@ function withWhatsAppPhone(input: PatientInput): PatientInput {
 }
 
 export const patientsService = {
+  get: (id: string) => window.clinic.patients.get(id),
   list: (input: PatientListInput) => window.clinic.patients.list(input),
   create: (input: PatientInput) => window.clinic.patients.create(withWhatsAppPhone(input)),
   update: (id: string, input: PatientInput) => window.clinic.patients.update(id, withWhatsAppPhone(input)),

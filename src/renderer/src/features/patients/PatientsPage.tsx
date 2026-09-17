@@ -516,7 +516,7 @@ export function PatientsPage(): React.JSX.Element {
         })()}
       </Popover>
 
-      <PatientDialog open={isDialogOpen} patient={dialogPatient} onClose={() => setDialogOpen(false)} />
+      {isDialogOpen && <PatientDialog open={isDialogOpen} patient={dialogPatient} onClose={() => setDialogOpen(false)} />}
       {canViewRecords && historyPatient && <PatientHistoryDialog patient={historyPatient} onClose={() => setHistoryPatient(undefined)} />}
       {appointmentPatient && (
         <AppointmentDialog

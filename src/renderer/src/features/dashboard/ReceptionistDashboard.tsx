@@ -400,12 +400,7 @@ function BookAppointmentModal({
   const [done, setDone] = useState(false);
   const [slotNotice, setSlotNotice] = useState<SlotAdjustReason | null>(null);
 
-  const { data: patients = [] } = useQuery<TokenPerson[]>({
-    queryKey: ['token-patients'],
-    queryFn: () => window.clinic.tokens.patients(),
-    enabled: open,
-    staleTime: 60_000,
-  });
+  const [selectedPatient, setSelectedPatient] = useState<TokenPerson | null>(null);
 
   const { data: doctors = [] } = useQuery<AppointmentPerson[]>({
     queryKey: ['doctors'],
@@ -426,7 +421,6 @@ function BookAppointmentModal({
     staleTime: 30_000,
   });
   const doctorAppts = rawAppts as Appointment[];
-  const selectedPatient = useMemo(() => patients.find((p) => p.id === patientId) ?? null, [patients, patientId]);
 
   const daySlot = useMemo(() => {
     if (!date || schedule.length === 0) return undefined;
@@ -511,7 +505,7 @@ function BookAppointmentModal({
   });
 
   function handleClose() {
-    setStep(0); setPatientId(''); setPatientName('');
+    setStep(0); setPatientId(''); setPatientName(''); setSelectedPatient(null);
     setProviderId(''); setDate(new Date().toLocaleDateString('en-CA'));
     setTime(new Date().toTimeString().slice(0, 5)); setDuration(15);
     setReason(''); setNotes(''); setDone(false);
@@ -539,6 +533,7 @@ function BookAppointmentModal({
               value={patientId}
               onChange={(id, p) => {
                 setPatientId(id);
+                setSelectedPatient(p);
                 setPatientName(p ? `${p.firstName} ${p.lastName ?? ''}`.trim() : '');
               }}
               label="Patient"
@@ -2316,24 +2311,30 @@ export function ReceptionistDashboard(): React.JSX.Element {
         </Stack>
       </Box>
 
-      <WalkInModal open={walkInOpen} onClose={() => setWalkInOpen(false)} />
-      <BookAppointmentModal
-        open={apptDialogOpen}
-        onClose={() => setApptDialogOpen(false)}
-        onCreatedAppointment={(appt) => setWhatsAppCreatedAppt(appt)}
-      />
-      <AppointmentWhatsAppDialog
-        open={Boolean(whatsAppCreatedAppt)}
-        appointment={whatsAppCreatedAppt}
-        onClose={() => setWhatsAppCreatedAppt(null)}
-      />
-      <InvoiceDialog
-        open={invoiceDialogOpen}
-        onClose={() => setInvoiceDialogOpen(false)}
-        onCreated={() => {
-          void navigate('/billing');
-        }}
-      />
+      {walkInOpen && <WalkInModal open={walkInOpen} onClose={() => setWalkInOpen(false)} />}
+      {apptDialogOpen && (
+        <BookAppointmentModal
+          open={apptDialogOpen}
+          onClose={() => setApptDialogOpen(false)}
+          onCreatedAppointment={(appt) => setWhatsAppCreatedAppt(appt)}
+        />
+      )}
+      {Boolean(whatsAppCreatedAppt) && (
+        <AppointmentWhatsAppDialog
+          open={Boolean(whatsAppCreatedAppt)}
+          appointment={whatsAppCreatedAppt}
+          onClose={() => setWhatsAppCreatedAppt(null)}
+        />
+      )}
+      {invoiceDialogOpen && (
+        <InvoiceDialog
+          open={invoiceDialogOpen}
+          onClose={() => setInvoiceDialogOpen(false)}
+          onCreated={() => {
+            void navigate('/billing');
+          }}
+        />
+      )}
       {tokenPrint.printToken && (
         <TokenPrintPreview token={tokenPrint.printToken} onClose={tokenPrint.closePrint} />
       )}

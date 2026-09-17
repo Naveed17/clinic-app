@@ -220,3 +220,9 @@ export async function deletePatient(id: string): Promise<void> {
     await tx.patient.delete({ where: { id } });
   });
 }
+
+export async function getPatient(id: string): Promise<Patient | null> {
+  return getPrisma().patient.findUnique({
+    where: { id },
+  });
+}

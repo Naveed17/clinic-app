@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Server as SocketIOServer } from 'socket.io';
-import { createInvoice, invoicePatients, listInvoices, getInvoice, addPayment, refundPayment, voidInvoice, deleteInvoice, getPayments, updateInvoice } from '../../invoices/invoice.service';
+import { createInvoice, invoicePatients, listInvoices, listInvoicesByPatient, getInvoice, addPayment, refundPayment, voidInvoice, deleteInvoice, getPayments, updateInvoice } from '../../invoices/invoice.service';
 import type { InvoiceInput, InvoiceUpdateInput } from '../../invoices/invoice.service';
 import { asyncHandler } from '../utils/async-handler';
 import { requireRole } from '../middleware/auth';
@@ -14,6 +14,14 @@ export function createInvoicesRouter(io: SocketIOServer): Router {
     requireRole(['admin', 'receptionist', 'pharmacist']),
     asyncHandler(async (_req, res) => {
       res.json(await listInvoices());
+    }),
+  );
+
+  router.get(
+    '/patient/:patientId',
+    requireRole(['admin', 'doctor', 'receptionist', 'pharmacist']),
+    asyncHandler(async (req, res) => {
+      res.json(await listInvoicesByPatient(String(req.params.patientId)));
     }),
   );
 

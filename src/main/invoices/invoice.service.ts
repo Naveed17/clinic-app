@@ -66,6 +66,16 @@ export async function listInvoices(limit: number = 200) {
   return invoices.map(serializeInvoice);
 }
 
+export async function listInvoicesByPatient(patientId: string) {
+  const invoices = await getPrisma().invoice.findMany({
+    where: { patientId },
+    include,
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+  });
+  return invoices.map(serializeInvoice);
+}
+
 export async function getInvoice(id: string) {
   const invoice = await getPrisma().invoice.findUnique({ where: { id }, include });
   return invoice ? serializeInvoice(invoice) : null;

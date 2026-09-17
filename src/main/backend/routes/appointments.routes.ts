@@ -8,6 +8,7 @@ import {
   getAppointment,
   listAppointmentPatients,
   listAppointments,
+  listAppointmentsByPatient,
   listDoctors,
   updateAppointment,
   updateAppointmentStatus,
@@ -25,6 +26,14 @@ export function createAppointmentsRouter(io: SocketIOServer): Router {
     requireRole(['admin', 'doctor', 'receptionist']),
     asyncHandler(async (_req, res) => {
       res.json(await listAppointments());
+    }),
+  );
+
+  router.get(
+    '/patient/:patientId',
+    requireRole(['admin', 'doctor', 'receptionist', 'lab_technician']),
+    asyncHandler(async (req, res) => {
+      res.json(await listAppointmentsByPatient(String(req.params.patientId)));
     }),
   );
 

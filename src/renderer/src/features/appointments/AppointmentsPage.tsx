@@ -285,12 +285,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   });
   type FormValues = z.infer<typeof schema>;
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: empty });
-  const patients = useQuery({
-    queryKey: ['patients', { page: 1, pageSize: 1000 }],
-    queryFn: () => patientsService.list({ page: 1, pageSize: 1000, search: '' }),
-    staleTime: 5 * 60 * 1000,
-    retry: 3,
-  });
+  const [selectedPatient, setSelectedPatient] = useState<AppointmentPerson | TokenPerson | null>(null);
 
   const doctors = useQuery({ queryKey: ['doctors'], queryFn: appointmentsService.doctors, staleTime: 5 * 60 * 1000, retry: 3 });
   function personLabel(person: AppointmentPerson): string {
@@ -307,7 +302,6 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
     }
     return [];
   }
-  const patientOptions = asArray<AppointmentPerson>(patients.data);
   const doctorOptions = asArray<AppointmentPerson>(doctors.data);
   const patientId = form.watch('patientId');
   const date = form.watch('date');
@@ -363,12 +357,12 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
     onSuccess: (saved, values) => {
       let createdAppt: Appointment | null = null;
       if (saved && typeof saved === 'object' && 'id' in saved) {
-        const patient = patientOptions.find((p) => p.id === values.patientId);
+        const patient = selectedPatient;
         const provider = doctorOptions.find((d) => d.id === values.providerId);
         const raw = saved as Appointment;
         const next: Appointment = {
           ...raw,
-          patient: raw.patient?.firstName ? raw.patient : (patient ?? { id: values.patientId, firstName: '', lastName: '', role: 'patient' }),
+          patient: raw.patient?.firstName ? raw.patient : (patient ? { id: patient.id, firstName: patient.firstName, lastName: patient.lastName ?? '', phone: patient.phone ?? '' } : { id: values.patientId, firstName: '', lastName: '', role: 'patient' }),
           provider: raw.provider?.firstName ? raw.provider : (provider ?? { id: values.providerId, firstName: '', lastName: '', role: 'doctor' }),
           status: raw.status ?? 'SCHEDULED',
         };
@@ -463,7 +457,10 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
               render={({ field }) => (
                 <PatientAutocomplete
                   value={field.value}
-                  onChange={(id) => field.onChange(id)}
+                  onChange={(id, p) => {
+                    field.onChange(id);
+                    setSelectedPatient(p);
+                  }}
                   label="Patient"
                   error={Boolean(errors.patientId)}
                   helperText={errors.patientId?.message}
@@ -1540,13 +1537,15 @@ export function AppointmentsPage(): React.JSX.Element {
         onClose={() => setBulkConfirmDelete(false)}
         onConfirm={handleBulkDelete}
       />
-      <AppointmentDialog
-        appointment={active}
-        open={open}
-        defaultDate={defaultDate}
-        defaultProviderId={user?.role === 'doctor' ? user.id : undefined}
-        onClose={() => setOpen(false)}
-      />
+      {open && (
+        <AppointmentDialog
+          appointment={active}
+          open={open}
+          defaultDate={defaultDate}
+          defaultProviderId={user?.role === 'doctor' ? user.id : undefined}
+          onClose={() => setOpen(false)}
+        />
+      )}
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="Delete appointment?"

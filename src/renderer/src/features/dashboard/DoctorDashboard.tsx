@@ -570,14 +570,16 @@ export function DoctorDashboard(): React.JSX.Element {
         </DialogActions>
       </Dialog>
 
-      <IssueTokenDialog
-        open={issueTokenOpen}
-        onClose={() => setIssueTokenOpen(false)}
-        date={new Date().toLocaleDateString('en-CA')}
-        defaultPatientId={issueTokenPatientId}
-        defaultDoctorId={user?.id}
-        onSuccess={(token) => setPrescriptionToken(token)}
-      />
+      {issueTokenOpen && (
+        <IssueTokenDialog
+          open={issueTokenOpen}
+          onClose={() => setIssueTokenOpen(false)}
+          date={new Date().toLocaleDateString('en-CA')}
+          defaultPatientId={issueTokenPatientId}
+          defaultDoctorId={user?.id}
+          onSuccess={(token) => setPrescriptionToken(token)}
+        />
+      )}
 
       {/* Appointment right-click menu */}
       <Menu
@@ -659,13 +661,15 @@ export function DoctorDashboard(): React.JSX.Element {
         </MenuItem>
       </Menu>
 
-      <AppointmentDialog
-        open={apptDialogOpen}
-        appointment={editAppt}
-        defaultDate={contextDate}
-        defaultProviderId={user?.id}
-        onClose={() => { setApptDialogOpen(false); setEditAppt(undefined); }}
-      />
+      {apptDialogOpen && (
+        <AppointmentDialog
+          open={apptDialogOpen}
+          appointment={editAppt}
+          defaultDate={contextDate}
+          defaultProviderId={user?.id}
+          onClose={() => { setApptDialogOpen(false); setEditAppt(undefined); }}
+        />
+      )}
     </Box>
   );
 }

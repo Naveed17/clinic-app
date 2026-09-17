@@ -64,8 +64,9 @@ import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { TokenFeeFields } from '@/features/tokens/TokenFeeFields';
 import { tokenNetFee } from '@shared/tokenFee';
 
-const statusConfig: Record<TokenStatus, { label: string; color: 'warning' | 'primary' | 'success' | 'default' }> = {
+const statusConfig: Record<string, { label: string; color: 'warning' | 'primary' | 'success' | 'default' | 'info' }> = {
   WAITING: { label: 'Waiting', color: 'warning' },
+  IN_PROGRESS: { label: 'In Progress', color: 'primary' },
   DONE: { label: 'Done', color: 'success' },
   SKIPPED: { label: 'Skipped', color: 'default' },
 };
@@ -91,8 +92,6 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   const [reason, setReason] = useState('');
   const [consultationFee, setConsultationFee] = useState('');
   const [feeDiscount, setFeeDiscount] = useState('');
-  const [patientQuery, setPatientQuery] = useState('');
-  const debouncedPatientQuery = useDebounce(patientQuery, 450);
 
   useEffect(() => {
     if (open) {
@@ -102,27 +101,8 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
       setReason('');
       setConsultationFee('');
       setFeeDiscount('');
-      setPatientQuery('');
     }
   }, [open, defaultPatientId, defaultDoctorId]);
-
-  const { data: patients = [] } = useQuery<TokenPerson[]>({
-    queryKey: ['token-patients'],
-    queryFn: () => window.clinic.tokens.patients(),
-    enabled: open,
-    staleTime: 60_000,
-  });
-
-  const filteredPatients = useMemo(() => {
-    const q = debouncedPatientQuery.trim().toLowerCase();
-    if (!q) return patients.slice(0, 50);
-    return patients.filter((p) => {
-      const name = `${p.firstName} ${p.lastName || ''}`.toLowerCase();
-      const phone = (p.phone || '').toLowerCase();
-      const mr = (p.mrNumber || '').toLowerCase();
-      return name.includes(q) || phone.includes(q) || mr.includes(q);
-    }).slice(0, 50);
-  }, [patients, debouncedPatientQuery]);
 
   const { data: doctors = [] } = useQuery<TokenPerson[]>({
     queryKey: ['token-doctors'],
@@ -131,10 +111,6 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
     staleTime: 60_000,
   });
 
-  const selectedPatient = useMemo(
-    () => patients.find((p) => p.id === patientId) ?? null,
-    [patients, patientId],
-  );
   const selectedDoctor = useMemo(
     () => doctors.find((d) => d.id === doctorId) ?? null,
     [doctors, doctorId],
@@ -372,13 +348,7 @@ function FeeRefundDialog({ token, onClose }: { token: Token; onClose: () => void
   );
 }
 
-Font.register({
-  family: 'Courier',
-  fonts: [
-    { src: 'https://fonts.gstatic.com/s/cousine/v27/d6lIkaiiRdih4SpPzSMlzA.ttf' },
-    { src: 'https://fonts.gstatic.com/s/cousine/v27/d6lNkaiiRdih4SpP_SEvyRTo39l8hw.ttf', fontWeight: 'bold' },
-  ],
-});
+
 
 const ts = StyleSheet.create({
   page: {
@@ -805,14 +775,15 @@ function DoctorFilterTabs({
   }, []);
 
   useEffect(() => {
-    updateOverflow();
+    const rafId = requestAnimationFrame(updateOverflow);
     const scroller = tabsWrapRef.current?.querySelector('.MuiTabs-scroller') as HTMLElement | null;
-    if (!scroller) return undefined;
+    if (!scroller) return () => cancelAnimationFrame(rafId);
     scroller.addEventListener('scroll', updateOverflow, { passive: true });
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => updateOverflow()) : null;
     ro?.observe(scroller);
     window.addEventListener('resize', updateOverflow);
     return () => {
+      cancelAnimationFrame(rafId);
       scroller.removeEventListener('scroll', updateOverflow);
       ro?.disconnect();
       window.removeEventListener('resize', updateOverflow);
@@ -1226,7 +1197,7 @@ export function TokensPage(): React.JSX.Element {
                   }}
                 >
                   {displayedTokens.map((token) => {
-                    const cfg = statusConfig[token.status];
+                    const cfg = statusConfig[token.status] ?? { label: token.status, color: 'default' as const };
                     const isDone = token.status === 'DONE' || token.status === 'SKIPPED';
                     const isCurrent = currentToken?.id === token.id;
                     return (
@@ -1408,7 +1379,7 @@ export function TokensPage(): React.JSX.Element {
                 )}
                 <Stack direction="row" spacing={1} sx={{ mt: 2.5 }}>
                   <Chip
-                    label={statusConfig[currentToken.status].label}
+                    label={statusConfig[currentToken.status]?.label ?? currentToken.status}
                     size="small"
                     sx={{
                       fontWeight: 800,
@@ -1486,12 +1457,14 @@ export function TokensPage(): React.JSX.Element {
         </Box>
       </Stack>
 
-      <IssueTokenDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        date={date}
-        onSuccess={(token) => setPrintToken(token)}
-      />
+      {dialogOpen && (
+        <IssueTokenDialog
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          date={date}
+          onSuccess={(token) => setPrintToken(token)}
+        />
+      )}
       {printToken && <TokenPrintPreview token={printToken} onClose={() => setPrintToken(null)} />}
       {refundToken && <FeeRefundDialog token={refundToken} onClose={() => setRefundToken(null)} />}
       <ConfirmDialog

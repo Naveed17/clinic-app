@@ -44,16 +44,7 @@ function generateBarcode(text: string): string | null {
   }
 }
 
-Font.register({
-  family: 'Courier',
-  fonts: [
-    { src: 'https://fonts.gstatic.com/s/cousine/v27/d6lIkaiiRdih4SpPzSMlzA.ttf' },
-    {
-      src: 'https://fonts.gstatic.com/s/cousine/v27/d6lNkaiiRdih4SpP_SEvyRTo39l8hw.ttf',
-      fontWeight: 'bold',
-    },
-  ],
-});
+
 
 const styles = StyleSheet.create({
   page: {

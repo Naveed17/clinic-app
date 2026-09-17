@@ -104,6 +104,16 @@ export async function listLabOrdersByToken(tokenId: string) {
   return orders.map(serialize);
 }
 
+export async function listLabOrdersByPatient(patientId: string) {
+  const orders = await getPrisma().labOrder.findMany({
+    where: { patientId },
+    include,
+    orderBy: { orderedAt: 'desc' },
+    take: 100,
+  });
+  return orders.map(serialize);
+}
+
 export async function createLabOrder(input: LabOrderInput) {
   const order = await getPrisma().labOrder.create({
     data: {
