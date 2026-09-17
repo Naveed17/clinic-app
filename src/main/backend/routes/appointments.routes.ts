@@ -31,8 +31,9 @@ export function createAppointmentsRouter(io: SocketIOServer): Router {
   router.get(
     '/patients',
     requireRole(['admin', 'doctor', 'receptionist']),
-    asyncHandler(async (_req, res) => {
-      res.json(await listAppointmentPatients());
+    asyncHandler(async (req, res) => {
+      const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+      res.json(await listAppointmentPatients(search));
     }),
   );
 

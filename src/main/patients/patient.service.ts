@@ -31,12 +31,38 @@ export interface PatientInput {
 
 async function generateMrNumber(): Promise<string> {
   const prisma = getPrisma();
+  try {
+    const updated = await prisma.$queryRawUnsafe<{ nextVal: number | bigint }[]>(
+      `UPDATE "_AppSequence" SET "nextVal" = "nextVal" + 1 WHERE "name" = 'mrNumber' RETURNING "nextVal"`
+    );
+    if (updated && updated.length > 0 && updated[0].nextVal != null) {
+      const num = Number(updated[0].nextVal);
+      return `MR-${String(num).padStart(5, '0')}`;
+    }
+  } catch {
+    // Table or row not present yet, initialize below
+  }
+
+  // Initialize sequence from current maximum MR number in DB
   const res = await prisma.$queryRawUnsafe<{ maxNum: number | bigint | null }[]>(
     `SELECT MAX(CAST(SUBSTR("mrNumber", 4) AS INTEGER)) as maxNum FROM "Patient" WHERE "mrNumber" LIKE 'MR-%'`,
   );
   const raw = res[0]?.maxNum;
-  const lastNum = raw != null && Number.isFinite(Number(raw)) ? Number(raw) : 0;
-  return `MR-${String(lastNum + 1).padStart(5, '0')}`;
+  const currentMax = raw != null && Number.isFinite(Number(raw)) ? Number(raw) : 0;
+  const nextVal = currentMax + 1;
+
+  try {
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "_AppSequence" ("name", "nextVal") VALUES ('mrNumber', ?)
+       ON CONFLICT("name") DO UPDATE SET "nextVal" = ?`,
+      nextVal,
+      nextVal,
+    );
+  } catch {
+    // Ignore fallback errors
+  }
+
+  return `MR-${String(nextVal).padStart(5, '0')}`;
 }
 
 function resolveDateOfBirth(input: PatientInput): Date | null {

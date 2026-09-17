@@ -130,10 +130,23 @@ export async function listAppointments(date?: string) {
   });
 }
 
-export async function listAppointmentPatients() {
+export async function listAppointmentPatients(search?: string) {
+  const query = search?.trim();
+  const where = query
+    ? {
+        OR: [
+          { firstName: { contains: query } },
+          { lastName: { contains: query } },
+          { phone: { contains: query } },
+          { mrNumber: { contains: query } },
+        ],
+      }
+    : {};
   return getPrisma().patient.findMany({
-    select: { id: true, firstName: true, lastName: true },
+    where,
+    select: { id: true, firstName: true, lastName: true, mrNumber: true, phone: true },
     orderBy: { createdAt: 'desc' },
+    take: query ? 50 : 100,
   });
 }
 

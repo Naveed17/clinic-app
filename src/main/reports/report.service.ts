@@ -57,11 +57,12 @@ export async function getReportSummary(): Promise<{
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const database = getPrisma();
 
-  const [appointments, todaysInvoices, monthlyInvoices] = await Promise.all([
-    database.appointment.findMany({
-      where: { startsAt: { gte: today, lt: tomorrow }, status: { not: 'CANCELLED' } },
-      select: { patientId: true },
-    }),
+  const [apptCountRes, todaysInvoices, monthlyInvoices] = await Promise.all([
+    database.$queryRawUnsafe<{ count: number | bigint }[]>(
+      `SELECT COUNT(DISTINCT "patientId") as count FROM "Appointment" WHERE "startsAt" >= ? AND "startsAt" < ? AND "status" <> 'CANCELLED'`,
+      today.toISOString(),
+      tomorrow.toISOString(),
+    ),
     database.invoice.aggregate({
       where: { createdAt: { gte: today, lt: tomorrow } },
       _sum: { total: true },
@@ -73,7 +74,7 @@ export async function getReportSummary(): Promise<{
   ]);
 
   return {
-    todaysPatients: new Set(appointments.map((appointment) => appointment.patientId)).size,
+    todaysPatients: Number(apptCountRes[0]?.count ?? 0),
     todaysRevenue: Number(todaysInvoices._sum.total ?? 0),
     monthlyRevenue: Number(monthlyInvoices._sum.total ?? 0),
   };
@@ -131,52 +132,68 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
     appointmentFeeType: string | null;
   };
 
-  const tokens = doctorId
-    ? await database.$queryRawUnsafe<TokenReportRow[]>(
-        `
-        SELECT t.id, t.tokenNumber, t.date, t.status, t.consultationFee, t.feeDiscount, t.feeRefunded,
-          t.patientId, t.doctorId, t.createdAt,
-          p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
-          u.firstName as doctorFirstName, u.lastName as doctorLastName,
-          dp.consultationFee as doctorConsultationFee,
-          (
-            SELECT a.feeType FROM "Appointment" a
-            WHERE a.patientId = t.patientId AND a.providerId = t.doctorId AND a.startsAt LIKE (t.date || '%')
-            ORDER BY a.createdAt DESC LIMIT 1
-          ) as appointmentFeeType
-        FROM "Token" t
-        JOIN "Patient" p ON p.id = t.patientId
-        JOIN "User" u ON u.id = t.doctorId
-        LEFT JOIN "DoctorProfile" dp ON dp.userId = t.doctorId
-        WHERE t.date >= ? AND t.date <= ? AND t.doctorId = ?
-        ORDER BY t.date DESC, t.tokenNumber DESC
-        `,
-        dateFrom,
-        dateTo,
-        doctorId,
-      )
-    : await database.$queryRawUnsafe<TokenReportRow[]>(
-        `
-        SELECT t.id, t.tokenNumber, t.date, t.status, t.consultationFee, t.feeDiscount, t.feeRefunded,
-          t.patientId, t.doctorId, t.createdAt,
-          p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
-          u.firstName as doctorFirstName, u.lastName as doctorLastName,
-          dp.consultationFee as doctorConsultationFee,
-          (
-            SELECT a.feeType FROM "Appointment" a
-            WHERE a.patientId = t.patientId AND a.providerId = t.doctorId AND a.startsAt LIKE (t.date || '%')
-            ORDER BY a.createdAt DESC LIMIT 1
-          ) as appointmentFeeType
-        FROM "Token" t
-        JOIN "Patient" p ON p.id = t.patientId
-        JOIN "User" u ON u.id = t.doctorId
-        LEFT JOIN "DoctorProfile" dp ON dp.userId = t.doctorId
-        WHERE t.date >= ? AND t.date <= ?
-        ORDER BY t.date DESC, t.tokenNumber DESC
-        `,
-        dateFrom,
-        dateTo,
-      );
+  const [rawTokens, matchingAppointments] = await Promise.all([
+    doctorId
+      ? database.$queryRawUnsafe<TokenReportRow[]>(
+          `
+          SELECT t.id, t.tokenNumber, t.date, t.status, t.consultationFee, t.feeDiscount, t.feeRefunded,
+            t.patientId, t.doctorId, t.createdAt,
+            p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
+            u.firstName as doctorFirstName, u.lastName as doctorLastName,
+            dp.consultationFee as doctorConsultationFee,
+            NULL as appointmentFeeType
+          FROM "Token" t
+          JOIN "Patient" p ON p.id = t.patientId
+          JOIN "User" u ON u.id = t.doctorId
+          LEFT JOIN "DoctorProfile" dp ON dp.userId = t.doctorId
+          WHERE t.date >= ? AND t.date <= ? AND t.doctorId = ?
+          ORDER BY t.date DESC, t.tokenNumber DESC
+          `,
+          dateFrom,
+          dateTo,
+          doctorId,
+        )
+      : database.$queryRawUnsafe<TokenReportRow[]>(
+          `
+          SELECT t.id, t.tokenNumber, t.date, t.status, t.consultationFee, t.feeDiscount, t.feeRefunded,
+            t.patientId, t.doctorId, t.createdAt,
+            p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
+            u.firstName as doctorFirstName, u.lastName as doctorLastName,
+            dp.consultationFee as doctorConsultationFee,
+            NULL as appointmentFeeType
+          FROM "Token" t
+          JOIN "Patient" p ON p.id = t.patientId
+          JOIN "User" u ON u.id = t.doctorId
+          LEFT JOIN "DoctorProfile" dp ON dp.userId = t.doctorId
+          WHERE t.date >= ? AND t.date <= ?
+          ORDER BY t.date DESC, t.tokenNumber DESC
+          `,
+          dateFrom,
+          dateTo,
+        ),
+    database.appointment.findMany({
+      where: {
+        startsAt: { gte: rangeStart, lte: rangeEnd },
+        ...(doctorId ? { providerId: doctorId } : {}),
+      },
+      select: { patientId: true, providerId: true, feeType: true, startsAt: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ]);
+
+  const apptFeeMap = new Map<string, string>();
+  for (const appt of matchingAppointments) {
+    const dStr = appt.startsAt.toISOString().slice(0, 10);
+    const key = `${appt.patientId}_${appt.providerId}_${dStr}`;
+    if (!apptFeeMap.has(key)) {
+      apptFeeMap.set(key, appt.feeType || 'PAID');
+    }
+  }
+
+  const tokens = rawTokens.map((t) => ({
+    ...t,
+    appointmentFeeType: apptFeeMap.get(`${t.patientId}_${t.doctorId}_${t.date}`) ?? null,
+  }));
 
   const patientDoctors = new Map<string, Set<string>>();
   for (const token of tokens) {

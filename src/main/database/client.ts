@@ -140,10 +140,19 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
     await database.$executeRawUnsafe('PRAGMA synchronous = NORMAL');
     await database.$executeRawUnsafe('PRAGMA temp_store = MEMORY');
     await database.$executeRawUnsafe('PRAGMA cache_size = -64000');
-    await database.$executeRawUnsafe('PRAGMA busy_timeout = 10000');
+    await database.$executeRawUnsafe('PRAGMA mmap_size = 268435456');
+    await database.$executeRawUnsafe('PRAGMA busy_timeout = 15000');
   } catch {
     /* Ignore pragma errors on non-SQLite backends */
   }
+
+  // Fast sequence table for atomic, zero-overhead sequence generation (e.g. MR numbers)
+  await database.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "_AppSequence" (
+      "name" TEXT NOT NULL PRIMARY KEY,
+      "nextVal" INTEGER NOT NULL DEFAULT 1
+    )
+  `);
 
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "User" (
@@ -291,6 +300,12 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
   if (!apptCols.includes('feeType')) await database.$executeRawUnsafe('ALTER TABLE "Appointment" ADD COLUMN "feeType" TEXT NOT NULL DEFAULT \'PAID\'');
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Appointment_providerId_startsAt_idx" ON "Appointment"("providerId", "startsAt")',
+  );
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Appointment_startsAt_status_idx" ON "Appointment"("startsAt", "status")',
+  );
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Appointment_providerId_startsAt_status_idx" ON "Appointment"("providerId", "startsAt", "status")',
   );
 
   await database.$executeRawUnsafe(`
@@ -486,6 +501,9 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
   );
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Token_patientId_idx" ON "Token"("patientId")',
+  );
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "Token_patientId_date_idx" ON "Token"("patientId", "date")',
   );
 
   const tokenCols = (await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Token)')).map(r => r.name);
