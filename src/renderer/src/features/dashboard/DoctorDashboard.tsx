@@ -195,12 +195,11 @@ export function DoctorDashboard(): React.JSX.Element {
       if (ctx?.prev) qc.setQueryData(['appointments'], ctx.prev);
     },
     onSuccess: async (_data, variables) => {
+      if (_data) {
+        qc.setQueryData(['appointment', variables.id], _data);
+      }
       await qc.invalidateQueries({ queryKey: ['appointments'] });
       await qc.invalidateQueries({ queryKey: ['tokens'] });
-      if (variables.status === 'CHECKED_IN') {
-        navigate(`/consultation/${variables.id}`);
-        return;
-      }
       if (variables.status !== 'COMPLETED') return;
       const appt =
         variables.appt ??
@@ -210,6 +209,25 @@ export function DoctorDashboard(): React.JSX.Element {
     },
     meta: { silent: true },
   });
+
+  async function handleStartConsultation(appt: Appointment) {
+    if (appt.status === 'SCHEDULED') {
+      try {
+        const updated = await appointmentsService.updateStatus(appt.id, 'CHECKED_IN');
+        if (updated) {
+          qc.setQueryData(['appointment', appt.id], updated);
+        }
+      } catch (err) {
+        console.error('Failed to update appointment status to CHECKED_IN', err);
+      }
+      await qc.invalidateQueries({ queryKey: ['appointments'] });
+      await qc.invalidateQueries({ queryKey: ['tokens'] });
+    } else {
+      const current = qc.getQueryData<Appointment>(['appointment', appt.id]);
+      qc.setQueryData(['appointment', appt.id], { ...(current ?? appt), status: 'CHECKED_IN' });
+    }
+    navigate(`/consultation/${appt.id}`);
+  }
 
   const tabSx = {
     position: 'relative' as const,
@@ -348,10 +366,25 @@ export function DoctorDashboard(): React.JSX.Element {
                         </IconButton>
                       </Tooltip>
                     )}
+                    {appt.status === 'CHECKED_IN' && (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        color="primary"
+                        startIcon={<MedicalServicesOutlinedIcon sx={{ fontSize: '13px !important' }} />}
+                        onClick={() => void handleStartConsultation(appt)}
+                        sx={{
+                          fontSize: '0.7rem', py: 0.3, px: 1, borderRadius: 1,
+                          fontWeight: 700, textTransform: 'none', boxShadow: 'none',
+                        }}
+                      >
+                        Start Consultation
+                      </Button>
+                    )}
                     {next && (
                       <Button
                         size="small"
-                        variant="outlined"
+                        variant={next === 'CHECKED_IN' ? 'contained' : 'outlined'}
                         endIcon={next === 'COMPLETED' ? <CheckCircleOutlineIcon sx={{ fontSize: '13px !important' }} /> : <ArrowForwardIcon sx={{ fontSize: '13px !important' }} />}
                         loading={appointmentStatusMutation.isPending && appointmentStatusMutation.variables?.id === appt.id}
                         onClick={() =>
@@ -363,8 +396,17 @@ export function DoctorDashboard(): React.JSX.Element {
                         }
                         sx={{
                           fontSize: '0.7rem', py: 0.3, px: 1, borderRadius: 1,
-                          borderColor: STATUS_COLOR[next], color: STATUS_COLOR[next],
-                          '&:hover': { bgcolor: alpha(STATUS_COLOR[next], 0.08), borderColor: STATUS_COLOR[next] },
+                          fontWeight: 700,
+                          bgcolor: next === 'CHECKED_IN' ? STATUS_COLOR[next] : undefined,
+                          borderColor: next === 'COMPLETED' ? STATUS_COLOR[next] : undefined,
+                          color: next === 'COMPLETED' ? STATUS_COLOR[next] : '#fff',
+                          boxShadow: 'none',
+                          '&:hover': {
+                            bgcolor: next === 'CHECKED_IN' ? STATUS_COLOR[next] : alpha(STATUS_COLOR[next], 0.08),
+                            borderColor: STATUS_COLOR[next],
+                            filter: next === 'CHECKED_IN' ? 'brightness(0.94)' : undefined,
+                            boxShadow: 'none',
+                          },
                         }}
                       >
                         {next === 'CHECKED_IN' ? 'Check In' : 'Complete'}
@@ -535,6 +577,7 @@ export function DoctorDashboard(): React.JSX.Element {
             onPrescriptionClick={(appt) => openPrescription(appt)}
             onPatientHistoryClick={canViewPatientHistory ? (appt) => openPatientHistory(appt) : undefined}
             onLabOrderClick={canOrderLab ? (appt) => openLabOrder(appt) : undefined}
+            onStartConsultation={(appt) => void handleStartConsultation(appt)}
           />
         </Box>
 
@@ -596,6 +639,18 @@ export function DoctorDashboard(): React.JSX.Element {
           />
         </MenuItem>
         <Divider />
+        {['SCHEDULED', 'CHECKED_IN'].includes(apptCtxMenu?.appointment.status ?? '') && (
+          <MenuItem
+            onClick={() => {
+              const a = apptCtxMenu!.appointment;
+              setApptCtxMenu(null);
+              void handleStartConsultation(a);
+            }}
+          >
+            <ListItemIcon><MedicalServicesOutlinedIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Start Consultation</ListItemText>
+          </MenuItem>
+        )}
         {canViewPatientHistory && (
           <MenuItem
             onClick={() => {

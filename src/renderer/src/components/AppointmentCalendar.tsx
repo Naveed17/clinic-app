@@ -229,6 +229,7 @@ interface Props {
   onPrescriptionClick?: (appointment: Appointment) => void | Promise<void>;
   onPatientHistoryClick?: (appointment: Appointment) => void | Promise<void>;
   onLabOrderClick?: (appointment: Appointment) => void | Promise<void>;
+  onStartConsultation?: (appointment: Appointment) => void | Promise<void>;
   readOnly?: boolean;
   hideCheckIn?: boolean;
   loading?: boolean;
@@ -236,7 +237,7 @@ interface Props {
   statusPendingId?: string | null;
 }
 
-export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu, onPrescriptionClick, onPatientHistoryClick, onLabOrderClick, readOnly = false, hideCheckIn = false, loading = false, fetching = false, statusPendingId = null }: Props): React.JSX.Element {
+export function AppointmentCalendar({ appointments, onStatusChange, onDateClick, onAppointmentClick, onDayContextMenu, onAppointmentContextMenu, onPrescriptionClick, onPatientHistoryClick, onLabOrderClick, onStartConsultation, readOnly = false, hideCheckIn = false, loading = false, fetching = false, statusPendingId = null }: Props): React.JSX.Element {
   const theme = useTheme();
   const today = new Date();
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
@@ -1360,10 +1361,36 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                               <MedicalServicesOutlinedIcon sx={{ fontSize: 15 }} />
                             </IconButton>
                           )}
-                          {!readOnly && next && !(hideCheckIn && next === 'CHECKED_IN') && (
+                          {!readOnly && onStartConsultation && a.status === 'CHECKED_IN' && (
                             <Button
                               size="small"
                               variant="contained"
+                              color="primary"
+                              startIcon={<MedicalServicesOutlinedIcon sx={{ fontSize: '13px !important' }} />}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                event.preventDefault();
+                                setDayListOpen(false);
+                                void onStartConsultation(a);
+                              }}
+                              sx={{
+                                fontSize: '0.72rem',
+                                py: 0.4,
+                                px: 1.2,
+                                borderRadius: 99,
+                                fontWeight: 800,
+                                textTransform: 'none',
+                                boxShadow: 'none',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              Start Consultation
+                            </Button>
+                          )}
+                          {!readOnly && next && !(hideCheckIn && next === 'CHECKED_IN') && (
+                            <Button
+                              size="small"
+                              variant={next === 'CHECKED_IN' ? 'contained' : 'outlined'}
                               loading={statusPendingId === a.id}
                               endIcon={next === 'COMPLETED' ? <CheckCircleOutlineIcon /> : <ArrowForwardIcon />}
                               onClick={(event) => {
@@ -1378,9 +1405,16 @@ export function AppointmentCalendar({ appointments, onStatusChange, onDateClick,
                                 borderRadius: 99,
                                 fontWeight: 800,
                                 textTransform: 'none',
-                                bgcolor: STATUS_COLOR[next],
+                                bgcolor: next === 'CHECKED_IN' ? STATUS_COLOR[next] : undefined,
+                                borderColor: next === 'COMPLETED' ? STATUS_COLOR[next] : undefined,
+                                color: next === 'COMPLETED' ? STATUS_COLOR[next] : '#fff',
                                 boxShadow: 'none',
-                                '&:hover': { bgcolor: STATUS_COLOR[next], filter: 'brightness(0.94)', boxShadow: 'none' },
+                                whiteSpace: 'nowrap',
+                                '&:hover': {
+                                  bgcolor: next === 'CHECKED_IN' ? STATUS_COLOR[next] : alpha(STATUS_COLOR[next], 0.08),
+                                  filter: next === 'CHECKED_IN' ? 'brightness(0.94)' : undefined,
+                                  boxShadow: 'none',
+                                },
                               }}
                             >
                               {next === 'CHECKED_IN' ? 'Check In' : 'Complete'}

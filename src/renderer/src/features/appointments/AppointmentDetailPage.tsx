@@ -108,12 +108,8 @@ export function AppointmentDetailPage(): React.JSX.Element {
 
   const statusMutation = useMutation({
     mutationFn: (status: Appointment['status']) => appointmentsService.updateStatus(id!, status),
-    onSuccess: async (_, status) => {
+    onSuccess: async () => {
       await invalidate();
-      // Auto-navigate to consultation page when checked in only for doctors
-      if (status === 'CHECKED_IN' && id && user?.role === 'doctor') {
-        navigate(`/consultation/${id}`);
-      }
     },
     meta: { toast: 'Appointment updated', errorToast: 'Could not update status.' },
   });
@@ -133,6 +129,27 @@ export function AppointmentDetailPage(): React.JSX.Element {
     },
     meta: { toast: 'Appointment deleted', errorToast: 'Could not delete.' },
   });
+
+  const handleStartConsultation = async () => {
+    if (!appointment) return;
+    if (appointment.status === 'SCHEDULED') {
+      try {
+        const updated = await appointmentsService.updateStatus(appointment.id, 'CHECKED_IN');
+        if (updated) {
+          qc.setQueryData(['appointment', appointment.id], updated);
+        }
+      } catch (err) {
+        console.error('Failed to auto check-in before consultation:', err);
+      }
+    } else {
+      qc.setQueryData(['appointment', appointment.id], (old: Appointment | undefined) =>
+        old ? { ...old, status: 'CHECKED_IN' } : appointment,
+      );
+    }
+    void qc.invalidateQueries({ queryKey: ['appointments'] });
+    void qc.invalidateQueries({ queryKey: ['appointment', appointment.id] });
+    navigate(`/consultation/${appointment.id}`);
+  };
 
   if (query.isLoading) {
     return (
@@ -332,7 +349,7 @@ export function AppointmentDetailPage(): React.JSX.Element {
                 variant="contained"
                 color="success"
                 sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
-                onClick={() => navigate(`/consultation/${appointment.id}`)}
+                onClick={() => void handleStartConsultation()}
               >
                 Start Consultation
               </Button>

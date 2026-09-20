@@ -94,71 +94,98 @@ function mapPatientInput(input: PatientInput): Omit<Prisma.PatientCreateInput, '
   return data as Omit<Prisma.PatientCreateInput, 'mrNumber'>;
 }
 
+function normalizePatientRow(row: any): Patient {
+  return {
+    ...row,
+    weight: row.weight != null && !Number.isNaN(Number(row.weight)) ? Number(row.weight) : null,
+    dateOfBirth: row.dateOfBirth
+      ? row.dateOfBirth instanceof Date
+        ? row.dateOfBirth
+        : new Date(row.dateOfBirth)
+      : null,
+    createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
+    updatedAt: row.updatedAt instanceof Date ? row.updatedAt : new Date(row.updatedAt),
+  };
+}
+
 export async function listPatients({ page, pageSize, search, providerId }: PatientListInput): Promise<{
   data: Patient[];
   total: number;
 }> {
   const prisma = getPrisma();
-  const where: Prisma.PatientWhereInput = {
-    ...(providerId
-      ? {
-          OR: [
-            { primaryDoctorId: providerId },
-            { appointments: { some: { providerId } } },
-            { tokens: { some: { doctorId: providerId } } },
-          ],
-        }
-      : {}),
-    ...(search
-      ? {
-          OR: [
-            { firstName: { contains: search } },
-            { lastName: { contains: search } },
-            { phone: { contains: search } },
-            { email: { contains: search } },
-            { mrNumber: { contains: search } },
-          ],
-        }
-      : {}),
-  };
+  const trimmed = search?.trim();
 
-  // When both provider + search, Prisma ANDs top-level keys — but two OR keys collide.
-  // Build AND explicitly when both are present.
-  const whereFinal: Prisma.PatientWhereInput =
-    providerId && search
-      ? {
-          AND: [
-            {
-              OR: [
-                { primaryDoctorId: providerId },
-                { appointments: { some: { providerId } } },
-                { tokens: { some: { doctorId: providerId } } },
-              ],
-            },
-            {
-              OR: [
-                { firstName: { contains: search } },
-                { lastName: { contains: search } },
-                { phone: { contains: search } },
-                { email: { contains: search } },
-                { mrNumber: { contains: search } },
-              ],
-            },
-          ],
-        }
-      : where;
+  // Fast path for doctor filtering (using indexed UNION instead of slow correlated scans)
+  if (providerId) {
+    let whereClause = `
+      "id" IN (
+        SELECT "id" FROM "Patient" WHERE "primaryDoctorId" = ?
+        UNION
+        SELECT "patientId" FROM "Appointment" WHERE "providerId" = ?
+        UNION
+        SELECT "patientId" FROM "Token" WHERE "doctorId" = ?
+      )
+    `;
+    const params: (string | number)[] = [providerId, providerId, providerId];
 
-  const [data, total] = await prisma.$transaction([
-    prisma.patient.findMany({
-      where: whereFinal,
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-    prisma.patient.count({ where: whereFinal }),
+    if (trimmed) {
+      whereClause += ` AND (
+        "firstName" LIKE ? OR "lastName" LIKE ? OR ("firstName" || ' ' || COALESCE("lastName", '')) LIKE ?
+        OR "phone" LIKE ? OR "email" LIKE ? OR "mrNumber" LIKE ?
+      )`;
+      const pattern = `%${trimmed}%`;
+      params.push(pattern, pattern, pattern, pattern, pattern, pattern);
+    }
+
+    const offset = Math.max(0, (page - 1) * pageSize);
+    const dataQuery = `SELECT * FROM "Patient" WHERE ${whereClause} ORDER BY "createdAt" DESC, "id" DESC LIMIT ? OFFSET ?`;
+    const countQuery = `SELECT COUNT(*) as "total" FROM "Patient" WHERE ${whereClause}`;
+
+    const [rows, countRes] = await Promise.all([
+      prisma.$queryRawUnsafe<any[]>(dataQuery, ...params, pageSize, offset),
+      prisma.$queryRawUnsafe<{ total: number | bigint }[]>(countQuery, ...params),
+    ]);
+
+    const data = rows.map(normalizePatientRow);
+    const total = Number(countRes[0]?.total ?? 0);
+
+    data.sort((a, b) => {
+      const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (tB !== tA) return tB - tA;
+      const mrA = parseInt((a.mrNumber || '').replace(/\D/g, ''), 10) || 0;
+      const mrB = parseInt((b.mrNumber || '').replace(/\D/g, ''), 10) || 0;
+      return mrB - mrA;
+    });
+
+    return { data, total };
+  }
+
+  // Non-doctor (admin / receptionist / lab)
+  let whereClause = '1=1';
+  const params: (string | number)[] = [];
+
+  if (trimmed) {
+    whereClause += ` AND (
+      "firstName" LIKE ? OR "lastName" LIKE ? OR ("firstName" || ' ' || COALESCE("lastName", '')) LIKE ?
+      OR "phone" LIKE ? OR "email" LIKE ? OR "mrNumber" LIKE ?
+    )`;
+    const pattern = `%${trimmed}%`;
+    params.push(pattern, pattern, pattern, pattern, pattern, pattern);
+  }
+
+  const offset = Math.max(0, (page - 1) * pageSize);
+  const dataQuery = `SELECT * FROM "Patient" WHERE ${whereClause} ORDER BY "createdAt" DESC, "id" DESC LIMIT ? OFFSET ?`;
+  const countQuery = `SELECT COUNT(*) as "total" FROM "Patient" WHERE ${whereClause}`;
+
+  const [rows, countRes] = await Promise.all([
+    prisma.$queryRawUnsafe<any[]>(dataQuery, ...params, pageSize, offset),
+    prisma.$queryRawUnsafe<{ total: number | bigint }[]>(countQuery, ...params),
   ]);
 
-  // Ensure deterministic descending sort by parsed UNIX timestamp (newest patient first)
+  const data = rows.map(normalizePatientRow);
+  const total = Number(countRes[0]?.total ?? 0);
+
   data.sort((a, b) => {
     const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
     const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;

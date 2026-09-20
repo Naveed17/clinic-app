@@ -14,6 +14,7 @@ import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumb
 import RepeatOutlinedIcon from '@mui/icons-material/RepeatOutlined';
 import MoreVertOutlinedIcon from '@mui/icons-material/MoreVertOutlined';
 import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
+import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
@@ -267,6 +268,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const isDoctor = user?.role === 'doctor';
   const { can } = useLicense();
   const showLabReason = can('labDashboard');
   const [slotNotice, setSlotNotice] = useState<SlotAdjustReason | null>(null);
@@ -342,9 +344,10 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
       const startsAt = new Date(`${values.date}T${values.time}:00`);
+      const effectiveProviderId = isDoctor && user?.id ? user.id : values.providerId;
       const input: AppointmentInput = {
         patientId: values.patientId,
-        providerId: values.providerId,
+        providerId: effectiveProviderId,
         tokenId: values.tokenId || null,
         startsAt: startsAt.toISOString(),
         endsAt: new Date(startsAt.getTime() + values.duration * 60000).toISOString(),
@@ -358,12 +361,13 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
       let createdAppt: Appointment | null = null;
       if (saved && typeof saved === 'object' && 'id' in saved) {
         const patient = selectedPatient;
-        const provider = doctorOptions.find((d) => d.id === values.providerId);
+        const effectiveProviderId = isDoctor && user?.id ? user.id : values.providerId;
+        const provider = doctorOptions.find((d) => d.id === effectiveProviderId);
         const raw = saved as Appointment;
         const next: Appointment = {
           ...raw,
           patient: raw.patient?.firstName ? raw.patient : (patient ? { id: patient.id, firstName: patient.firstName, lastName: patient.lastName ?? '', phone: patient.phone ?? '' } : { id: values.patientId, firstName: '', lastName: '', role: 'patient' }),
-          provider: raw.provider?.firstName ? raw.provider : (provider ?? { id: values.providerId, firstName: '', lastName: '', role: 'doctor' }),
+          provider: raw.provider?.firstName ? raw.provider : (provider ?? { id: effectiveProviderId, firstName: '', lastName: '', role: 'doctor' }),
           status: raw.status ?? 'SCHEDULED',
         };
         createdAppt = next;
@@ -393,16 +397,25 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
     if (!open) return;
     setSlotNotice(null);
     if (appointment) {
-      form.reset(appointmentValues(appointment));
+      form.reset({
+        ...appointmentValues(appointment),
+        ...(isDoctor && user?.id ? { providerId: user.id } : {}),
+      });
     } else {
       form.reset({
         ...empty,
         date: defaultDate ?? empty.date,
-        providerId: defaultProviderId ?? empty.providerId,
+        providerId: isDoctor && user?.id ? user.id : (defaultProviderId ?? empty.providerId),
         patientId: defaultPatientId ?? empty.patientId,
       });
     }
-  }, [appointment, defaultDate, defaultProviderId, defaultPatientId, form, open]);
+  }, [appointment, defaultDate, defaultProviderId, defaultPatientId, form, open, isDoctor, user?.id]);
+
+  useEffect(() => {
+    if (open && isDoctor && user?.id && form.getValues('providerId') !== user.id) {
+      form.setValue('providerId', user.id);
+    }
+  }, [open, isDoctor, user?.id, form]);
 
   useEffect(() => {
     if (!open || appointment || !providerId) return;
@@ -473,15 +486,19 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
               name="providerId"
               control={form.control}
               render={({ field }) => {
-                const selected = doctorOptions.find((p) => p.id === field.value) ?? null;
+                const effectiveDoctorId = isDoctor && user?.id ? user.id : field.value;
+                const selected = doctorOptions.find((p) => p.id === effectiveDoctorId) ?? null;
                 return (
                   <Autocomplete
-                    options={doctorOptions}
+                    disabled={isDoctor}
+                    readOnly={isDoctor}
+                    disableClearable={isDoctor}
+                    options={isDoctor ? (selected ? [selected] : doctorOptions.filter((d) => d.id === user?.id)) : doctorOptions}
                     loading={doctors.isLoading}
                     value={selected}
                     isOptionEqualToValue={(option, value) => option.id === value.id}
                     getOptionLabel={(option) => personLabel(option)}
-                    onChange={(_, value) => field.onChange(value?.id ?? '')}
+                    onChange={isDoctor ? undefined : (_, value) => field.onChange(value?.id ?? '')}
                     renderOption={(props, option) => (
                       <Box component="li" {...props} key={option.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
                         <DoctorAvatar src={option.avatar} name={`Dr. ${personLabel(option)}`} size={32} />
@@ -498,11 +515,13 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
                         {...params}
                         fullWidth
                         label="Doctor"
+                        disabled={isDoctor}
                         error={Boolean(errors.providerId)}
-                        helperText={errors.providerId?.message}
+                        helperText={isDoctor ? 'Assigned to your doctor schedule (read-only)' : errors.providerId?.message}
                         onBlur={field.onBlur}
                         InputProps={{
                           ...params.InputProps,
+                          readOnly: isDoctor,
                           startAdornment: selected ? (
                             <>
                               <DoctorAvatar
@@ -878,10 +897,9 @@ export function AppointmentsPage(): React.JSX.Element {
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(['appointments'], ctx.prev);
     },
-    onSuccess: (_result, { id, status }) => {
-      // Auto-navigate to consultation page when appointment is checked in only for doctors
-      if (status === 'CHECKED_IN' && user?.role === 'doctor') {
-        navigate(`/consultation/${id}`);
+    onSuccess: (_result, { id }) => {
+      if (_result) {
+        queryClient.setQueryData(['appointment', id], _result);
       }
     },
     onSettled: () => {
@@ -890,6 +908,26 @@ export function AppointmentsPage(): React.JSX.Element {
     },
     meta: { silent: true },
   });
+
+  const handleStartConsultation = async (appt: Appointment) => {
+    if (appt.status === 'SCHEDULED') {
+      try {
+        const updated = await appointmentsService.updateStatus(appt.id, 'CHECKED_IN');
+        if (updated) {
+          queryClient.setQueryData(['appointment', appt.id], updated);
+        }
+      } catch (err) {
+        console.error('Failed to auto check-in before consultation:', err);
+      }
+    } else {
+      queryClient.setQueryData(['appointment', appt.id], (old: Appointment | undefined) =>
+        old ? { ...old, status: 'CHECKED_IN' } : appt,
+      );
+    }
+    void queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    void queryClient.invalidateQueries({ queryKey: ['appointment', appt.id] });
+    navigate(`/consultation/${appt.id}`);
+  };
 
 
   const allData = user?.role === 'doctor'
@@ -1156,6 +1194,7 @@ export function AppointmentsPage(): React.JSX.Element {
               onAppointmentClick={isAdmin ? undefined : (appt) => navigate(`/appointments/${appt.id}`, { state: detailNavState })}
               readOnly={isAdmin}
               hideCheckIn={false}
+              onStartConsultation={user?.role === 'doctor' ? (appt) => void handleStartConsultation(appt) : undefined}
             />
           </Paper>
         </Box>
@@ -1437,6 +1476,21 @@ export function AppointmentsPage(): React.JSX.Element {
                     onClick={() => { close(); statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' }); }}
                   >
                     <ConfirmationNumberOutlinedIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+              {user?.role === 'doctor' && a.status === 'CHECKED_IN' && (
+                <Tooltip title="Start Consultation" arrow placement="top">
+                  <IconButton
+                    sx={{
+                      ...actionBtnSx,
+                      color: 'info.main',
+                      bgcolor: alpha(theme.palette.info.main, 0.1),
+                      '&:hover': { bgcolor: alpha(theme.palette.info.main, 0.2) },
+                    }}
+                    onClick={() => { close(); void handleStartConsultation(a); }}
+                  >
+                    <MedicalServicesOutlinedIcon sx={{ fontSize: 17 }} />
                   </IconButton>
                 </Tooltip>
               )}

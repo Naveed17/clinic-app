@@ -671,6 +671,17 @@ export function ConsultationPage(): React.JSX.Element {
     meta: { toast: 'Consultation completed ✓', errorToast: 'Could not complete.' },
   });
 
+  const checkInMutation = useMutation({
+    mutationFn: () => appointmentsService.updateStatus(id!, 'CHECKED_IN'),
+    onSuccess: async (updated) => {
+      if (updated) {
+        qc.setQueryData(['appointment', id], updated);
+      }
+      await invalidate();
+    },
+    meta: { toast: 'Patient checked in ✓', errorToast: 'Could not check in.' },
+  });
+
   const handleCompleteVisit = async () => {
     if (!appointment) return;
     try {
@@ -784,11 +795,30 @@ export function ConsultationPage(): React.JSX.Element {
 
   if (appointment.status !== 'CHECKED_IN' && appointment.status !== 'COMPLETED') {
     return (
-      <Box sx={{ p: 4 }}>
+      <Box sx={{ p: 4, maxWidth: 640 }}>
         <Alert severity="warning" sx={{ borderRadius: 2 }}>
-          Appointment status is <strong>{appointment.status.replace('_', ' ')}</strong>. Consultation view is only available when patient is checked in.
+          Appointment status is <strong>{appointment.status.replace('_', ' ')}</strong>. Consultation view is available when the patient is checked in.
         </Alert>
-        <Button sx={{ mt: 2 }} startIcon={<ArrowBackOutlinedIcon />} onClick={() => navigate('/dashboard')}>Return to Dashboard</Button>
+        <Stack direction="row" spacing={1.5} sx={{ mt: 2.5 }}>
+          <Button
+            variant="contained"
+            color="success"
+            startIcon={<MedicalServicesOutlinedIcon />}
+            loading={checkInMutation.isPending}
+            onClick={() => checkInMutation.mutate()}
+            sx={{ fontWeight: 700, borderRadius: 2, textTransform: 'none' }}
+          >
+            Check In & Start Consultation
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<ArrowBackOutlinedIcon />}
+            onClick={() => navigate('/dashboard')}
+            sx={{ borderRadius: 2, textTransform: 'none' }}
+          >
+            Return to Dashboard
+          </Button>
+        </Stack>
       </Box>
     );
   }

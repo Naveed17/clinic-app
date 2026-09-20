@@ -315,6 +315,15 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Appointment_providerId_startsAt_status_idx" ON "Appointment"("providerId", "startsAt", "status")',
   );
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "idx_appointment_provider_patient" ON "Appointment"("providerId", "patientId")',
+  );
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "idx_token_doctor_patient" ON "Token"("doctorId", "patientId")',
+  );
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "idx_patient_primary_doctor" ON "Patient"("primaryDoctorId")',
+  );
 
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "Invoice" (
@@ -756,6 +765,8 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
   await rebuildMedicineWithoutCategoryFk(database);
   await migrateMedicineNameMgUnique(database);
   await database.$executeRawUnsafe('PRAGMA foreign_keys = ON');
+
+  await normalizeDateTimeStorage(database);
 }
 
 /** Drop leftover FK to MedicineCategory so catalog inserts do not require that table. */
@@ -877,6 +888,58 @@ async function migrateMedicineNameMgUnique(database: PrismaClient): Promise<void
     'CREATE UNIQUE INDEX IF NOT EXISTS "Medicine_name_mg_key" ON "Medicine"("name", IFNULL("mg", -1))',
   );
   await database.$executeRawUnsafe('PRAGMA foreign_keys=ON');
+}
+
+const DATETIME_STORAGE_COLUMNS: { table: string; cols: string[] }[] = [
+  { table: 'User', cols: ['createdAt', 'updatedAt'] },
+  { table: 'DoctorProfile', cols: ['createdAt', 'updatedAt'] },
+  { table: 'DoctorSchedule', cols: ['createdAt', 'updatedAt'] },
+  { table: 'DoctorAttendance', cols: ['checkInAt', 'checkOutAt', 'createdAt', 'updatedAt'] },
+  { table: 'Patient', cols: ['dateOfBirth', 'createdAt', 'updatedAt'] },
+  { table: 'PatientDocument', cols: ['uploadedAt', 'createdAt', 'updatedAt'] },
+  { table: 'Appointment', cols: ['startsAt', 'endsAt', 'createdAt', 'updatedAt'] },
+  { table: 'Invoice', cols: ['issuedAt', 'dueAt', 'createdAt', 'updatedAt'] },
+  { table: 'InvoiceItem', cols: ['createdAt', 'updatedAt'] },
+  { table: 'Payment', cols: ['paidAt', 'createdAt', 'updatedAt'] },
+  { table: 'LabOrder', cols: ['orderedAt', 'createdAt', 'updatedAt'] },
+  { table: 'LabReport', cols: ['uploadedAt', 'createdAt', 'updatedAt'] },
+  { table: 'Token', cols: ['createdAt', 'updatedAt'] },
+  { table: 'Prescription', cols: ['dispensedAt', 'createdAt', 'updatedAt'] },
+  { table: 'Medicine', cols: ['createdAt', 'updatedAt'] },
+  { table: 'MedicineBatch', cols: ['expiryDate', 'createdAt', 'updatedAt'] },
+  { table: 'ChatMessage', cols: ['createdAt'] },
+];
+
+/**
+ * Prisma with SQLite expects and writes DateTime columns as integer milliseconds.
+ * If legacy/imported rows contain ISO text strings, SQLite's type affinity considers
+ * all TEXT greater than all INTEGER, breaking ORDER BY DESC and date range queries.
+ * This migration normalizes any legacy TEXT DateTime values to Unix epoch milliseconds.
+ */
+export async function normalizeDateTimeStorage(database: PrismaClient): Promise<void> {
+  try {
+    for (const { table, cols } of DATETIME_STORAGE_COLUMNS) {
+      const tableExists = await database.$queryRawUnsafe<{ name: string }[]>(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`,
+        table,
+      );
+      if (!tableExists || tableExists.length === 0) continue;
+      const tableCols = (
+        await database.$queryRawUnsafe<{ name: string }[]>(`PRAGMA table_info("${table}")`)
+      ).map((c) => c.name);
+
+      for (const col of cols) {
+        if (!tableCols.includes(col)) continue;
+        await database.$executeRawUnsafe(`
+          UPDATE "${table}" 
+          SET "${col}" = CAST(ROUND((julianday("${col}") - 2440587.5) * 86400000) AS INTEGER)
+          WHERE typeof("${col}") = 'text' AND "${col}" IS NOT NULL AND "${col}" != ''
+        `);
+      }
+    }
+  } catch (err) {
+    console.error('[Database] Failed to normalize DateTime storage classes:', err);
+  }
 }
 
 export async function disconnectPrisma(): Promise<void> {

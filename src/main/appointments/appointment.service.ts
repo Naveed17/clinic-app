@@ -77,7 +77,7 @@ export async function listAppointments(date?: string) {
       { startsAt: 'desc' },
       { createdAt: 'desc' },
     ],
-    take: date ? undefined : 200,
+    take: date ? undefined : 500,
   });
 
   const patientIds = Array.from(new Set(appointments.map((a) => a.patientId)));
