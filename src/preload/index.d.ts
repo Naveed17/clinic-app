@@ -4,6 +4,7 @@ declare global {
   interface Window {
     electron: ElectronAPI;
     clinic: {
+      getApiUrl?: () => Promise<string>;
       patients: {
         list: (input: unknown) => Promise<unknown>;
         create: (input: unknown) => Promise<unknown>;

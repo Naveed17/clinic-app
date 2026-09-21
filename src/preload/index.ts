@@ -267,6 +267,7 @@ async function ensureSocket(): Promise<Socket> {
 }
 
 const api = {
+  getApiUrl: resolveSocketUrl,
   patients: {
     get: (id: string) =>
       call(

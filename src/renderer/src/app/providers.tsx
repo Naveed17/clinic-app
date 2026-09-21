@@ -11,6 +11,8 @@ import { AppToastHost, showAppToast } from '@/components/AppToast';
 import { UpdateBanner } from '@/components/UpdateBanner';
 import { UpdateProvider } from '@/context/updateProvider';
 import { DatabaseModeProvider } from '@/context/DatabaseModeProvider';
+import { httpBatchLink } from '@trpc/client';
+import { trpc } from '@/utils/trpc';
 
 function RealtimeBootstrap({ children }: PropsWithChildren): React.JSX.Element {
   useSocket();
@@ -74,21 +76,42 @@ export function AppProviders({ children }: PropsWithChildren): React.JSX.Element
     [mode],
   );
 
+  const [trpcClient] = useState(() =>
+    trpc.createClient({
+      links: [
+        httpBatchLink({
+          url: 'http://127.0.0.1:3333/trpc',
+          fetch: async (url, options) => {
+            const base = (await window.clinic?.getApiUrl?.()) || 'http://127.0.0.1:3333';
+            const resolvedUrl = String(url).replace(/http:\/\/127\.0\.0\.1:3333/, base.replace(/\/+$/, ''));
+            return fetch(resolvedUrl, options);
+          },
+          headers: () => {
+            const token = window.localStorage.getItem('clinic-auth-token');
+            return token ? { Authorization: `Bearer ${token}` } : {};
+          },
+        }),
+      ],
+    }),
+  );
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <ColorModeContext.Provider value={colorMode}>
-        <ThemeRegistry>
-          <AuthProvider>
-            <DatabaseModeProvider>
-              <LicenseModulesProvider>
-                <UpdateProvider>
-                  <RealtimeBootstrap>{children}</RealtimeBootstrap>
-                </UpdateProvider>
-              </LicenseModulesProvider>
-            </DatabaseModeProvider>
-          </AuthProvider>
-        </ThemeRegistry>
-      </ColorModeContext.Provider>
-    </QueryClientProvider>
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <ColorModeContext.Provider value={colorMode}>
+          <ThemeRegistry>
+            <AuthProvider>
+              <DatabaseModeProvider>
+                <LicenseModulesProvider>
+                  <UpdateProvider>
+                    <RealtimeBootstrap>{children}</RealtimeBootstrap>
+                  </UpdateProvider>
+                </LicenseModulesProvider>
+              </DatabaseModeProvider>
+            </AuthProvider>
+          </ThemeRegistry>
+        </ColorModeContext.Provider>
+      </QueryClientProvider>
+    </trpc.Provider>
   );
 }

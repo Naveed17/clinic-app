@@ -4,6 +4,9 @@ import { createServer, type Server as HttpServer } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import type { AddressInfo } from 'node:net';
 import { Server as SocketIOServer } from 'socket.io';
+import { createExpressMiddleware } from '@trpc/server/adapters/express';
+import { appRouter } from '../trpc/router';
+import { createContext } from '../trpc/context';
 import { errorHandler } from './middleware/error-handler';
 import { registerRealtimeSocket } from './realtime';
 import { registerRoutes } from './routes';
@@ -56,6 +59,14 @@ export async function startBackendServer(port = Number(process.env.CLINIC_API_PO
   app.get('/health', (_req, res) => {
     res.json({ ok: true, service: 'clinic-backend' });
   });
+
+  app.use(
+    '/trpc',
+    createExpressMiddleware({
+      router: appRouter,
+      createContext,
+    }),
+  );
 
   registerRoutes(app, io);
   registerRealtimeSocket(io);

@@ -1,6 +1,6 @@
 {
   "name": "care-flow",
-  "version": "1.0.78",
+  "version": "1.0.79",
   "repository": {
     "type": "git",
     "url": "https://github.com/Naveed17/clinic-app.git"
@@ -104,6 +104,9 @@
     "@tiptap/pm": "^3.29.2",
     "@tiptap/react": "^3.29.2",
     "@tiptap/starter-kit": "^3.29.2",
+    "@trpc/client": "^11.19.0",
+    "@trpc/react-query": "^11.19.0",
+    "@trpc/server": "^11.19.0",
     "adm-zip": "^0.6.0",
     "axios": "^1.18.1",
     "bcryptjs": "^2.4.3",

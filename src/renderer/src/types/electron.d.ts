@@ -11,6 +11,7 @@ import type { Medicine } from './medicine';
 declare global {
   interface Window {
     clinic: {
+      getApiUrl?: () => Promise<string>;
       medicines: {
         search: (query: string) => Promise<Medicine[]>;
         list: () => Promise<Medicine[]>;
