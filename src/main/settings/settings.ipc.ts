@@ -21,6 +21,10 @@ export function trackDiscoveredServer(server: DiscoveredServer): void {
   discoveredServers.set(server.ip, server);
 }
 
+export function getDiscoveredServers(): DiscoveredServer[] {
+  return Array.from(discoveredServers.values());
+}
+
 export function registerSettingsIpc(): void {
   ipcMain.handle('settings:get', () => getSettings());
   ipcMain.handle('settings:save', (_e, patch: Partial<AppSettings>) => saveSettings(patch));

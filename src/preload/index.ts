@@ -1084,9 +1084,17 @@ const api = {
       if (isLanClient) {
         return request<{ id: string; name: string; email: string; role: string; avatar: string; token?: string } | null>(
           '/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }
-        ).catch(() => null);
+        ).catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { ok: false, error: msg };
+        });
       }
-      return ipc('auth:login', email, password);
+      try {
+        return await ipc('auth:login', email, password);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { ok: false, error: msg };
+      }
     },
     directory: async () => {
       await settingsReady;
@@ -1109,6 +1117,25 @@ const api = {
     updateAvatar: async (userId: string, avatar: string | null) => {
       await settingsReady;
       return ipc('auth:update-avatar', userId, avatar);
+    },
+  },
+  sync: {
+    status: () => ipc<{ state: 'idle' | 'syncing' | 'synced' | 'offline' | 'error'; lastSyncTime: number | null; peerUrl: string | null; peerName?: string; message?: string; recordsSyncedLastTime?: number }>('sync:status'),
+    trigger: (customPeerUrl?: string) => ipc<{ ok: boolean; recordsSynced?: number; error?: string }>('sync:trigger', customPeerUrl),
+    resolvePeer: () => ipc<string | null>('sync:resolve-peer'),
+    onStatusChange: (callback: (status: { state: 'idle' | 'syncing' | 'synced' | 'offline' | 'error'; lastSyncTime: number | null; peerUrl: string | null; peerName?: string; message?: string; recordsSyncedLastTime?: number }) => void) => {
+      const listener = (_e: unknown, status: any) => callback(status);
+      ipcRenderer.on('sync:status-changed', listener);
+      return () => {
+        ipcRenderer.removeListener('sync:status-changed', listener);
+      };
+    },
+    onDataChanged: (callback: (data: { entity: string; action: string }) => void) => {
+      const listener = (_e: unknown, data: any) => callback(data);
+      ipcRenderer.on('data:changed', listener);
+      return () => {
+        ipcRenderer.removeListener('data:changed', listener);
+      };
     },
   },
 };

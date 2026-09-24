@@ -44,6 +44,7 @@ import { getNavItems } from './navigation';
 import { realtimeService, type RealtimeNotification } from '@/services/realtime.service';
 import { GlobalSearchModal } from '@/components/GlobalSearchModal';
 import { showAppToast } from '@/components/AppToast';
+import { SyncBadge } from '@/components/SyncBadge';
 import { DoctorAvatar, avatarFallbackFromRole } from '@/components/DoctorAvatar';
 import { fileToAvatarDataUrl } from '@/utils/avatarImage';
 import {
@@ -227,6 +228,7 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
             <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10, bgcolor: alpha(theme.palette.text.primary, 0.08), px: 0.7, py: 0.2, borderRadius: 1 }}>Ctrl K</Typography>
           </Box>
           <GlobalSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+          <SyncBadge />
           <Tooltip title={isDarkMode ? 'Light mode' : 'Dark mode'}>
             <IconButton onClick={toggleColorMode} size="small">
               {isDarkMode ? <LightModeOutlinedIcon fontSize="small" /> : <DarkModeOutlinedIcon fontSize="small" />}

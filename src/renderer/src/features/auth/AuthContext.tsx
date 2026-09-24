@@ -103,21 +103,46 @@ export function AuthProvider({ children }: PropsWithChildren): React.JSX.Element
   const value = useMemo<AuthContextValue>(() => ({
     user,
     login: async (email, password) => {
-      const result = await window.clinic?.auth.login(email, password);
-      if (!result) return false;
-      // Blocked role (module disabled)
-      if ('blocked' in result) return (result as { blocked: true; error?: string }).error || 'Access denied.';
-      const authUser: AuthUser = {
-        id: result.id,
-        name: result.name,
-        email: result.email,
-        role: result.role as UserRole,
-        avatar: result.avatar,
-      };
-      setUser(authUser);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
-      if ('token' in result && result.token) localStorage.setItem(TOKEN_KEY, result.token as string);
-      return true;
+      try {
+        if (!window.clinic?.auth?.login) {
+          return 'Application services not ready. Please restart CareFlow.';
+        }
+        const result = (await window.clinic.auth.login(email, password)) as
+          | {
+              ok?: boolean;
+              id?: string;
+              name?: string;
+              email?: string;
+              role?: string;
+              avatar?: string | null;
+              token?: string;
+              error?: string;
+              blocked?: boolean;
+            }
+          | null
+          | undefined;
+
+        if (!result) return false;
+        if (result.error) return result.error;
+        if (result.blocked) return result.error || 'Access denied for this role.';
+        if (!result.id || !result.role) return false;
+
+        const authUser: AuthUser = {
+          id: result.id,
+          name: result.name || '',
+          email: result.email || email,
+          role: result.role as UserRole,
+          avatar: result.avatar,
+        };
+        setUser(authUser);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
+        if (result.token) localStorage.setItem(TOKEN_KEY, result.token);
+        return true;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[AuthContext] Login error:', err);
+        return `Connection error: ${msg}`;
+      }
     },
     logout,
     updateAvatar: async (avatar: string | null) => {

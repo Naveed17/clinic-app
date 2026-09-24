@@ -305,6 +305,29 @@ declare global {
         onError?: (handler: (err: string) => void) => () => void;
         getVersion: () => Promise<string>;
       };
+      sync: {
+        status: () => Promise<{
+          state: 'idle' | 'syncing' | 'synced' | 'offline' | 'error';
+          lastSyncTime: number | null;
+          peerUrl: string | null;
+          peerName?: string;
+          message?: string;
+          recordsSyncedLastTime?: number;
+          progress?: { percent: number; label: string };
+        }>;
+        trigger: (customPeerUrl?: string) => Promise<{ ok: boolean; recordsSynced?: number; error?: string }>;
+        resolvePeer: () => Promise<string | null>;
+        onStatusChange: (callback: (status: {
+          state: 'idle' | 'syncing' | 'synced' | 'offline' | 'error';
+          lastSyncTime: number | null;
+          peerUrl: string | null;
+          peerName?: string;
+          message?: string;
+          recordsSyncedLastTime?: number;
+          progress?: { percent: number; label: string };
+        }) => void) => () => void;
+        onDataChanged: (callback: (data: { entity: string; action: string }) => void) => () => void;
+      };
     };
   }
 }

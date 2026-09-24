@@ -46,6 +46,8 @@ import { registerScheduleIpc } from './doctors/schedule.ipc';
 import { seedDefaultAdmin } from './auth/seed';
 import { initAutoUpdater } from './updater';
 import { registerWhatsAppIpc } from './whatsapp/whatsapp.ipc';
+import { registerSyncIpc } from './sync/sync.ipc';
+import { startAutoSync, stopAutoSync } from './sync/sync.service';
 
 let backendServer: BackendServer | undefined;
 
@@ -255,9 +257,11 @@ app.whenReady().then(async () => {
   registerWhatsAppIpc();
   registerSearchIpc();
   registerMedicineIpc();
-  // LAN discovery only when not on cloud Postgres
+  registerSyncIpc();
+  // LAN discovery and peer sync only when not on cloud Postgres
   if (!isOnlineDatabaseMode()) {
     startDiscoveryListener();
+    startAutoSync();
   }
   initAutoUpdater();
   createWindow();
@@ -272,6 +276,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  stopAutoSync();
   stopDiscoveryBroadcast();
   stopDiscoveryListener();
   stopLanRetry();

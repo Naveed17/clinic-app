@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/async-handler';
 import { signToken } from '../middleware/auth';
 import { getLicenseModules } from '../../license/license.ipc';
 import { listLoginDirectory } from '../../auth/login-directory';
+import { seedDefaultAdmin } from '../../auth/seed';
 
 const ROLE_MODULE: Record<string, string> = {
   doctor:         'doctorDashboard',
@@ -27,7 +28,15 @@ export function createAuthRouter(): Router {
       res.status(400).json({ error: 'Email and password required.' });
       return;
     }
-    const user = await getPrisma().user.findUnique({
+
+    const prisma = getPrisma();
+    try {
+      if ((await prisma.user.count()) === 0) {
+        await seedDefaultAdmin();
+      }
+    } catch { /* ignore */ }
+
+    const user = await prisma.user.findUnique({
       where: { email: email.trim().toLowerCase() },
       select: {
         id: true,
@@ -41,7 +50,15 @@ export function createAuthRouter(): Router {
         passwordHash: true,
       },
     });
-    if (!user || !user.isActive || !user.passwordHash || !bcrypt.compareSync(password, user.passwordHash)) {
+    if (!user) {
+      res.status(401).json({ error: 'Invalid email or password.' });
+      return;
+    }
+    if (!user.isActive) {
+      res.status(403).json({ error: 'This account has been deactivated. Please contact the administrator.' });
+      return;
+    }
+    if (!user.passwordHash || !bcrypt.compareSync(password, user.passwordHash)) {
       res.status(401).json({ error: 'Invalid email or password.' });
       return;
     }

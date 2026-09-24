@@ -103,7 +103,9 @@ export async function ensureDatabaseReady(): Promise<PrismaClient> {
         await initializeDatabase(db);
         try {
           await seedDefaultAdmin();
-        } catch { /* ignore */ }
+        } catch (err) {
+          console.error('[Database] Failed to seed default admin:', err);
+        }
         initializedDbPaths.add(targetDbPath);
       })().finally(() => {
         initPromise = undefined;
@@ -319,9 +321,6 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
     'CREATE INDEX IF NOT EXISTS "idx_appointment_provider_patient" ON "Appointment"("providerId", "patientId")',
   );
   await database.$executeRawUnsafe(
-    'CREATE INDEX IF NOT EXISTS "idx_token_doctor_patient" ON "Token"("doctorId", "patientId")',
-  );
-  await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "idx_patient_primary_doctor" ON "Patient"("primaryDoctorId")',
   );
 
@@ -521,6 +520,9 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
   );
   await database.$executeRawUnsafe(
     'CREATE INDEX IF NOT EXISTS "Token_patientId_date_idx" ON "Token"("patientId", "date")',
+  );
+  await database.$executeRawUnsafe(
+    'CREATE INDEX IF NOT EXISTS "idx_token_doctor_patient" ON "Token"("doctorId", "patientId")',
   );
 
   const tokenCols = (await database.$queryRawUnsafe<{ name: string }[]>('PRAGMA table_info(Token)')).map(r => r.name);
@@ -766,7 +768,54 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
   await migrateMedicineNameMgUnique(database);
   await database.$executeRawUnsafe('PRAGMA foreign_keys = ON');
 
+  await initializeSyncTombstones(database);
   await normalizeDateTimeStorage(database);
+}
+
+/** Track deletions for two-way peer sync so records deleted on one machine are pruned on the other. */
+async function initializeSyncTombstones(database: PrismaClient): Promise<void> {
+  try {
+    await database.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "_DeletedRecord" (
+        "id" TEXT NOT NULL,
+        "tableName" TEXT NOT NULL,
+        "deletedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY ("id", "tableName")
+      )
+    `);
+    await database.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "_DeletedRecord_deletedAt_idx" ON "_DeletedRecord"("deletedAt")',
+    );
+
+    const tablesToTrack = [
+      'Patient',
+      'Appointment',
+      'Token',
+      'Prescription',
+      'Invoice',
+      'InvoiceItem',
+      'Payment',
+      'LabOrder',
+      'LabReport',
+      'PatientDocument',
+      'Medicine',
+      'MedicineBatch',
+      'DoctorSchedule',
+      'DoctorAttendance',
+    ];
+
+    for (const table of tablesToTrack) {
+      await database.$executeRawUnsafe(`
+        CREATE TRIGGER IF NOT EXISTS "trig_${table}_deleted" AFTER DELETE ON "${table}"
+        BEGIN
+          INSERT OR REPLACE INTO "_DeletedRecord" ("id", "tableName", "deletedAt")
+          VALUES (OLD.id, '${table}', datetime('now'));
+        END;
+      `);
+    }
+  } catch (err) {
+    console.warn('[Database] Failed to initialize sync tombstones/triggers:', err);
+  }
 }
 
 /** Drop leftover FK to MedicineCategory so catalog inserts do not require that table. */

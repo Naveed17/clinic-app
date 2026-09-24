@@ -46,8 +46,10 @@ import SupportAgentOutlinedIcon from '@mui/icons-material/SupportAgentOutlined';
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
+import SyncOutlinedIcon from '@mui/icons-material/SyncOutlined';
 import { useUpdate } from '@/context/updateProvider';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
+import { useSync } from '@/context/SyncContext';
 import { useAuth } from '@/features/auth/AuthContext';
 import { useLicense, useRefreshLicenseModules } from '@/features/auth/LicenseModulesContext';
 import { PhoneInputField } from '@/components/PhoneInputField';
@@ -97,6 +99,8 @@ export function SettingsPage(): React.JSX.Element {
   const { can } = useLicense();
   const refreshLicenseModules = useRefreshLicenseModules();
   const { isOnline, schemaId, ready: databaseModeReady, refresh: refreshDatabaseMode } = useDatabaseMode();
+  const { status: syncStatus, syncNow: triggerPeerSync } = useSync();
+  const [syncingManual, setSyncingManual] = useState(false);
 
   // Context Hook Integration for Global Auto-Updater State
   const {
@@ -486,6 +490,31 @@ export function SettingsPage(): React.JSX.Element {
     const ok = await window.clinic?.settings.testConnection(settings.clientApiUrl);
     setTestResult(ok ?? false);
     setTesting(false);
+  }
+
+  async function handleManualSync() {
+    setSyncingManual(true);
+    try {
+      const res = await triggerPeerSync();
+      if (res?.ok) {
+        showAppToast({
+          type: 'success',
+          message: `Sync successful! ${res.recordsSynced ?? 0} records merged.`,
+        });
+      } else {
+        showAppToast({
+          type: 'error',
+          message: res?.error || 'Could not reach peer machine. Ensure both devices are on the same Wi-Fi.',
+        });
+      }
+    } catch (err: any) {
+      showAppToast({
+        type: 'error',
+        message: err?.message || 'Sync failed.',
+      });
+    } finally {
+      setSyncingManual(false);
+    }
   }
 
   async function handleSave() {
@@ -1083,6 +1112,139 @@ export function SettingsPage(): React.JSX.Element {
                     )}
                   </Stack>
                 )}
+
+                <Divider />
+
+                {/* Local Peer Sync Card */}
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2.5,
+                    borderRadius: 3,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    bgcolor: (t) => alpha(t.palette.background.paper, 0.6),
+                  }}
+                >
+                  <Stack spacing={2}>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
+                      <Stack direction="row" alignItems="center" spacing={1.5}>
+                        <Box
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 2,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            bgcolor: (t) => alpha(t.palette.primary.main, 0.12),
+                            color: 'primary.main',
+                          }}
+                        >
+                          <SyncOutlinedIcon
+                            sx={{
+                              fontSize: 22,
+                              animation: syncStatus.state === 'syncing' || syncingManual ? 'spin 1.2s linear infinite' : 'none',
+                              '@keyframes spin': {
+                                '0%': { transform: 'rotate(0deg)' },
+                                '100%': { transform: 'rotate(360deg)' },
+                              },
+                            }}
+                          />
+                        </Box>
+                        <Box>
+                          <Typography variant="subtitle1" fontWeight={700}>
+                            Local Two-Way Sync (Doctor &amp; Receptionist)
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Auto-syncs changes both ways over local Wi-Fi without internet. Doctor can work offline at home and merge morning clinic tokens seamlessly.
+                          </Typography>
+                        </Box>
+                      </Stack>
+
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<SyncOutlinedIcon />}
+                        disabled={syncStatus.state === 'syncing' || syncingManual}
+                        onClick={() => void handleManualSync()}
+                        sx={{ textTransform: 'none', borderRadius: 2, px: 2 }}
+                      >
+                        {syncStatus.state === 'syncing' || syncingManual ? 'Syncing...' : 'Sync Now'}
+                      </Button>
+                    </Stack>
+
+                    <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" sx={{ pt: 0.5 }}>
+                      <Chip
+                        size="small"
+                        label={
+                          syncStatus.state === 'syncing' || syncingManual
+                            ? syncStatus.progress?.percent
+                              ? `Syncing ${syncStatus.progress.percent}%`
+                              : 'Syncing in progress...'
+                            : syncStatus.state === 'synced'
+                              ? 'Connected & Synced'
+                              : syncStatus.state === 'error'
+                                ? 'Sync Idle / Warning'
+                                : 'Background Auto-Sync Active'
+                        }
+                        color={
+                          syncStatus.state === 'synced'
+                            ? 'success'
+                            : syncStatus.state === 'syncing' || syncingManual
+                              ? 'primary'
+                              : syncStatus.state === 'error'
+                                ? 'warning'
+                                : 'default'
+                        }
+                        variant="outlined"
+                      />
+
+                      {syncStatus.lastSyncTime ? (
+                        <Typography variant="caption" color="text.secondary">
+                          Last synced: {new Date(syncStatus.lastSyncTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          {typeof syncStatus.recordsSyncedLastTime === 'number' && syncStatus.recordsSyncedLastTime > 0
+                            ? ` (${syncStatus.recordsSyncedLastTime} records merged)`
+                            : ''}
+                        </Typography>
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">
+                          Background sync is checking every 25 seconds.
+                        </Typography>
+                      )}
+                    </Stack>
+
+                    {(syncStatus.state === 'syncing' || syncingManual) && (
+                      <Box sx={{ width: '100%', pt: 0.5 }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                          <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                            {syncStatus.progress?.label || syncStatus.message || 'Synchronizing with clinic peer...'}
+                          </Typography>
+                          <Typography variant="caption" color="primary.main" fontWeight={700}>
+                            {syncStatus.progress?.percent ?? 0}%
+                          </Typography>
+                        </Stack>
+                        <LinearProgress
+                          variant={typeof syncStatus.progress?.percent === 'number' && syncStatus.progress.percent > 0 ? 'determinate' : 'indeterminate'}
+                          value={syncStatus.progress?.percent ?? 0}
+                          sx={{ height: 6, borderRadius: 3 }}
+                        />
+                      </Box>
+                    )}
+
+                    {syncStatus.peerUrl && (
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
+                        Peer device: {syncStatus.peerName ? `${syncStatus.peerName} — ` : ''}{syncStatus.peerUrl}
+                      </Typography>
+                    )}
+
+                    {syncStatus.message && syncStatus.state === 'error' && (
+                      <Alert severity="info" sx={{ py: 0.5, fontSize: 13 }}>
+                        {syncStatus.message}. Connect both devices to the same Wi-Fi router for auto-synchronization.
+                      </Alert>
+                    )}
+                  </Stack>
+                </Paper>
                 </>
                 )}
               </Stack>

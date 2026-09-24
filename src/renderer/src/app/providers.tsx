@@ -11,6 +11,7 @@ import { AppToastHost, showAppToast } from '@/components/AppToast';
 import { UpdateBanner } from '@/components/UpdateBanner';
 import { UpdateProvider } from '@/context/updateProvider';
 import { DatabaseModeProvider } from '@/context/DatabaseModeProvider';
+import { SyncProvider } from '@/context/SyncContext';
 import { httpBatchLink } from '@trpc/client';
 import { trpc } from '@/utils/trpc';
 
@@ -104,7 +105,9 @@ export function AppProviders({ children }: PropsWithChildren): React.JSX.Element
               <DatabaseModeProvider>
                 <LicenseModulesProvider>
                   <UpdateProvider>
-                    <RealtimeBootstrap>{children}</RealtimeBootstrap>
+                    <SyncProvider>
+                      <RealtimeBootstrap>{children}</RealtimeBootstrap>
+                    </SyncProvider>
                   </UpdateProvider>
                 </LicenseModulesProvider>
               </DatabaseModeProvider>

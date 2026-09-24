@@ -195,15 +195,21 @@ export function LoginPage(): React.JSX.Element {
     }
     setLoading(true);
     setError('');
-    const result = await login(email, password);
-    setLoading(false);
-    if (result === true) {
-      window.localStorage.setItem(LAST_LOGIN_EMAIL_KEY, email.trim().toLowerCase());
-      navigate('/dashboard', { replace: true });
-    } else if (typeof result === 'string') {
-      setError(result);
-    } else {
-      setError('Invalid email or password.');
+    try {
+      const result = await login(email, password);
+      if (result === true) {
+        window.localStorage.setItem(LAST_LOGIN_EMAIL_KEY, email.trim().toLowerCase());
+        navigate('/dashboard', { replace: true });
+      } else if (typeof result === 'string') {
+        setError(result);
+      } else {
+        setError('Invalid email or password.');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Login error: ${msg}`);
+    } finally {
+      setLoading(false);
     }
   };
 

@@ -13,9 +13,11 @@ import { createScheduleRouter } from './schedule.routes';
 import { createSearchRouter } from './search.routes';
 import { createChatRouter } from './chat.routes';
 import { createMedicinesRouter } from './medicines.routes';
+import { createSyncRouter } from './sync.routes';
 
 export function registerRoutes(app: Express, io: SocketIOServer): void {
   app.use('/api/auth', createAuthRouter());
+  app.use('/api/sync', createSyncRouter(io));
   app.use(authenticate);
   app.use('/api/tokens', createTokensRouter(io));
   app.use('/api/lab', createLabRouter(io));
