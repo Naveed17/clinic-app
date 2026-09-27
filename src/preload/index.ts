@@ -657,6 +657,16 @@ const api = {
         () => request(`/api/tokens/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
         'tokens:update-status', id, status,
       ),
+    updatePriority: (id: string, priority: string) =>
+      call(
+        () => request(`/api/tokens/${id}/priority`, { method: 'PATCH', body: JSON.stringify({ priority }) }),
+        'tokens:update-priority', id, priority,
+      ),
+    updateVitals: (id: string, vitals: unknown) =>
+      call(
+        () => request(`/api/tokens/${id}/vitals`, { method: 'PATCH', body: JSON.stringify({ vitals }) }),
+        'tokens:update-vitals', id, vitals,
+      ),
     delete: (id: string) =>
       call(
         () => request(`/api/tokens/${id}`, { method: 'DELETE' }),

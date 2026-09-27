@@ -14,6 +14,8 @@ import {
   listPrescriptionsForPatient,
   listTokens,
   updateTokenStatus,
+  updateTokenPriority,
+  updateTokenVitals,
   upsertPrescription,
   refundTokenFee,
   countPriorVisitsThisWeek,
@@ -79,7 +81,17 @@ export function createTokensRouter(io: SocketIOServer): Router {
     res.status(201).json(token);
   }));
   router.patch('/:id/status', asyncHandler(async (req, res) => {
-    const token = await updateTokenStatus(String(req.params.id), req.body.status as TokenStatus);
+    const token = await updateTokenStatus(String(req.params.id), req.body.status);
+    emitDataChange(io, 'token', 'updated');
+    res.json(token);
+  }));
+  router.patch('/:id/priority', asyncHandler(async (req, res) => {
+    const token = await updateTokenPriority(String(req.params.id), String(req.body.priority ?? 'NORMAL'));
+    emitDataChange(io, 'token', 'updated');
+    res.json(token);
+  }));
+  router.patch('/:id/vitals', asyncHandler(async (req, res) => {
+    const token = await updateTokenVitals(String(req.params.id), req.body.vitals);
     emitDataChange(io, 'token', 'updated');
     res.json(token);
   }));

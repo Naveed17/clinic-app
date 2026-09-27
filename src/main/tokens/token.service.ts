@@ -19,6 +19,8 @@ export interface TokenInput {
   reason?: string | null;
   consultationFee?: number;
   feeDiscount?: number;
+  priority?: string;
+  vitals?: unknown;
 }
 
 export interface PrescriptionInput {
@@ -104,6 +106,8 @@ function mapTokenRecord(token: {
   consultationFee: unknown;
   feeDiscount?: unknown;
   feeRefunded?: unknown;
+  priority?: unknown;
+  vitals?: unknown;
   createdAt: Date;
   updatedAt: Date;
   patient: Parameters<typeof mapPatientPerson>[0];
@@ -115,6 +119,12 @@ function mapTokenRecord(token: {
     consultationFee: mapTokenFee(token.consultationFee),
     feeDiscount: mapTokenFee(token.feeDiscount),
     feeRefunded: mapTokenFee(token.feeRefunded),
+    priority: (token.priority as string) || 'NORMAL',
+    vitals: token.vitals
+      ? typeof token.vitals === 'string'
+        ? (() => { try { return JSON.parse(token.vitals as string); } catch { return null; } })()
+        : token.vitals
+      : null,
     patient: mapPatientPerson(token.patient),
     prescription: token.prescription ?? null,
   };
@@ -139,12 +149,23 @@ function mapPrescription(tokenId: unknown, r: Record<string, unknown>) {
 
 function mapJoinToken(r: Record<string, unknown>) {
   return {
-    id: r.id, tokenNumber: r.tokenNumber, date: r.date,
-    patientId: r.patientId, doctorId: r.doctorId,
-    status: r.status, notes: r.notes, reason: r.reason,
+    id: String(r.id),
+    tokenNumber: Number(r.tokenNumber),
+    date: String(r.date),
+    patientId: String(r.patientId),
+    doctorId: String(r.doctorId),
+    status: String(r.status),
+    notes: (r.notes as string | null) ?? null,
+    reason: (r.reason as string | null) ?? null,
     consultationFee: mapTokenFee(r.consultationFee),
     feeDiscount: mapTokenFee(r.feeDiscount),
     feeRefunded: mapTokenFee(r.feeRefunded),
+    priority: (r.priority as string) || 'NORMAL',
+    vitals: r.vitals
+      ? typeof r.vitals === 'string'
+        ? (() => { try { return JSON.parse(r.vitals as string); } catch { return null; } })()
+        : r.vitals
+      : null,
     createdAt: r.createdAt, updatedAt: r.updatedAt,
     patient: mapPatientPerson({
       id: r.patientObjId as string,
@@ -155,8 +176,12 @@ function mapJoinToken(r: Record<string, unknown>) {
       dateOfBirth: r.patientDob ? new Date(r.patientDob as string) : null,
       weight: r.patientWeight != null ? Number(r.patientWeight) : null,
     }),
-    doctor:  { id: r.doctorObjId,  firstName: r.doctorFirstName,  lastName: r.doctorLastName },
-    prescription: r.prescriptionRaw ? mapPrescription(r.id, r) : null,
+    doctor: {
+      id: String(r.doctorObjId || ''),
+      firstName: String(r.doctorFirstName || ''),
+      lastName: String(r.doctorLastName || ''),
+    },
+    prescription: r.prescriptionRaw ? mapPrescription(r.id as string, r) : null,
   };
 }
 
@@ -442,6 +467,21 @@ export async function createToken(input: TokenInput) {
         },
         include: tokenInclude,
       });
+      if (input.priority) {
+        await getPrisma().$executeRawUnsafe(
+          `UPDATE "Token" SET "priority" = ? WHERE id = ?`,
+          input.priority,
+          token.id,
+        );
+      }
+      if (input.vitals) {
+        const json = typeof input.vitals === 'string' ? input.vitals : JSON.stringify(input.vitals);
+        await getPrisma().$executeRawUnsafe(
+          `UPDATE "Token" SET "vitals" = ? WHERE id = ?`,
+          json,
+          token.id,
+        );
+      }
       await getPrisma().$executeRawUnsafe(
         `UPDATE "Token" SET feeDiscount = ? WHERE id = ?`,
         feeDiscount,
@@ -463,6 +503,8 @@ export async function createToken(input: TokenInput) {
         patient: token.patient as Parameters<typeof mapPatientPerson>[0],
         feeDiscount,
         feeRefunded: (token as { feeRefunded?: unknown }).feeRefunded,
+        priority: input.priority || 'NORMAL',
+        vitals: input.vitals || null,
         prescription: null,
       });
     } catch (err: unknown) {
@@ -476,12 +518,15 @@ export async function createToken(input: TokenInput) {
   throw new Error('Could not allocate a unique token number. Please try again.');
 }
 
-export async function updateTokenStatus(id: string, status: TokenStatus) {
-  const token = await getPrisma().token.update({
-    where: { id },
-    data: { status },
-    include: tokenInclude,
-  });
+export async function updateTokenStatus(id: string, status: TokenStatus | string) {
+  await getPrisma().$executeRawUnsafe(
+    `UPDATE "Token" SET status = ?, updatedAt = ? WHERE id = ?`,
+    status,
+    new Date().toISOString(),
+    id,
+  );
+  const token = await getTokenById(id);
+  if (!token) throw new Error('Token not found.');
 
   if (status === 'DONE') {
     const existing = await getPrisma().doctorAttendance.findUnique({
@@ -495,16 +540,44 @@ export async function updateTokenStatus(id: string, status: TokenStatus) {
     });
     if (remaining === 0) await markCheckOut(token.doctor.id, token.date);
   }
-  const pr = await getPrisma().$queryRawUnsafe<Record<string, unknown>[]>(
-    `SELECT * FROM "Prescription" WHERE tokenId = ? LIMIT 1`, id
+  return token;
+}
+
+export async function updateTokenPriority(id: string, priority: string) {
+  const valid = ['NORMAL', 'URGENT', 'SENIOR', 'CHILD'];
+  const safePriority = valid.includes(priority) ? priority : 'NORMAL';
+  await getPrisma().$executeRawUnsafe(
+    `UPDATE "Token" SET "priority" = ?, "updatedAt" = ? WHERE id = ?`,
+    safePriority,
+    new Date().toISOString(),
+    id,
   );
-  return {
-    ...token,
-    consultationFee: mapTokenFee((token as { consultationFee?: unknown }).consultationFee),
-    feeDiscount: mapTokenFee((token as { feeDiscount?: unknown }).feeDiscount),
-    feeRefunded: mapTokenFee((token as { feeRefunded?: unknown }).feeRefunded),
-    prescription: pr[0] ? mapPrescription(id, pr[0]) : null,
-  };
+  return getTokenById(id);
+}
+
+export async function updateTokenVitals(id: string, vitals: unknown) {
+  const json = vitals ? JSON.stringify(vitals) : null;
+  await getPrisma().$executeRawUnsafe(
+    `UPDATE "Token" SET "vitals" = ?, "updatedAt" = ? WHERE id = ?`,
+    json,
+    new Date().toISOString(),
+    id,
+  );
+  if (vitals && typeof vitals === 'object' && 'weight' in (vitals as Record<string, unknown>)) {
+    const rawWeight = (vitals as Record<string, unknown>).weight;
+    const numWeight = Number(rawWeight);
+    if (!Number.isNaN(numWeight) && numWeight > 0) {
+      try {
+        const tok = await getPrisma().token.findUnique({ where: { id }, select: { patientId: true } });
+        if (tok?.patientId) {
+          await getPrisma().patient.update({ where: { id: tok.patientId }, data: { weight: numWeight } });
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return getTokenById(id);
 }
 
 /** Same patient + doctor + local day — used when a visit appointment is completed. */

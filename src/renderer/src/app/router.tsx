@@ -22,6 +22,7 @@ import { DoctorSchedulePage } from '@/features/doctors/DoctorSchedulePage';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { TokensPage } from '@/features/tokens/TokensPage';
 import { WaitingRoomPage } from '@/features/waiting-room/WaitingRoomPage';
+import { WaitingDisplayPage } from '@/features/waiting-room/WaitingDisplayPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { ChatPage } from '@/features/chat/ChatPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -40,6 +41,7 @@ const router = createHashRouter([
     errorElement: <RouteErrorPage />,
     children: [
       { path: '/login', element: <LoginPage /> },
+      { path: '/waiting-display', element: <WaitingDisplayPage /> },
       {
         element: <ProtectedRoute />,
         errorElement: <RouteErrorPage />,

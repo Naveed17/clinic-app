@@ -57,6 +57,8 @@ declare global {
         weekVisits: (patientId: string, doctorId: string, date: string) => Promise<{ count: number }>;
         create: (input: TokenInput) => Promise<Token>;
         updateStatus: (id: string, status: string) => Promise<Token>;
+        updatePriority: (id: string, priority: string) => Promise<Token>;
+        updateVitals: (id: string, vitals: unknown) => Promise<Token>;
         refundFee: (id: string, amount?: number) => Promise<Token>;
         delete: (id: string) => Promise<void>;
       };

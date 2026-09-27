@@ -1,4 +1,16 @@
-export type TokenStatus = 'WAITING' | 'DONE' | 'SKIPPED';
+export type TokenStatus = 'WAITING' | 'DONE' | 'SKIPPED' | 'ON_HOLD';
+export type TokenPriority = 'NORMAL' | 'URGENT' | 'SENIOR' | 'CHILD';
+
+export interface TokenVitals {
+  bp?: string;
+  pulse?: number | string;
+  temp?: number | string;
+  spo2?: number | string;
+  rbs?: number | string;
+  weight?: number | string;
+  notes?: string;
+  recordedAt?: string;
+}
 
 export interface TokenPerson {
   id: string;
@@ -20,6 +32,8 @@ export interface Token {
   patientId: string;
   doctorId: string;
   status: TokenStatus;
+  priority?: TokenPriority;
+  vitals?: TokenVitals | null;
   notes: string | null;
   reason: string | null;
   consultationFee?: number;
@@ -40,6 +54,8 @@ export interface TokenInput {
   reason?: string | null;
   consultationFee?: number;
   feeDiscount?: number;
+  priority?: TokenPriority | string;
+  vitals?: TokenVitals | null;
 }
 
 export interface PrescriptionMedicine {

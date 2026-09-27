@@ -9,7 +9,8 @@ import RedoIcon from '@mui/icons-material/Redo';
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 import TitleOutlinedIcon from '@mui/icons-material/TitleOutlined';
 import UndoIcon from '@mui/icons-material/Undo';
-import { Box, IconButton, Stack, Tooltip } from '@mui/material';
+import { Box, IconButton, Stack, Tooltip, useTheme } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { useEffect, useState } from 'react';
 import { labTableExtensions } from './labTiptapTable';
 
@@ -29,6 +30,14 @@ export function LabTiptapEditor({
   onEditor,
   minHeight = 420,
 }: LabTiptapEditorProps): React.JSX.Element {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const blueColor = isDark ? '#38bdf8' : BLUE;
+  const inkColor = isDark ? '#f1f5f9' : INK;
+  const borderColor = theme.palette.divider;
+  const toolbarBg = isDark ? alpha(theme.palette.background.default, 0.7) : '#f8fafc';
+  const contentBg = theme.palette.background.paper;
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -122,8 +131,9 @@ export function LabTiptapEditor({
         sx={{
           px: 1,
           py: 0.5,
-          borderBottom: '1px solid #e2e8f0',
-          bgcolor: '#f8fafc',
+          borderBottom: '1px solid',
+          borderColor,
+          bgcolor: toolbarBg,
           flexWrap: 'wrap',
         }}
       >
@@ -134,7 +144,10 @@ export function LabTiptapEditor({
                 size="small"
                 disabled={!editor}
                 onClick={tool.run}
-                sx={{ color: tool.active ? BLUE : '#64748b' }}
+                sx={{
+                  color: tool.active ? blueColor : isDark ? '#94a3b8' : '#64748b',
+                  '&:hover': { bgcolor: alpha(blueColor, 0.1) },
+                }}
               >
                 {tool.icon}
               </IconButton>
@@ -149,22 +162,22 @@ export function LabTiptapEditor({
           overflow: 'auto',
           px: 2.5,
           py: 2,
-          bgcolor: '#fff',
+          bgcolor: contentBg,
           '& .ProseMirror': {
             outline: 'none',
             minHeight,
             fontSize: 14,
             lineHeight: 1.65,
-            color: `${INK} !important`,
-            caretColor: BLUE,
+            color: `${inkColor} !important`,
+            caretColor: blueColor,
             '& p': { m: 0, mb: 1 },
-            '& h2': { fontSize: 20, fontWeight: 800, color: `${BLUE} !important`, mt: 0, mb: 0.75 },
+            '& h2': { fontSize: 20, fontWeight: 800, color: `${blueColor} !important`, mt: 0, mb: 0.75 },
             '& h3': {
               fontSize: 13.5,
               fontWeight: 800,
               letterSpacing: 0.4,
               textTransform: 'uppercase',
-              color: `${BLUE} !important`,
+              color: `${blueColor} !important`,
               mt: 2,
               mb: 0.75,
             },
@@ -177,13 +190,14 @@ export function LabTiptapEditor({
               fontSize: 13,
             },
             '& th, & td': {
-              border: '1px solid #cbd5e1',
+              border: `1px solid ${isDark ? alpha('#ffffff', 0.15) : '#cbd5e1'}`,
               padding: '6px 8px',
               verticalAlign: 'top',
+              color: isDark ? '#e2e8f0' : undefined,
             },
             '& th': {
-              background: '#e8f1f8',
-              color: BLUE,
+              background: isDark ? alpha(blueColor, 0.15) : '#e8f1f8',
+              color: isDark ? '#7dd3fc' : BLUE,
               fontWeight: 800,
               textAlign: 'left',
               fontSize: 11.5,

@@ -22,6 +22,7 @@ import {
   TextField,
   Tooltip,
   Typography,
+  useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -70,6 +71,17 @@ export function LabReportBuilderDialog({
 }: LabReportBuilderDialogProps): React.JSX.Element {
   const { can } = useLicense();
   const qc = useQueryClient();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const blueColor = isDark ? '#38bdf8' : BLUE;
+  const abnormalBg = isDark ? alpha('#ef4444', 0.16) : ABNORMAL_BG;
+  const abnormalBorder = isDark ? alpha('#ef4444', 0.45) : ABNORMAL_BORDER;
+  const panelBg = theme.palette.background.paper;
+  const subHeaderBg = isDark ? alpha(theme.palette.background.default, 0.6) : '#f8fafc';
+  const borderColor = theme.palette.divider;
+  const dialogBg = isDark ? theme.palette.background.default : '#eef3f8';
+  const inputBg = isDark ? alpha('#ffffff', 0.05) : '#ffffff';
+  const inputBorder = isDark ? alpha('#ffffff', 0.15) : '#cbd5e1';
   const [clinic, setClinic] = useState<LabReportClinic>({
     clinicName: '',
     clinicAddress: '',
@@ -293,7 +305,7 @@ export function LabReportBuilderDialog({
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            bgcolor: '#eef3f8',
+            bgcolor: dialogBg,
           },
         }}
       >
@@ -304,12 +316,13 @@ export function LabReportBuilderDialog({
             display: 'flex',
             alignItems: 'center',
             gap: 1.5,
-            bgcolor: '#fff',
-            borderBottom: '1px solid #e2e8f0',
+            bgcolor: panelBg,
+            borderBottom: '1px solid',
+            borderColor,
             flexShrink: 0,
           }}
         >
-          <ScienceOutlinedIcon sx={{ color: BLUE }} />
+          <ScienceOutlinedIcon sx={{ color: blueColor }} />
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography fontWeight={800} fontSize={15} noWrap>
               Test Report Builder — {order.test}
@@ -376,7 +389,12 @@ export function LabReportBuilderDialog({
               startIcon={<PrintOutlinedIcon />}
               loading={saveMutation.isPending}
               onClick={() => void handleSaveAndPrint()}
-              sx={{ bgcolor: BLUE, '&:hover': { bgcolor: '#155a87' } }}
+              sx={{
+                bgcolor: blueColor,
+                color: isDark ? '#0f172a' : '#fff',
+                fontWeight: 700,
+                '&:hover': { bgcolor: isDark ? '#7dd3fc' : '#155a87' },
+              }}
             >
               Print
             </Button>
@@ -398,16 +416,17 @@ export function LabReportBuilderDialog({
         >
           <Box
             sx={{
-              bgcolor: '#fff',
+              bgcolor: panelBg,
               borderRadius: 2,
-              border: '1px solid #e2e8f0',
+              border: '1px solid',
+              borderColor,
               display: 'flex',
               flexDirection: 'column',
               minHeight: 0,
               overflow: 'hidden',
             }}
           >
-            <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid #e2e8f0' }}>
+            <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid', borderColor, bgcolor: subHeaderBg }}>
               <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
                 <Box>
                   <Typography fontWeight={800} fontSize={13.5}>
@@ -445,15 +464,16 @@ export function LabReportBuilderDialog({
                   gap: 0,
                   px: 1.5,
                   py: 1,
-                  bgcolor: '#f8fafc',
-                  borderBottom: '1px solid #e2e8f0',
+                  bgcolor: subHeaderBg,
+                  borderBottom: '1px solid',
+                  borderColor,
                   position: 'sticky',
                   top: 0,
                   zIndex: 1,
                 }}
               >
                 {['Test parameter', 'Current value', 'Normal range', 'Unit', 'Flag'].map((label) => (
-                  <Typography key={label} fontSize={11} fontWeight={800} color={BLUE} sx={{ textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                  <Typography key={label} fontSize={11} fontWeight={800} color={blueColor} sx={{ textTransform: 'uppercase', letterSpacing: 0.3 }}>
                     {label}
                   </Typography>
                 ))}
@@ -470,9 +490,9 @@ export function LabReportBuilderDialog({
                       alignItems: 'center',
                       px: 1.5,
                       py: 0.85,
-                      bgcolor: abnormal ? ABNORMAL_BG : 'transparent',
+                      bgcolor: abnormal ? abnormalBg : 'transparent',
                       borderBottom: '1px solid',
-                      borderColor: abnormal ? ABNORMAL_BORDER : '#f1f5f9',
+                      borderColor: abnormal ? abnormalBorder : borderColor,
                     }}
                   >
                     <TextField
@@ -481,7 +501,7 @@ export function LabReportBuilderDialog({
                       value={row.name}
                       disabled={readOnly}
                       onChange={(e) => updateRow(row.id, { name: e.target.value })}
-                      InputProps={{ disableUnderline: true, sx: { fontSize: 13, fontWeight: 600 } }}
+                      InputProps={{ disableUnderline: true, sx: { fontSize: 13, fontWeight: 600, color: 'text.primary' } }}
                     />
                     <TextField
                       size="small"
@@ -492,12 +512,15 @@ export function LabReportBuilderDialog({
                       onChange={(e) => updateRow(row.id, { value: e.target.value })}
                       sx={{
                         '& .MuiOutlinedInput-root': {
-                          bgcolor: '#fff',
+                          bgcolor: inputBg,
+                          color: 'text.primary',
                           fontWeight: 700,
                           fontSize: 13,
+                          '& fieldset': { borderColor: inputBorder },
+                          '&:hover fieldset': { borderColor: blueColor },
                           ...(abnormal
                             ? {
-                                bgcolor: alpha('#ef4444', 0.08),
+                                bgcolor: alpha('#ef4444', isDark ? 0.22 : 0.08),
                                 '& fieldset': { borderColor: '#ef4444' },
                               }
                             : {}),
@@ -515,7 +538,7 @@ export function LabReportBuilderDialog({
                       onChange={(e) => updateRow(row.id, { unit: e.target.value })}
                       InputProps={{
                         disableUnderline: true,
-                        sx: { fontSize: 12.5 },
+                        sx: { fontSize: 12.5, color: 'text.secondary' },
                       }}
                     />
                     <Typography
@@ -530,7 +553,7 @@ export function LabReportBuilderDialog({
               })}
             </Box>
 
-            <Box sx={{ px: 2, py: 1.25, borderTop: '1px solid #e2e8f0' }}>
+            <Box sx={{ px: 2, py: 1.25, borderTop: '1px solid', borderColor, bgcolor: subHeaderBg }}>
               {!readOnly && (
                 <Button
                   size="small"
@@ -593,17 +616,20 @@ export function LabReportBuilderDialog({
 
           <Box
             sx={{
-              bgcolor: '#fff',
+              bgcolor: panelBg,
               borderRadius: 2,
-              border: '1px solid #e2e8f0',
+              border: '1px solid',
+              borderColor,
               display: 'flex',
               flexDirection: 'column',
               minHeight: 0,
               overflow: 'hidden',
-              boxShadow: '0 12px 40px rgba(26, 111, 168, 0.08)',
+              boxShadow: isDark
+                ? `0 12px 40px ${alpha('#000', 0.45)}`
+                : '0 12px 40px rgba(26, 111, 168, 0.08)',
             }}
           >
-            <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid #e2e8f0', bgcolor: '#f8fafc' }}>
+            <Box sx={{ px: 2, py: 1.25, borderBottom: '1px solid', borderColor, bgcolor: subHeaderBg }}>
               <Typography fontWeight={800} fontSize={13.5}>
                 Report canvas
               </Typography>

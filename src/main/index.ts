@@ -48,6 +48,7 @@ import { initAutoUpdater } from './updater';
 import { registerWhatsAppIpc } from './whatsapp/whatsapp.ipc';
 import { registerSyncIpc } from './sync/sync.ipc';
 import { startAutoSync, stopAutoSync } from './sync/sync.service';
+import { registerTtsIpc } from './tts/tts.ipc';
 
 let backendServer: BackendServer | undefined;
 
@@ -258,6 +259,7 @@ app.whenReady().then(async () => {
   registerSearchIpc();
   registerMedicineIpc();
   registerSyncIpc();
+  registerTtsIpc();
   // LAN discovery and peer sync only when not on cloud Postgres
   if (!isOnlineDatabaseMode()) {
     startDiscoveryListener();

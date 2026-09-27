@@ -56,6 +56,7 @@ enum TokenStatus {
   IN_PROGRESS
   DONE
   SKIPPED
+  ON_HOLD
 }
 
 // ==========================================
@@ -221,6 +222,8 @@ model Token {
   patientId   String
   doctorId    String
   status      TokenStatus @default(WAITING)
+  priority    String      @default("NORMAL")
+  vitals      String?
   notes       String?
   reason      String?
   consultationFee Decimal    @default(0)

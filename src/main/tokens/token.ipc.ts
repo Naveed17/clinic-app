@@ -13,6 +13,8 @@ import {
   listPrescriptionsForPatient,
   listTokens,
   updateTokenStatus,
+  updateTokenPriority,
+  updateTokenVitals,
   upsertPrescription,
   refundTokenFee,
   countPriorVisitsThisWeek,
@@ -59,8 +61,14 @@ export function registerTokenIpc(io?: SocketIOServer): void {
     }
     return token;
   });
-  ipcMain.handle('tokens:update-status', (_, id: string, status: TokenStatus) =>
+  ipcMain.handle('tokens:update-status', (_, id: string, status: string) =>
     updateTokenStatus(id, status)
+  );
+  ipcMain.handle('tokens:update-priority', (_, id: string, priority: string) =>
+    updateTokenPriority(id, priority)
+  );
+  ipcMain.handle('tokens:update-vitals', (_, id: string, vitals: unknown) =>
+    updateTokenVitals(id, vitals)
   );
   ipcMain.handle('tokens:delete', (_, id: string) => deleteToken(id));
   ipcMain.handle('tokens:refund-fee', (_, id: string, amount?: number) => refundTokenFee(id, amount));

@@ -59,6 +59,7 @@ import { fileToClinicLogoDataUrl } from '@/utils/avatarImage';
 import { invalidateClinicLogoCache, notifyClinicBrandChanged, resolveClinicLogoSrc } from '@/utils/clinicBrandLogo';
 import { CAREFLOW_BRAND, supportWhatsAppHref } from '@shared/careflowSupport';
 import { copySupportPhone, openSupportEmail, openSupportWhatsApp } from '@/utils/careflowSupportActions';
+import { TokenAudioSettingsContent } from '@/features/waiting-room/TokenAudioSettingsDialog';
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
 
@@ -179,7 +180,7 @@ export function SettingsPage(): React.JSX.Element {
     }
   }, [updateError]);
 
-  const [settingsTab, setSettingsTab] = useState<'general' | 'ai' | 'whatsapp' | 'backup' | 'support'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'announcements' | 'ai' | 'whatsapp' | 'backup' | 'support'>('general');
   const [supportContact, setSupportContact] = useState<{ phone: string; email: string } | null>(null);
   const [supportLoading, setSupportLoading] = useState(false);
   const [waTesting, setWaTesting] = useState(false);
@@ -720,7 +721,7 @@ export function SettingsPage(): React.JSX.Element {
         <Stack spacing={0} sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <Tabs
             value={settingsTab}
-            onChange={(_, v: 'general' | 'ai' | 'whatsapp' | 'backup' | 'support') => setSettingsTab(v)}
+            onChange={(_, v: 'general' | 'announcements' | 'ai' | 'whatsapp' | 'backup' | 'support') => setSettingsTab(v)}
             sx={{
               mb: 3,
               minHeight: 44,
@@ -741,6 +742,12 @@ export function SettingsPage(): React.JSX.Element {
               icon={<TuneOutlinedIcon sx={{ fontSize: 18 }} />}
               iconPosition="start"
               label="General"
+            />
+            <Tab
+              value="announcements"
+              icon={<CampaignOutlinedIcon sx={{ fontSize: 18 }} />}
+              iconPosition="start"
+              label="Token Voice & Draft"
             />
             {can('ai') && (
               <Tab
@@ -1249,6 +1256,12 @@ export function SettingsPage(): React.JSX.Element {
                 )}
               </Stack>
             </Stack>
+          )}
+
+          {settingsTab === 'announcements' && (
+            <Box sx={{ maxWidth: 640, pb: 4 }}>
+              <TokenAudioSettingsContent />
+            </Box>
           )}
 
           {settingsTab === 'ai' && can('ai') && (

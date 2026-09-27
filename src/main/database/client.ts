@@ -544,6 +544,16 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
       'ALTER TABLE "Token" ADD COLUMN "feeDiscount" DECIMAL NOT NULL DEFAULT 0',
     );
   }
+  if (!tokenCols.includes('priority')) {
+    await database.$executeRawUnsafe(
+      'ALTER TABLE "Token" ADD COLUMN "priority" TEXT NOT NULL DEFAULT \'NORMAL\'',
+    );
+  }
+  if (!tokenCols.includes('vitals')) {
+    await database.$executeRawUnsafe(
+      'ALTER TABLE "Token" ADD COLUMN "vitals" TEXT',
+    );
+  }
 
   await database.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "DoctorSchedule" (

@@ -29,7 +29,7 @@ export const ROUTE_ACCESS: Record<AppRoute, UserRole[]> = {
   '/appointments': ['doctor', 'receptionist'],
   '/consultation/:id': ['doctor'],
   '/tokens':       ['receptionist'],
-  '/waiting-room': ['doctor'],
+  '/waiting-room': ['doctor', 'receptionist', 'admin'],
   '/billing':      ['receptionist'],
   '/opd-reports':  ['admin', 'receptionist'],
   '/medicines':    ['receptionist'],
