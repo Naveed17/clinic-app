@@ -1,8 +1,10 @@
 import { app, BrowserWindow } from 'electron';
 import { join } from 'node:path';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { getSettings } from '../config/settings';
+import { getSettings, resolveOnlineApiOrigin } from '../config/settings';
 import { getDiscoveredServers } from '../settings/settings.ipc';
+import { getLicenseRuntimeMeta, applyDatabaseModeFromApi } from '../license/license.ipc';
+import { uploadLocalFile } from '../backup/migrate-to-cloud.ipc';
 import {
   extractChangesSince,
   extractManifest,
@@ -12,6 +14,7 @@ import {
 } from './sync.engine';
 import {
   SYNC_TABLES,
+  type SyncTableName,
   type SyncStatus,
   type SyncProgressInfo,
   type SyncExchangePayload,
@@ -24,27 +27,92 @@ function getSyncStateFilePath(): string {
   return join(app.getPath('userData'), 'sync-state.json');
 }
 
-function loadLastSyncTime(): number {
+function getSyncKey(schemaId?: string): string {
+  return schemaId ? `sync_${schemaId}` : 'lastSyncTime';
+}
+
+function loadLastSyncTime(schemaId?: string): number {
   try {
     const file = getSyncStateFilePath();
     if (existsSync(file)) {
-      const data = JSON.parse(readFileSync(file, 'utf-8')) as { lastSyncTime?: number };
+      const data = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>;
+      const key = getSyncKey(schemaId);
+      if (typeof data[key] === 'number') {
+        return data[key] as number;
+      }
+      // If a schemaId has never been synced, return 0 to trigger full initial sync
+      if (schemaId) {
+        return 0;
+      }
       return Number(data?.lastSyncTime || 0);
     }
   } catch { /* ignore */ }
   return 0;
 }
 
-function saveLastSyncTime(timestamp: number): void {
+function saveLastSyncTime(timestamp: number, schemaId?: string): void {
   try {
-    writeFileSync(
-      getSyncStateFilePath(),
-      JSON.stringify({ lastSyncTime: timestamp, updatedAt: new Date().toISOString() }, null, 2),
-      'utf-8',
-    );
+    const file = getSyncStateFilePath();
+    let currentData: Record<string, unknown> = {};
+    if (existsSync(file)) {
+      try {
+        currentData = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>;
+      } catch { /* ignore */ }
+    }
+    const key = getSyncKey(schemaId);
+    currentData[key] = timestamp;
+    currentData.lastSyncTime = timestamp;
+    currentData.updatedAt = new Date().toISOString();
+    writeFileSync(file, JSON.stringify(currentData, null, 2), 'utf-8');
   } catch (err) {
     console.warn('[SyncService] Failed to save last sync timestamp:', err);
   }
+}
+
+interface SyncCheckpointData {
+  completedTables?: string[];
+  tableOffsets?: Record<string, number>;
+}
+
+function loadSyncCheckpoint(schemaId?: string): SyncCheckpointData {
+  try {
+    const file = getSyncStateFilePath();
+    if (existsSync(file)) {
+      const data = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>;
+      const cpKey = schemaId ? `checkpoint_${schemaId}` : 'checkpoint';
+      if (data[cpKey] && typeof data[cpKey] === 'object') {
+        return data[cpKey] as SyncCheckpointData;
+      }
+    }
+  } catch { /* ignore */ }
+  return { completedTables: [], tableOffsets: {} };
+}
+
+function saveSyncCheckpoint(schemaId: string | undefined, cp: SyncCheckpointData): void {
+  try {
+    const file = getSyncStateFilePath();
+    let currentData: Record<string, unknown> = {};
+    if (existsSync(file)) {
+      try {
+        currentData = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>;
+      } catch { /* ignore */ }
+    }
+    const cpKey = schemaId ? `checkpoint_${schemaId}` : 'checkpoint';
+    currentData[cpKey] = cp;
+    writeFileSync(file, JSON.stringify(currentData, null, 2), 'utf-8');
+  } catch { /* ignore */ }
+}
+
+function clearSyncCheckpoint(schemaId?: string): void {
+  try {
+    const file = getSyncStateFilePath();
+    if (existsSync(file)) {
+      const currentData = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>;
+      const cpKey = schemaId ? `checkpoint_${schemaId}` : 'checkpoint';
+      delete currentData[cpKey];
+      writeFileSync(file, JSON.stringify(currentData, null, 2), 'utf-8');
+    }
+  } catch { /* ignore */ }
 }
 
 let syncStatus: SyncStatus = {
@@ -59,6 +127,7 @@ let isSyncing = false;
 function broadcastStatus(): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
+      win.webContents.send('sync:status-changed', syncStatus);
       win.webContents.send('clinic:sync:status-changed', syncStatus);
     }
   }
@@ -67,6 +136,7 @@ function broadcastStatus(): void {
 function notifyDataChanged(): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
+      win.webContents.send('data:changed', { entity: 'all', action: 'sync' });
       win.webContents.send('clinic:sync:data-changed', { entity: 'all', action: 'sync' });
     }
   }
@@ -90,22 +160,365 @@ export function getSyncStatus(): SyncStatus {
   return syncStatus;
 }
 
-/**
- * Resolves the peer URL to talk to.
- */
-export function resolvePeerUrl(): string | null {
+export type SyncTarget =
+  | { type: 'lan'; url: string }
+  | { type: 'cloud'; url: string; key?: string | null; schemaId?: string; hwid?: string }
+  | null;
+
+export function resolveSyncTarget(customPeerUrl?: string): SyncTarget {
+  const meta = getLicenseRuntimeMeta();
   const settings = getSettings();
+  const isOnlineMode = meta.databaseMode === 'online' || settings.databaseMode === 'online';
+
+  if (customPeerUrl && customPeerUrl.trim()) {
+    const trimmed = customPeerUrl.trim().replace(/\/+$/, '');
+    if (trimmed.startsWith('https://') || trimmed.includes('.vercel.app')) {
+      if (!isOnlineMode) {
+        return null;
+      }
+      return { type: 'cloud', url: trimmed, key: meta.key, schemaId: meta.schemaId, hwid: meta.hwid };
+    }
+    return { type: 'lan', url: trimmed };
+  }
+
   if (settings.clientApiUrl && settings.clientApiUrl.trim()) {
-    return settings.clientApiUrl.trim().replace(/\/+$/, '');
+    return { type: 'lan', url: settings.clientApiUrl.trim().replace(/\/+$/, '') };
   }
 
   const discovered = getDiscoveredServers();
   if (discovered && discovered.length > 0) {
     const first = discovered[0];
-    return `http://${first.ip}:${first.port}`;
+    return { type: 'lan', url: `http://${first.ip}:${first.port}` };
+  }
+
+  // Cloud database sync ONLY runs when license or settings databaseMode is 'online'
+  if (isOnlineMode) {
+    const cloudUrl = resolveOnlineApiOrigin(meta.clinicalApiUrl || settings.clinicalApiUrl);
+    if (cloudUrl) {
+      return {
+        type: 'cloud',
+        url: cloudUrl,
+        key: meta.key,
+        schemaId: meta.schemaId,
+        hwid: meta.hwid,
+      };
+    }
   }
 
   return null;
+}
+
+export function resolvePeerUrl(): string | null {
+  const target = resolveSyncTarget();
+  return target ? target.url : null;
+}
+
+async function syncWithCloud(
+  target: { url: string; key?: string | null; schemaId?: string; hwid?: string },
+  opts?: { silent?: boolean },
+): Promise<{ ok: boolean; recordsSynced?: number; error?: string }> {
+  updateProgress(5, 'Connecting to cloud database...');
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const pingRes = await fetch(`${target.url}/api/clinical/health`, {
+      signal: controller.signal,
+      headers: {
+        ...(target.key ? { 'x-license-key': target.key } : {}),
+        ...(target.schemaId ? { 'x-schema-id': target.schemaId } : {}),
+      },
+    }).catch(() => null);
+    clearTimeout(timeoutId);
+
+    if (!pingRes || !pingRes.ok) {
+      syncStatus = {
+        ...syncStatus,
+        state: 'offline',
+        peerUrl: target.url,
+        peerName: 'Cloud',
+        message: 'Cloud not reachable. Working offline.',
+        progress: undefined,
+      };
+      broadcastStatus();
+      isSyncing = false;
+      return { ok: false, error: 'Cloud database not reachable. Working offline.' };
+    }
+
+    const since = loadLastSyncTime(target.schemaId || undefined);
+    const isInitialSync = since <= 0;
+    updateProgress(5, isInitialSync ? 'Checking cloud database records...' : 'Scanning local changes...');
+
+    let remoteTables: Record<string, number> = {};
+    if (isInitialSync) {
+      try {
+        const statusRes = await fetch(`${target.url}/api/clinic/migrate/export/status`, {
+          headers: {
+            ...(target.key ? { 'x-license-key': target.key } : {}),
+            ...(target.schemaId ? { 'x-schema-id': target.schemaId } : {}),
+          },
+        });
+        if (statusRes.ok) {
+          const statusData = (await statusRes.json()) as { tables?: Record<string, number> };
+          if (statusData && statusData.tables) {
+            remoteTables = statusData.tables;
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
+    const checkpoint = isInitialSync ? loadSyncCheckpoint(target.schemaId || undefined) : { completedTables: [], tableOffsets: {} };
+    const completedTables = new Set(checkpoint.completedTables || []);
+    const tableOffsets = checkpoint.tableOffsets || {};
+
+    const { changes, deletions } = await extractChangesSince(since);
+
+    let totalPushRows = 0;
+    const tableKeys = (Object.keys(changes) as SyncTableName[]).filter(
+      (t) => t !== 'PatientDocument' && t !== 'LabReport',
+    );
+    for (const t of Object.keys(changes) as SyncTableName[]) {
+      totalPushRows += (changes[t] || []).length;
+    }
+
+    const newSyncTime = Date.now();
+    if (totalPushRows === 0) {
+      saveLastSyncTime(newSyncTime, target.schemaId || undefined);
+      clearSyncCheckpoint(target.schemaId || undefined);
+      syncStatus = {
+        state: 'synced',
+        lastSyncTime: newSyncTime,
+        peerUrl: target.url,
+        peerName: 'Cloud',
+        message: 'All data is up to date',
+        recordsSyncedLastTime: 0,
+        progress: undefined,
+      };
+      broadcastStatus();
+      isSyncing = false;
+      return { ok: true, recordsSynced: 0 };
+    }
+
+    const BATCH_SIZE = 100;
+    let pushedCount = 0;
+
+    // Detect rows already synced to cloud so progress accurately resumes from where it stopped
+    if (isInitialSync) {
+      for (const table of tableKeys) {
+        const rows = changes[table] || [];
+        const remoteCount = remoteTables[table] || 0;
+        if (remoteCount >= rows.length && rows.length > 0) {
+          completedTables.add(table);
+          pushedCount += rows.length;
+        } else if (completedTables.has(table)) {
+          pushedCount += rows.length;
+        } else if (remoteCount > 0) {
+          const offset = Math.floor(remoteCount / BATCH_SIZE) * BATCH_SIZE;
+          if (offset > 0) {
+            tableOffsets[table] = offset;
+            pushedCount += offset;
+          }
+        }
+      }
+
+      if (pushedCount > 0) {
+        const rawPct = Math.round((pushedCount / totalPushRows) * 100);
+        updateProgress(
+          Math.min(99, Math.max(1, rawPct)),
+          `Resuming cloud sync from ${rawPct}% (${pushedCount}/${totalPushRows} records)...`,
+        );
+      }
+    }
+
+    for (const table of tableKeys) {
+      const rows = changes[table] || [];
+      if (!rows.length) continue;
+
+      if (isInitialSync && completedTables.has(table)) {
+        continue;
+      }
+
+      const startOffset = isInitialSync ? (tableOffsets[table] || 0) : 0;
+      for (let i = startOffset; i < rows.length; i += BATCH_SIZE) {
+        const batch = rows.slice(i, i + BATCH_SIZE);
+        let lastErr: Error | null = null;
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 45000);
+          try {
+            const pushRes = await fetch(`${target.url}/api/clinic/migrate/rows`, {
+              method: 'POST',
+              signal: controller.signal,
+              headers: {
+                'Content-Type': 'application/json',
+                ...(target.key ? { 'x-license-key': target.key } : {}),
+                ...(target.schemaId ? { 'x-schema-id': target.schemaId } : {}),
+                ...(target.hwid ? { 'x-hwid': target.hwid } : {}),
+              },
+              body: JSON.stringify({ table, rows: batch }),
+            });
+            clearTimeout(timer);
+            if (!pushRes.ok) {
+              const errText = await pushRes.text().catch(() => '');
+              if (pushRes.status === 403 || /online database service suspended/i.test(errText)) {
+                console.info('[SyncService] Online database is disabled for this license. Automatically transitioning to Local mode.');
+                if (target.key) {
+                  applyDatabaseModeFromApi(target.key, { databaseMode: 'local', onlineDatabase: false });
+                }
+                syncStatus = {
+                  ...syncStatus,
+                  state: 'offline',
+                  peerUrl: null,
+                  peerName: undefined,
+                  message: 'Online Database is disabled for this license. Operating in Local Mode.',
+                  progress: undefined,
+                };
+                broadcastStatus();
+                isSyncing = false;
+                return { ok: true, recordsSynced: 0 };
+              }
+              throw new Error(`Server ${pushRes.status}: ${errText.slice(0, 120)}`);
+            }
+            lastErr = null;
+            break;
+          } catch (e) {
+            clearTimeout(timer);
+            lastErr = e instanceof Error ? e : new Error(String(e));
+            if (attempt < 2) {
+              await new Promise((r) => setTimeout(r, 1500));
+            }
+          }
+        }
+
+        if (lastErr) {
+          throw new Error(`Uploading ${table} failed: ${lastErr.message}`);
+        }
+
+        pushedCount += batch.length;
+        const rawPct = Math.round((pushedCount / totalPushRows) * 100);
+        const pct = Math.min(99, Math.max(1, rawPct));
+        updateProgress(pct, `Uploaded ${pushedCount}/${totalPushRows} records (${pct}%)...`);
+
+        if (isInitialSync) {
+          tableOffsets[table] = i + batch.length;
+          saveSyncCheckpoint(target.schemaId || undefined, {
+            completedTables: Array.from(completedTables),
+            tableOffsets,
+          });
+        }
+      }
+
+      if (isInitialSync) {
+        completedTables.add(table);
+        delete tableOffsets[table];
+        saveSyncCheckpoint(target.schemaId || undefined, {
+          completedTables: Array.from(completedTables),
+          tableOffsets,
+        });
+      }
+    }
+
+    // Upload any modified Patient Documents & Lab Reports (PDFs / images) to Cloudflare R2
+    const patientDocChanges = changes['PatientDocument'] || [];
+    for (const doc of patientDocChanges) {
+      try {
+        await uploadLocalFile({
+          kind: 'patient',
+          ownerId: String(doc.patientId || ''),
+          id: String(doc.id || ''),
+          name: String(doc.name || 'document'),
+          mimeType: String(doc.mimeType || 'application/pdf'),
+          size: Number(doc.size || 0),
+          storedPath: String(doc.filePath || ''),
+        });
+      } catch (err) {
+        console.warn('[SyncService] Failed to sync patient doc to R2:', err);
+      }
+    }
+
+    const labReportChanges = changes['LabReport'] || [];
+    for (const report of labReportChanges) {
+      try {
+        await uploadLocalFile({
+          kind: 'lab',
+          ownerId: String(report.labOrderId || ''),
+          id: String(report.id || ''),
+          name: String(report.name || 'report'),
+          mimeType: String(report.mimeType || 'application/pdf'),
+          size: Number(report.size || 0),
+          storedPath: String(report.filePath || ''),
+        });
+      } catch (err) {
+        console.warn('[SyncService] Failed to sync lab report to R2:', err);
+      }
+    }
+
+    // Push local deletions to cloud so removed records and R2 files are also deleted from Neon & R2
+    if (deletions && deletions.length > 0) {
+      try {
+        await fetch(`${target.url}/api/clinic/migrate/deletions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(target.key ? { 'x-license-key': target.key } : {}),
+            ...(target.schemaId ? { 'x-schema-id': target.schemaId } : {}),
+            ...(target.hwid ? { 'x-hwid': target.hwid } : {}),
+          },
+          body: JSON.stringify({ deletions }),
+        });
+      } catch (err) {
+        console.warn('[SyncService] Failed to push deletions to cloud:', err);
+      }
+    }
+
+    saveLastSyncTime(newSyncTime, target.schemaId || undefined);
+    clearSyncCheckpoint(target.schemaId || undefined);
+    syncStatus = {
+      state: 'synced',
+      lastSyncTime: newSyncTime,
+      peerUrl: target.url,
+      peerName: 'Cloud',
+      message: `Synced ${pushedCount} record${pushedCount === 1 ? '' : 's'} with cloud`,
+      recordsSyncedLastTime: pushedCount,
+      progress: undefined,
+    };
+    broadcastStatus();
+    isSyncing = false;
+    return { ok: true, recordsSynced: pushedCount };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/online database service suspended/i.test(msg) || /server 403/i.test(msg)) {
+      console.info('[SyncService] Online database is disabled for this license. Operating in Local Mode.');
+      if (target.key) {
+        applyDatabaseModeFromApi(target.key, { databaseMode: 'local', onlineDatabase: false });
+      }
+      syncStatus = {
+        ...syncStatus,
+        state: 'offline',
+        peerUrl: null,
+        peerName: undefined,
+        message: 'Online Database is disabled for this license. Operating in Local Mode.',
+        progress: undefined,
+      };
+      broadcastStatus();
+      isSyncing = false;
+      return { ok: true, recordsSynced: 0 };
+    }
+    console.warn('[SyncService] Cloud sync failed:', msg);
+    syncStatus = {
+      ...syncStatus,
+      state: 'error',
+      peerUrl: target.url,
+      peerName: 'Cloud',
+      message: `Cloud sync error: ${msg}`,
+      progress: undefined,
+    };
+    broadcastStatus();
+    isSyncing = false;
+    return { ok: false, error: msg };
+  }
 }
 
 /**
@@ -120,20 +533,30 @@ export async function triggerSync(opts?: { silent?: boolean; customPeerUrl?: str
     return { ok: false, error: 'Sync already in progress.' };
   }
 
-  const targetUrl = opts?.customPeerUrl || resolvePeerUrl();
-  if (!targetUrl) {
+  const target = resolveSyncTarget(opts?.customPeerUrl);
+  if (!target) {
+    const meta = getLicenseRuntimeMeta();
+    const isLocalMode = meta.databaseMode !== 'online';
     syncStatus = {
       ...syncStatus,
       state: 'offline',
       peerUrl: null,
-      message: 'No clinic peer discovered. Working offline.',
+      peerName: undefined,
+      message: isLocalMode
+        ? 'Working in Local Mode (offline).'
+        : 'No clinic peer or cloud database configured. Working locally.',
       progress: undefined,
     };
-    if (!opts?.silent) broadcastStatus();
-    return { ok: false, error: 'No clinic peer found.' };
+    broadcastStatus();
+    return { ok: true, recordsSynced: 0 };
   }
 
   isSyncing = true;
+  if (target.type === 'cloud') {
+    return syncWithCloud(target, opts);
+  }
+
+  const targetUrl = target.url;
   updateProgress(2, 'Connecting to clinic peer...');
 
   try {

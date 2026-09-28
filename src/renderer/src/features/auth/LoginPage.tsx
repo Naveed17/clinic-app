@@ -282,15 +282,8 @@ export function LoginPage(): React.JSX.Element {
         }}
       >
         {/* Machine Role Badge */}
-        {serverMode && (
+        {!isOnline && serverMode && (
           <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1.5 }}>
-            {isOnline && (
-              <Stack direction="row" alignItems="center" spacing={0.6}
-                sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(14,165,233,0.2)', border: '1px solid rgba(56,189,248,0.45)' }}>
-                <WifiTetheringIcon sx={{ fontSize: 13, color: '#38bdf8' }} />
-                <Typography variant="caption" sx={{ color: '#7dd3fc', fontWeight: 700, fontSize: 11 }}>Online database</Typography>
-              </Stack>
-            )}
             {!isOnline && serverMode === 'lan-server' && (
               <Stack direction="row" alignItems="center" spacing={0.6}
                 sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(15,118,110,0.25)', border: '1px solid rgba(15,118,110,0.5)' }}>

@@ -192,7 +192,6 @@ app.whenReady().then(async () => {
         clientApiUrl: '',
       });
       process.env.CLINIC_API_URL = clinicalOrigin;
-      console.log('[CareFlow] Online mode → Neon via', process.env.CLINIC_API_URL, settings.schemaId || meta.schemaId);
     } else if (settings.serverMode === 'lan-client' && settings.clientApiUrl) {
       // Verify remote server is reachable before committing to client mode
       const reachable = await new Promise<boolean>((resolve) => {
@@ -260,11 +259,11 @@ app.whenReady().then(async () => {
   registerMedicineIpc();
   registerSyncIpc();
   registerTtsIpc();
-  // LAN discovery and peer sync only when not on cloud Postgres
+  // LAN discovery only when not on cloud Postgres
   if (!isOnlineDatabaseMode()) {
     startDiscoveryListener();
-    startAutoSync();
   }
+  startAutoSync();
   initAutoUpdater();
   createWindow();
 

@@ -132,7 +132,8 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps): React.JSX.Elemen
   const paperSx = {
     width: drawerWidth,
     boxSizing: 'border-box',
-    border: 'none',
+    border: '1px solid',
+    borderColor: 'divider',
     bgcolor: alpha(theme.palette.background.paper, 0.72),
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)',

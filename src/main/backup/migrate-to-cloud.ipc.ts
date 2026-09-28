@@ -457,7 +457,7 @@ export async function migrateLocalToCloud(onProgress?: ProgressCb): Promise<Migr
   return { ok: true, imported, files };
 }
 
-async function uploadLocalFile(input: {
+export async function uploadLocalFile(input: {
   kind: 'patient' | 'lab';
   ownerId: string;
   id: string;

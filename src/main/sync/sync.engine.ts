@@ -29,15 +29,22 @@ export async function extractChangesSince(sinceMs: number): Promise<{
 
   for (const table of SYNC_TABLES) {
     try {
-      // Query rows where updatedAt is newer than sinceMs
-      const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(
-        `SELECT * FROM "${table}" 
-         WHERE (typeof(updatedAt) = 'integer' AND updatedAt > ?)
-            OR (typeof(updatedAt) = 'text' AND CAST(ROUND((julianday(updatedAt) - 2440587.5) * 86400000) AS INTEGER) > ?)
-         ORDER BY updatedAt ASC`,
-        sinceMs,
-        sinceMs,
-      );
+      // Query rows: full table if sinceMs <= 0, or newer than sinceMs
+      let rows: Record<string, unknown>[] = [];
+      if (sinceMs <= 0) {
+        rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(
+          `SELECT * FROM "${table}"`,
+        );
+      } else {
+        rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(
+          `SELECT * FROM "${table}" 
+           WHERE (typeof(updatedAt) = 'integer' AND updatedAt > ?)
+              OR (typeof(updatedAt) = 'text' AND CAST(ROUND((julianday(updatedAt) - 2440587.5) * 86400000) AS INTEGER) > ?)
+           ORDER BY updatedAt ASC`,
+          sinceMs,
+          sinceMs,
+        );
+      }
 
       if (rows && rows.length > 0) {
         const allowedCols = SYNC_COLUMNS[table];

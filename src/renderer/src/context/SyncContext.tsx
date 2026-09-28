@@ -63,9 +63,37 @@ export function SyncProvider({ children }: PropsWithChildren): React.JSX.Element
       invalidateAllData();
     });
 
+    // Instant browser network detection
+    const handleOffline = () => {
+      setStatus((prev) => ({
+        ...prev,
+        state: 'offline',
+        message: 'No internet connection. Working offline.',
+      }));
+    };
+
+    const handleOnline = () => {
+      setStatus((prev) => ({
+        ...prev,
+        state: 'syncing',
+        message: 'Reconnected to internet. Syncing changes...',
+        progress: undefined,
+      }));
+      void window.clinic?.sync?.trigger?.();
+    };
+
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      handleOffline();
+    }
+
     return () => {
       unsubStatus?.();
       unsubData?.();
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
     };
   }, [invalidateAllData]);
 

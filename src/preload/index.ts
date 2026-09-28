@@ -29,7 +29,7 @@ const settingsReady = ipcRenderer
     if (s.databaseMode === 'online' && s.clinicalApiUrl) {
       apiUrl = s.clinicalApiUrl.replace(/\/+$/, '').replace(/\/api$/i, '');
       isOnlineClient = true;
-      isLanClient = true; // reuse HTTP path in call()
+      isLanClient = false; // Offline-first: Keep local IPC for all operations!
       if (s.schemaId) onlineSchemaId = s.schemaId;
       return;
     }
@@ -1130,21 +1130,25 @@ const api = {
     },
   },
   sync: {
-    status: () => ipc<{ state: 'idle' | 'syncing' | 'synced' | 'offline' | 'error'; lastSyncTime: number | null; peerUrl: string | null; peerName?: string; message?: string; recordsSyncedLastTime?: number }>('sync:status'),
+    status: () => ipc<{ state: 'idle' | 'syncing' | 'synced' | 'offline' | 'error'; lastSyncTime: number | null; peerUrl: string | null; peerName?: string; message?: string; recordsSyncedLastTime?: number; progress?: { percent: number; label: string } }>('sync:status'),
     trigger: (customPeerUrl?: string) => ipc<{ ok: boolean; recordsSynced?: number; error?: string }>('sync:trigger', customPeerUrl),
     resolvePeer: () => ipc<string | null>('sync:resolve-peer'),
-    onStatusChange: (callback: (status: { state: 'idle' | 'syncing' | 'synced' | 'offline' | 'error'; lastSyncTime: number | null; peerUrl: string | null; peerName?: string; message?: string; recordsSyncedLastTime?: number }) => void) => {
+    onStatusChange: (callback: (status: any) => void) => {
       const listener = (_e: unknown, status: any) => callback(status);
       ipcRenderer.on('sync:status-changed', listener);
+      ipcRenderer.on('clinic:sync:status-changed', listener);
       return () => {
         ipcRenderer.removeListener('sync:status-changed', listener);
+        ipcRenderer.removeListener('clinic:sync:status-changed', listener);
       };
     },
     onDataChanged: (callback: (data: { entity: string; action: string }) => void) => {
       const listener = (_e: unknown, data: any) => callback(data);
       ipcRenderer.on('data:changed', listener);
+      ipcRenderer.on('clinic:sync:data-changed', listener);
       return () => {
         ipcRenderer.removeListener('data:changed', listener);
+        ipcRenderer.removeListener('clinic:sync:data-changed', listener);
       };
     },
   },

@@ -132,8 +132,7 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
       elevation={0}
       sx={{
         zIndex: 1,
-        border: 'none',
-        borderBottom: '1px solid',
+        border: '1px solid',
         borderColor: 'divider',
         bgcolor: alpha(theme.palette.background.paper, 0.72),
         backdropFilter: 'blur(12px)',
@@ -154,14 +153,21 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
         </IconButton>
 
         {/* Scrollable nav tabs */}
-        <Box sx={{ display: { xs: 'none', md: 'flex' }, flex: 1, justifyContent: 'center', minWidth: 0 }}>
+        <Box
+          onWheel={(e) => {
+            const scroller = e.currentTarget.querySelector('.MuiTabs-scroller');
+            if (scroller) {
+              scroller.scrollLeft += e.deltaY;
+            }
+          }}
+          sx={{ display: { xs: 'none', md: 'flex' }, flex: 1, minWidth: 0, overflow: 'hidden' }}
+        >
           <Tabs
             value={activeIndex < 0 ? false : activeIndex}
             onChange={(_, i) => navigate(navItems[i].path)}
-            variant={user?.role === 'admin' ? 'scrollable' : 'fullWidth'}
-            centered={user?.role !== 'admin'}
-            scrollButtons={false}
-
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
             sx={{
               width: '100%',
               bgcolor: alpha(theme.palette.text.primary, 0.05),
@@ -175,8 +181,22 @@ export function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
                 boxShadow: theme.shadows[2],
                 zIndex: 0,
               },
-              '& .MuiTabs-flexContainer': { flexWrap: 'nowrap' },
-              '& .MuiTabs-scrollButtons': { borderRadius: 99 },
+              '& .MuiTabs-flexContainer': {
+                flexWrap: 'nowrap',
+                justifyContent: navItems.length > 7 ? 'flex-start' : 'center',
+              },
+              '& .MuiTabs-scroller': {
+                overflowX: 'auto !important',
+                scrollbarWidth: 'none',
+                '&::-webkit-scrollbar': { display: 'none' },
+              },
+              '& .MuiTabs-scrollButtons': {
+                borderRadius: 99,
+                width: 28,
+                height: 28,
+                alignSelf: 'center',
+                '&.Mui-disabled': { opacity: 0.25 },
+              },
             }}
           >
             {navItems.map((item) => (

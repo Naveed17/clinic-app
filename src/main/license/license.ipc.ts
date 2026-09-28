@@ -294,7 +294,7 @@ type LicenseApiExtras = {
   licenseType?: string;
 };
 
-function applyDatabaseModeFromApi(key: string, data: LicenseApiExtras & { expiresAt?: string | Date | null }): void {
+export function applyDatabaseModeFromApi(key: string, data: LicenseApiExtras & { expiresAt?: string | Date | null }): void {
   const databaseMode: DatabaseMode =
     data.databaseMode === 'online' || data.onlineDatabase === true ? 'online' : 'local';
   const fromApi = normalizeClinicalApiUrl(data.clinicalApiUrl || '');
