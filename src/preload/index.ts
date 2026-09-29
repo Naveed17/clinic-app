@@ -480,6 +480,12 @@ const api = {
             ipcRenderer.removeListener('backup:google-progress', listener);
           };
         },
+        cloudStatus: () => ipc('backup:cloud-status'),
+        cloudSchedule: (schedule: 'off' | 'daily' | 'weekly') => ipc('backup:cloud-schedule', schedule),
+        cloudBackupNow: (notes?: string) => ipc('backup:cloud-upload', notes),
+        cloudList: () => ipc('backup:cloud-list'),
+        cloudRestore: (backupId: string) => ipc('backup:cloud-restore', backupId),
+        cloudDelete: (backupId: string) => ipc('backup:cloud-delete', backupId),
       },
   docs: {
     patient: {
@@ -1150,6 +1156,42 @@ const api = {
         ipcRenderer.removeListener('data:changed', listener);
         ipcRenderer.removeListener('clinic:sync:data-changed', listener);
       };
+    },
+  },
+  recycleBin: {
+    list: async () => {
+      await settingsReady;
+      if (isLanClient) {
+        return request<Array<{
+          id: string;
+          entityType: 'patient' | 'appointment' | 'invoice' | 'medicine';
+          title: string;
+          subtitle: string;
+          deletedAt: string;
+          createdAt: string;
+        }>>('/api/recycle-bin').catch(() => []);
+      }
+      return ipc('recycle-bin:list');
+    },
+    restore: async (entityType: string, id: string) => {
+      await settingsReady;
+      if (isLanClient) {
+        return request<{ ok: boolean }>('/api/recycle-bin/restore', {
+          method: 'POST',
+          body: JSON.stringify({ entityType, id }),
+        }).catch(() => ({ ok: false }));
+      }
+      return ipc('recycle-bin:restore', { entityType, id });
+    },
+    purge: async (entityType: string, id: string) => {
+      await settingsReady;
+      if (isLanClient) {
+        return request<{ ok: boolean }>('/api/recycle-bin/purge', {
+          method: 'POST',
+          body: JSON.stringify({ entityType, id }),
+        }).catch(() => ({ ok: false }));
+      }
+      return ipc('recycle-bin:purge', { entityType, id });
     },
   },
 };

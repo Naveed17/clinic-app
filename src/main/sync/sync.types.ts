@@ -30,11 +30,11 @@ export const SYNC_COLUMNS: Record<SyncTableName, string[]> = {
   Patient: [
     'id', 'mrNumber', 'firstName', 'lastName', 'weight', 'dateOfBirth', 'gender', 'phone', 'email', 'address',
     'emergencyContactName', 'emergencyContactPhone', 'bloodGroup', 'allergies', 'chronicConditions',
-    'primaryDoctorId', 'createdAt', 'updatedAt',
+    'primaryDoctorId', 'isDeleted', 'deletedAt', 'createdAt', 'updatedAt',
   ],
   Medicine: [
     'id', 'name', 'mg', 'genericName', 'categoryId', 'barcode', 'unit', 'rackNumber', 'minStockAlert',
-    'createdAt', 'updatedAt',
+    'isDeleted', 'deletedAt', 'createdAt', 'updatedAt',
   ],
   MedicineBatch: [
     'id', 'medicineId', 'batchNumber', 'expiryDate', 'purchasePrice', 'salePrice', 'quantity',
@@ -42,7 +42,7 @@ export const SYNC_COLUMNS: Record<SyncTableName, string[]> = {
   ],
   Appointment: [
     'id', 'patientId', 'providerId', 'startsAt', 'endsAt', 'status', 'reason', 'notes',
-    'feeType', 'recurrenceRule', 'parentId', 'createdAt', 'updatedAt',
+    'feeType', 'recurrenceRule', 'parentId', 'isDeleted', 'deletedAt', 'createdAt', 'updatedAt',
   ],
   Token: [
     'id', 'tokenNumber', 'date', 'patientId', 'doctorId', 'status', 'notes', 'reason',
@@ -54,7 +54,7 @@ export const SYNC_COLUMNS: Record<SyncTableName, string[]> = {
   ],
   Invoice: [
     'id', 'patientId', 'appointmentId', 'invoiceNumber', 'status', 'issuedAt', 'dueAt', 'subtotal',
-    'discount', 'tax', 'total', 'amountPaid', 'notes', 'createdAt', 'updatedAt',
+    'discount', 'tax', 'total', 'amountPaid', 'notes', 'isDeleted', 'deletedAt', 'createdAt', 'updatedAt',
   ],
   InvoiceItem: ['id', 'invoiceId', 'description', 'quantity', 'unitPrice', 'lineTotal', 'createdAt', 'updatedAt'],
   Payment: ['id', 'invoiceId', 'amount', 'method', 'paidAt', 'reference', 'notes', 'createdAt', 'updatedAt'],

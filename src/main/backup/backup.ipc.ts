@@ -19,6 +19,15 @@ import {
   downloadGoogleDriveBackup,
   type DriveSchedule,
 } from './google-drive';
+import {
+  getCloudVaultStatus,
+  saveCloudVaultSchedule,
+  uploadBackupToCloudVault,
+  listCloudVaultBackups,
+  restoreFromCloudVault,
+  deleteCloudVaultBackup,
+  type CloudVaultSchedule,
+} from './cloud-vault.service';
 import { registerMigrateToCloudIpc } from './migrate-to-cloud.ipc';
 import { registerMigrateFromCloudIpc } from './migrate-from-cloud.ipc';
 
@@ -58,6 +67,14 @@ export function registerBackupIpc(): void {
   ipcMain.removeHandler('backup:google-disconnect');
   ipcMain.removeHandler('backup:google-schedule');
   ipcMain.removeHandler('backup:google-now');
+  ipcMain.removeHandler('backup:google-list');
+  ipcMain.removeHandler('backup:google-restore');
+  ipcMain.removeHandler('backup:cloud-status');
+  ipcMain.removeHandler('backup:cloud-schedule');
+  ipcMain.removeHandler('backup:cloud-upload');
+  ipcMain.removeHandler('backup:cloud-list');
+  ipcMain.removeHandler('backup:cloud-restore');
+  ipcMain.removeHandler('backup:cloud-delete');
 
   ipcMain.handle('backup:create', async () => {
     if (isOnlineDatabaseMode()) {
@@ -216,6 +233,13 @@ export function registerBackupIpc(): void {
       }
     }
   });
+
+  ipcMain.handle('backup:cloud-status', () => getCloudVaultStatus());
+  ipcMain.handle('backup:cloud-schedule', (_e, schedule: CloudVaultSchedule) => saveCloudVaultSchedule(schedule));
+  ipcMain.handle('backup:cloud-upload', (_e, notes?: string) => uploadBackupToCloudVault('manual', notes));
+  ipcMain.handle('backup:cloud-list', () => listCloudVaultBackups());
+  ipcMain.handle('backup:cloud-restore', (_e, backupId: string) => restoreFromCloudVault(backupId));
+  ipcMain.handle('backup:cloud-delete', (_e, backupId: string) => deleteCloudVaultBackup(backupId));
 
   startGoogleDriveBackupScheduler();
   registerMigrateToCloudIpc();

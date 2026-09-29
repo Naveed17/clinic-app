@@ -27,6 +27,8 @@ import {
   Radio,
   RadioGroup,
   FormControlLabel,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import LaptopOutlinedIcon from '@mui/icons-material/LaptopOutlined';
@@ -36,6 +38,9 @@ import RestoreOutlinedIcon from '@mui/icons-material/RestoreOutlined';
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
 import CloudDownloadOutlinedIcon from '@mui/icons-material/CloudDownloadOutlined';
 import CloudOutlinedIcon from '@mui/icons-material/CloudOutlined';
+import CloudDoneOutlinedIcon from '@mui/icons-material/CloudDoneOutlined';
+import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined';
+import SecurityOutlinedIcon from '@mui/icons-material/SecurityOutlined';
 import SystemUpdateAltOutlinedIcon from '@mui/icons-material/SystemUpdateAltOutlined';
 import WifiTetheringOutlinedIcon from '@mui/icons-material/WifiTetheringOutlined';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
@@ -47,6 +52,8 @@ import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import SyncOutlinedIcon from '@mui/icons-material/SyncOutlined';
+import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
+import { RecycleBinTab } from './RecycleBinTab';
 import { useUpdate } from '@/context/updateProvider';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useSync } from '@/context/SyncContext';
@@ -180,7 +187,7 @@ export function SettingsPage(): React.JSX.Element {
     }
   }, [updateError]);
 
-  const [settingsTab, setSettingsTab] = useState<'general' | 'announcements' | 'ai' | 'whatsapp' | 'backup' | 'support'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'announcements' | 'ai' | 'whatsapp' | 'backup' | 'support' | 'recycle-bin'>('general');
   const [supportContact, setSupportContact] = useState<{ phone: string; email: string } | null>(null);
   const [supportLoading, setSupportLoading] = useState(false);
   const [waTesting, setWaTesting] = useState(false);
@@ -204,6 +211,124 @@ export function SettingsPage(): React.JSX.Element {
   const [selectedDriveFile, setSelectedDriveFile] = useState<string>('');
   const [driveRestoreLoading, setDriveRestoreLoading] = useState(false);
   const [driveProgress, setDriveProgress] = useState<{ percent: number; label: string }>({ percent: 0, label: '' });
+
+  type CloudVaultSchedule = 'off' | 'daily' | 'weekly';
+  interface CloudVaultItem {
+    id: string;
+    licenseKey: string;
+    fileName: string;
+    originalName: string;
+    fileSize: number;
+    mimeType: string;
+    format: string;
+    deviceName?: string;
+    backupType: 'auto' | 'manual';
+    notes?: string;
+    createdAt: string;
+  }
+
+  const [cloudVaultStatus, setCloudVaultStatus] = useState<{
+    enabled: boolean;
+    schedule: CloudVaultSchedule;
+    lastBackupAt: string | null;
+    licenseKey: string | null;
+    serverUrl: string;
+  } | null>(null);
+  const [cloudVaultList, setCloudVaultList] = useState<CloudVaultItem[]>([]);
+  const [cloudVaultLoading, setCloudVaultLoading] = useState(false);
+  const [cloudVaultUploading, setCloudVaultUploading] = useState(false);
+  const [cloudVaultRestoringId, setCloudVaultRestoringId] = useState<string | null>(null);
+  const [cloudVaultDeletingId, setCloudVaultDeletingId] = useState<string | null>(null);
+
+  const loadCloudVaultData = async () => {
+    try {
+      setCloudVaultLoading(true);
+      const status = await window.clinic?.backup.cloudStatus();
+      if (status) setCloudVaultStatus(status);
+      const res = await window.clinic?.backup.cloudList();
+      if (res?.ok && res.backups) {
+        setCloudVaultList(res.backups);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setCloudVaultLoading(false);
+    }
+  };
+
+  async function handleCloudVaultSchedule(sch: CloudVaultSchedule) {
+    try {
+      const updated = await window.clinic?.backup.cloudSchedule(sch);
+      if (updated) setCloudVaultStatus(updated);
+      showAppToast({ type: 'success', message: `Cloud backup schedule set to ${sch}.` });
+    } catch {
+      showAppToast({ type: 'error', message: 'Could not update cloud backup schedule.' });
+    }
+  }
+
+  async function handleCloudVaultBackupNow() {
+    setCloudVaultUploading(true);
+    try {
+      const res = await window.clinic?.backup.cloudBackupNow();
+      if (res?.ok) {
+        showAppToast({ type: 'success', message: 'Backup successfully uploaded to Cloud Vault!' });
+        await loadCloudVaultData();
+      } else {
+        showAppToast({ type: 'error', message: res?.error || 'Failed to upload backup to cloud vault.' });
+      }
+    } catch (e: any) {
+      showAppToast({ type: 'error', message: e?.message || 'Cloud backup failed.' });
+    } finally {
+      setCloudVaultUploading(false);
+    }
+  }
+
+  async function handleCloudVaultRestore(item: CloudVaultItem) {
+    const dateFormatted = new Date(item.createdAt).toLocaleString();
+    const confirmed = window.confirm(
+      `Restore Cloud Vault backup from ${dateFormatted} (${(item.fileSize / (1024 * 1024)).toFixed(2)} MB)?\n\nWARNING: This will replace your local clinic database with this snapshot. The app will reload immediately after restore.`
+    );
+    if (!confirmed) return;
+
+    setCloudVaultRestoringId(item.id);
+    try {
+      const res = await window.clinic?.backup.cloudRestore(item.id);
+      if (res?.ok) {
+        showAppToast({ type: 'success', message: 'Cloud backup restored successfully! Reloading…' });
+        setTimeout(() => {
+          window.location.reload();
+        }, 1200);
+      } else {
+        showAppToast({ type: 'error', message: res?.error || 'Restore from cloud vault failed.' });
+      }
+    } catch (e: any) {
+      showAppToast({ type: 'error', message: e?.message || 'Restore failed.' });
+    } finally {
+      setCloudVaultRestoringId(null);
+    }
+  }
+
+  async function handleCloudVaultDelete(item: CloudVaultItem) {
+    const confirmed = window.confirm(
+      `Permanently delete this cloud snapshot (${new Date(item.createdAt).toLocaleString()}) from CareFlow Cloud Vault?`
+    );
+    if (!confirmed) return;
+
+    setCloudVaultDeletingId(item.id);
+    try {
+      const res = await window.clinic?.backup.cloudDelete(item.id);
+      if (res?.ok) {
+        showAppToast({ type: 'success', message: 'Cloud backup snapshot deleted.' });
+        await loadCloudVaultData();
+      } else {
+        showAppToast({ type: 'error', message: res?.error || 'Failed to delete snapshot.' });
+      }
+    } catch (e: any) {
+      showAppToast({ type: 'error', message: e?.message || 'Delete failed.' });
+    } finally {
+      setCloudVaultDeletingId(null);
+    }
+  }
 
   useEffect(() => {
     const unsub = window.clinic?.backup?.onGoogleProgress?.((p) => {
@@ -256,8 +381,11 @@ export function SettingsPage(): React.JSX.Element {
   }
 
   useEffect(() => {
-    if (settingsTab !== 'backup' || isOnline) return;
-    void window.clinic?.backup.googleStatus().then(setDrive);
+    if (settingsTab !== 'backup') return;
+    if (!isOnline) {
+      void window.clinic?.backup.googleStatus().then(setDrive);
+    }
+    void loadCloudVaultData();
   }, [settingsTab, isOnline]);
 
   useEffect(() => {
@@ -721,7 +849,7 @@ export function SettingsPage(): React.JSX.Element {
         <Stack spacing={0} sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <Tabs
             value={settingsTab}
-            onChange={(_, v: 'general' | 'announcements' | 'ai' | 'whatsapp' | 'backup' | 'support') => setSettingsTab(v)}
+            onChange={(_, v: 'general' | 'announcements' | 'ai' | 'whatsapp' | 'backup' | 'support' | 'recycle-bin') => setSettingsTab(v)}
             sx={{
               mb: 3,
               minHeight: 44,
@@ -770,6 +898,12 @@ export function SettingsPage(): React.JSX.Element {
               icon={<BackupOutlinedIcon sx={{ fontSize: 18 }} />}
               iconPosition="start"
               label="Backup & Restore"
+            />
+            <Tab
+              value="recycle-bin"
+              icon={<DeleteOutlineOutlinedIcon sx={{ fontSize: 18 }} />}
+              iconPosition="start"
+              label="Recycle Bin"
             />
             <Tab
               value="support"
@@ -1427,6 +1561,214 @@ export function SettingsPage(): React.JSX.Element {
 
                   <Divider />
 
+                  {/* CAREFLOW CLOUD VAULT (CENTRAL SERVER BACKUP) */}
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      p: 2.5,
+                      borderRadius: 2,
+                      borderColor: 'primary.main',
+                      bgcolor: (theme) => alpha(theme.palette.primary.main, 0.02),
+                      boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
+                    }}
+                  >
+                    <Stack spacing={2}>
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
+                        <Stack direction="row" alignItems="center" spacing={1.2}>
+                          <CloudDoneOutlinedIcon sx={{ fontSize: 26, color: 'primary.main' }} />
+                          <div>
+                            <Typography variant="subtitle1" fontWeight={800} sx={{ lineHeight: 1.2 }}>
+                              CareFlow Cloud Vault (Central Server Backup)
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Encrypted off-site storage powered by CareFlow Server &amp; Cloudflare R2
+                            </Typography>
+                          </div>
+                        </Stack>
+                        <Chip
+                          icon={<SecurityOutlinedIcon sx={{ fontSize: '16px !important' }} />}
+                          label={cloudVaultStatus?.licenseKey ? `License: ${cloudVaultStatus.licenseKey.slice(0, 10)}...` : 'Vault Active'}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </Stack>
+
+                      <Typography variant="body2" color="text.secondary">
+                        Securely vault snapshots of your complete clinic database (.db) and attachments to the central cloud.
+                        Even if your computer crashes or data is accidentally lost, restore with 1-click at any time.
+                      </Typography>
+
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={2}
+                        justifyContent="space-between"
+                        alignItems={{ xs: 'flex-start', sm: 'center' }}
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 1.5,
+                          bgcolor: (theme) => alpha(theme.palette.background.paper, 0.8),
+                          border: '1px solid',
+                          borderColor: 'divider',
+                        }}
+                      >
+                        <Stack spacing={0.5}>
+                          <Typography variant="caption" fontWeight={700} color="text.secondary">
+                            AUTOMATIC BACKUP SCHEDULE
+                          </Typography>
+                          <ToggleButtonGroup
+                            exclusive
+                            size="small"
+                            value={cloudVaultStatus?.schedule || 'daily'}
+                            onChange={(_e, val: CloudVaultSchedule | null) => {
+                              if (val) void handleCloudVaultSchedule(val);
+                            }}
+                          >
+                            <ToggleButton value="daily" sx={{ px: 2, textTransform: 'none', fontWeight: 700 }}>
+                              Daily (Recommended)
+                            </ToggleButton>
+                            <ToggleButton value="weekly" sx={{ px: 2, textTransform: 'none', fontWeight: 700 }}>
+                              Weekly
+                            </ToggleButton>
+                            <ToggleButton value="off" sx={{ px: 2, textTransform: 'none', fontWeight: 700 }}>
+                              Off
+                            </ToggleButton>
+                          </ToggleButtonGroup>
+                        </Stack>
+
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Button
+                            variant="contained"
+                            startIcon={<CloudUploadOutlinedIcon />}
+                            loading={cloudVaultUploading}
+                            onClick={() => void handleCloudVaultBackupNow()}
+                            sx={{ fontWeight: 700 }}
+                          >
+                            Backup to Cloud Vault Now
+                          </Button>
+                          <Tooltip title="Refresh snapshot list">
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => void loadCloudVaultData()}
+                                disabled={cloudVaultLoading}
+                              >
+                                <SyncOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Stack>
+                      </Stack>
+
+                      {cloudVaultStatus?.lastBackupAt && (
+                        <Typography variant="caption" color="text.secondary">
+                          Last cloud vault snapshot: <strong>{new Date(cloudVaultStatus.lastBackupAt).toLocaleString()}</strong>
+                        </Typography>
+                      )}
+
+                      {/* Snapshots Table / List */}
+                      <Box sx={{ mt: 1 }}>
+                        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                          <Typography variant="body2" fontWeight={800}>
+                            Cloud Snapshots ({cloudVaultList.length} of max 5)
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Oldest snapshots auto-pruned past 5
+                          </Typography>
+                        </Stack>
+
+                        {cloudVaultLoading && cloudVaultList.length === 0 ? (
+                          <LinearProgress sx={{ my: 2, borderRadius: 1 }} />
+                        ) : cloudVaultList.length === 0 ? (
+                          <Alert severity="info" variant="outlined" sx={{ borderRadius: 1.5 }}>
+                            No snapshots vaulted in cloud yet. Click &apos;Backup to Cloud Vault Now&apos; above to create your first cloud snapshot.
+                          </Alert>
+                        ) : (
+                          <Stack spacing={1}>
+                            {cloudVaultList.map((item) => (
+                              <Paper
+                                key={item.id}
+                                variant="outlined"
+                                sx={{
+                                  p: 1.5,
+                                  borderRadius: 1.5,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  flexWrap: 'wrap',
+                                  gap: 1.5,
+                                  bgcolor: 'background.paper',
+                                  borderColor: 'divider',
+                                  '&:hover': {
+                                    borderColor: 'primary.main',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                                  },
+                                }}
+                              >
+                                <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 220 }}>
+                                  <StorageOutlinedIcon sx={{ color: 'primary.main', fontSize: 24 }} />
+                                  <div>
+                                    <Typography variant="body2" fontWeight={700}>
+                                      {new Date(item.createdAt).toLocaleString(undefined, {
+                                        dateStyle: 'medium',
+                                        timeStyle: 'short',
+                                      })}
+                                    </Typography>
+                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
+                                      <Chip
+                                        label={item.backupType === 'auto' ? 'Daily Auto' : 'Manual'}
+                                        size="small"
+                                        color={item.backupType === 'auto' ? 'success' : 'primary'}
+                                        sx={{ height: 18, fontSize: '0.68rem', fontWeight: 700 }}
+                                      />
+                                      <Typography variant="caption" color="text.secondary">
+                                        {(item.fileSize / (1024 * 1024)).toFixed(2)} MB
+                                      </Typography>
+                                      {item.deviceName && (
+                                        <Typography variant="caption" color="text.secondary">
+                                          • {item.deviceName}
+                                        </Typography>
+                                      )}
+                                    </Stack>
+                                  </div>
+                                </Stack>
+
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="warning"
+                                    startIcon={<RestoreOutlinedIcon />}
+                                    loading={cloudVaultRestoringId === item.id}
+                                    onClick={() => void handleCloudVaultRestore(item)}
+                                    sx={{ fontWeight: 700 }}
+                                  >
+                                    Restore
+                                  </Button>
+                                  <Tooltip title="Delete from Cloud">
+                                    <span>
+                                      <IconButton
+                                        size="small"
+                                        color="error"
+                                        disabled={cloudVaultDeletingId === item.id}
+                                        onClick={() => void handleCloudVaultDelete(item)}
+                                      >
+                                        <DeleteOutlineOutlinedIcon fontSize="small" />
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                </Stack>
+                              </Paper>
+                            ))}
+                          </Stack>
+                        )}
+                      </Box>
+                    </Stack>
+                  </Paper>
+
+                  <Divider />
+
                   <Stack direction="row" alignItems="center" spacing={1}>
                     <CloudOutlinedIcon sx={{ fontSize: 22, color: 'primary.main' }} />
                     <Typography variant="subtitle1" fontWeight={800}>
@@ -1690,9 +2032,13 @@ export function SettingsPage(): React.JSX.Element {
               </Button>
             </Box>
           )}
+
+          {settingsTab === 'recycle-bin' && (
+            <RecycleBinTab />
+          )}
           </Box>
 
-          {settingsTab !== 'support' && (
+          {settingsTab !== 'support' && settingsTab !== 'recycle-bin' && (
             <>
               <Divider sx={{ my: 3, flexShrink: 0 }} />
 

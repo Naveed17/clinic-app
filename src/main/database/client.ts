@@ -73,6 +73,26 @@ let currentDbPath: string | undefined;
 const initializedDbPaths = new Set<string>();
 let initPromise: Promise<void> | undefined;
 
+type MutationListener = () => void;
+const mutationListeners = new Set<MutationListener>();
+
+export function onDatabaseMutation(listener: MutationListener): () => void {
+  mutationListeners.add(listener);
+  return () => {
+    mutationListeners.delete(listener);
+  };
+}
+
+export function notifyDatabaseMutation(): void {
+  for (const listener of mutationListeners) {
+    try {
+      listener();
+    } catch (e) {
+      console.warn('[Database] Error in mutation listener:', e);
+    }
+  }
+}
+
 export function getPrisma(): PrismaClient {
   const targetDbPath = getClinicDbPath();
   if (prisma && currentDbPath !== targetDbPath) {
@@ -84,11 +104,35 @@ export function getPrisma(): PrismaClient {
 
   if (!prisma) {
     currentDbPath = targetDbPath;
-    prisma = new PrismaClient({
+    const baseClient = new PrismaClient({
       datasources: {
         db: { url: `file:${targetDbPath.replaceAll('\\', '/')}` },
       },
     });
+
+    const extended = baseClient.$extends({
+      query: {
+        $allModels: {
+          async $allOperations({ operation, args, query }: { operation: string; args: any; query: (args: any) => Promise<any> }) {
+            const result = await query(args);
+            if (
+              operation === 'create' ||
+              operation === 'createMany' ||
+              operation === 'update' ||
+              operation === 'updateMany' ||
+              operation === 'upsert' ||
+              operation === 'delete' ||
+              operation === 'deleteMany'
+            ) {
+              notifyDatabaseMutation();
+            }
+            return result;
+          },
+        },
+      },
+    });
+
+    prisma = extended as unknown as PrismaClient;
   }
 
   return prisma;
@@ -106,6 +150,7 @@ export async function ensureDatabaseReady(): Promise<PrismaClient> {
         } catch (err) {
           console.error('[Database] Failed to seed default admin:', err);
         }
+        await ensureSoftDeleteColumns(db);
         initializedDbPaths.add(targetDbPath);
       })().finally(() => {
         initPromise = undefined;
@@ -954,17 +999,17 @@ const DATETIME_STORAGE_COLUMNS: { table: string; cols: string[] }[] = [
   { table: 'DoctorProfile', cols: ['createdAt', 'updatedAt'] },
   { table: 'DoctorSchedule', cols: ['createdAt', 'updatedAt'] },
   { table: 'DoctorAttendance', cols: ['checkInAt', 'checkOutAt', 'createdAt', 'updatedAt'] },
-  { table: 'Patient', cols: ['dateOfBirth', 'createdAt', 'updatedAt'] },
+  { table: 'Patient', cols: ['dateOfBirth', 'createdAt', 'updatedAt', 'deletedAt'] },
   { table: 'PatientDocument', cols: ['uploadedAt', 'createdAt', 'updatedAt'] },
-  { table: 'Appointment', cols: ['startsAt', 'endsAt', 'createdAt', 'updatedAt'] },
-  { table: 'Invoice', cols: ['issuedAt', 'dueAt', 'createdAt', 'updatedAt'] },
+  { table: 'Appointment', cols: ['startsAt', 'endsAt', 'createdAt', 'updatedAt', 'deletedAt'] },
+  { table: 'Invoice', cols: ['issuedAt', 'dueAt', 'createdAt', 'updatedAt', 'deletedAt'] },
   { table: 'InvoiceItem', cols: ['createdAt', 'updatedAt'] },
   { table: 'Payment', cols: ['paidAt', 'createdAt', 'updatedAt'] },
   { table: 'LabOrder', cols: ['orderedAt', 'createdAt', 'updatedAt'] },
   { table: 'LabReport', cols: ['uploadedAt', 'createdAt', 'updatedAt'] },
   { table: 'Token', cols: ['createdAt', 'updatedAt'] },
   { table: 'Prescription', cols: ['dispensedAt', 'createdAt', 'updatedAt'] },
-  { table: 'Medicine', cols: ['createdAt', 'updatedAt'] },
+  { table: 'Medicine', cols: ['createdAt', 'updatedAt', 'deletedAt'] },
   { table: 'MedicineBatch', cols: ['expiryDate', 'createdAt', 'updatedAt'] },
   { table: 'ChatMessage', cols: ['createdAt'] },
 ];
@@ -998,6 +1043,39 @@ export async function normalizeDateTimeStorage(database: PrismaClient): Promise<
     }
   } catch (err) {
     console.error('[Database] Failed to normalize DateTime storage classes:', err);
+  }
+}
+
+export async function ensureSoftDeleteColumns(database: PrismaClient = getPrisma()): Promise<void> {
+  const tables = ['Patient', 'Appointment', 'Invoice', 'Medicine'];
+  for (const table of tables) {
+    try {
+      const tableExists = await database.$queryRawUnsafe<{ name: string }[]>(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name = ?`,
+        table,
+      );
+      if (!tableExists || tableExists.length === 0) continue;
+
+      const cols = (
+        await database.$queryRawUnsafe<{ name: string }[]>(`PRAGMA table_info("${table}")`)
+      ).map((r) => r.name);
+
+      if (!cols.includes('isDeleted')) {
+        await database.$executeRawUnsafe(
+          `ALTER TABLE "${table}" ADD COLUMN "isDeleted" BOOLEAN NOT NULL DEFAULT 0`,
+        );
+        await database.$executeRawUnsafe(
+          `CREATE INDEX IF NOT EXISTS "${table}_isDeleted_idx" ON "${table}"("isDeleted")`,
+        );
+      }
+      if (!cols.includes('deletedAt')) {
+        await database.$executeRawUnsafe(
+          `ALTER TABLE "${table}" ADD COLUMN "deletedAt" DATETIME`,
+        );
+      }
+    } catch (err) {
+      console.warn(`[Database] Failed to ensure soft delete columns for ${table}:`, err);
+    }
   }
 }
 

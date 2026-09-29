@@ -124,7 +124,7 @@ export async function listPatients({ page, pageSize, search, providerId }: Patie
         SELECT "patientId" FROM "Appointment" WHERE "providerId" = ?
         UNION
         SELECT "patientId" FROM "Token" WHERE "doctorId" = ?
-      )
+      ) AND ("isDeleted" = 0 OR "isDeleted" IS NULL)
     `;
     const params: (string | number)[] = [providerId, providerId, providerId];
 
@@ -162,7 +162,7 @@ export async function listPatients({ page, pageSize, search, providerId }: Patie
   }
 
   // Non-doctor (admin / receptionist / lab)
-  let whereClause = '1=1';
+  let whereClause = '("isDeleted" = 0 OR "isDeleted" IS NULL)';
   const params: (string | number)[] = [];
 
   if (trimmed) {
@@ -217,39 +217,19 @@ export async function updatePatient(id: string, input: PatientInput): Promise<Pa
 
 export async function deletePatient(id: string): Promise<void> {
   const prisma = getPrisma();
-  await prisma.$transaction(async (tx) => {
-    const invoices = await tx.invoice.findMany({ where: { patientId: id }, select: { id: true } });
-    const invoiceIds = invoices.map((i) => i.id);
-    if (invoiceIds.length > 0) {
-      await tx.payment.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
-      await tx.invoiceItem.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
-      await tx.invoice.deleteMany({ where: { patientId: id } });
-    }
-
-    const labOrders = await tx.labOrder.findMany({ where: { patientId: id }, select: { id: true } });
-    const labOrderIds = labOrders.map((o) => o.id);
-    if (labOrderIds.length > 0) {
-      await tx.labReport.deleteMany({ where: { labOrderId: { in: labOrderIds } } });
-      await tx.labOrder.deleteMany({ where: { patientId: id } });
-    }
-
-    const tokens = await tx.token.findMany({ where: { patientId: id }, select: { id: true } });
-    if (tokens.length > 0) {
-      // Prescription is SQLite-only (not in Prisma schema); remove before tokens.
-      for (const token of tokens) {
-        await tx.$executeRawUnsafe('DELETE FROM "Prescription" WHERE "tokenId" = ?', token.id);
-      }
-      await tx.token.deleteMany({ where: { patientId: id } });
-    }
-
-    await tx.appointment.deleteMany({ where: { patientId: id } });
-    await tx.patientDocument.deleteMany({ where: { patientId: id } });
-    await tx.patient.delete({ where: { id } });
+  await prisma.patient.update({
+    where: { id },
+    data: {
+      isDeleted: true,
+      deletedAt: new Date(),
+    },
   });
 }
 
 export async function getPatient(id: string): Promise<Patient | null> {
-  return getPrisma().patient.findUnique({
+  const patient = await getPrisma().patient.findUnique({
     where: { id },
   });
+  if (!patient || patient.isDeleted) return null;
+  return patient;
 }

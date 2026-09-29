@@ -34,6 +34,7 @@ import { getSettings, saveDatabaseModeSettings, resolveOnlineApiOrigin, isOnline
 import { startDiscoveryBroadcast, stopDiscoveryBroadcast } from './discovery/discovery.server';
 import { startDiscoveryListener, stopDiscoveryListener } from './discovery/discovery.client';
 import { registerBackupIpc } from './backup/backup.ipc';
+import { startCloudVaultScheduler, stopCloudVaultScheduler } from './backup/cloud-vault.service';
 import { registerDocumentsIpc } from './backup/documents.ipc';
 import { registerTokenIpc } from './tokens/token.ipc';
 import { registerLabIpc } from './lab/lab.ipc';
@@ -43,6 +44,8 @@ import { registerAuthIpc } from './auth/auth.ipc';
 import { registerSearchIpc } from './search/search.ipc';
 import { registerMedicineIpc } from './medicines/medicine.ipc';
 import { registerScheduleIpc } from './doctors/schedule.ipc';
+import { registerRecycleBinIpc } from './recycle-bin/recycle-bin.ipc';
+import { startRecycleBinAutoPurgeScheduler, stopRecycleBinAutoPurgeScheduler } from './recycle-bin/recycle-bin.service';
 import { seedDefaultAdmin } from './auth/seed';
 import { initAutoUpdater } from './updater';
 import { registerWhatsAppIpc } from './whatsapp/whatsapp.ipc';
@@ -257,6 +260,7 @@ app.whenReady().then(async () => {
   registerWhatsAppIpc();
   registerSearchIpc();
   registerMedicineIpc();
+  registerRecycleBinIpc(backendServer?.io);
   registerSyncIpc();
   registerTtsIpc();
   // LAN discovery only when not on cloud Postgres
@@ -264,6 +268,8 @@ app.whenReady().then(async () => {
     startDiscoveryListener();
   }
   startAutoSync();
+  startCloudVaultScheduler();
+  startRecycleBinAutoPurgeScheduler(7);
   initAutoUpdater();
   createWindow();
 
@@ -278,6 +284,8 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   stopAutoSync();
+  stopCloudVaultScheduler();
+  stopRecycleBinAutoPurgeScheduler();
   stopDiscoveryBroadcast();
   stopDiscoveryListener();
   stopLanRetry();

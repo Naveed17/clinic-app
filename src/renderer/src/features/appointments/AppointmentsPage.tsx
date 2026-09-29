@@ -1586,7 +1586,7 @@ export function AppointmentsPage(): React.JSX.Element {
       <ConfirmDialog
         open={bulkConfirmDelete}
         title={`Delete ${selectedIds.size} appointments?`}
-        message={`Are you sure you want to delete ${selectedIds.size} selected appointment(s)? This action cannot be undone.`}
+        message={`Are you sure you want to delete ${selectedIds.size} selected appointment(s)?`}
         loading={isBulkLoading}
         onClose={() => setBulkConfirmDelete(false)}
         onConfirm={handleBulkDelete}

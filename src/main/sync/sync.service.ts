@@ -5,6 +5,7 @@ import { getSettings, resolveOnlineApiOrigin } from '../config/settings';
 import { getDiscoveredServers } from '../settings/settings.ipc';
 import { getLicenseRuntimeMeta, applyDatabaseModeFromApi } from '../license/license.ipc';
 import { uploadLocalFile } from '../backup/migrate-to-cloud.ipc';
+import { onDatabaseMutation } from '../database/client';
 import {
   extractChangesSince,
   extractManifest,
@@ -791,22 +792,53 @@ export async function triggerSync(opts?: { silent?: boolean; customPeerUrl?: str
   }
 }
 
+let smartSyncTimer: NodeJS.Timeout | null = null;
+let unsubMutation: (() => void) | null = null;
+
+/**
+ * Called when local data is created, updated, or deleted.
+ * Batches changes with a 2.5s debounce so multiple rapid edits trigger only ONE sync request.
+ */
+export function scheduleSmartSync(delayMs = 2500): void {
+  if (smartSyncTimer) clearTimeout(smartSyncTimer);
+  smartSyncTimer = setTimeout(() => {
+    smartSyncTimer = null;
+    void triggerSync({ silent: true });
+  }, delayMs);
+}
+
 export function startAutoSync(): void {
   if (autoSyncTimer) return;
-  // Initial check after 3 seconds
+
+  // 1. Smart event-driven sync on any add/edit/delete
+  if (!unsubMutation) {
+    unsubMutation = onDatabaseMutation(() => {
+      scheduleSmartSync(2500);
+    });
+  }
+
+  // 2. Initial catch-up on app start (single check)
   setTimeout(() => {
     void triggerSync({ silent: true });
-  }, 3000);
+  }, 4000);
 
-  // Background interval every 25 seconds
+  // 3. Relaxed fallback heartbeat (every 15 minutes) - NOT rapid 5s/25s polling!
   autoSyncTimer = setInterval(() => {
     void triggerSync({ silent: true });
-  }, 25000);
+  }, 15 * 60 * 1000);
 }
 
 export function stopAutoSync(): void {
   if (autoSyncTimer) {
     clearInterval(autoSyncTimer);
     autoSyncTimer = undefined;
+  }
+  if (smartSyncTimer) {
+    clearTimeout(smartSyncTimer);
+    smartSyncTimer = null;
+  }
+  if (unsubMutation) {
+    unsubMutation();
+    unsubMutation = null;
   }
 }

@@ -45,12 +45,13 @@ async function assertProviderActive(providerId: string): Promise<void> {
 
 export async function listAppointments(date?: string) {
   const db = getPrisma();
-  let whereClause = {};
+  let whereClause: Record<string, unknown> = { isDeleted: false };
   if (date) {
     const [y, m, d] = date.split('-').map(Number);
     const startOfDay = new Date(y, m - 1, d, 0, 0, 0, 0);
     const endOfDay = new Date(y, m - 1, d, 23, 59, 59, 999);
     whereClause = {
+      isDeleted: false,
       startsAt: {
         gte: startOfDay,
         lte: endOfDay,
@@ -138,7 +139,7 @@ export async function listAppointments(date?: string) {
 export async function listAppointmentsByPatient(patientId: string) {
   const db = getPrisma();
   const appointments = await db.appointment.findMany({
-    where: { patientId },
+    where: { patientId, isDeleted: false },
     include: {
       patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
       provider: {
@@ -208,8 +209,10 @@ export async function listAppointmentsByPatient(patientId: string) {
 
 export async function listAppointmentPatients(search?: string) {
   const query = search?.trim();
+  const baseWhere = { isDeleted: false };
   const where = query
     ? {
+        ...baseWhere,
         OR: [
           { firstName: { contains: query } },
           { lastName: { contains: query } },
@@ -217,7 +220,7 @@ export async function listAppointmentPatients(search?: string) {
           { mrNumber: { contains: query } },
         ],
       }
-    : {};
+    : baseWhere;
   return getPrisma().patient.findMany({
     where,
     select: { id: true, firstName: true, lastName: true, mrNumber: true, phone: true },
@@ -265,7 +268,7 @@ async function getAppointmentById(id: string) {
       },
     },
   });
-  if (!a) return null;
+  if (!a || a.isDeleted) return null;
 
   const dateStr = a.startsAt.toLocaleDateString('en-CA');
   const token = await db.token.findFirst({
@@ -555,5 +558,8 @@ export async function updateAppointmentStatus(id: string, status: AppointmentSta
 }
 
 export async function deleteAppointment(id: string) {
-  return getPrisma().appointment.delete({ where: { id } });
+  return getPrisma().appointment.update({
+    where: { id },
+    data: { isDeleted: true, deletedAt: new Date() },
+  });
 }

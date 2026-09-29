@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Button, Tooltip, CircularProgress, Typography, Stack } from '@mui/material';
+import { IconButton, Tooltip, CircularProgress, Typography, Stack } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import SyncOutlinedIcon from '@mui/icons-material/SyncOutlined';
 import SyncDisabledOutlinedIcon from '@mui/icons-material/SyncDisabledOutlined';
@@ -8,6 +8,9 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import WifiOffOutlinedIcon from '@mui/icons-material/WifiOffOutlined';
 import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined';
 import LanOutlinedIcon from '@mui/icons-material/LanOutlined';
+import CloudDoneOutlinedIcon from '@mui/icons-material/CloudDoneOutlined';
+import CloudOffOutlinedIcon from '@mui/icons-material/CloudOffOutlined';
+import SyncProblemOutlinedIcon from '@mui/icons-material/SyncProblemOutlined';
 import { useSync } from '@/context/SyncContext';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { showAppToast } from './AppToast';
@@ -64,12 +67,12 @@ export function SyncBadge(): React.JSX.Element | null {
       return {
         label: displayLabel,
         color: theme.palette.success.main,
-        bgColor: alpha(theme.palette.success.main, 0.12),
-        borderColor: alpha(theme.palette.success.main, 0.3),
-        icon: <CheckCircleOutlineIcon sx={{ fontSize: 15, color: 'inherit' }} />,
+        bgColor: 'transparent',
+        borderColor: 'transparent',
+        icon: <CloudDoneOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
         tooltip: (
           <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.25 }}>
-            <CheckCircleOutlineIcon sx={{ fontSize: 15, color: theme.palette.success.light }} />
+            <CloudDoneOutlinedIcon sx={{ fontSize: 16, color: theme.palette.success.light }} />
             <Typography variant="caption" sx={{ fontSize: 12 }}>
               Synced with {peerText} at {timeStr} • Click to sync now
             </Typography>
@@ -82,12 +85,12 @@ export function SyncBadge(): React.JSX.Element | null {
       return {
         label: 'Sync Retry',
         color: theme.palette.warning.main,
-        bgColor: alpha(theme.palette.warning.main, 0.12),
-        borderColor: alpha(theme.palette.warning.main, 0.3),
-        icon: <SyncOutlinedIcon sx={{ fontSize: 15, color: 'inherit' }} />,
+        bgColor: 'transparent',
+        borderColor: 'transparent',
+        icon: <SyncProblemOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
         tooltip: (
           <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.25 }}>
-            <ErrorOutlineIcon sx={{ fontSize: 15, color: theme.palette.warning.light }} />
+            <ErrorOutlineIcon sx={{ fontSize: 16, color: theme.palette.warning.light }} />
             <Typography variant="caption" sx={{ fontSize: 12 }}>
               {status.message || 'Connection issue'} • Click to retry sync
             </Typography>
@@ -97,18 +100,17 @@ export function SyncBadge(): React.JSX.Element | null {
     }
 
     if (status.state === 'offline' && !animating) {
-      // In Local Mode (when online database is off), this is NORMAL operating mode, NOT an error!
       if (!isOnline) {
         const hasPeer = Boolean(status.peerName);
         return {
           label: hasPeer ? `Local: ${status.peerName}` : 'Local Mode',
           color: theme.palette.success.main,
-          bgColor: alpha(theme.palette.success.main, 0.1),
-          borderColor: alpha(theme.palette.success.main, 0.25),
-          icon: hasPeer ? <LanOutlinedIcon sx={{ fontSize: 15, color: 'inherit' }} /> : <StorageOutlinedIcon sx={{ fontSize: 15, color: 'inherit' }} />,
+          bgColor: 'transparent',
+          borderColor: 'transparent',
+          icon: hasPeer ? <LanOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} /> : <StorageOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
           tooltip: (
             <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.25 }}>
-              <StorageOutlinedIcon sx={{ fontSize: 15, color: theme.palette.success.light }} />
+              <StorageOutlinedIcon sx={{ fontSize: 16, color: theme.palette.success.light }} />
               <Typography variant="caption" sx={{ fontSize: 12 }}>
                 {hasPeer
                   ? `Connected to local clinic network (${status.peerName}). All data is saved and synced locally.`
@@ -123,12 +125,12 @@ export function SyncBadge(): React.JSX.Element | null {
       return {
         label: 'Cloud Offline',
         color: theme.palette.text.secondary,
-        bgColor: alpha(theme.palette.text.secondary, 0.08),
-        borderColor: alpha(theme.palette.text.secondary, 0.2),
-        icon: <SyncDisabledOutlinedIcon sx={{ fontSize: 15, color: 'inherit' }} />,
+        bgColor: 'transparent',
+        borderColor: 'transparent',
+        icon: <CloudOffOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
         tooltip: (
           <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.25 }}>
-            <WifiOffOutlinedIcon sx={{ fontSize: 15, color: 'inherit' }} />
+            <WifiOffOutlinedIcon sx={{ fontSize: 16, color: 'inherit' }} />
             <Typography variant="caption" sx={{ fontSize: 12 }}>
               Cloud database not reachable. Working offline locally. Changes will auto-sync when internet is restored.
             </Typography>
@@ -145,12 +147,12 @@ export function SyncBadge(): React.JSX.Element | null {
       return {
         label: labelText,
         color: theme.palette.info.main,
-        bgColor: alpha(theme.palette.info.main, 0.12),
-        borderColor: alpha(theme.palette.info.main, 0.3),
-        icon: <CircularProgress size={13} thickness={4} color="inherit" />,
+        bgColor: 'transparent',
+        borderColor: 'transparent',
+        icon: <CircularProgress size={20} thickness={4} color="inherit" />,
         tooltip: (
           <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.25 }}>
-            <CircularProgress size={12} thickness={4} color="inherit" />
+            <CircularProgress size={14} thickness={4} color="inherit" />
             <Typography variant="caption" sx={{ fontSize: 12 }}>
               {tooltipText}
             </Typography>
@@ -162,14 +164,14 @@ export function SyncBadge(): React.JSX.Element | null {
     return {
       label: isOnline ? 'Cloud Sync' : 'Local Mode',
       color: isOnline ? theme.palette.primary.main : theme.palette.success.main,
-      bgColor: alpha(isOnline ? theme.palette.primary.main : theme.palette.success.main, 0.1),
-      borderColor: alpha(isOnline ? theme.palette.primary.main : theme.palette.success.main, 0.25),
-      icon: isOnline ? <SyncOutlinedIcon sx={{ fontSize: 15, color: 'inherit' }} /> : <StorageOutlinedIcon sx={{ fontSize: 15, color: 'inherit' }} />,
+      bgColor: 'transparent',
+      borderColor: 'transparent',
+      icon: isOnline ? <CloudDoneOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} /> : <StorageOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
       tooltip: (
         <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.25 }}>
-          {isOnline ? <SyncOutlinedIcon sx={{ fontSize: 15, color: 'inherit' }} /> : <StorageOutlinedIcon sx={{ fontSize: 15, color: 'inherit' }} />}
+          {isOnline ? <CloudDoneOutlinedIcon sx={{ fontSize: 16, color: 'inherit' }} /> : <StorageOutlinedIcon sx={{ fontSize: 16, color: 'inherit' }} />}
           <Typography variant="caption" sx={{ fontSize: 12 }}>
-            {isOnline ? 'Click to sync changes with Cloud database' : 'Local Database active. All data is saved on this PC.'}
+            {isOnline ? 'Cloud Sync active. Click to sync now.' : 'Local Database active. All data is saved on this PC.'}
           </Typography>
         </Stack>
       ),
@@ -179,39 +181,16 @@ export function SyncBadge(): React.JSX.Element | null {
   const display = getStatusDisplay();
 
   return (
-    <Tooltip title={display.tooltip} arrow>
-      <Button
+    <Tooltip title={display.tooltip} arrow placement="bottom">
+      <IconButton
         onClick={() => void handleManualSync()}
         size="small"
         sx={{
-          minWidth: 108,
-          flexShrink: 0,
-          justifyContent: 'center',
-          px: 1.2,
-          py: 0.5,
-          borderRadius: 2,
-          textTransform: 'none',
-          fontSize: 12,
-          fontWeight: 600,
           color: display.color,
-          bgcolor: display.bgColor,
-          border: '1px solid',
-          borderColor: display.borderColor,
-          gap: 0.75,
-          boxShadow: 'none',
-          whiteSpace: 'nowrap',
-          transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
-          '&:hover': {
-            bgcolor: alpha(display.color, 0.18),
-            borderColor: display.color,
-          },
         }}
       >
         {display.icon}
-        <Typography variant="caption" sx={{ fontWeight: 700, fontSize: 11.5, color: 'inherit', lineHeight: 1 }}>
-          {display.label}
-        </Typography>
-      </Button>
+      </IconButton>
     </Tooltip>
   );
 }

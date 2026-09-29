@@ -14,6 +14,7 @@ import { createSearchRouter } from './search.routes';
 import { createChatRouter } from './chat.routes';
 import { createMedicinesRouter } from './medicines.routes';
 import { createSyncRouter } from './sync.routes';
+import { createRecycleBinRouter } from './recycle-bin.routes';
 
 export function registerRoutes(app: Express, io: SocketIOServer): void {
   app.use('/api/auth', createAuthRouter());
@@ -30,4 +31,5 @@ export function registerRoutes(app: Express, io: SocketIOServer): void {
   app.use('/api/search', createSearchRouter());
   app.use('/api/chat', createChatRouter(io));
   app.use('/api/medicines', createMedicinesRouter(io));
+  app.use('/api/recycle-bin', createRecycleBinRouter(io));
 }

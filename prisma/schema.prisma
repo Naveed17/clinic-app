@@ -157,6 +157,8 @@ model Patient {
   primaryDoctorId       String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+  isDeleted             Boolean   @default(false)
+  deletedAt             DateTime?
 
   primaryDoctor User?             @relation("PatientPrimaryDoctor", fields: [primaryDoctorId], references: [id], onDelete: SetNull)
   appointments  Appointment[]
@@ -169,6 +171,7 @@ model Patient {
   @@index([phone])
   @@index([mrNumber])
   @@index([primaryDoctorId])
+  @@index([isDeleted])
 }
 
 model PatientDocument {
@@ -205,6 +208,8 @@ model Appointment {
   parentId       String? // original appointment id for recurring copies
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
+  isDeleted      Boolean           @default(false)
+  deletedAt      DateTime?
 
   patient  Patient  @relation(fields: [patientId], references: [id], onDelete: Restrict)
   provider User     @relation(fields: [providerId], references: [id], onDelete: Restrict)
@@ -213,6 +218,7 @@ model Appointment {
   @@index([patientId, startsAt])
   @@index([providerId, startsAt])
   @@index([startsAt])
+  @@index([isDeleted])
 }
 
 model Token {
@@ -261,6 +267,8 @@ model Invoice {
   notes         String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+  isDeleted     Boolean       @default(false)
+  deletedAt     DateTime?
 
   patient     Patient       @relation(fields: [patientId], references: [id], onDelete: Restrict)
   appointment Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
@@ -269,6 +277,7 @@ model Invoice {
 
   @@index([patientId, createdAt])
   @@index([status, dueAt])
+  @@index([isDeleted])
 }
 
 model InvoiceItem {
@@ -363,12 +372,15 @@ model Medicine {
   minStockAlert Int      @default(10)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  isDeleted     Boolean  @default(false)
+  deletedAt     DateTime?
 
   batches  MedicineBatch[]
 
   @@index([name])
   @@index([genericName])
   @@index([barcode])
+  @@index([isDeleted])
 }
 
 model MedicineBatch {

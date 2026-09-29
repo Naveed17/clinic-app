@@ -62,13 +62,18 @@ function toInvoiceData(input: InvoiceInput): Omit<Prisma.InvoiceUncheckedCreateI
 }
 
 export async function listInvoices(limit: number = 200) {
-  const invoices = await getPrisma().invoice.findMany({ include, orderBy: { createdAt: 'desc' }, take: limit });
+  const invoices = await getPrisma().invoice.findMany({
+    where: { isDeleted: false },
+    include,
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
   return invoices.map(serializeInvoice);
 }
 
 export async function listInvoicesByPatient(patientId: string) {
   const invoices = await getPrisma().invoice.findMany({
-    where: { patientId },
+    where: { patientId, isDeleted: false },
     include,
     orderBy: { createdAt: 'desc' },
     take: 100,
@@ -78,13 +83,16 @@ export async function listInvoicesByPatient(patientId: string) {
 
 export async function getInvoice(id: string) {
   const invoice = await getPrisma().invoice.findUnique({ where: { id }, include });
-  return invoice ? serializeInvoice(invoice) : null;
+  if (!invoice || invoice.isDeleted) return null;
+  return serializeInvoice(invoice);
 }
 
 export async function invoicePatients(search?: string) {
   const query = search?.trim();
+  const baseWhere: Prisma.PatientWhereInput = { isDeleted: false };
   const where: Prisma.PatientWhereInput = query
     ? {
+        ...baseWhere,
         OR: [
           { firstName: { contains: query } },
           { lastName: { contains: query } },
@@ -92,7 +100,7 @@ export async function invoicePatients(search?: string) {
           { mrNumber: { contains: query } },
         ],
       }
-    : {};
+    : baseWhere;
   return getPrisma().patient.findMany({
     where,
     select: {
@@ -202,10 +210,9 @@ export async function voidInvoice(id: string) {
 
 export async function deleteInvoice(id: string): Promise<void> {
   const database = getPrisma();
-  await database.$transaction(async (tx) => {
-    await tx.payment.deleteMany({ where: { invoiceId: id } });
-    await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
-    await tx.invoice.delete({ where: { id } });
+  await database.invoice.update({
+    where: { id },
+    data: { isDeleted: true, deletedAt: new Date() },
   });
 }
 

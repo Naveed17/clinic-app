@@ -124,6 +124,12 @@ declare global {
           configured: boolean;
         }>;
         googleBackupNow: () => Promise<{ ok: boolean; name?: string; error?: string }>;
+        cloudStatus: () => Promise<unknown>;
+        cloudSchedule: (schedule: 'off' | 'daily' | 'weekly') => Promise<unknown>;
+        cloudBackupNow: (notes?: string) => Promise<unknown>;
+        cloudList: () => Promise<unknown>;
+        cloudRestore: (backupId: string) => Promise<unknown>;
+        cloudDelete: (backupId: string) => Promise<unknown>;
       };
       docs: {
         patient: {

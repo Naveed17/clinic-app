@@ -188,8 +188,8 @@ export function DeleteInvoiceDialog({
       title="Delete invoice?"
       message={
         <>
-          Permanently delete <strong>{invoice.invoiceNumber}</strong> for{' '}
-          <strong>{personLabel(invoice.patient)}</strong>? Payments recorded on this invoice will also be removed. This cannot be undone.
+          Delete <strong>{invoice.invoiceNumber}</strong> for{' '}
+          <strong>{personLabel(invoice.patient)}</strong>?
         </>
       }
       confirmLabel="Delete"

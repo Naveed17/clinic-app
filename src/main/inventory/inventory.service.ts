@@ -69,7 +69,7 @@ async function findCatalogByNameMg(name: string, mg?: number | null) {
   if (!trimmed) return null;
   const strength = normalizeMedicineMg(mg);
   const rows = await getPrisma().$queryRawUnsafe<{ id: string; name: string; mg: number | null }[]>(
-    `SELECT id, name, mg FROM "Medicine" WHERE LOWER(name) = LOWER(?) AND IFNULL(mg, -1) = IFNULL(?, -1) LIMIT 1`,
+    `SELECT id, name, mg FROM "Medicine" WHERE LOWER(name) = LOWER(?) AND IFNULL(mg, -1) = IFNULL(?, -1) AND (isDeleted = 0 OR isDeleted IS NULL) LIMIT 1`,
     trimmed,
     strength,
   );
@@ -129,9 +129,10 @@ const catalogInclude = {
 export async function searchCatalogMedicines(query: string) {
   const q = query.trim().toLowerCase();
   const medicines = await db().medicine.findMany({
-    where: q
-      ? { OR: [{ name: { contains: q } }, { genericName: { contains: q } }] }
-      : undefined,
+    where: {
+      isDeleted: false,
+      ...(q ? { OR: [{ name: { contains: q } }, { genericName: { contains: q } }] } : {}),
+    },
     include: catalogInclude,
     orderBy: { name: 'asc' },
     take: q ? 50 : 200,
@@ -260,6 +261,9 @@ export async function updateCatalogMedicine(
 export async function deleteCatalogMedicine(id: string) {
   const medicine = await db().medicine.findUnique({ where: { id } });
   if (!medicine) throw new Error('Medicine not found.');
-  await db().medicine.delete({ where: { id } });
+  await db().medicine.update({
+    where: { id },
+    data: { isDeleted: true, deletedAt: new Date() },
+  });
   return { ok: true, id };
 }

@@ -6,6 +6,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { Box, Paper, Stack, Typography, Chip, Avatar, LinearProgress, CircularProgress, Button } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useState, useMemo } from 'react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip as ChartTooltip, CartesianGrid } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { reportsService } from '@/services/reports.service';
 import { patientsService } from '@/services/patients.service';
@@ -68,6 +69,39 @@ export function AdminDashboard(): React.JSX.Element {
       }).length;
   const paidPercentage = totalInvoices ? Math.round((paidInvoices / totalInvoices) * 100) : 0;
   const apptPercentage = totalAppts ? Math.round((completedAppts / totalAppts) * 100) : 0;
+
+  const chartData = useMemo(() => {
+    const list: { day: string; date: string; revenue: number; appointments: number }[] = [];
+    const now = new Date();
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' });
+
+      const rev = (invoices.data ?? []).reduce((acc, inv) => {
+        const invDate = inv.createdAt ? new Date(inv.createdAt).toISOString().slice(0, 10) : '';
+        if (invDate === dateStr && inv.status === 'PAID') {
+          return acc + (Number(inv.total) || 0);
+        }
+        return acc;
+      }, 0);
+
+      const appts = (appointments.data ?? []).filter((a) => {
+        const aDate = a.startsAt ? new Date(a.startsAt).toISOString().slice(0, 10) : '';
+        return aDate === dateStr;
+      }).length;
+
+      list.push({
+        day: dayLabel,
+        date: dateStr,
+        revenue: rev,
+        appointments: appts,
+      });
+    }
+    return list;
+  }, [invoices.data, appointments.data]);
 
   const statCards = [
     {
@@ -277,112 +311,176 @@ export function AdminDashboard(): React.JSX.Element {
               />
             </Stack>
 
-            <Stack spacing={2.5}>
-              {showBilling && (
-              <Box
-                sx={{
-                  p: 2.5,
-                  borderRadius: '24px',
-                  bgcolor: alpha(theme.palette.primary.main, 0.08),
-                  border: `1px solid ${alpha(theme.palette.primary.main, 0.18)}`
-                }}
-              >
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                  <Box>
-                    <Typography variant="body2" fontWeight={700}>
-                      Paid Invoices
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Revenue collected from issued bills
-                    </Typography>
-                  </Box>
-                  <Typography variant="body2" fontWeight={800} color="primary.main">
-                    {paidPercentage}%
-                  </Typography>
-                </Stack>
-
-                <Box sx={{ width: '100%', height: 14, borderRadius: 99, bgcolor: alpha(theme.palette.primary.main, 0.18), overflow: 'hidden' }}>
+            <Stack spacing={2}>
+              {/* Quick Summary Metric Pills */}
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                {showBilling && (
                   <Box
                     sx={{
-                      width: `${paidPercentage}%`,
-                      height: '100%',
-                      bgcolor: theme.palette.primary.main,
-                      transition: 'width 0.3s ease'
+                      flex: 1,
+                      p: 1.5,
+                      borderRadius: '16px',
+                      bgcolor: alpha(theme.palette.primary.main, 0.08),
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.16)}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
                     }}
-                  />
-                </Box>
+                  >
+                    <div>
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                        Paid Invoices
+                      </Typography>
+                      <Typography variant="body2" fontWeight={800} color="primary.main">
+                        {paidInvoices} of {totalInvoices} settled
+                      </Typography>
+                    </div>
+                    <Chip
+                      label={`${paidPercentage}%`}
+                      size="small"
+                      color="primary"
+                      sx={{ fontWeight: 800, fontSize: '0.75rem', height: 24 }}
+                    />
+                  </Box>
+                )}
 
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1.25 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    {paidInvoices} of {totalInvoices} invoices
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {totalInvoices ? `${Math.round((paidInvoices / totalInvoices) * 100)}% settled` : 'No invoices'}
-                  </Typography>
-                </Stack>
-              </Box>
-              )}
-
-              <Box
-                sx={{
-                  p: 2.5,
-                  borderRadius: '24px',
-                  bgcolor: alpha(theme.palette.secondary.main, 0.08),
-                  border: `1px solid ${alpha(theme.palette.secondary.main, 0.18)}`
-                }}
-              >
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                  <Box>
-                    <Typography variant="body2" fontWeight={700}>
+                <Box
+                  sx={{
+                    flex: 1,
+                    p: 1.5,
+                    borderRadius: '16px',
+                    bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                    border: `1px solid ${alpha(theme.palette.secondary.main, 0.16)}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
                       Completed Appointments
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Appointments successfully closed
+                    <Typography variant="body2" fontWeight={800} color="secondary.main">
+                      {completedAppts} of {totalAppts} closed
                     </Typography>
-                  </Box>
-                  <Typography variant="body2" fontWeight={800} color="secondary.main">
-                    {apptPercentage}%
-                  </Typography>
-                </Stack>
-
-                <Box sx={{ width: '100%', height: 14, borderRadius: 99, bgcolor: alpha(theme.palette.secondary.main, 0.18), overflow: 'hidden' }}>
-                  <Box
-                    sx={{
-                      width: `${apptPercentage}%`,
-                      height: '100%',
-                      bgcolor: theme.palette.secondary.main,
-                      transition: 'width 0.3s ease'
-                    }}
+                  </div>
+                  <Chip
+                    label={`${apptPercentage}%`}
+                    size="small"
+                    color="secondary"
+                    sx={{ fontWeight: 800, fontSize: '0.75rem', height: 24 }}
                   />
                 </Box>
+              </Stack>
 
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1.25 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    {completedAppts} of {totalAppts} appointments
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {totalAppts ? `${Math.round((completedAppts / totalAppts) * 100)}% complete` : 'No appointments'}
-                  </Typography>
-                </Stack>
+              {/* 7-Day Trend Area Chart */}
+              <Box sx={{ width: '100%', height: 180, pt: 1 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={alpha(theme.palette.divider, 0.4)} vertical={false} />
+                    <XAxis
+                      dataKey="day"
+                      stroke={theme.palette.text.secondary}
+                      fontSize={11}
+                      tickLine={false}
+                      axisLine={{ stroke: alpha(theme.palette.divider, 0.4) }}
+                    />
+                    <YAxis
+                      stroke={theme.palette.text.secondary}
+                      fontSize={11}
+                      tickLine={false}
+                      axisLine={false}
+                      allowDecimals={false}
+                    />
+                    <ChartTooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const item = payload[0].payload as { day: string; date: string; revenue: number; appointments: number };
+                          return (
+                            <Paper
+                              elevation={4}
+                              sx={{
+                                p: 1.25,
+                                bgcolor: 'background.paper',
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                borderRadius: 1.5,
+                              }}
+                            >
+                              <Typography variant="caption" fontWeight={700} color="text.secondary">
+                                {item.day} ({item.date})
+                              </Typography>
+                              <Stack spacing={0.25} sx={{ mt: 0.5 }}>
+                                <Typography variant="caption" sx={{ color: theme.palette.primary.main, fontWeight: 700 }}>
+                                  Revenue: {money(item.revenue)}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: theme.palette.secondary.main, fontWeight: 700 }}>
+                                  Appointments: {item.appointments}
+                                </Typography>
+                              </Stack>
+                            </Paper>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke={theme.palette.primary.main}
+                      strokeWidth={2}
+                      fill={alpha(theme.palette.primary.main, 0.12)}
+                      name="Revenue"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="appointments"
+                      stroke={theme.palette.secondary.main}
+                      strokeWidth={2}
+                      fill={alpha(theme.palette.secondary.main, 0.08)}
+                      name="Appointments"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
               </Box>
 
+              {/* Bottom Summary Row */}
               <Stack
                 direction="row"
                 justifyContent="space-between"
                 alignItems="center"
+                flexWrap="wrap"
+                gap={1.5}
                 sx={{
                   pt: 1.5,
                   px: 1,
                   borderTop: '1px dashed',
-                  borderColor: 'divider'
+                  borderColor: 'divider',
                 }}
               >
-                <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                  Total Accumulated Revenue
-                </Typography>
-                <Typography fontWeight={900} color="primary.main" fontSize="1.3rem">
-                  {money(totalRevenue)}
-                </Typography>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: theme.palette.primary.main }} />
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                      Revenue (PKR)
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: theme.palette.secondary.main }} />
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                      Appointments
+                    </Typography>
+                  </Stack>
+                </Stack>
+
+                <Stack direction="row" spacing={1} alignItems="baseline">
+                  <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                    Total Revenue:
+                  </Typography>
+                  <Typography fontWeight={900} color="primary.main" fontSize="1.25rem">
+                    {money(totalRevenue)}
+                  </Typography>
+                </Stack>
               </Stack>
             </Stack>
           </Paper>

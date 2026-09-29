@@ -253,6 +253,42 @@ declare global {
         googleList: () => Promise<{ ok: boolean; files?: Array<{ id: string; name: string; size: number; createdTime: string }>; error?: string }>;
         googleRestore: (fileId: string) => Promise<{ ok: boolean; error?: string }>;
         onGoogleProgress: (handler: (progress: { percent: number; label: string }) => void) => () => void;
+        cloudStatus: () => Promise<{
+          enabled: boolean;
+          schedule: 'off' | 'daily' | 'weekly';
+          lastBackupAt: string | null;
+          licenseKey: string | null;
+          serverUrl: string;
+        }>;
+        cloudSchedule: (
+          schedule: 'off' | 'daily' | 'weekly',
+        ) => Promise<{
+          enabled: boolean;
+          schedule: 'off' | 'daily' | 'weekly';
+          lastBackupAt: string | null;
+          licenseKey: string | null;
+          serverUrl: string;
+        }>;
+        cloudBackupNow: (notes?: string) => Promise<{ ok: boolean; data?: any; error?: string }>;
+        cloudList: () => Promise<{
+          ok: boolean;
+          backups?: Array<{
+            id: string;
+            licenseKey: string;
+            fileName: string;
+            originalName: string;
+            fileSize: number;
+            mimeType: string;
+            format: string;
+            deviceName?: string;
+            backupType: 'auto' | 'manual';
+            notes?: string;
+            createdAt: string;
+          }>;
+          error?: string;
+        }>;
+        cloudRestore: (backupId: string) => Promise<{ ok: boolean; error?: string }>;
+        cloudDelete: (backupId: string) => Promise<{ ok: boolean; error?: string }>;
       };
       docs: {
         patient: {
@@ -326,6 +362,18 @@ declare global {
           progress?: { percent: number; label: string };
         }) => void) => () => void;
         onDataChanged?: (callback: (data: { entity: string; action: string }) => void) => () => void;
+      };
+      recycleBin: {
+        list: () => Promise<Array<{
+          id: string;
+          entityType: 'patient' | 'appointment' | 'invoice' | 'medicine';
+          title: string;
+          subtitle: string;
+          deletedAt: string;
+          createdAt: string;
+        }>>;
+        restore: (entityType: string, id: string) => Promise<{ ok: boolean }>;
+        purge: (entityType: string, id: string) => Promise<{ ok: boolean }>;
       };
     };
   }

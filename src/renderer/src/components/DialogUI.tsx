@@ -126,6 +126,7 @@ export function FormDialogTitle({ title, subtitle }: FormDialogTitleProps): Reac
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
+  subtitle?: string | null;
   message: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
@@ -139,6 +140,7 @@ interface ConfirmDialogProps {
 export function ConfirmDialog({
   open,
   title,
+  subtitle,
   message,
   confirmLabel = 'Delete',
   cancelLabel = 'Cancel',
@@ -178,11 +180,13 @@ export function ConfirmDialog({
         >
           <WarningAmberOutlinedIcon />
         </Box>
-        <Box>
+        <Box sx={{ alignSelf: 'center' }}>
           <DialogTitle sx={{ p: 0, fontWeight: 800, fontSize: 18, lineHeight: 1.3 }}>{title}</DialogTitle>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            This action cannot be undone.
-          </Typography>
+          {Boolean(subtitle) && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {subtitle}
+            </Typography>
+          )}
         </Box>
       </Box>
       <DialogContent sx={dialogContentSx}>
