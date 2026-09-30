@@ -28,6 +28,10 @@ export function useRealtimeInvalidation(): void {
 
     // Invalidate on data:changed (new path — covers tokens, lab, and all routes)
     const unsubData = realtimeService.onDataChanged(({ entity }) => {
+      if (entity === 'all' || !entity) {
+        void queryClient.invalidateQueries();
+        return;
+      }
       const keys = ENTITY_QUERY_MAP[entity];
       keys?.forEach((key) => void queryClient.invalidateQueries({ queryKey: [key] }));
     });

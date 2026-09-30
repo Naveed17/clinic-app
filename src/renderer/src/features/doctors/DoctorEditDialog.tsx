@@ -2,7 +2,7 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, Skeleton,
+  Alert, Autocomplete, Box, Button, Dialog, DialogActions, DialogContent, Skeleton,
   Divider, FormControlLabel, IconButton, InputAdornment,
   Stack, Switch, TextField, Typography,
 } from '@mui/material';
@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { doctorsService } from '@/services/doctors.service';
-import type { Doctor, DoctorUpdateInput } from '@/types/doctor';
+import { Doctor, DoctorUpdateInput, MEDICAL_SPECIALIZATIONS } from '@/types/doctor';
 
 const editSchema = z.object({
   firstName: z.string().trim().min(1, 'First name is required.'),
@@ -139,7 +139,29 @@ export function DoctorEditDialog({ doctorId, open, onClose }: { doctorId: string
             <Divider />
             <Typography variant="subtitle2" color="text.secondary">Doctor Profile</Typography>
             <DoctorAvatarPicker value={avatar} onChange={setAvatar} />
-            <TextField fullWidth label="Specialization" error={Boolean(errors.specialization)} helperText={errors.specialization?.message} {...form.register('specialization')} />
+            <Controller
+              control={form.control}
+              name="specialization"
+              render={({ field }) => (
+                <Autocomplete
+                  freeSolo
+                  options={MEDICAL_SPECIALIZATIONS as unknown as string[]}
+                  value={field.value || ''}
+                  onChange={(_, newValue) => field.onChange(newValue || '')}
+                  onInputChange={(_, newInputValue) => field.onChange(newInputValue || '')}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      fullWidth
+                      label="Specialization"
+                      placeholder="Select specialization (e.g. Cardiologist)"
+                      error={Boolean(errors.specialization)}
+                      helperText={errors.specialization?.message}
+                    />
+                  )}
+                />
+              )}
+            />
             <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
               <TextField fullWidth label="Qualification (e.g. MBBS, MD)" {...form.register('qualification')} />
               <TextField fullWidth label="Experience (years)" type="number" slotProps={{ htmlInput: { min: 0, max: 60, step: 1 } }}

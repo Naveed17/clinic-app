@@ -239,6 +239,15 @@ export async function applyIncomingChanges(
       for (const row of rows) {
         if (!row.id) continue;
 
+        // Normalize enum values from mobile / cloud
+        if (table === 'Token' && row.status) {
+          if (row.status === 'COMPLETED') row.status = 'DONE';
+          if (row.status === 'IN_CONSULTATION') row.status = 'IN_PROGRESS';
+        }
+        if (table === 'Appointment' && row.status) {
+          if (row.status === 'CONFIRMED' || row.status === 'PENDING') row.status = 'SCHEDULED';
+        }
+
         const colsPresent = Object.keys(row).filter((c) => allowedCols.includes(c));
         if (colsPresent.length === 0) continue;
 
@@ -258,6 +267,49 @@ export async function applyIncomingChanges(
           }
           return val;
         });
+
+        // Pre-reconcile secondary unique constraints to avoid SQLite aborts
+        if (table === 'User' && row.email) {
+          try {
+            const existingWithEmail = await db.$queryRawUnsafe<{ id: string }[]>(
+              `SELECT id FROM "User" WHERE LOWER(email) = LOWER(?) AND id != ?`,
+              String(row.email).trim(),
+              row.id,
+            );
+            if (existingWithEmail && existingWithEmail.length > 0) {
+              const oldId = existingWithEmail[0].id;
+              await db.$executeRawUnsafe(`UPDATE "DoctorProfile" SET "userId" = ? WHERE "userId" = ?`, row.id, oldId).catch(() => {});
+              await db.$executeRawUnsafe(`UPDATE "DoctorSchedule" SET "doctorId" = ? WHERE "doctorId" = ?`, row.id, oldId).catch(() => {});
+              await db.$executeRawUnsafe(`UPDATE "DoctorAttendance" SET "doctorId" = ? WHERE "doctorId" = ?`, row.id, oldId).catch(() => {});
+              await db.$executeRawUnsafe(`UPDATE "Appointment" SET "providerId" = ? WHERE "providerId" = ?`, row.id, oldId).catch(() => {});
+              await db.$executeRawUnsafe(`UPDATE "Token" SET "doctorId" = ? WHERE "doctorId" = ?`, row.id, oldId).catch(() => {});
+              await db.$executeRawUnsafe(`UPDATE "Patient" SET "primaryDoctorId" = ? WHERE "primaryDoctorId" = ?`, row.id, oldId).catch(() => {});
+              await db.$executeRawUnsafe(`UPDATE "User" SET id = ? WHERE id = ?`, row.id, oldId);
+            }
+          } catch {
+            await db.$executeRawUnsafe(`DELETE FROM "User" WHERE LOWER(email) = LOWER(?) AND id != ?`, String(row.email).trim(), row.id).catch(() => {});
+          }
+        } else if (table === 'DoctorProfile' && row.userId) {
+          await db.$executeRawUnsafe(
+            `DELETE FROM "DoctorProfile" WHERE "userId" = ? AND id != ?`,
+            row.userId,
+            row.id,
+          ).catch(() => {});
+        } else if (table === 'DoctorSchedule' && row.doctorId && row.dayOfWeek !== undefined) {
+          await db.$executeRawUnsafe(
+            `DELETE FROM "DoctorSchedule" WHERE "doctorId" = ? AND "dayOfWeek" = ? AND id != ?`,
+            row.doctorId,
+            row.dayOfWeek,
+            row.id,
+          ).catch(() => {});
+        } else if (table === 'DoctorAttendance' && row.doctorId && row.date) {
+          await db.$executeRawUnsafe(
+            `DELETE FROM "DoctorAttendance" WHERE "doctorId" = ? AND "date" = ? AND id != ?`,
+            row.doctorId,
+            row.date,
+            row.id,
+          ).catch(() => {});
+        }
 
         const sql = `
           INSERT INTO "${table}" (${colNames})

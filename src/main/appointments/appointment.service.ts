@@ -70,7 +70,7 @@ export async function listAppointments(date?: string) {
           lastName: true,
           role: true,
           avatar: true,
-          doctorProfile: { select: { avatar: true } },
+          doctorProfile: { select: { avatar: true, specialization: true } },
         },
       },
     },
@@ -102,10 +102,19 @@ export async function listAppointments(date?: string) {
     const dateStr = a.startsAt.toLocaleDateString('en-CA');
     const token = tokenMap.get(`${a.patientId}_${a.providerId}_${dateStr}`);
     const resolvedFeeType = (a as unknown as { feeType?: string }).feeType ?? token?.feeType ?? 'PAID';
+    const doctorObj = {
+      id: a.provider.id,
+      firstName: a.provider.firstName,
+      lastName: a.provider.lastName,
+      role: String(a.provider.role),
+      specialization: a.provider.doctorProfile?.specialization || 'General',
+      avatar: a.provider.avatar || a.provider.doctorProfile?.avatar || null,
+    };
     return {
       id: a.id,
       patientId: a.patientId,
       providerId: a.providerId,
+      doctorId: a.providerId,
       startsAt: a.startsAt.toISOString(),
       endsAt: a.endsAt.toISOString(),
       status: a.status,
@@ -125,13 +134,8 @@ export async function listAppointments(date?: string) {
         role: 'patient',
         phone: a.patient.phone ?? null,
       },
-      provider: {
-        id: a.provider.id,
-        firstName: a.provider.firstName,
-        lastName: a.provider.lastName,
-        role: String(a.provider.role),
-        avatar: a.provider.avatar || a.provider.doctorProfile?.avatar || null,
-      },
+      provider: doctorObj,
+      doctor: doctorObj,
     };
   });
 }
@@ -149,7 +153,7 @@ export async function listAppointmentsByPatient(patientId: string) {
           lastName: true,
           role: true,
           avatar: true,
-          doctorProfile: { select: { avatar: true } },
+          doctorProfile: { select: { avatar: true, specialization: true } },
         },
       },
     },
@@ -173,10 +177,19 @@ export async function listAppointmentsByPatient(patientId: string) {
     const dateStr = a.startsAt.toLocaleDateString('en-CA');
     const token = tokenMap.get(`${a.patientId}_${a.providerId}_${dateStr}`);
     const resolvedFeeType = (a as unknown as { feeType?: string }).feeType ?? token?.feeType ?? 'PAID';
+    const doctorObj = {
+      id: a.provider.id,
+      firstName: a.provider.firstName,
+      lastName: a.provider.lastName,
+      role: String(a.provider.role),
+      specialization: a.provider.doctorProfile?.specialization || 'General',
+      avatar: a.provider.avatar || a.provider.doctorProfile?.avatar || null,
+    };
     return {
       id: a.id,
       patientId: a.patientId,
       providerId: a.providerId,
+      doctorId: a.providerId,
       startsAt: a.startsAt.toISOString(),
       endsAt: a.endsAt.toISOString(),
       status: a.status,
@@ -196,13 +209,8 @@ export async function listAppointmentsByPatient(patientId: string) {
         role: 'patient',
         phone: a.patient.phone ?? null,
       },
-      provider: {
-        id: a.provider.id,
-        firstName: a.provider.firstName,
-        lastName: a.provider.lastName,
-        role: String(a.provider.role),
-        avatar: a.provider.avatar || a.provider.doctorProfile?.avatar || null,
-      },
+      provider: doctorObj,
+      doctor: doctorObj,
     };
   });
 }
@@ -237,7 +245,7 @@ export async function listDoctors() {
       firstName: true,
       lastName: true,
       avatar: true,
-      doctorProfile: { select: { avatar: true, consultationFee: true } },
+      doctorProfile: { select: { avatar: true, specialization: true, consultationFee: true } },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -245,6 +253,7 @@ export async function listDoctors() {
     id: d.id,
     firstName: d.firstName,
     lastName: d.lastName,
+    specialization: d.doctorProfile?.specialization || 'General',
     avatar: d.avatar || d.doctorProfile?.avatar || null,
     consultationFee: Number(d.doctorProfile?.consultationFee ?? 0),
   }));
@@ -263,7 +272,7 @@ async function getAppointmentById(id: string) {
           lastName: true,
           role: true,
           avatar: true,
-          doctorProfile: { select: { avatar: true } },
+          doctorProfile: { select: { avatar: true, specialization: true } },
         },
       },
     },
@@ -273,13 +282,24 @@ async function getAppointmentById(id: string) {
   const dateStr = a.startsAt.toLocaleDateString('en-CA');
   const token = await db.token.findFirst({
     where: { patientId: a.patientId, doctorId: a.providerId, date: dateStr },
+    select: { id: true, tokenNumber: true },
     orderBy: { tokenNumber: 'desc' },
   });
+
+  const doctorObj = {
+    id: a.provider.id,
+    firstName: a.provider.firstName,
+    lastName: a.provider.lastName,
+    role: String(a.provider.role),
+    specialization: a.provider.doctorProfile?.specialization || 'General',
+    avatar: a.provider.avatar || a.provider.doctorProfile?.avatar || null,
+  };
 
   return {
     id: a.id,
     patientId: a.patientId,
     providerId: a.providerId,
+    doctorId: a.providerId,
     startsAt: a.startsAt.toISOString(),
     endsAt: a.endsAt.toISOString(),
     status: a.status,
@@ -298,13 +318,8 @@ async function getAppointmentById(id: string) {
       role: 'patient',
       phone: a.patient.phone ?? null,
     },
-    provider: {
-      id: a.provider.id,
-      firstName: a.provider.firstName,
-      lastName: a.provider.lastName,
-      role: String(a.provider.role),
-      avatar: a.provider.avatar || a.provider.doctorProfile?.avatar || null,
-    },
+    provider: doctorObj,
+    doctor: doctorObj,
   };
 }
 

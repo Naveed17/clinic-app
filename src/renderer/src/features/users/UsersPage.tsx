@@ -8,6 +8,7 @@ import { alpha, useTheme } from '@mui/material/styles';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
+  Autocomplete,
   Avatar,
   Box,
   Button,
@@ -37,6 +38,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { usersService } from '@/services/users.service';
 import type { User, UserInput, UserUpdateInput } from '@/types/user';
+import { MEDICAL_SPECIALIZATIONS } from '@/types/doctor';
 import { tableSx, chipSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
@@ -243,12 +245,28 @@ function UserDialog({ user, open, onClose }: { user?: User; open: boolean; onClo
               <>
                 <Divider />
                 <Typography variant="subtitle2" color="text.secondary">Doctor Profile</Typography>
-                <TextField
-                  fullWidth
-                  label="Specialization"
-                  error={Boolean(errors.doctorProfile?.specialization)}
-                  helperText={errors.doctorProfile?.specialization?.message}
-                  {...form.register('doctorProfile.specialization')}
+                <Controller
+                  control={form.control}
+                  name="doctorProfile.specialization"
+                  render={({ field }) => (
+                    <Autocomplete
+                      freeSolo
+                      options={MEDICAL_SPECIALIZATIONS as unknown as string[]}
+                      value={field.value || ''}
+                      onChange={(_, newValue) => field.onChange(newValue || '')}
+                      onInputChange={(_, newInputValue) => field.onChange(newInputValue || '')}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          fullWidth
+                          label="Specialization"
+                          placeholder="Select specialization (e.g. Cardiologist)"
+                          error={Boolean(errors.doctorProfile?.specialization)}
+                          helperText={errors.doctorProfile?.specialization?.message}
+                        />
+                      )}
+                    />
+                  )}
                 />
                 <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
                   <TextField fullWidth label="Qualification (e.g. MBBS, MD)" {...form.register('doctorProfile.qualification')} />

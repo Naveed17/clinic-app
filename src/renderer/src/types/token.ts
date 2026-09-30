@@ -1,4 +1,4 @@
-export type TokenStatus = 'WAITING' | 'DONE' | 'SKIPPED' | 'ON_HOLD';
+export type TokenStatus = 'WAITING' | 'IN_PROGRESS' | 'DONE' | 'SKIPPED' | 'ON_HOLD' | 'COMPLETED' | 'CALLED' | 'IN_CONSULTATION' | 'CANCELLED';
 export type TokenPriority = 'NORMAL' | 'URGENT' | 'SENIOR' | 'CHILD';
 
 export interface TokenVitals {

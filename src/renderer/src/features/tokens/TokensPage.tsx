@@ -68,6 +68,10 @@ const statusConfig: Record<string, { label: string; color: 'warning' | 'primary'
   WAITING: { label: 'Waiting', color: 'warning' },
   IN_PROGRESS: { label: 'In Progress', color: 'primary' },
   DONE: { label: 'Done', color: 'success' },
+  COMPLETED: { label: 'Done', color: 'success' },
+  CALLED: { label: 'Called', color: 'primary' },
+  IN_CONSULTATION: { label: 'In Progress', color: 'primary' },
+  CANCELLED: { label: 'Cancelled', color: 'default' },
   SKIPPED: { label: 'Skipped', color: 'default' },
 };
 
@@ -972,11 +976,11 @@ export function TokensPage(): React.JSX.Element {
     }
   }, [filtered.length]);
 
-  const waiting = tokens.filter((t) => t.status === 'WAITING').length;
-  const done = tokens.filter((t) => t.status === 'DONE').length;
-  const skipped = tokens.filter((t) => t.status === 'SKIPPED').length;
+  const waiting = tokens.filter((t) => t.status === 'WAITING' || t.status === 'CALLED').length;
+  const done = tokens.filter((t) => t.status === 'DONE' || t.status === 'COMPLETED').length;
+  const skipped = tokens.filter((t) => t.status === 'SKIPPED' || t.status === 'CANCELLED').length;
 
-  const currentToken = filtered.find((t) => t.status === 'WAITING');
+  const currentToken = filtered.find((t) => t.status === 'WAITING' || t.status === 'CALLED' || t.status === 'IN_PROGRESS' || t.status === 'IN_CONSULTATION');
 
   const softCard = {
     borderRadius: '20px',

@@ -252,22 +252,20 @@ async function syncWithCloud(
     updateProgress(5, isInitialSync ? 'Checking cloud database records...' : 'Scanning local changes...');
 
     let remoteTables: Record<string, number> = {};
-    if (isInitialSync) {
-      try {
-        const statusRes = await fetch(`${target.url}/api/clinic/migrate/export/status`, {
-          headers: {
-            ...(target.key ? { 'x-license-key': target.key } : {}),
-            ...(target.schemaId ? { 'x-schema-id': target.schemaId } : {}),
-          },
-        });
-        if (statusRes.ok) {
-          const statusData = (await statusRes.json()) as { tables?: Record<string, number> };
-          if (statusData && statusData.tables) {
-            remoteTables = statusData.tables;
-          }
+    try {
+      const statusRes = await fetch(`${target.url}/api/clinic/migrate/export/status`, {
+        headers: {
+          ...(target.key ? { 'x-license-key': target.key } : {}),
+          ...(target.schemaId ? { 'x-schema-id': target.schemaId } : {}),
+        },
+      });
+      if (statusRes.ok) {
+        const statusData = (await statusRes.json()) as { tables?: Record<string, number> };
+        if (statusData && statusData.tables) {
+          remoteTables = statusData.tables;
         }
-      } catch { /* ignore */ }
-    }
+      }
+    } catch { /* ignore */ }
 
     const checkpoint = isInitialSync ? loadSyncCheckpoint(target.schemaId || undefined) : { completedTables: [], tableOffsets: {} };
     const completedTables = new Set(checkpoint.completedTables || []);
@@ -284,25 +282,10 @@ async function syncWithCloud(
     }
 
     const newSyncTime = Date.now();
-    if (totalPushRows === 0) {
-      saveLastSyncTime(newSyncTime, target.schemaId || undefined);
-      clearSyncCheckpoint(target.schemaId || undefined);
-      syncStatus = {
-        state: 'synced',
-        lastSyncTime: newSyncTime,
-        peerUrl: target.url,
-        peerName: 'Cloud',
-        message: 'All data is up to date',
-        recordsSyncedLastTime: 0,
-        progress: undefined,
-      };
-      broadcastStatus();
-      isSyncing = false;
-      return { ok: true, recordsSynced: 0 };
-    }
-
-    const BATCH_SIZE = 100;
     let pushedCount = 0;
+
+    if (totalPushRows > 0) {
+      const BATCH_SIZE = 100;
 
     // Detect rows already synced to cloud so progress accurately resumes from where it stopped
     if (isInitialSync) {
@@ -473,7 +456,50 @@ async function syncWithCloud(
         console.warn('[SyncService] Failed to push deletions to cloud:', err);
       }
     }
+  }
 
+    // Phase B: Pull updates from Cloud into local SQLite database (Two-Way Sync)
+    let pulledCount = 0;
+    const PULL_BATCH = 50;
+    const cloudHeaders = {
+      ...(target.key ? { 'x-license-key': target.key } : {}),
+      ...(target.schemaId ? { 'x-schema-id': target.schemaId } : {}),
+      ...(target.hwid ? { 'x-hwid': target.hwid } : {}),
+    };
+
+    updateProgress(85, 'Downloading updates from cloud...');
+    for (const table of SYNC_TABLES) {
+      if (table === 'PatientDocument' || table === 'LabReport') continue;
+      const remoteCount = remoteTables[table] || 0;
+      if (remoteCount === 0) continue;
+
+      let offset = 0;
+      while (offset < remoteCount) {
+        try {
+          const pullRes = await fetch(
+            `${target.url}/api/clinic/migrate/export/rows?table=${encodeURIComponent(table)}&offset=${offset}&limit=${PULL_BATCH}`,
+            { headers: cloudHeaders },
+          );
+          if (!pullRes.ok) break;
+          const pullData = (await pullRes.json()) as { rows?: Record<string, unknown>[] };
+          const rows = pullData.rows || [];
+          if (!rows.length) break;
+
+          const { appliedChanges } = await applyIncomingChanges({ [table]: rows }, []);
+          pulledCount += appliedChanges;
+          offset += rows.length;
+        } catch (e) {
+          console.warn(`[SyncService] Failed pulling ${table}:`, e);
+          break;
+        }
+      }
+    }
+
+    if (pulledCount > 0) {
+      notifyDataChanged();
+    }
+
+    const totalRecords = pushedCount + pulledCount;
     saveLastSyncTime(newSyncTime, target.schemaId || undefined);
     clearSyncCheckpoint(target.schemaId || undefined);
     syncStatus = {
@@ -481,13 +507,15 @@ async function syncWithCloud(
       lastSyncTime: newSyncTime,
       peerUrl: target.url,
       peerName: 'Cloud',
-      message: `Synced ${pushedCount} record${pushedCount === 1 ? '' : 's'} with cloud`,
-      recordsSyncedLastTime: pushedCount,
+      message: totalRecords > 0
+        ? `Synced ${totalRecords} record${totalRecords === 1 ? '' : 's'} (${pushedCount} sent, ${pulledCount} received)`
+        : 'All data is up to date',
+      recordsSyncedLastTime: totalRecords,
       progress: undefined,
     };
     broadcastStatus();
     isSyncing = false;
-    return { ok: true, recordsSynced: pushedCount };
+    return { ok: true, recordsSynced: totalRecords };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     if (/online database service suspended/i.test(msg) || /server 403/i.test(msg)) {
@@ -822,10 +850,12 @@ export function startAutoSync(): void {
     void triggerSync({ silent: true });
   }, 4000);
 
-  // 3. Relaxed fallback heartbeat (every 15 minutes) - NOT rapid 5s/25s polling!
+  // 3. Heartbeat: 30 seconds for online cloud database, 15 minutes for local LAN
+  const target = resolveSyncTarget();
+  const pollInterval = target?.type === 'cloud' ? 30 * 1000 : 15 * 60 * 1000;
   autoSyncTimer = setInterval(() => {
     void triggerSync({ silent: true });
-  }, 15 * 60 * 1000);
+  }, pollInterval);
 }
 
 export function stopAutoSync(): void {

@@ -8,6 +8,7 @@ import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Dialog,
@@ -31,7 +32,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { doctorsService } from '@/services/doctors.service';
 import { useAuth } from '@/features/auth/AuthContext';
-import type { Doctor, DoctorInput, DoctorUpdateInput } from '@/types/doctor';
+import { Doctor, DoctorInput, DoctorUpdateInput, MEDICAL_SPECIALIZATIONS } from '@/types/doctor';
 import { tableSx, actionBtnSx, TablePageShell, SearchField, TablePager, Table, TableHead, TableBody, TableRow, TableCell } from '@/components/TableUI';
 import { TableRowsSkeleton } from '@/components/LoadingUI';
 import {
@@ -191,7 +192,29 @@ function DoctorDialog({ doctor, open, onClose }: { doctor?: Doctor; open: boolea
             <Typography variant="subtitle2" color="text.secondary">Doctor Profile</Typography>
             <DoctorAvatarPicker value={avatar} onChange={setAvatar} />
 
-            <TextField fullWidth label="Specialization" error={Boolean(errors.specialization)} helperText={errors.specialization?.message} {...form.register('specialization')} />
+            <Controller
+              control={form.control}
+              name="specialization"
+              render={({ field }) => (
+                <Autocomplete
+                  freeSolo
+                  options={MEDICAL_SPECIALIZATIONS as unknown as string[]}
+                  value={field.value || ''}
+                  onChange={(_, newValue) => field.onChange(newValue || '')}
+                  onInputChange={(_, newInputValue) => field.onChange(newInputValue || '')}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      fullWidth
+                      label="Specialization"
+                      placeholder="Select specialization (e.g. Cardiologist)"
+                      error={Boolean(errors.specialization)}
+                      helperText={errors.specialization?.message}
+                    />
+                  )}
+                />
+              )}
+            />
             <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
               <TextField fullWidth label="Qualification (e.g. MBBS, MD)" {...form.register('qualification')} />
               <TextField

@@ -31,38 +31,57 @@ export interface PatientInput {
 
 async function generateMrNumber(): Promise<string> {
   const prisma = getPrisma();
+  
+  // 1. Find the highest number in Patient table
+  let currentMax = 0;
   try {
-    const updated = await prisma.$queryRawUnsafe<{ nextVal: number | bigint }[]>(
-      `UPDATE "_AppSequence" SET "nextVal" = "nextVal" + 1 WHERE "name" = 'mrNumber' RETURNING "nextVal"`
+    const res = await prisma.$queryRawUnsafe<{ maxNum: number | bigint | null }[]>(
+      `SELECT MAX(CAST(SUBSTR("mrNumber", 4) AS INTEGER)) as maxNum FROM "Patient" WHERE "mrNumber" LIKE 'MR-%'`,
     );
-    if (updated && updated.length > 0 && updated[0].nextVal != null) {
-      const num = Number(updated[0].nextVal);
-      return `MR-${String(num).padStart(5, '0')}`;
+    const raw = res?.[0]?.maxNum;
+    if (raw != null && Number.isFinite(Number(raw))) {
+      currentMax = Math.max(currentMax, Number(raw));
+    }
+  } catch (err) {
+    console.warn('[patient.service] Error checking MAX mrNumber from Patient:', err);
+  }
+
+  // 2. Also check _AppSequence
+  try {
+    const seqRow = await prisma.$queryRawUnsafe<{ nextVal: number | bigint }[]>(
+      `SELECT "nextVal" FROM "_AppSequence" WHERE "name" = 'mrNumber'`,
+    );
+    if (seqRow && seqRow.length > 0 && seqRow[0].nextVal != null) {
+      currentMax = Math.max(currentMax, Number(seqRow[0].nextVal));
     }
   } catch {
-    // Table or row not present yet, initialize below
+    // ignore
   }
 
-  // Initialize sequence from current maximum MR number in DB
-  const res = await prisma.$queryRawUnsafe<{ maxNum: number | bigint | null }[]>(
-    `SELECT MAX(CAST(SUBSTR("mrNumber", 4) AS INTEGER)) as maxNum FROM "Patient" WHERE "mrNumber" LIKE 'MR-%'`,
-  );
-  const raw = res[0]?.maxNum;
-  const currentMax = raw != null && Number.isFinite(Number(raw)) ? Number(raw) : 0;
-  const nextVal = currentMax + 1;
-
-  try {
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "_AppSequence" ("name", "nextVal") VALUES ('mrNumber', ?)
-       ON CONFLICT("name") DO UPDATE SET "nextVal" = ?`,
-      nextVal,
-      nextVal,
-    );
-  } catch {
-    // Ignore fallback errors
+  // 3. Find first free candidate number that does not exist in Patient table
+  let candidate = currentMax + 1;
+  while (true) {
+    const mrStr = `MR-${String(candidate).padStart(5, '0')}`;
+    const exists = await prisma.patient.findFirst({
+      where: { mrNumber: mrStr },
+      select: { id: true },
+    });
+    if (!exists) {
+      // Update _AppSequence to candidate
+      try {
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "_AppSequence" ("name", "nextVal") VALUES ('mrNumber', ?)
+           ON CONFLICT("name") DO UPDATE SET "nextVal" = ?`,
+          candidate,
+          candidate,
+        );
+      } catch {
+        // ignore
+      }
+      return mrStr;
+    }
+    candidate++;
   }
-
-  return `MR-${String(nextVal).padStart(5, '0')}`;
 }
 
 function resolveDateOfBirth(input: PatientInput): Date | null {
@@ -199,8 +218,37 @@ export async function listPatients({ page, pageSize, search, providerId }: Patie
 }
 
 export async function createPatient(input: PatientInput): Promise<Patient> {
-  const mrNumber = await generateMrNumber();
-  return getPrisma().patient.create({ data: { ...mapPatientInput(input), mrNumber } });
+  const prisma = getPrisma();
+  const data = mapPatientInput(input);
+
+  // Validate primaryDoctorId exists if provided
+  if (input.primaryDoctorId) {
+    const doc = await prisma.user.findUnique({
+      where: { id: input.primaryDoctorId },
+      select: { id: true },
+    });
+    if (!doc) {
+      delete (data as { primaryDoctor?: unknown }).primaryDoctor;
+    }
+  }
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const mrNumber = await generateMrNumber();
+    try {
+      return await prisma.patient.create({ data: { ...data, mrNumber } });
+    } catch (err: any) {
+      if (err?.code === 'P2002' && attempt < 4) {
+        try {
+          await prisma.$executeRawUnsafe(
+            `UPDATE "_AppSequence" SET "nextVal" = "nextVal" + 1 WHERE "name" = 'mrNumber'`,
+          );
+        } catch { /* ignore */ }
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('Failed to create patient: could not generate a unique MR number');
 }
 
 export async function updatePatient(id: string, input: PatientInput): Promise<Patient> {
@@ -211,6 +259,15 @@ export async function updatePatient(id: string, input: PatientInput): Promise<Pa
   } else if (!input.primaryDoctorId) {
     delete (data as { primaryDoctor?: unknown }).primaryDoctor;
     (data as Prisma.PatientUpdateInput).primaryDoctor = { disconnect: true };
+  } else {
+    // Validate doctor exists before trying to connect
+    const doc = await getPrisma().user.findUnique({
+      where: { id: input.primaryDoctorId },
+      select: { id: true },
+    });
+    if (!doc) {
+      delete (data as { primaryDoctor?: unknown }).primaryDoctor;
+    }
   }
   return getPrisma().patient.update({ where: { id }, data });
 }

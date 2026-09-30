@@ -21,6 +21,8 @@ enum UserRole {
 
 enum AppointmentStatus {
   SCHEDULED
+  CONFIRMED
+  PENDING
   CHECKED_IN
   COMPLETED
   CANCELLED
@@ -53,10 +55,14 @@ enum LabOrderStatus {
 
 enum TokenStatus {
   WAITING
+  CALLED
   IN_PROGRESS
+  IN_CONSULTATION
   DONE
+  COMPLETED
   SKIPPED
   ON_HOLD
+  CANCELLED
 }
 
 // ==========================================

@@ -57,3 +57,22 @@ export interface DoctorListInput {
   pageSize: number;
   search: string;
 }
+
+export const MEDICAL_SPECIALIZATIONS = [
+  'General OPD',
+  'Cardiologist',
+  'Neurologist',
+  'Orthopedist',
+  'Pulmonologist',
+  'Dental Care',
+  'Dermatologist',
+  'Pediatrician',
+  'Gynecologist',
+  'Ophthalmologist',
+  'ENT Specialist',
+  'Urologist',
+  'Psychiatrist',
+  'Gastroenterologist',
+  'General Physician',
+  'General Surgeon',
+] as const;

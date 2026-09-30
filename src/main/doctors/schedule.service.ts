@@ -88,6 +88,8 @@ export async function assertDoctorAvailable(
   }
 
   const slots = await getDoctorSchedule(doctorId);
+  if (slots.length === 0) return; // Schedule not explicitly configured yet; allow bookings
+
   const day = startsAt.getDay();
   const dayName = DAY_NAMES[day];
   const slot = slots.find((s) => s.dayOfWeek === day);
@@ -114,6 +116,8 @@ export async function assertDoctorAvailable(
  */
 export async function assertDoctorAvailableOnDate(doctorId: string, dateStr: string): Promise<void> {
   const slots = await getDoctorSchedule(doctorId);
+  if (slots.length === 0) return; // Schedule not explicitly configured yet; allow tokens
+
   const d = new Date(`${dateStr}T12:00:00`);
   if (Number.isNaN(d.getTime())) throw new Error('Invalid token date.');
 
