@@ -15,10 +15,12 @@ import { createChatRouter } from './chat.routes';
 import { createMedicinesRouter } from './medicines.routes';
 import { createSyncRouter } from './sync.routes';
 import { createRecycleBinRouter } from './recycle-bin.routes';
+import { createMcpRouter } from '../../mcp/mcp.routes';
 
 export function registerRoutes(app: Express, io: SocketIOServer): void {
   app.use('/api/auth', createAuthRouter());
   app.use('/api/sync', createSyncRouter(io));
+  app.use('/api/mcp', createMcpRouter());
   app.use(authenticate);
   app.use('/api/tokens', createTokensRouter(io));
   app.use('/api/lab', createLabRouter(io));

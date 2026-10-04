@@ -4,10 +4,10 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 export function groqConfig(): { apiKey: string; model: string } {
   const apiKey = String(process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY || '').trim();
-  const defaultModel = 'gemini-3.6-flash';
+  const defaultModel = 'gemini-2.0-flash';
   let model = String(process.env.GEMINI_MODEL || process.env.GROQ_MODEL || defaultModel).trim();
-  if (model.toLowerCase().includes('llama') || model.toLowerCase().includes('1.5') || model.toLowerCase().includes('2.5') || model.toLowerCase().includes('2.0')) {
-    model = 'gemini-3.6-flash';
+  if (model === 'gemini-3.6-flash' || model === 'gemini-3.8-flash' || !model) {
+    model = defaultModel;
   }
 
   if (!apiKey) throw new HttpError('CareFlow AI is not configured on the license server.', 503);
@@ -19,7 +19,7 @@ export async function groqChat(system: string, user: string): Promise<string> {
 
   // If Gemini API Key or Gemini Model
   if (!apiKey.startsWith('gsk_')) {
-    const cleanModel = (model.toLowerCase().startsWith('models/') ? model.slice(7) : model).trim() || 'gemini-3.6-flash';
+    const cleanModel = (model.toLowerCase().startsWith('models/') ? model.slice(7) : model).trim() || 'gemini-2.0-flash';
 
     // 1. Try Google Gemini OpenAI-compatible endpoint first
     try {
@@ -54,7 +54,7 @@ export async function groqChat(system: string, user: string): Promise<string> {
     }
 
     // 2. Native Google Gemini generateContent endpoint
-    const nativeModel = cleanModel.startsWith('gemini-') ? cleanModel : 'gemini-3.6-flash';
+    const nativeModel = cleanModel.startsWith('gemini-') ? cleanModel : 'gemini-2.0-flash';
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${nativeModel}:generateContent?key=${apiKey}`;
 
     const res = await fetch(geminiUrl, {

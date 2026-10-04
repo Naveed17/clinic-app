@@ -10,6 +10,7 @@ declare global {
         create: (input: unknown) => Promise<unknown>;
         update: (id: string, input: unknown) => Promise<unknown>;
         delete: (id: string) => Promise<unknown>;
+        getAddresses: (query?: string) => Promise<string[]>;
       };
       appointments: {
         list: () => Promise<unknown>;

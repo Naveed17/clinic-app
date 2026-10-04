@@ -30,6 +30,7 @@ import { registerDoctorIpc } from './doctors/doctor.ipc';
 import { registerSettingsIpc } from './settings/settings.ipc';
 import { registerPrintIpc } from './print/print.ipc';
 import { registerAiIpc } from './ai/groq.ipc';
+import { registerMcpIpc } from './mcp/mcp.ipc';
 import { getSettings, saveDatabaseModeSettings, resolveOnlineApiOrigin, isOnlineDatabaseMode } from './config/settings';
 import { startDiscoveryBroadcast, stopDiscoveryBroadcast } from './discovery/discovery.server';
 import { startDiscoveryListener, stopDiscoveryListener } from './discovery/discovery.client';
@@ -257,6 +258,7 @@ app.whenReady().then(async () => {
   registerSettingsIpc();
   registerPrintIpc();
   registerAiIpc();
+  registerMcpIpc();
   registerWhatsAppIpc();
   registerSearchIpc();
   registerMedicineIpc();

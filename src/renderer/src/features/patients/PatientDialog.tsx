@@ -15,6 +15,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { PhoneInputField } from '@/components/PhoneInputField';
 import { GenderRadioGroup } from '@/components/GenderRadioGroup';
 import { patientsService } from '@/services/patients.service';
+import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { ageToDateOfBirth, dateOfBirthToAgeParts, dateOfBirthToAge, type AgeUnit } from '@shared/patientAge';
 import type { Patient, PatientInput } from '@/types/patient';
 
@@ -135,6 +136,7 @@ export function PatientDialog({
       await queryClient.invalidateQueries({ queryKey: ['patients'] });
       await queryClient.invalidateQueries({ queryKey: ['token-patients'] });
       await queryClient.invalidateQueries({ queryKey: ['invoice-patients'] });
+      await queryClient.invalidateQueries({ queryKey: ['patient-distinct-addresses'] });
       if (savedPatient && !patient) {
         onCreated?.(savedPatient as Patient);
       }
@@ -254,7 +256,18 @@ export function PatientDialog({
               />
               <TextField fullWidth label="Email (optional)" type="email" error={Boolean(errors.email)} helperText={errors.email?.message} {...form.register('email')} />
             </Box>
-            <TextField fullWidth label="Address" minRows={2} multiline {...form.register('address')} />
+            <Controller
+              name="address"
+              control={form.control}
+              render={({ field }) => (
+                <AddressAutocomplete
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={Boolean(errors.address)}
+                  helperText={errors.address?.message}
+                />
+              )}
+            />
             <Typography color="text.secondary" variant="subtitle2">Emergency contact</Typography>
             <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
               <TextField fullWidth label="Name" {...form.register('emergencyContactName')} />

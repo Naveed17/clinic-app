@@ -39,6 +39,7 @@ declare global {
         create: (input: PatientInput) => Promise<Patient>;
         update: (id: string, input: PatientInput) => Promise<Patient>;
         delete: (id: string) => Promise<void>;
+        getAddresses: (query?: string) => Promise<string[]>;
       };
       tokens: {
         getForPatient: (patientId: string, date: string, doctorId?: string) => Promise<Token | null>;
@@ -173,6 +174,18 @@ declare global {
           },
           onDelta?: (delta: string) => void,
         ) => Promise<{ ok: boolean; html?: string; error?: string }>;
+      };
+      mcp: {
+        callTool: (name: string, args?: Record<string, unknown>) => Promise<any>;
+        askAssistant: (
+          query: string,
+          userContext: {
+            userId: string;
+            role: string;
+            name?: string;
+            history?: Array<{ sender: string; text: string; data?: any }>;
+          },
+        ) => Promise<{ reply: string; toolUsed: string; data?: any; error?: string }>;
       };
       whatsapp: {
         status: () => Promise<{ enabled: boolean; configured: boolean; displayNumber: string }>;

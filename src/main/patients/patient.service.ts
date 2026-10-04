@@ -290,3 +290,40 @@ export async function getPatient(id: string): Promise<Patient | null> {
   if (!patient || patient.isDeleted) return null;
   return patient;
 }
+
+export async function getDistinctAddresses(query?: string): Promise<string[]> {
+  const prisma = getPrisma();
+  const q = String(query || '').trim();
+  try {
+    if (q) {
+      const rows = await prisma.$queryRawUnsafe<Array<{ address: string }>>(
+        `SELECT "address", COUNT(*) as count 
+         FROM "Patient" 
+         WHERE "address" IS NOT NULL 
+           AND TRIM("address") != '' 
+           AND "isDeleted" = false 
+           AND LOWER("address") LIKE LOWER($1) 
+         GROUP BY "address" 
+         ORDER BY count DESC 
+         LIMIT 20`,
+        `%${q}%`,
+      );
+      return rows.map((r) => r.address).filter(Boolean);
+    }
+
+    const rows = await prisma.$queryRawUnsafe<Array<{ address: string }>>(
+      `SELECT "address", COUNT(*) as count 
+       FROM "Patient" 
+       WHERE "address" IS NOT NULL 
+         AND TRIM("address") != '' 
+         AND "isDeleted" = false 
+       GROUP BY "address" 
+       ORDER BY count DESC 
+       LIMIT 50`,
+    );
+    return rows.map((r) => r.address).filter(Boolean);
+  } catch (err) {
+    console.warn('[patient.service] Error fetching distinct addresses:', err);
+    return [];
+  }
+}

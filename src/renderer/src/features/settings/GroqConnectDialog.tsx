@@ -13,7 +13,7 @@ import {
 } from '@/components/DialogUI';
 
 const GEMINI_KEYS_URL = 'https://aistudio.google.com/app/apikey';
-const DEFAULT_MODEL = 'gemini-3.6-flash';
+const DEFAULT_MODEL = 'gemini-2.0-flash';
 
 export function GroqConnectDialog({
   open,

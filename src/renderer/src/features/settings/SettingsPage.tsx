@@ -596,7 +596,7 @@ export function SettingsPage(): React.JSX.Element {
         databaseMode: 'local',
         aiEnabled: false,
         groqApiKey: '',
-        groqModel: 'gemini-3.6-flash',
+        groqModel: 'gemini-2.0-flash',
         whatsappEnabled: false,
         whatsappToken: '',
         whatsappPhoneNumberId: '',

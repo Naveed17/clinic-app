@@ -294,6 +294,11 @@ const api = {
         () => request(`/api/patients/${id}`, { method: 'DELETE' }),
         'patients:delete', id,
       ),
+    getAddresses: (query?: string) =>
+      call(
+        () => request(`/api/patients/addresses?${toQueryString({ q: query })}`),
+        'patients:getAddresses', query,
+      ),
   },
   appointments: {
     list: () => call(() => request('/api/appointments'), 'appointments:list'),
@@ -907,6 +912,23 @@ const api = {
         if (onDelta) ipcRenderer.removeListener('ai:interpretLabReport:delta', listener);
       });
     },
+  },
+  mcp: {
+    callTool: (name: string, args: Record<string, unknown> = {}) =>
+      ipc<any>('mcp:callTool', { name, args }),
+    askAssistant: (
+      query: string,
+      userContext: {
+        userId: string;
+        role: string;
+        name?: string;
+        history?: Array<{ sender: string; text: string; data?: any }>;
+      },
+    ) =>
+      ipc<{ reply: string; toolUsed: string; data?: any; error?: string }>('mcp:askAssistant', {
+        query,
+        userContext,
+      }),
   },
   whatsapp: {
     status: () =>
