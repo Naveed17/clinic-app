@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import { licenseApi } from '../license/licenseApi';
+import { isLicenseModuleEnabled } from '../license/license.ipc';
 import { getPrisma } from '../database/client';
 import {
   getDoctorTodayAppointments,
@@ -468,6 +469,14 @@ export function registerMcpIpc(): void {
   ipcMain.handle(
     'mcp:askAssistant',
     async (_event, { query, userContext }: { query: string; userContext: UserContext }) => {
+      if (!isLicenseModuleEnabled('ai')) {
+        return {
+          reply: 'CareFlow AI Assistant is not enabled for your clinic license. Please contact CareFlow support to activate the AI module.',
+          toolUsed: 'license_disabled',
+          data: null,
+        };
+      }
+
       const rawQ = query.trim();
 
       // 1. PRIMARY ENGINE: Google Gemini AI Agent with MCP Tool Execution & Natural Formatting

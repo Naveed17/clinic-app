@@ -29,6 +29,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import InsightsIcon from '@mui/icons-material/Insights';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import { useAuth } from '@/features/auth/AuthContext';
+import { useLicense } from '@/features/auth/LicenseModulesContext';
 
 interface Message {
   id: string;
@@ -77,13 +78,36 @@ function formatCleanText(raw: string): string {
     .trim();
 }
 
-export function AiAssistantWidget(): React.JSX.Element | null {
+export interface AiAssistantWidgetProps {
+  open?: boolean;
+  onClose?: () => void;
+  hideFab?: boolean;
+}
+
+export function AiAssistantWidget({
+  open: controlledOpen,
+  onClose,
+  hideFab = false,
+}: AiAssistantWidgetProps = {}): React.JSX.Element | null {
   const { user } = useAuth();
-  const [open, setOpen] = useState(false);
+  const { can } = useLicense();
+  const [internalOpen, setInternalOpen] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const isControlled = typeof controlledOpen === 'boolean';
+  const open = isControlled ? controlledOpen : internalOpen;
+
+  const handleClose = () => {
+    if (onClose) onClose();
+    if (!isControlled) setInternalOpen(false);
+  };
+
+  const handleOpen = () => {
+    if (!isControlled) setInternalOpen(true);
+  };
 
   const role = user?.role?.toUpperCase() || 'RECEPTIONIST';
 
@@ -110,11 +134,11 @@ export function AiAssistantWidget(): React.JSX.Element | null {
 
   useEffect(() => {
     function handleOpenEvent() {
-      setOpen(true);
+      handleOpen();
     }
     window.addEventListener('careflow:open-ai-assistant', handleOpenEvent);
     return () => window.removeEventListener('careflow:open-ai-assistant', handleOpenEvent);
-  }, []);
+  }, [isControlled]);
 
   useEffect(() => {
     if (open) {
@@ -122,7 +146,8 @@ export function AiAssistantWidget(): React.JSX.Element | null {
     }
   }, [messages, open]);
 
-  if (!user) return null;
+  // Hide AI Assistant completely if user is not logged in OR AI is not active on license key
+  if (!user || !can('ai')) return null;
 
   async function handleSend(queryText?: string) {
     const textToSend = (queryText || input).trim();
@@ -204,7 +229,7 @@ export function AiAssistantWidget(): React.JSX.Element | null {
         sx={{
           position: 'fixed',
           right: { xs: 16, sm: 24 },
-          bottom: 154,
+          bottom: 92,
           width: { xs: 'calc(100vw - 32px)', sm: 390 },
           height: { xs: 'min(540px, calc(100vh - 170px))', sm: 540 },
           zIndex: 1450,
@@ -249,7 +274,7 @@ export function AiAssistantWidget(): React.JSX.Element | null {
                 <DeleteOutlineIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <IconButton size="small" onClick={() => setOpen(false)} sx={{ color: '#ffffff' }}>
+            <IconButton size="small" onClick={handleClose} sx={{ color: '#ffffff' }}>
               <CloseIcon fontSize="small" />
             </IconButton>
           </Box>
@@ -694,25 +719,27 @@ export function AiAssistantWidget(): React.JSX.Element | null {
       </Paper>
 
       {/* Floating Trigger Button */}
-      <Zoom in>
-        <Box sx={{ position: 'fixed', right: 24, bottom: 88, zIndex: 1400 }}>
-          <Tooltip title={open ? 'Close CareFlow AI' : 'CareFlow AI Assistant'} placement="left">
-            <Fab
-              onClick={() => setOpen((prev) => !prev)}
-              sx={{
-                background: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)',
-                color: '#ffffff',
-                boxShadow: '0 8px 24px rgba(13, 148, 136, 0.4)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #047857 0%, #0f766e 100%)',
-                },
-              }}
-            >
-              {open ? <CloseIcon /> : <AutoAwesomeIcon sx={{ color: '#fef08a' }} />}
-            </Fab>
-          </Tooltip>
-        </Box>
-      </Zoom>
+      {!hideFab && (
+        <Zoom in>
+          <Box sx={{ position: 'fixed', right: 24, bottom: 88, zIndex: 1400 }}>
+            <Tooltip title={open ? 'Close CareFlow AI' : 'CareFlow AI Assistant'} placement="left">
+              <Fab
+                onClick={() => (open ? handleClose() : handleOpen())}
+                sx={{
+                  background: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)',
+                  color: '#ffffff',
+                  boxShadow: '0 8px 24px rgba(13, 148, 136, 0.4)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #047857 0%, #0f766e 100%)',
+                  },
+                }}
+              >
+                {open ? <CloseIcon /> : <AutoAwesomeIcon sx={{ color: '#fef08a' }} />}
+              </Fab>
+            </Tooltip>
+          </Box>
+        </Zoom>
+      )}
     </>
   );
 }
