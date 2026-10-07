@@ -9,15 +9,22 @@ export function appointmentLocalDate(startsAt: string): string {
 }
 
 export async function loadTokenForAppointment(appointment: Appointment): Promise<Token | null> {
+  let token: Token | null = null;
   if (appointment.tokenId) {
     const byId = await window.clinic.tokens.getById(appointment.tokenId);
-    if (byId) return byId;
+    if (byId) token = byId;
   }
-  return window.clinic.tokens.getForPatient(
-    appointment.patientId,
-    appointmentLocalDate(appointment.startsAt),
-    appointment.providerId,
-  );
+  if (!token) {
+    token = await window.clinic.tokens.getForPatient(
+      appointment.patientId,
+      appointmentLocalDate(appointment.startsAt),
+      appointment.providerId,
+    );
+  }
+  if (token && !token.patient?.address && appointment.patient?.address) {
+    token.patient.address = appointment.patient.address;
+  }
+  return token;
 }
 
 export function usePrintAppointmentToken() {

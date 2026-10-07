@@ -62,7 +62,7 @@ export async function listAppointments(date?: string) {
   const appointments = await db.appointment.findMany({
     where: whereClause,
     include: {
-      patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
+      patient: { select: { id: true, firstName: true, lastName: true, phone: true, address: true } },
       provider: {
         select: {
           id: true,
@@ -133,6 +133,7 @@ export async function listAppointments(date?: string) {
         lastName: a.patient.lastName,
         role: 'patient',
         phone: a.patient.phone ?? null,
+        address: (a.patient as { address?: string | null }).address ?? null,
       },
       provider: doctorObj,
       doctor: doctorObj,
@@ -145,7 +146,7 @@ export async function listAppointmentsByPatient(patientId: string) {
   const appointments = await db.appointment.findMany({
     where: { patientId, isDeleted: false },
     include: {
-      patient: { select: { id: true, firstName: true, lastName: true, phone: true } },
+      patient: { select: { id: true, firstName: true, lastName: true, phone: true, address: true } },
       provider: {
         select: {
           id: true,

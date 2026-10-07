@@ -77,11 +77,11 @@ async function resolveConsultationFee(doctorId: string, override?: number): Prom
 }
 
 const tokenInclude = {
-  patient: { select: { id: true, firstName: true, lastName: true, mrNumber: true, gender: true, dateOfBirth: true, weight: true } },
+  patient: { select: { id: true, firstName: true, lastName: true, mrNumber: true, gender: true, dateOfBirth: true, weight: true, phone: true, address: true } },
   doctor:  { select: { id: true, firstName: true, lastName: true } },
 } as unknown as Prisma.TokenInclude;
 
-function mapPatientPerson(p: { id: string; firstName: string; lastName: string; mrNumber?: string | null; gender?: string | null; dateOfBirth?: Date | null; phone?: string | null; weight?: number | null }) {
+function mapPatientPerson(p: { id: string; firstName: string; lastName: string; mrNumber?: string | null; gender?: string | null; dateOfBirth?: Date | null; phone?: string | null; address?: string | null; weight?: number | null }) {
   return {
     id: p.id,
     firstName: p.firstName,
@@ -89,6 +89,7 @@ function mapPatientPerson(p: { id: string; firstName: string; lastName: string; 
     mrNumber: p.mrNumber ?? undefined,
     gender: p.gender ?? null,
     phone: p.phone ?? null,
+    address: p.address ?? null,
     age: dateOfBirthToAge(p.dateOfBirth),
     weight: p.weight != null && !Number.isNaN(Number(p.weight)) ? Number(p.weight) : null,
   };
@@ -175,6 +176,8 @@ function mapJoinToken(r: Record<string, unknown>) {
       gender: r.patientGender as string | null,
       dateOfBirth: r.patientDob ? new Date(r.patientDob as string) : null,
       weight: r.patientWeight != null ? Number(r.patientWeight) : null,
+      phone: (r.patientPhone as string | null) ?? null,
+      address: (r.patientAddress as string | null) ?? null,
     }),
     doctor: {
       id: String(r.doctorObjId || ''),
@@ -188,7 +191,7 @@ function mapJoinToken(r: Record<string, unknown>) {
 export async function listTokens(date: string) {
   const db = getPrisma();
   const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(`
-    SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber, p.gender as patientGender, p.dateOfBirth as patientDob, p.weight as patientWeight,
+    SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber, p.gender as patientGender, p.dateOfBirth as patientDob, p.weight as patientWeight, p.phone as patientPhone, p.address as patientAddress,
            u.id as doctorObjId, u.firstName as doctorFirstName, u.lastName as doctorLastName,
            pr.id as prescriptionId, pr.diagnosis, pr.medicines, pr.tests, pr.advice,
            pr.thumbName, NULL as thumbnail, pr.pharmacyStatus, pr.dispensedAt, pr.invoiceId,
@@ -745,7 +748,7 @@ export async function getTokenForPatient(patientId: string, date: string, doctor
   const doctorFilter = doctorId ? 'AND t.doctorId = ?' : '';
   const params = doctorId ? [patientId, date, doctorId] : [patientId, date];
   const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(`
-    SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber, p.gender as patientGender, p.dateOfBirth as patientDob, p.weight as patientWeight,
+    SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber, p.gender as patientGender, p.dateOfBirth as patientDob, p.weight as patientWeight, p.phone as patientPhone, p.address as patientAddress,
            u.id as doctorObjId, u.firstName as doctorFirstName, u.lastName as doctorLastName,
            pr.id as prescriptionId, pr.diagnosis, pr.medicines, pr.tests, pr.advice,
            pr.thumbName, pr.thumbnail, pr.pharmacyStatus, pr.dispensedAt, pr.invoiceId,
@@ -766,7 +769,7 @@ export async function getTokenForPatient(patientId: string, date: string, doctor
 export async function getTokenById(tokenId: string) {
   const db = getPrisma();
   const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(`
-    SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber, p.gender as patientGender, p.dateOfBirth as patientDob, p.weight as patientWeight,
+    SELECT t.*, p.id as patientObjId, p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber, p.gender as patientGender, p.dateOfBirth as patientDob, p.weight as patientWeight, p.phone as patientPhone, p.address as patientAddress,
            u.id as doctorObjId, u.firstName as doctorFirstName, u.lastName as doctorLastName,
            pr.id as prescriptionId, pr.diagnosis, pr.medicines, pr.tests, pr.advice,
            pr.thumbName, pr.thumbnail, pr.pharmacyStatus, pr.dispensedAt, pr.invoiceId,

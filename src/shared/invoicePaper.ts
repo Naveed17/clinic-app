@@ -32,7 +32,7 @@ export const POS_PAPER = {
   electronPageSize: { width: 80_000, height: 297_000 },
   /** @react-pdf Page size in points (~80mm wide) */
   pdfPageWidth: 226,
-  pdfPageHeightToken: 500,
+  pdfPageHeightToken: 520,
   pdfPageHeightInvoice: 720,
   pdfPaddingLeft: 10,
   pdfPaddingRight: 18,

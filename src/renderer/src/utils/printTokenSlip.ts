@@ -75,6 +75,9 @@ export function buildTokenSlipHtml(
   const weight = token.patient.weight != null && Number(token.patient.weight) > 0
     ? `<div class="row"><div class="lbl">Weight</div><div class="val">${escapeHtml(String(token.patient.weight))} kg</div></div>`
     : '';
+  const address = token.patient.address
+    ? `<div class="row"><div class="lbl">Address</div><div class="val">${escapeHtml(token.patient.address)}</div></div>`
+    : '';
 
   return `<!DOCTYPE html>
 <html data-paper="pos80">
@@ -162,6 +165,7 @@ export function buildTokenSlipHtml(
   ${age}
   ${gender}
   ${weight}
+  ${address}
   <div class="row"><div class="lbl">Doctor</div><div class="val">${escapeHtml(['Dr.', token.doctor.firstName, token.doctor.lastName].filter(Boolean).join(' ').trim())}</div></div>
   ${fee}
   <div class="row"><div class="lbl">Date</div><div class="val">${escapeHtml(date)}</div></div>
@@ -180,10 +184,10 @@ export async function printTokenSlip(
   options?: { silent?: boolean },
 ): Promise<void> {
   let tokenToPrint = token;
-  if (tokenToPrint.patient?.weight == null && tokenToPrint.id && window.clinic?.tokens?.getById) {
+  if ((tokenToPrint.patient?.weight == null || !tokenToPrint.patient?.address) && tokenToPrint.id && window.clinic?.tokens?.getById) {
     try {
       const fresh = await window.clinic.tokens.getById(tokenToPrint.id);
-      if (fresh?.patient?.weight != null) {
+      if (fresh) {
         tokenToPrint = fresh;
       }
     } catch {

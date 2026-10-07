@@ -21,6 +21,7 @@ export interface TokenPerson {
   age?: number | null;
   weight?: number | null;
   phone?: string | null;
+  address?: string | null;
   consultationFee?: number;
   avatar?: string | null;
 }

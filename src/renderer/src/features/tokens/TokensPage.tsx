@@ -373,8 +373,8 @@ const ts = StyleSheet.create({
   tokenLabel: { fontSize: 9, letterSpacing: 2, color: '#000', fontWeight: 'bold' },
   tokenNum: { fontSize: 48, fontWeight: 'bold', lineHeight: 1, letterSpacing: 3, color: '#000' },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
-  lbl: { fontSize: 10, color: '#000', fontWeight: 'bold' },
-  val: { fontSize: 10, color: POS_RECEIPT.muted },
+  lbl: { fontSize: 10, color: '#000', fontWeight: 'bold', flexShrink: 0 },
+  val: { fontSize: 10, color: POS_RECEIPT.muted, textAlign: 'right', flex: 1, marginLeft: 8 },
   footer: { fontSize: 9, color: POS_RECEIPT.muted, textAlign: 'center', marginTop: 10 },
   brand: { fontSize: 8, color: '#000', textAlign: 'center', marginTop: 8, fontWeight: 'bold', letterSpacing: 0.5 },
 });
@@ -405,6 +405,9 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
         {token.patient.gender ? <View style={ts.row}><Text style={ts.lbl}>Gender</Text><Text style={ts.val}>{token.patient.gender}</Text></View> : null}
         {token.patient.weight != null && Number(token.patient.weight) > 0 ? (
           <View style={ts.row}><Text style={ts.lbl}>Weight</Text><Text style={ts.val}>{String(token.patient.weight)} kg</Text></View>
+        ) : null}
+        {token.patient.address ? (
+          <View style={ts.row}><Text style={ts.lbl}>Address</Text><Text style={ts.val}>{token.patient.address}</Text></View>
         ) : null}
         <View style={ts.row}><Text style={ts.lbl}>Doctor</Text><Text style={ts.val}>Dr. {token.doctor.firstName} {token.doctor.lastName}</Text></View>
         {Number(token.consultationFee ?? 0) > 0 ? (
@@ -631,6 +634,7 @@ export function TokenPrintPreview({
     freshToken.patient.age ?? '',
     freshToken.patient.gender ?? '',
     freshToken.patient.weight ?? '',
+    freshToken.patient.address ?? '',
     clinic?.clinicName ?? '',
     clinic?.clinicAddress ?? '',
     clinic?.clinicPhone ?? '',
