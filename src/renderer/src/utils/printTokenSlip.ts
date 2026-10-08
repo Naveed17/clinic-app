@@ -1,5 +1,5 @@
 import type { Token } from '@/types/token';
-import { POS_PAPER, POS_RECEIPT } from '@shared/invoicePaper';
+import { POS_PAPER, POS_RECEIPT, resolveTokenSlipShade } from '@shared/invoicePaper';
 import { getCareflowLogoDataUrl } from '@/utils/careflowLogo';
 import { tokenNetFee } from '@shared/tokenFee';
 
@@ -15,6 +15,7 @@ export type TokenClinicInfo = {
   clinicName?: string | null;
   clinicAddress?: string | null;
   clinicPhone?: string | null;
+  tokenSlipContrast?: string | null;
 };
 
 /** POS 80mm classic token slip as HTML (thermal printers often print PDF as a blank roll). */
@@ -25,6 +26,9 @@ export function buildTokenSlipHtml(
 ): string {
   const css = POS_PAPER;
   const stars = POS_RECEIPT.starLine;
+  const shade = resolveTokenSlipShade(clinic.tokenSlipContrast);
+  const valColor = shade.hex;
+  const valWeight = shade.weight;
   const clinicName = escapeHtml(clinic.clinicName?.trim() || POS_RECEIPT.clinicFallback);
   const clinicAddress = clinic.clinicAddress?.trim()
     ? `<div class="sub">${escapeHtml(clinic.clinicAddress.trim())}</div>`
@@ -97,7 +101,7 @@ export function buildTokenSlipHtml(
     }
     @media print {
       html, body { color: #000 !important; background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .sub, .val, .footer { color: ${POS_RECEIPT.muted} !important; }
+      .sub, .val, .footer { color: ${valColor} !important; font-weight: ${valWeight} !important; }
     }
     body {
       padding: ${css.bodyPadding};
@@ -121,7 +125,7 @@ export function buildTokenSlipHtml(
       print-color-adjust: exact;
     }
     .name { font-size: ${css.nameSize}; font-weight: 700; margin-bottom: 4px; color: #000; }
-    .sub { font-size: 12px; text-align: center; margin-bottom: 2px; word-break: break-word; color: ${POS_RECEIPT.muted}; }
+    .sub { font-size: 12px; text-align: center; margin-bottom: 2px; word-break: break-word; color: ${valColor}; font-weight: ${valWeight}; }
     .stars {
       text-align: center;
       margin: 8px 0;
@@ -142,8 +146,8 @@ export function buildTokenSlipHtml(
     .box-num { font-size: 36px; font-weight: 700; line-height: 1.1; letter-spacing: 0.04em; color: #000; }
     .row { display: flex; justify-content: space-between; gap: 6px; margin: 4px 0; }
     .lbl { font-weight: 700; flex-shrink: 0; color: #000; }
-    .val { font-size: 12px; text-align: right; min-width: 0; flex: 1; overflow-wrap: anywhere; word-break: break-word; color: ${POS_RECEIPT.muted}; }
-    .footer { text-align: center; margin-top: 10px; color: ${POS_RECEIPT.muted}; }
+    .val { font-size: 12px; text-align: right; min-width: 0; flex: 1; overflow-wrap: anywhere; word-break: break-word; color: ${valColor}; font-weight: ${valWeight}; }
+    .footer { text-align: center; margin-top: 10px; color: ${valColor}; font-weight: ${valWeight}; }
     .brand { text-align: center; margin-top: 8px; font-size: 0.8em; font-weight: 700; letter-spacing: 0.04em; color: #000; }
   </style>
 </head>
@@ -173,7 +177,10 @@ export function buildTokenSlipHtml(
   ${note}
   ${reason}
   <div class="stars">${stars}</div>
-  <div class="footer">Please wait for your token to be called.<br/>${POS_RECEIPT.thankYou}</div>
+  <div class="footer">
+    <div>Please wait for your token to be called.</div>
+    <div>${POS_RECEIPT.thankYou}</div>
+  </div>
   <div class="brand">${POS_RECEIPT.poweredBy}</div>
 </body>
 </html>`;
@@ -202,6 +209,10 @@ export async function printTokenSlip(
       clinicName: settings.clinicName,
       clinicAddress: settings.clinicAddress,
       clinicPhone: settings.clinicPhone,
+      tokenSlipContrast:
+        (typeof window !== 'undefined' ? localStorage.getItem('careflow_token_slip_contrast') : null) ||
+        settings.tokenSlipContrast ||
+        'gray-900',
     },
     logoSrc,
   );

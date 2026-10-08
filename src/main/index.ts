@@ -40,7 +40,7 @@ import { registerDocumentsIpc } from './backup/documents.ipc';
 import { registerTokenIpc } from './tokens/token.ipc';
 import { registerLabIpc } from './lab/lab.ipc';
 import { registerChatIpc } from './chat/chat.ipc';
-import { registerLicenseIpc, isLicenseActivated, getLicenseRuntimeMeta } from './license/license.ipc';
+import { registerLicenseIpc, isLicenseActivated, getLicenseRuntimeMeta, getSavedKey, getLicenseCache } from './license/license.ipc';
 import { registerAuthIpc } from './auth/auth.ipc';
 import { registerSearchIpc } from './search/search.ipc';
 import { registerMedicineIpc } from './medicines/medicine.ipc';
@@ -173,10 +173,20 @@ app.whenReady().then(async () => {
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window));
   try {
     // Pull online/local flag from license API (or cache) BEFORE starting SQLite/LAN.
-    try {
-      await isLicenseActivated();
-    } catch (err) {
-      console.warn('[CareFlow] License sync at startup failed — using cached mode', err);
+    const key = getSavedKey();
+    const cache = key ? getLicenseCache(key) : null;
+    if (cache && cache.lastGate !== 'blocked') {
+      // Valid cache exists — launch immediately and refresh license in background!
+      void isLicenseActivated().catch(() => {});
+    } else {
+      try {
+        await Promise.race([
+          isLicenseActivated(),
+          new Promise((r) => setTimeout(r, 1500)),
+        ]);
+      } catch (err) {
+        console.warn('[CareFlow] License sync at startup failed — using cached mode', err);
+      }
     }
 
     const settings = getSettings();

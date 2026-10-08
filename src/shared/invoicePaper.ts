@@ -62,3 +62,36 @@ export const RX_PAPER = {
 };
 
 export type PrintPaperId = typeof POS_PAPER.id | typeof RX_PAPER.id;
+
+export type TokenSlipShadeId = 'gray-400' | 'gray-500' | 'gray-600' | 'gray-700' | 'gray-800' | 'gray-900';
+
+export interface TokenSlipColorShade {
+  id: TokenSlipShadeId;
+  label: string;
+  step: string;
+  hex: string;
+  weight: number | string;
+  pdfWeight: 'bold' | 'normal';
+  description: string;
+}
+
+export const TOKEN_SLIP_SHADES: readonly TokenSlipColorShade[] = [
+  { id: 'gray-400', label: 'Gray 400', step: '400', hex: '#9ca3af', weight: '500', pdfWeight: 'normal', description: 'Light gray' },
+  { id: 'gray-500', label: 'Gray 500', step: '500', hex: '#6b7280', weight: '500', pdfWeight: 'normal', description: 'Medium light' },
+  { id: 'gray-600', label: 'Gray 600', step: '600', hex: '#4b5563', weight: '600', pdfWeight: 'normal', description: 'Muted slate' },
+  { id: 'gray-700', label: 'Gray 700', step: '700', hex: '#374151', weight: '600', pdfWeight: 'bold', description: 'Dark gray' },
+  { id: 'gray-800', label: 'Gray 800', step: '800', hex: '#1f2937', weight: '700', pdfWeight: 'bold', description: 'Very dark' },
+  { id: 'gray-900', label: 'Gray 900', step: '900', hex: '#000000', weight: '700', pdfWeight: 'bold', description: 'Pure black (Recommended)' },
+] as const;
+
+export function resolveTokenSlipShade(shadeOrHex?: string | null): TokenSlipColorShade {
+  if (!shadeOrHex) return TOKEN_SLIP_SHADES[5]; // gray-900
+  const normalized = shadeOrHex.trim().toLowerCase();
+  const found = TOKEN_SLIP_SHADES.find(
+    (s) => s.id === normalized || s.hex.toLowerCase() === normalized || s.step === normalized,
+  );
+  if (found) return found;
+  if (normalized === 'dark') return TOKEN_SLIP_SHADES[5]; // gray-900
+  if (normalized === 'muted') return TOKEN_SLIP_SHADES[2]; // gray-600
+  return TOKEN_SLIP_SHADES[5];
+}

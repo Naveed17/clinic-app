@@ -78,6 +78,10 @@ async function pickPrinter(
 
 function waitForLoad(win: BrowserWindow): Promise<void> {
   return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve(); // Proceed even if an external font/asset was slow to finish loading
+    }, 3500);
     const onOk = () => {
       cleanup();
       resolve();
@@ -87,6 +91,7 @@ function waitForLoad(win: BrowserWindow): Promise<void> {
       reject(new Error(desc || 'Failed to load print document'));
     };
     const cleanup = () => {
+      clearTimeout(timer);
       win.webContents.off('did-finish-load', onOk);
       win.webContents.off('did-fail-load', onFail);
     };

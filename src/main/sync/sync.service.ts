@@ -850,9 +850,10 @@ export function startAutoSync(): void {
     void triggerSync({ silent: true });
   }, 4000);
 
-  // 3. Heartbeat: 30 seconds for online cloud database, 15 minutes for local LAN
+  // 3. Heartbeat: 2.5 minutes for online cloud database, 15 minutes for local LAN
+  // (Note: all user mutations already auto-sync immediately in 2.5s via scheduleSmartSync)
   const target = resolveSyncTarget();
-  const pollInterval = target?.type === 'cloud' ? 30 * 1000 : 15 * 60 * 1000;
+  const pollInterval = target?.type === 'cloud' ? 150 * 1000 : 15 * 60 * 1000;
   autoSyncTimer = setInterval(() => {
     void triggerSync({ silent: true });
   }, pollInterval);

@@ -99,7 +99,7 @@ export function getLicenseAuth(): { key: string; hwid: string } | null {
 function getDeviceName(): string {
   try { return os.hostname() || 'Unknown Device'; } catch { return 'Unknown Device'; }
 }
-function getSavedKey(): string | null {
+export function getSavedKey(): string | null {
   try {
     const file = getLicenseFilePath();
     if (existsSync(file)) {
@@ -119,7 +119,7 @@ function getSavedKey(): string | null {
     return null;
   }
 }
-function getLicenseCache(key: string): LicenseCache | null {
+export function getLicenseCache(key: string): LicenseCache | null {
   try {
     const file = getLicenseCacheFilePath();
     if (!existsSync(file)) return null;
@@ -360,11 +360,15 @@ export async function getLicenseModules(): Promise<Record<string, boolean> | nul
   if (!savedKey) return null;
   if (isLocallyExpired(savedKey)) return null;
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2500);
     const response = await fetch(`${API_BASE_URL}/license/modules`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: savedKey }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     const data = (await response.json()) as {
       ok: boolean;
       error?: string;
@@ -403,11 +407,15 @@ export async function getLicenseGate(): Promise<LicenseGate> {
   if (!savedKey) return { state: 'none' };
   try {
     const hwid = getHWID();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
     const response = await fetch(`${API_BASE_URL}/license/validate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: savedKey, hwid }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     const data = (await response.json()) as {
       ok: boolean;
       valid: boolean;
@@ -475,11 +483,15 @@ export async function checkUpdatesAllowed(): Promise<{ allowed: boolean; reason?
   const hwid = getHWID();
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2500);
     const response = await fetch(`${API_BASE_URL}/license/updates-allowed`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: savedKey, hwid }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
     if (response.ok) {
       const data = (await response.json()) as {

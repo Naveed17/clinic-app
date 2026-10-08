@@ -32,7 +32,10 @@ export function usePrintAppointmentToken() {
 
   const mutation = useMutation({
     mutationFn: async (appointment: Appointment) => {
-      const token = await loadTokenForAppointment(appointment);
+      const token = await Promise.race([
+        loadTokenForAppointment(appointment),
+        new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Timed out fetching token for visit')), 5000)),
+      ]);
       if (!token) throw new Error('No token found for this visit.');
       return token;
     },

@@ -32,6 +32,8 @@ export interface AppSettings {
   whatsappPhoneNumberId: string;
   /** Clinic WhatsApp display number, e.g. 923001234567 */
   whatsappDisplayNumber: string;
+  /** Token slip text contrast for thermal prints: gray-400 to gray-900 or hex */
+  tokenSlipContrast?: string;
 }
 
 const DEFAULTS: AppSettings = {
@@ -53,6 +55,7 @@ const DEFAULTS: AppSettings = {
   whatsappToken: '',
   whatsappPhoneNumberId: '',
   whatsappDisplayNumber: '',
+  tokenSlipContrast: 'gray-900',
 };
 
 function getSavedLicenseKey(): string | null {

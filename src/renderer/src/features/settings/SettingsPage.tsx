@@ -53,6 +53,7 @@ import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import SyncOutlinedIcon from '@mui/icons-material/SyncOutlined';
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
+import CheckIcon from '@mui/icons-material/Check';
 import { RecycleBinTab } from './RecycleBinTab';
 import { useUpdate } from '@/context/updateProvider';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
@@ -67,6 +68,7 @@ import { invalidateClinicLogoCache, notifyClinicBrandChanged, resolveClinicLogoS
 import { CAREFLOW_BRAND, supportWhatsAppHref } from '@shared/careflowSupport';
 import { copySupportPhone, openSupportEmail, openSupportWhatsApp } from '@/utils/careflowSupportActions';
 import { TokenAudioSettingsContent } from '@/features/waiting-room/TokenAudioSettingsDialog';
+import { TOKEN_SLIP_SHADES, resolveTokenSlipShade } from '@shared/invoicePaper';
 
 type ServerMode = 'local' | 'lan-server' | 'lan-client';
 
@@ -98,6 +100,7 @@ interface Settings {
   whatsappToken?: string;
   whatsappPhoneNumberId?: string;
   whatsappDisplayNumber?: string;
+  tokenSlipContrast?: string;
 }
 
 export function SettingsPage(): React.JSX.Element {
@@ -601,6 +604,7 @@ export function SettingsPage(): React.JSX.Element {
         whatsappToken: '',
         whatsappPhoneNumberId: '',
         whatsappDisplayNumber: '',
+        tokenSlipContrast: 'gray-900',
       });
     });
     void window.clinic?.settings.lanIp().then((ip) => setLanIp(ip));
@@ -924,1118 +928,1390 @@ export function SettingsPage(): React.JSX.Element {
               '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,0,0,0.15)', borderRadius: 99 },
             }}
           >
-          {settingsTab === 'general' && (
-            <Stack direction="row" spacing={4} alignItems="flex-start">
-              {/* Left Side: Clinic Info, Backup & App Update */}
-              <Box sx={{ width: 280, flexShrink: 0 }}>
-                <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>Clinic Information</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  {isOnline
-                    ? 'Name, contact, and logo on prints. Saved to the cloud so every online PC shares the same clinic profile.'
-                    : 'Name, contact, and logo on prints, receipts, and the app sidebar.'}
-                </Typography>
-                <Stack spacing={1.5} sx={{ mb: 3 }}>
-                  <TextField
-                    label="Clinic Name"
-                    size="small"
-                    fullWidth
-                    value={settings.clinicName}
-                    onChange={(e) => setSettings((s) => s && ({ ...s, clinicName: e.target.value }))}
-                  />
-                  <TextField
-                    label="Address"
-                    size="small"
-                    fullWidth
-                    value={settings.clinicAddress}
-                    onChange={(e) => setSettings((s) => s && ({ ...s, clinicAddress: e.target.value }))}
-                  />
-                  <PhoneInputField
-                    label="Phone"
-                    size="small"
-                    value={settings.clinicPhone}
-                    onChange={(digits) => setSettings((s) => s && ({ ...s, clinicPhone: digits }))}
-                  />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" sx={{ mb: 0.75 }}>
-                      Clinic logo
-                    </Typography>
-                    <Stack direction="row" spacing={1.5} alignItems="center">
-                      <Box
-                        sx={{
-                          width: 56,
-                          height: 56,
-                          borderRadius: 2,
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          bgcolor: 'background.paper',
-                          overflow: 'hidden',
-                          p: 0.5,
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Box
-                          component="img"
-                          src={resolveClinicLogoSrc(settings.clinicLogo)}
-                          alt="Clinic logo"
-                          sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                        />
-                      </Box>
-                      <Box>
-                        <Stack direction="row" spacing={1}>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<ImageOutlinedIcon />}
-                            onClick={() => logoInputRef.current?.click()}
-                            sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2 }}
-                          >
-                            {settings.clinicLogo ? 'Change' : 'Upload'}
-                          </Button>
-                          {settings.clinicLogo ? (
-                            <Button
-                              size="small"
-                              onClick={() => { setSettings((s) => s && ({ ...s, clinicLogo: '' })); setLogoError(''); }}
-                              sx={{ textTransform: 'none', fontWeight: 600 }}
-                            >
-                              Use CareFlow
-                            </Button>
-                          ) : null}
-                        </Stack>
-                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                          Optional. If you skip this, the CareFlow logo stays everywhere.
-                        </Typography>
-                        {logoError ? (
-                          <Typography variant="caption" color="error" display="block">{logoError}</Typography>
-                        ) : null}
-                      </Box>
-                    </Stack>
-                    <input
-                      ref={logoInputRef}
-                      type="file"
-                      accept="image/*"
-                      hidden
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = '';
-                        if (!file) return;
-                        void fileToClinicLogoDataUrl(file)
-                          .then((dataUrl) => {
-                            setLogoError('');
-                            setSettings((s) => s && ({ ...s, clinicLogo: dataUrl }));
-                          })
-                          .catch((err: unknown) => {
-                            setLogoError(err instanceof Error ? err.message : 'Unable to use that image.');
-                          });
-                      }}
-                    />
-                  </Box>
-                </Stack>
-
-                <Divider sx={{ my: 2 }} />
-
-                {/* App Update Section */}
-                <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>App Update</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Check if a newer version is available on GitHub.</Typography>
-
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">Current Version:</Typography>
-                  <Chip label={`v${currentVersion}`} size="small" variant="outlined" color="primary" sx={{ fontWeight: 600, height: 22 }} />
-                </Stack>
-
-                <Box sx={{ width: '100%' }}>
-                  {isUpdateReady ? (
-                    <Button
-                      variant="contained"
-                      color="success"
-                      fullWidth
-                      startIcon={<SystemUpdateAltOutlinedIcon />}
-                      onClick={installUpdate}
-                    >
-                      Restart & Install Update
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      startIcon={<SystemUpdateAltOutlinedIcon />}
-                      loading={updateStatus === 'checking' || isChecking}
-                      disabled={isDownloading}
-                      onClick={() => void handleCheckUpdate()}
-                    >
-                      {(updateStatus === 'checking' || isChecking) ? 'Checking...' : 'Check for Updates'}
-                    </Button>
-                  )}
-
-                  {isDownloading && (
-                    <Box sx={{ width: '100%', mt: 2 }}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                          {downloadStatusText}
-                        </Typography>
-                        <Typography variant="caption" color="primary.main" fontWeight={700}>
-                          {downloadIndeterminate ? '…' : `${downloadProgress}%`}
-                        </Typography>
-                      </Stack>
-                      <LinearProgress
-                        variant={downloadIndeterminate ? 'indeterminate' : 'determinate'}
-                        value={downloadIndeterminate ? undefined : downloadProgress}
-                        sx={{ height: 6, borderRadius: 3 }}
-                      />
-                    </Box>
-                  )}
-                </Box>
-              </Box>
-
-              <Divider orientation="vertical" flexItem />
-
-              {/* Right Side: Network Settings */}
-              <Stack spacing={3} flex={1}>
-                <Box>
-                  <Typography variant="h6" fontWeight={700}>Network Settings</Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {settingsTab === 'general' && (
+              <Stack direction="row" spacing={4} alignItems="flex-start">
+                {/* Left Side: Clinic Info, Backup & App Update */}
+                <Box sx={{ width: 280, flexShrink: 0 }}>
+                  <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>Clinic Information</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                     {isOnline
-                      ? 'This license uses online Postgres — LAN roles are disabled.'
-                      : 'Configure how this machine connects to the clinic network.'}
+                      ? 'Name, contact, and logo on prints. Saved to the cloud so every online PC shares the same clinic profile.'
+                      : 'Name, contact, and logo on prints, receipts, and the app sidebar.'}
                   </Typography>
-                  {isOnline && (
-                    <Alert severity="info" sx={{ mt: 1.5 }}>
-                      Online database mode is active
-                      {schemaId ? ` (tenant ${schemaId})` : ''}.
-                      Clinic data is stored in the shared cloud schema, filtered per license.
-                    </Alert>
-                  )}
-                  {!isOnline && settings?.serverMode === 'lan-client' && connectionOk === false && (
-                    <Alert severity="error" sx={{ mt: 1.5 }}>
-                      LAN server unreachable. App has fallen back to local mode. Please check the server URL and save again.
-                    </Alert>
-                  )}
-                </Box>
-
-                {isOnline ? null : (
-                <>
-                <Divider />
-
-                <Box>
-                  <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>Machine Role</Typography>
-                  <ToggleButtonGroup
-                    value={settings.serverMode}
-                    exclusive
-                    onChange={(_e, val) => val && setSettings((s) => s && ({ ...s, serverMode: val as ServerMode }))}
-                    sx={{ gap: 1, flexWrap: 'wrap', width: '100%' }}
-                  >
-                    {([
-                      { value: 'local', icon: <LaptopOutlinedIcon />, label: 'Standalone', desc: 'Only this machine, no sharing' },
-                      { value: 'lan-server', icon: <DnsOutlinedIcon />, label: 'LAN Server', desc: 'Share data with other machines' },
-                      { value: 'lan-client', icon: <DevicesOutlinedIcon />, label: 'LAN Client', desc: 'Connect to another machine' },
-                    ] as const).map(({ value, icon, label, desc }) => (
-                      <ToggleButton
-                        key={value}
-                        value={value}
-                        sx={{
-                          flex: 1,
-                          flexDirection: 'column',
-                          gap: 0.5,
-                          py: 2,
-                          px: 3,
-                          borderRadius: '12px !important',
-                          border: '1px solid !important',
-                          borderColor: settings.serverMode === value
-                            ? `${theme.palette.primary.main} !important`
-                            : 'divider !important',
-                          bgcolor: settings.serverMode === value
-                            ? alpha(theme.palette.primary.main, 0.1)
-                            : 'transparent',
-                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
-                        }}
-                      >
-                        {icon}
-                        <Typography variant="caption" fontWeight={700}>{label}</Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>{desc}</Typography>
-                      </ToggleButton>
-                    ))}
-                  </ToggleButtonGroup>
-                </Box>
-
-                <Divider />
-
-                {settings.serverMode !== 'lan-client' && (
-                  <>
-                    <Alert severity="info" icon={<DnsOutlinedIcon />}>
-                      <Typography variant="body2" fontWeight={600}>
-                        {settings.serverMode === 'lan-server' ? 'LAN Server mode active.' : 'This machine hosts the database.'}
-                      </Typography>
-                      <Typography variant="body2" sx={{ mt: 0.5 }}>
-                        Other machines on the network will auto-discover this machine. They connect via:
-                      </Typography>
-                      <Chip
-                        label={`http://${lanIp}:${settings.lanPort}`}
-                        size="small"
-                        sx={{ mt: 1, fontFamily: 'monospace', fontWeight: 600 }}
-                      />
-                    </Alert>
+                  <Stack spacing={1.5} sx={{ mb: 3 }}>
                     <TextField
-                      label="Server Port"
-                      type="number"
-                      value={settings.lanPort}
-                      onChange={(e) => setSettings((s) => s && ({ ...s, lanPort: Number(e.target.value) }))}
+                      label="Clinic Name"
                       size="small"
-                      sx={{ maxWidth: 180 }}
-                      helperText="Default: 3333"
+                      fullWidth
+                      value={settings.clinicName}
+                      onChange={(e) => setSettings((s) => s && ({ ...s, clinicName: e.target.value }))}
                     />
-                  </>
-                )}
-
-                {settings.serverMode === 'lan-client' && (
-                  <Stack spacing={2}>
-                    <Alert severity="info" icon={<DevicesOutlinedIcon />}>
-                      <Typography variant="body2" fontWeight={600}>LAN Client mode</Typography>
-                      <Typography variant="body2" sx={{ mt: 0.5 }}>Scan for a server on your network, or enter the server URL manually.</Typography>
-                    </Alert>
-
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<WifiTetheringOutlinedIcon />}
-                        loading={scanning}
-                        onClick={() => void handleScan()}
-                      >
-                        Scan Network
-                      </Button>
-                      {discovered.length > 0 && (
-                        <Typography variant="caption" color="text.secondary">{discovered.length} server(s) found</Typography>
-                      )}
-                    </Stack>
-
-                    {discovered.length > 0 && (
-                      <Stack spacing={0.5}>
-                        {discovered.map((s) => (
-                          <Chip
-                            key={s.ip}
-                            label={`${s.name} — http://${s.ip}:${s.port}`}
-                            size="small"
-                            clickable
-                            onClick={() => {
-                              setSettings((prev) => prev && ({ ...prev, clientApiUrl: `http://${s.ip}:${s.port}` }));
-                              setTestResult(null);
-                            }}
-                            sx={{ fontFamily: 'monospace', justifyContent: 'flex-start' }}
-                          />
-                        ))}
-                      </Stack>
-                    )}
-
-                    <Stack direction="row" spacing={1} alignItems="flex-start">
-                      <TextField
-                        label="Server URL"
-                        size="small"
-                        fullWidth
-                        placeholder="http://192.168.1.x:3333"
-                        value={settings.clientApiUrl}
-                        onChange={(e) => { setSettings((s) => s && ({ ...s, clientApiUrl: e.target.value })); setTestResult(null); }}
-                      />
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        sx={{ whiteSpace: 'nowrap', mt: 0.5 }}
-                        disabled={!settings.clientApiUrl}
-                        loading={testing}
-                        onClick={() => void handleTestConnection()}
-                      >
-                        Test
-                      </Button>
-                    </Stack>
-
-                    {testResult !== null && (
-                      <Alert severity={testResult ? 'success' : 'error'}>
-                        {testResult ? 'Connection successful!' : 'Could not reach server. Check the URL and firewall.'}
-                      </Alert>
-                    )}
-                  </Stack>
-                )}
-
-                <Divider />
-
-                {/* Local Peer Sync Card */}
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 2.5,
-                    borderRadius: 3,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    bgcolor: (t) => alpha(t.palette.background.paper, 0.6),
-                  }}
-                >
-                  <Stack spacing={2}>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
-                      <Stack direction="row" alignItems="center" spacing={1.5}>
+                    <TextField
+                      label="Address"
+                      size="small"
+                      fullWidth
+                      value={settings.clinicAddress}
+                      onChange={(e) => setSettings((s) => s && ({ ...s, clinicAddress: e.target.value }))}
+                    />
+                    <PhoneInputField
+                      label="Phone"
+                      size="small"
+                      value={settings.clinicPhone}
+                      onChange={(digits) => setSettings((s) => s && ({ ...s, clinicPhone: digits }))}
+                    />
+                    <Box>
+                      <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" sx={{ mb: 0.75 }}>
+                        Clinic logo
+                      </Typography>
+                      <Stack direction="row" spacing={1.5} alignItems="center">
                         <Box
                           sx={{
-                            width: 40,
-                            height: 40,
+                            width: 56,
+                            height: 56,
                             borderRadius: 2,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            bgcolor: (t) => alpha(t.palette.primary.main, 0.12),
-                            color: 'primary.main',
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            bgcolor: 'background.paper',
+                            overflow: 'hidden',
+                            p: 0.5,
+                            flexShrink: 0,
                           }}
                         >
-                          <SyncOutlinedIcon
-                            sx={{
-                              fontSize: 22,
-                              animation: syncStatus.state === 'syncing' || syncingManual ? 'spin 1.2s linear infinite' : 'none',
-                              '@keyframes spin': {
-                                '0%': { transform: 'rotate(0deg)' },
-                                '100%': { transform: 'rotate(360deg)' },
-                              },
-                            }}
+                          <Box
+                            component="img"
+                            src={resolveClinicLogoSrc(settings.clinicLogo)}
+                            alt="Clinic logo"
+                            sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
                           />
                         </Box>
                         <Box>
-                          <Typography variant="subtitle1" fontWeight={700}>
-                            Local Two-Way Sync (Doctor &amp; Receptionist)
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<ImageOutlinedIcon />}
+                              onClick={() => logoInputRef.current?.click()}
+                              sx={{ textTransform: 'none', fontWeight: 700, borderRadius: 2 }}
+                            >
+                              {settings.clinicLogo ? 'Change' : 'Upload'}
+                            </Button>
+                            {settings.clinicLogo ? (
+                              <Button
+                                size="small"
+                                onClick={() => { setSettings((s) => s && ({ ...s, clinicLogo: '' })); setLogoError(''); }}
+                                sx={{ textTransform: 'none', fontWeight: 600 }}
+                              >
+                                Use CareFlow
+                              </Button>
+                            ) : null}
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                            Optional. If you skip this, the CareFlow logo stays everywhere.
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Auto-syncs changes both ways over local Wi-Fi without internet. Doctor can work offline at home and merge morning clinic tokens seamlessly.
-                          </Typography>
+                          {logoError ? (
+                            <Typography variant="caption" color="error" display="block">{logoError}</Typography>
+                          ) : null}
                         </Box>
                       </Stack>
+                      <input
+                        ref={logoInputRef}
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = '';
+                          if (!file) return;
+                          void fileToClinicLogoDataUrl(file)
+                            .then((dataUrl) => {
+                              setLogoError('');
+                              setSettings((s) => s && ({ ...s, clinicLogo: dataUrl }));
+                            })
+                            .catch((err: unknown) => {
+                              setLogoError(err instanceof Error ? err.message : 'Unable to use that image.');
+                            });
+                        }}
+                      />
+                    </Box>
 
+                    {/* Token Slip Text Color & Darkness (Gray 400 - 900) */}
+                    {(() => {
+                      const currentShade = resolveTokenSlipShade(settings.tokenSlipContrast);
+                      return (
+                        <Box sx={{ pt: 1 }}>
+                          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                              Token Slip Text Darkness
+                            </Typography>
+                            <Chip
+                              label={`${currentShade.step} (${currentShade.hex})`}
+                              size="small"
+                              sx={{
+                                height: 20,
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                fontFamily: 'monospace',
+                                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                color: 'primary.main',
+                              }}
+                            />
+                          </Stack>
+
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.25, fontSize: '0.74rem' }}>
+                            Select color darkness for patient details (Gray-400 to Gray-900).
+                          </Typography>
+
+                          {/* Color Swatches from 400 to 900 */}
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              gap: 0.75,
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              mb: 1.25,
+                            }}
+                          >
+                            {TOKEN_SLIP_SHADES.map((shade) => {
+                              const isSelected = currentShade.id === shade.id;
+                              const isLight = shade.id === 'gray-400';
+                              return (
+                                <Tooltip key={shade.id} title={`${shade.label} (${shade.hex}) — ${shade.description}`} arrow>
+                                  <Box
+                                    onClick={() => {
+                                      if (typeof window !== 'undefined') {
+                                        localStorage.setItem('careflow_token_slip_contrast', shade.id);
+                                        window.dispatchEvent(new CustomEvent('careflow-settings-changed', { detail: { tokenSlipContrast: shade.id } }));
+                                      }
+                                      setSettings((s) => s && ({ ...s, tokenSlipContrast: shade.id }));
+                                      void window.clinic?.settings.save({ tokenSlipContrast: shade.id });
+                                    }}
+                                    sx={{
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'center',
+                                      gap: 0.5,
+                                      cursor: 'pointer',
+                                      flex: 1,
+                                      minWidth: 0,
+                                    }}
+                                  >
+                                    <Box
+                                      sx={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: '10px',
+                                        bgcolor: shade.hex,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        position: 'relative',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.18s ease',
+                                        border: '2px solid',
+                                        borderColor: isSelected
+                                          ? theme.palette.mode === 'dark'
+                                            ? '#ffffff'
+                                            : theme.palette.primary.main
+                                          : 'transparent',
+                                        boxShadow: isSelected
+                                          ? `0 0 0 2.5px ${alpha(theme.palette.primary.main, 0.45)}, 0 2px 6px rgba(0,0,0,0.25)`
+                                          : '0 1px 3px rgba(0,0,0,0.12)',
+                                        transform: isSelected ? 'scale(1.08)' : 'scale(1)',
+                                        '&:hover': {
+                                          transform: 'scale(1.12)',
+                                          boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                                        },
+                                      }}
+                                    >
+                                      {isSelected && (
+                                        <CheckIcon
+                                          sx={{
+                                            color: isLight ? '#111827' : '#ffffff',
+                                            fontSize: 20,
+                                            fontWeight: 'bold',
+                                            filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.6))',
+                                          }}
+                                        />
+                                      )}
+                                    </Box>
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        fontSize: '0.66rem',
+                                        fontWeight: isSelected ? 800 : 600,
+                                        color: isSelected ? 'primary.main' : 'text.secondary',
+                                      }}
+                                    >
+                                      {shade.step}
+                                    </Typography>
+                                  </Box>
+                                </Tooltip>
+                              );
+                            })}
+                          </Box>
+
+                          {/* Live Thermal Slip Preview */}
+                          <Box
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 1,
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              bgcolor: (t) => (t.palette.mode === 'dark' ? alpha(t.palette.background.default, 0.7) : '#fafafa'),
+                              fontFamily: "'Courier New', Courier, monospace",
+                              fontSize: 11,
+                            }}
+                          >
+                            <Typography
+                              sx={{
+                                fontFamily: 'inherit',
+                                fontSize: '0.65rem',
+                                fontWeight: 700,
+                                letterSpacing: 0.5,
+                                color: 'text.secondary',
+                                mb: 1,
+                                textTransform: 'uppercase',
+                              }}
+                            >
+                              Live Slip Preview
+                            </Typography>
+
+                            {/* Slip Clinic Header */}
+                            <Box sx={{ textAlign: 'center', mb: 0.75 }}>
+                              <Typography sx={{ fontFamily: 'inherit', fontSize: '0.85rem', fontWeight: 800, color: '#000' }}>
+                                {settings.clinicName?.trim() || 'CLINIC MANAGEMENT'}
+                              </Typography>
+                              <Typography
+                                sx={{
+                                  fontFamily: 'inherit',
+                                  fontSize: '0.72rem',
+                                  color: currentShade.hex,
+                                  fontWeight: currentShade.weight,
+                                  lineHeight: 1.3,
+                                  transition: 'color 0.15s ease',
+                                }}
+                              >
+                                {settings.clinicAddress?.trim() || 'Ratto Kala'}
+                              </Typography>
+                              <Typography
+                                sx={{
+                                  fontFamily: 'inherit',
+                                  fontSize: '0.72rem',
+                                  color: currentShade.hex,
+                                  fontWeight: currentShade.weight,
+                                  lineHeight: 1.3,
+                                  transition: 'color 0.15s ease',
+                                }}
+                              >
+                                Tel: {settings.clinicPhone?.trim() || '030066455786'}
+                              </Typography>
+                              <Typography sx={{ fontFamily: 'inherit', fontSize: '0.65rem', color: '#000', my: 0.5 }}>
+                                * * * * * * * * * * * * * * *
+                              </Typography>
+                            </Box>
+
+                            {/* Slip Patient & Doctor Rows */}
+                            <Stack spacing={0.35}>
+                              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                <Typography sx={{ fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 700, color: '#000' }}>
+                                  Patient:
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    fontFamily: 'inherit',
+                                    fontSize: 'inherit',
+                                    fontWeight: currentShade.weight,
+                                    color: currentShade.hex,
+                                    transition: 'color 0.15s ease',
+                                  }}
+                                >
+                                  Gull Khan
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                <Typography sx={{ fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 700, color: '#000' }}>
+                                  Doctor:
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    fontFamily: 'inherit',
+                                    fontSize: 'inherit',
+                                    fontWeight: currentShade.weight,
+                                    color: currentShade.hex,
+                                    transition: 'color 0.15s ease',
+                                  }}
+                                >
+                                  Dr. Ahmed Ali
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                <Typography sx={{ fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 700, color: '#000' }}>
+                                  Time:
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    fontFamily: 'inherit',
+                                    fontSize: 'inherit',
+                                    fontWeight: currentShade.weight,
+                                    color: currentShade.hex,
+                                    transition: 'color 0.15s ease',
+                                  }}
+                                >
+                                  10:57 AM
+                                </Typography>
+                              </Stack>
+                            </Stack>
+
+                            {/* Slip Footer with Dynamic Shade */}
+                            <Box sx={{ textAlign: 'center', mt: 0.75 }}>
+                              <Typography sx={{ fontFamily: 'inherit', fontSize: '0.65rem', color: '#000', my: 0.5 }}>
+                                * * * * * * * * * * * * * * *
+                              </Typography>
+                              <Typography
+                                sx={{
+                                  fontFamily: 'inherit',
+                                  fontSize: '0.72rem',
+                                  color: currentShade.hex,
+                                  fontWeight: currentShade.weight,
+                                  lineHeight: 1.3,
+                                  transition: 'color 0.15s ease',
+                                }}
+                              >
+                                Please wait for your token to be called.
+                              </Typography>
+                              <Typography
+                                sx={{
+                                  fontFamily: 'inherit',
+                                  fontSize: '0.72rem',
+                                  color: currentShade.hex,
+                                  fontWeight: currentShade.weight,
+                                  lineHeight: 1.3,
+                                  transition: 'color 0.15s ease',
+                                }}
+                              >
+                                THANK YOU!
+                              </Typography>
+                              <Typography sx={{ fontFamily: 'inherit', fontSize: '0.62rem', fontWeight: 800, color: '#000', mt: 0.5 }}>
+                                Powered by CareFlow
+                              </Typography>
+                            </Box>
+                          </Box>
+
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75, fontSize: '0.72rem' }}>
+                            {currentShade.id === 'gray-900'
+                              ? '★ Gray-900: Pure black (Recommended for thermal printers).'
+                              : `${currentShade.label}: ${currentShade.description}. Thermal print par check kar lein.`}
+                          </Typography>
+                        </Box>
+                      );
+                    })()}
+                  </Stack>
+
+                  <Divider sx={{ my: 2 }} />
+
+                  {/* App Update Section */}
+                  <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>App Update</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Check if a newer version is available on GitHub.</Typography>
+
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="text.secondary">Current Version:</Typography>
+                    <Chip label={`v${currentVersion}`} size="small" variant="outlined" color="primary" sx={{ fontWeight: 600, height: 22 }} />
+                  </Stack>
+
+                  <Box sx={{ width: '100%' }}>
+                    {isUpdateReady ? (
                       <Button
                         variant="contained"
-                        size="small"
-                        startIcon={<SyncOutlinedIcon />}
-                        disabled={syncStatus.state === 'syncing' || syncingManual}
-                        onClick={() => void handleManualSync()}
-                        sx={{ textTransform: 'none', borderRadius: 2, px: 2 }}
+                        color="success"
+                        fullWidth
+                        startIcon={<SystemUpdateAltOutlinedIcon />}
+                        onClick={installUpdate}
                       >
-                        {syncStatus.state === 'syncing' || syncingManual ? 'Syncing...' : 'Sync Now'}
+                        Restart & Install Update
                       </Button>
-                    </Stack>
-
-                    <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" sx={{ pt: 0.5 }}>
-                      <Chip
-                        size="small"
-                        label={
-                          syncStatus.state === 'syncing' || syncingManual
-                            ? syncStatus.progress?.percent
-                              ? `Syncing ${syncStatus.progress.percent}%`
-                              : 'Syncing in progress...'
-                            : syncStatus.state === 'synced'
-                              ? 'Connected & Synced'
-                              : syncStatus.state === 'error'
-                                ? 'Sync Idle / Warning'
-                                : 'Background Auto-Sync Active'
-                        }
-                        color={
-                          syncStatus.state === 'synced'
-                            ? 'success'
-                            : syncStatus.state === 'syncing' || syncingManual
-                              ? 'primary'
-                              : syncStatus.state === 'error'
-                                ? 'warning'
-                                : 'default'
-                        }
+                    ) : (
+                      <Button
                         variant="outlined"
-                      />
+                        fullWidth
+                        startIcon={<SystemUpdateAltOutlinedIcon />}
+                        loading={updateStatus === 'checking' || isChecking}
+                        disabled={isDownloading}
+                        onClick={() => void handleCheckUpdate()}
+                      >
+                        {(updateStatus === 'checking' || isChecking) ? 'Checking...' : 'Check for Updates'}
+                      </Button>
+                    )}
 
-                      {syncStatus.lastSyncTime ? (
-                        <Typography variant="caption" color="text.secondary">
-                          Last synced: {new Date(syncStatus.lastSyncTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                          {typeof syncStatus.recordsSyncedLastTime === 'number' && syncStatus.recordsSyncedLastTime > 0
-                            ? ` (${syncStatus.recordsSyncedLastTime} records merged)`
-                            : ''}
-                        </Typography>
-                      ) : (
-                        <Typography variant="caption" color="text.secondary">
-                          Background sync is checking every 25 seconds.
-                        </Typography>
-                      )}
-                    </Stack>
-
-                    {(syncStatus.state === 'syncing' || syncingManual) && (
-                      <Box sx={{ width: '100%', pt: 0.5 }}>
+                    {isDownloading && (
+                      <Box sx={{ width: '100%', mt: 2 }}>
                         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                           <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                            {syncStatus.progress?.label || syncStatus.message || 'Synchronizing with clinic peer...'}
+                            {downloadStatusText}
                           </Typography>
                           <Typography variant="caption" color="primary.main" fontWeight={700}>
-                            {syncStatus.progress?.percent ?? 0}%
+                            {downloadIndeterminate ? '…' : `${downloadProgress}%`}
                           </Typography>
                         </Stack>
                         <LinearProgress
-                          variant={typeof syncStatus.progress?.percent === 'number' && syncStatus.progress.percent > 0 ? 'determinate' : 'indeterminate'}
-                          value={syncStatus.progress?.percent ?? 0}
+                          variant={downloadIndeterminate ? 'indeterminate' : 'determinate'}
+                          value={downloadIndeterminate ? undefined : downloadProgress}
                           sx={{ height: 6, borderRadius: 3 }}
                         />
                       </Box>
                     )}
+                  </Box>
+                </Box>
 
-                    {syncStatus.peerUrl && (
-                      <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
-                        Peer device: {syncStatus.peerName ? `${syncStatus.peerName} — ` : ''}{syncStatus.peerUrl}
-                      </Typography>
+                <Divider orientation="vertical" flexItem />
+
+                {/* Right Side: Network Settings */}
+                <Stack spacing={3} flex={1}>
+                  <Box>
+                    <Typography variant="h6" fontWeight={700}>Network Settings</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      {isOnline
+                        ? 'This license uses online Postgres — LAN roles are disabled.'
+                        : 'Configure how this machine connects to the clinic network.'}
+                    </Typography>
+                    {isOnline && (
+                      <Alert severity="info" sx={{ mt: 1.5 }}>
+                        Online database mode is active
+                        {schemaId ? ` (tenant ${schemaId})` : ''}.
+                        Clinic data is stored in the shared cloud schema, filtered per license.
+                      </Alert>
                     )}
+                    {!isOnline && settings?.serverMode === 'lan-client' && connectionOk === false && (
+                      <Alert severity="error" sx={{ mt: 1.5 }}>
+                        LAN server unreachable. App has fallen back to local mode. Please check the server URL and save again.
+                      </Alert>
+                    )}
+                  </Box>
 
-                    {syncStatus.message && syncStatus.state === 'error' && (
-                      <Alert severity="info" sx={{ py: 0.5, fontSize: 13 }}>
-                        {syncStatus.message}. Connect both devices to the same Wi-Fi router for auto-synchronization.
+                  {isOnline ? null : (
+                    <>
+                      <Divider />
+
+                      <Box>
+                        <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>Machine Role</Typography>
+                        <ToggleButtonGroup
+                          value={settings.serverMode}
+                          exclusive
+                          onChange={(_e, val) => val && setSettings((s) => s && ({ ...s, serverMode: val as ServerMode }))}
+                          sx={{ gap: 1, flexWrap: 'wrap', width: '100%' }}
+                        >
+                          {([
+                            { value: 'local', icon: <LaptopOutlinedIcon />, label: 'Standalone', desc: 'Only this machine, no sharing' },
+                            { value: 'lan-server', icon: <DnsOutlinedIcon />, label: 'LAN Server', desc: 'Share data with other machines' },
+                            { value: 'lan-client', icon: <DevicesOutlinedIcon />, label: 'LAN Client', desc: 'Connect to another machine' },
+                          ] as const).map(({ value, icon, label, desc }) => (
+                            <ToggleButton
+                              key={value}
+                              value={value}
+                              sx={{
+                                flex: 1,
+                                flexDirection: 'column',
+                                gap: 0.5,
+                                py: 2,
+                                px: 3,
+                                borderRadius: '12px !important',
+                                border: '1px solid !important',
+                                borderColor: settings.serverMode === value
+                                  ? `${theme.palette.primary.main} !important`
+                                  : 'divider !important',
+                                bgcolor: settings.serverMode === value
+                                  ? alpha(theme.palette.primary.main, 0.1)
+                                  : 'transparent',
+                                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
+                              }}
+                            >
+                              {icon}
+                              <Typography variant="caption" fontWeight={700}>{label}</Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>{desc}</Typography>
+                            </ToggleButton>
+                          ))}
+                        </ToggleButtonGroup>
+                      </Box>
+
+                      <Divider />
+
+                      {settings.serverMode !== 'lan-client' && (
+                        <>
+                          <Alert severity="info" icon={<DnsOutlinedIcon />}>
+                            <Typography variant="body2" fontWeight={600}>
+                              {settings.serverMode === 'lan-server' ? 'LAN Server mode active.' : 'This machine hosts the database.'}
+                            </Typography>
+                            <Typography variant="body2" sx={{ mt: 0.5 }}>
+                              Other machines on the network will auto-discover this machine. They connect via:
+                            </Typography>
+                            <Chip
+                              label={`http://${lanIp}:${settings.lanPort}`}
+                              size="small"
+                              sx={{ mt: 1, fontFamily: 'monospace', fontWeight: 600 }}
+                            />
+                          </Alert>
+                          <TextField
+                            label="Server Port"
+                            type="number"
+                            value={settings.lanPort}
+                            onChange={(e) => setSettings((s) => s && ({ ...s, lanPort: Number(e.target.value) }))}
+                            size="small"
+                            sx={{ maxWidth: 180 }}
+                            helperText="Default: 3333"
+                          />
+                        </>
+                      )}
+
+                      {settings.serverMode === 'lan-client' && (
+                        <Stack spacing={2}>
+                          <Alert severity="info" icon={<DevicesOutlinedIcon />}>
+                            <Typography variant="body2" fontWeight={600}>LAN Client mode</Typography>
+                            <Typography variant="body2" sx={{ mt: 0.5 }}>Scan for a server on your network, or enter the server URL manually.</Typography>
+                          </Alert>
+
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              startIcon={<WifiTetheringOutlinedIcon />}
+                              loading={scanning}
+                              onClick={() => void handleScan()}
+                            >
+                              Scan Network
+                            </Button>
+                            {discovered.length > 0 && (
+                              <Typography variant="caption" color="text.secondary">{discovered.length} server(s) found</Typography>
+                            )}
+                          </Stack>
+
+                          {discovered.length > 0 && (
+                            <Stack spacing={0.5}>
+                              {discovered.map((s) => (
+                                <Chip
+                                  key={s.ip}
+                                  label={`${s.name} — http://${s.ip}:${s.port}`}
+                                  size="small"
+                                  clickable
+                                  onClick={() => {
+                                    setSettings((prev) => prev && ({ ...prev, clientApiUrl: `http://${s.ip}:${s.port}` }));
+                                    setTestResult(null);
+                                  }}
+                                  sx={{ fontFamily: 'monospace', justifyContent: 'flex-start' }}
+                                />
+                              ))}
+                            </Stack>
+                          )}
+
+                          <Stack direction="row" spacing={1} alignItems="flex-start">
+                            <TextField
+                              label="Server URL"
+                              size="small"
+                              fullWidth
+                              placeholder="http://192.168.1.x:3333"
+                              value={settings.clientApiUrl}
+                              onChange={(e) => { setSettings((s) => s && ({ ...s, clientApiUrl: e.target.value })); setTestResult(null); }}
+                            />
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              sx={{ whiteSpace: 'nowrap', mt: 0.5 }}
+                              disabled={!settings.clientApiUrl}
+                              loading={testing}
+                              onClick={() => void handleTestConnection()}
+                            >
+                              Test
+                            </Button>
+                          </Stack>
+
+                          {testResult !== null && (
+                            <Alert severity={testResult ? 'success' : 'error'}>
+                              {testResult ? 'Connection successful!' : 'Could not reach server. Check the URL and firewall.'}
+                            </Alert>
+                          )}
+                        </Stack>
+                      )}
+
+                      <Divider />
+
+                      {/* Local Peer Sync Card */}
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 2.5,
+                          borderRadius: 3,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          bgcolor: (t) => alpha(t.palette.background.paper, 0.6),
+                        }}
+                      >
+                        <Stack spacing={2}>
+                          <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
+                            <Stack direction="row" alignItems="center" spacing={1.5}>
+                              <Box
+                                sx={{
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: 2,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  bgcolor: (t) => alpha(t.palette.primary.main, 0.12),
+                                  color: 'primary.main',
+                                }}
+                              >
+                                <SyncOutlinedIcon
+                                  sx={{
+                                    fontSize: 22,
+                                    animation: syncStatus.state === 'syncing' || syncingManual ? 'spin 1.2s linear infinite' : 'none',
+                                    '@keyframes spin': {
+                                      '0%': { transform: 'rotate(0deg)' },
+                                      '100%': { transform: 'rotate(360deg)' },
+                                    },
+                                  }}
+                                />
+                              </Box>
+                              <Box>
+                                <Typography variant="subtitle1" fontWeight={700}>
+                                  Local Two-Way Sync (Doctor &amp; Receptionist)
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Auto-syncs changes both ways over local Wi-Fi without internet. Doctor can work offline at home and merge morning clinic tokens seamlessly.
+                                </Typography>
+                              </Box>
+                            </Stack>
+
+                            <Button
+                              variant="contained"
+                              size="small"
+                              startIcon={<SyncOutlinedIcon />}
+                              disabled={syncStatus.state === 'syncing' || syncingManual}
+                              onClick={() => void handleManualSync()}
+                              sx={{ textTransform: 'none', borderRadius: 2, px: 2 }}
+                            >
+                              {syncStatus.state === 'syncing' || syncingManual ? 'Syncing...' : 'Sync Now'}
+                            </Button>
+                          </Stack>
+
+                          <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" sx={{ pt: 0.5 }}>
+                            <Chip
+                              size="small"
+                              label={
+                                syncStatus.state === 'syncing' || syncingManual
+                                  ? syncStatus.progress?.percent
+                                    ? `Syncing ${syncStatus.progress.percent}%`
+                                    : 'Syncing in progress...'
+                                  : syncStatus.state === 'synced'
+                                    ? 'Connected & Synced'
+                                    : syncStatus.state === 'error'
+                                      ? 'Sync Idle / Warning'
+                                      : 'Background Auto-Sync Active'
+                              }
+                              color={
+                                syncStatus.state === 'synced'
+                                  ? 'success'
+                                  : syncStatus.state === 'syncing' || syncingManual
+                                    ? 'primary'
+                                    : syncStatus.state === 'error'
+                                      ? 'warning'
+                                      : 'default'
+                              }
+                              variant="outlined"
+                            />
+
+                            {syncStatus.lastSyncTime ? (
+                              <Typography variant="caption" color="text.secondary">
+                                Last synced: {new Date(syncStatus.lastSyncTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                {typeof syncStatus.recordsSyncedLastTime === 'number' && syncStatus.recordsSyncedLastTime > 0
+                                  ? ` (${syncStatus.recordsSyncedLastTime} records merged)`
+                                  : ''}
+                              </Typography>
+                            ) : (
+                              <Typography variant="caption" color="text.secondary">
+                                Background sync is checking every 25 seconds.
+                              </Typography>
+                            )}
+                          </Stack>
+
+                          {(syncStatus.state === 'syncing' || syncingManual) && (
+                            <Box sx={{ width: '100%', pt: 0.5 }}>
+                              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                                <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                                  {syncStatus.progress?.label || syncStatus.message || 'Synchronizing with clinic peer...'}
+                                </Typography>
+                                <Typography variant="caption" color="primary.main" fontWeight={700}>
+                                  {syncStatus.progress?.percent ?? 0}%
+                                </Typography>
+                              </Stack>
+                              <LinearProgress
+                                variant={typeof syncStatus.progress?.percent === 'number' && syncStatus.progress.percent > 0 ? 'determinate' : 'indeterminate'}
+                                value={syncStatus.progress?.percent ?? 0}
+                                sx={{ height: 6, borderRadius: 3 }}
+                              />
+                            </Box>
+                          )}
+
+                          {syncStatus.peerUrl && (
+                            <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>
+                              Peer device: {syncStatus.peerName ? `${syncStatus.peerName} — ` : ''}{syncStatus.peerUrl}
+                            </Typography>
+                          )}
+
+                          {syncStatus.message && syncStatus.state === 'error' && (
+                            <Alert severity="info" sx={{ py: 0.5, fontSize: 13 }}>
+                              {syncStatus.message}. Connect both devices to the same Wi-Fi router for auto-synchronization.
+                            </Alert>
+                          )}
+                        </Stack>
+                      </Paper>
+                    </>
+                  )}
+                </Stack>
+              </Stack>
+            )}
+
+            {settingsTab === 'announcements' && (
+              <Box sx={{ maxWidth: 640, pb: 4 }}>
+                <TokenAudioSettingsContent />
+              </Box>
+            )}
+
+            {settingsTab === 'ai' && can('ai') && (
+              <Box sx={{ maxWidth: 520 }}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                  <AutoAwesomeOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                  <Typography variant="h6" fontWeight={700}>AI Assist (add-on)</Typography>
+                </Stack>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+                  Paid add-on. Prescription drafts and history summaries use CareFlow&apos;s hosted model.
+                  Clinics without this add-on do not see AI buttons.
+                </Typography>
+                <Stack spacing={2}>
+                  <Alert severity="info" sx={{ py: 0.5 }}>
+                    This clinic&apos;s license includes the AI add-on. No API key is stored on this PC.
+                  </Alert>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Button
+                      variant="outlined"
+                      disabled={aiTesting}
+                      onClick={() => void handleTestAi()}
+                    >
+                      {aiTesting ? 'Testing…' : 'Test connection'}
+                    </Button>
+                    {aiTest && (
+                      <Alert severity={aiTest.ok ? 'success' : 'error'} sx={{ py: 0.25, flex: 1 }}>
+                        {aiTest.ok ? 'CareFlow AI is ready.' : aiTest.error}
                       </Alert>
                     )}
                   </Stack>
-                </Paper>
-                </>
-                )}
-              </Stack>
-            </Stack>
-          )}
-
-          {settingsTab === 'announcements' && (
-            <Box sx={{ maxWidth: 640, pb: 4 }}>
-              <TokenAudioSettingsContent />
-            </Box>
-          )}
-
-          {settingsTab === 'ai' && can('ai') && (
-            <Box sx={{ maxWidth: 520 }}>
-              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-                <AutoAwesomeOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
-                <Typography variant="h6" fontWeight={700}>AI Assist (add-on)</Typography>
-              </Stack>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-                Paid add-on. Prescription drafts and history summaries use CareFlow&apos;s hosted model.
-                Clinics without this add-on do not see AI buttons.
-              </Typography>
-              <Stack spacing={2}>
-                <Alert severity="info" sx={{ py: 0.5 }}>
-                  This clinic&apos;s license includes the AI add-on. No API key is stored on this PC.
-                </Alert>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Button
-                    variant="outlined"
-                    disabled={aiTesting}
-                    onClick={() => void handleTestAi()}
-                  >
-                    {aiTesting ? 'Testing…' : 'Test connection'}
-                  </Button>
-                  {aiTest && (
-                    <Alert severity={aiTest.ok ? 'success' : 'error'} sx={{ py: 0.25, flex: 1 }}>
-                      {aiTest.ok ? 'CareFlow AI is ready.' : aiTest.error}
-                    </Alert>
-                  )}
                 </Stack>
-              </Stack>
-            </Box>
-          )}
+              </Box>
+            )}
 
-          {settingsTab === 'whatsapp' && can('whatsapp') && (
-            <Box>
-              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-                <WhatsAppIcon sx={{ fontSize: 20, color: 'primary.main' }} />
-                <Typography variant="h6" fontWeight={700}>WhatsApp Cloud API (add-on)</Typography>
-              </Stack>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-                Paid add-on for in-app send, documents, and campaigns from CareFlow&apos;s shared number.
-                Without this add-on, WhatsApp still opens WhatsApp Web (wa.me) as usual.
-              </Typography>
-              <Stack spacing={2} sx={{ maxWidth: 520, mb: 3 }}>
-                <Alert severity="info" sx={{ py: 0.5 }}>
-                  This clinic&apos;s license includes the WhatsApp Cloud API add-on. No Meta token is stored on this PC.
-                </Alert>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Button
-                    variant="outlined"
-                    disabled={waTesting}
-                    onClick={() => void handleTestWhatsApp()}
-                  >
-                    {waTesting ? 'Testing…' : 'Test connection'}
-                  </Button>
-                  {waTest && (
-                    <Alert severity={waTest.ok ? 'success' : 'error'} sx={{ py: 0.25, flex: 1 }}>
-                      {waTest.ok
-                        ? `CareFlow WhatsApp ready${waTest.name ? ` — ${waTest.name}` : ''}${waTest.phone ? ` (${waTest.phone})` : ''}`
-                        : waTest.error}
-                    </Alert>
-                  )}
+            {settingsTab === 'whatsapp' && can('whatsapp') && (
+              <Box>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                  <WhatsAppIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                  <Typography variant="h6" fontWeight={700}>WhatsApp Cloud API (add-on)</Typography>
                 </Stack>
-              </Stack>
-
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
-                Campaign
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                Choose a doctor and visit date, then write text or add an image. The message is sent to every patient with a WhatsApp number.
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<CampaignOutlinedIcon />}
-                onClick={() => setWaCampaignOpen(true)}
-              >
-                New campaign
-              </Button>
-            </Box>
-          )}
-
-          {settingsTab === 'backup' && (
-            <Box sx={{ maxWidth: 560 }}>
-              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-                <BackupOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
-                <Typography variant="h6" fontWeight={700}>Backup & Restore</Typography>
-              </Stack>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-                Full backup (.zip) includes the database plus patient/lab documents so images and PDFs work after restore on another PC. Legacy .db-only backups are still supported.
-              </Typography>
-              {isOnline ? (
-                <Stack spacing={2}>
-                  <Alert severity="info">
-                    Online database is on. Local ZIP backup is disabled. Copy local → Online (empty cloud only), or copy Online → this PC so you can switch the license back to Local with the latest cloud data.
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+                  Paid add-on for in-app send, documents, and campaigns from CareFlow&apos;s shared number.
+                  Without this add-on, WhatsApp still opens WhatsApp Web (wa.me) as usual.
+                </Typography>
+                <Stack spacing={2} sx={{ maxWidth: 520, mb: 3 }}>
+                  <Alert severity="info" sx={{ py: 0.5 }}>
+                    This clinic&apos;s license includes the WhatsApp Cloud API add-on. No Meta token is stored on this PC.
                   </Alert>
-                  {isAdmin && (
-                    migrateLoading ? (
-                      <Box sx={{ width: '100%', pt: 0.5 }}>
-                        <Stack
-                          direction="row"
-                          justifyContent="space-between"
-                          alignItems="center"
-                          sx={{ mb: 0.75 }}
-                        >
-                          <Typography variant="body2" color="text.secondary" fontWeight={600} noWrap>
-                            {migrateProgress.label}
-                          </Typography>
-                          <Typography variant="body2" color="primary.main" fontWeight={800} sx={{ ml: 2 }}>
-                            {migrateProgress.percent}%
-                          </Typography>
-                        </Stack>
-                        <LinearProgress
-                          variant="determinate"
-                          value={migrateProgress.percent}
-                          sx={{ height: 10, borderRadius: 5 }}
-                        />
-                      </Box>
-                    ) : (
-                      <Stack direction="row" gap={1.5} flexWrap="wrap">
-                        <Button
-                          variant="contained"
-                          startIcon={<CloudUploadOutlinedIcon />}
-                          onClick={() => void handleMigrateToCloud()}
-                        >
-                          Migrate local data to Online DB
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          startIcon={<CloudDownloadOutlinedIcon />}
-                          onClick={() => void handleMigrateFromCloud()}
-                        >
-                          Copy Online DB to this PC
-                        </Button>
-                      </Stack>
-                    )
-                  )}
-                </Stack>
-              ) : (
-                <Stack spacing={2}>
-                  <Alert severity="info">
-                    Local mode uses this PC’s clinic.db. To bring the latest Online data here, turn Online Database on, click Copy Online DB to this PC, then switch the license back to Local.
-                  </Alert>
-                  <Stack direction="row" gap={1.5} flexWrap="wrap">
+                  <Stack direction="row" spacing={1} alignItems="center">
                     <Button
                       variant="outlined"
-                      startIcon={<BackupOutlinedIcon />}
-                      loading={backupLoading}
-                      onClick={() => void handleBackup()}
+                      disabled={waTesting}
+                      onClick={() => void handleTestWhatsApp()}
                     >
-                      Create Backup
+                      {waTesting ? 'Testing…' : 'Test connection'}
                     </Button>
-                    <Button
-                      variant="outlined"
-                      color="warning"
-                      startIcon={<RestoreOutlinedIcon />}
-                      loading={restoreLoading}
-                      onClick={() => void handleRestore()}
-                    >
-                      Restore Backup
-                    </Button>
+                    {waTest && (
+                      <Alert severity={waTest.ok ? 'success' : 'error'} sx={{ py: 0.25, flex: 1 }}>
+                        {waTest.ok
+                          ? `CareFlow WhatsApp ready${waTest.name ? ` — ${waTest.name}` : ''}${waTest.phone ? ` (${waTest.phone})` : ''}`
+                          : waTest.error}
+                      </Alert>
+                    )}
                   </Stack>
+                </Stack>
 
-                  <Divider />
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
+                  Campaign
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                  Choose a doctor and visit date, then write text or add an image. The message is sent to every patient with a WhatsApp number.
+                </Typography>
+                <Button
+                  variant="contained"
+                  startIcon={<CampaignOutlinedIcon />}
+                  onClick={() => setWaCampaignOpen(true)}
+                >
+                  New campaign
+                </Button>
+              </Box>
+            )}
 
-                  {/* CAREFLOW CLOUD VAULT (CENTRAL SERVER BACKUP) */}
-                  <Paper
-                    variant="outlined"
-                    sx={{
-                      p: 2.5,
-                      borderRadius: 2,
-                      borderColor: 'primary.main',
-                      bgcolor: (theme) => alpha(theme.palette.primary.main, 0.02),
-                      boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
-                    }}
-                  >
-                    <Stack spacing={2}>
-                      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
-                        <Stack direction="row" alignItems="center" spacing={1.2}>
-                          <CloudDoneOutlinedIcon sx={{ fontSize: 26, color: 'primary.main' }} />
-                          <div>
-                            <Typography variant="subtitle1" fontWeight={800} sx={{ lineHeight: 1.2 }}>
-                              CareFlow Cloud Vault (Central Server Backup)
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Encrypted off-site storage powered by CareFlow Server &amp; Cloudflare R2
-                            </Typography>
-                          </div>
-                        </Stack>
-                        <Chip
-                          icon={<SecurityOutlinedIcon sx={{ fontSize: '16px !important' }} />}
-                          label={cloudVaultStatus?.licenseKey ? `License: ${cloudVaultStatus.licenseKey.slice(0, 10)}...` : 'Vault Active'}
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                          sx={{ fontWeight: 600 }}
-                        />
-                      </Stack>
-
-                      <Typography variant="body2" color="text.secondary">
-                        Securely vault snapshots of your complete clinic database (.db) and attachments to the central cloud.
-                        Even if your computer crashes or data is accidentally lost, restore with 1-click at any time.
-                      </Typography>
-
-                      <Stack
-                        direction={{ xs: 'column', sm: 'row' }}
-                        spacing={2}
-                        justifyContent="space-between"
-                        alignItems={{ xs: 'flex-start', sm: 'center' }}
-                        sx={{
-                          p: 1.5,
-                          borderRadius: 1.5,
-                          bgcolor: (theme) => alpha(theme.palette.background.paper, 0.8),
-                          border: '1px solid',
-                          borderColor: 'divider',
-                        }}
-                      >
-                        <Stack spacing={0.5}>
-                          <Typography variant="caption" fontWeight={700} color="text.secondary">
-                            AUTOMATIC BACKUP SCHEDULE
-                          </Typography>
-                          <ToggleButtonGroup
-                            exclusive
-                            size="small"
-                            value={cloudVaultStatus?.schedule || 'daily'}
-                            onChange={(_e, val: CloudVaultSchedule | null) => {
-                              if (val) void handleCloudVaultSchedule(val);
-                            }}
+            {settingsTab === 'backup' && (
+              <Box sx={{ maxWidth: 560 }}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                  <BackupOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                  <Typography variant="h6" fontWeight={700}>Backup & Restore</Typography>
+                </Stack>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+                  Full backup (.zip) includes the database plus patient/lab documents so images and PDFs work after restore on another PC. Legacy .db-only backups are still supported.
+                </Typography>
+                {isOnline ? (
+                  <Stack spacing={2}>
+                    <Alert severity="info">
+                      Online database is on. Local ZIP backup is disabled. Copy local → Online (empty cloud only), or copy Online → this PC so you can switch the license back to Local with the latest cloud data.
+                    </Alert>
+                    {isAdmin && (
+                      migrateLoading ? (
+                        <Box sx={{ width: '100%', pt: 0.5 }}>
+                          <Stack
+                            direction="row"
+                            justifyContent="space-between"
+                            alignItems="center"
+                            sx={{ mb: 0.75 }}
                           >
-                            <ToggleButton value="daily" sx={{ px: 2, textTransform: 'none', fontWeight: 700 }}>
-                              Daily (Recommended)
-                            </ToggleButton>
-                            <ToggleButton value="weekly" sx={{ px: 2, textTransform: 'none', fontWeight: 700 }}>
-                              Weekly
-                            </ToggleButton>
-                            <ToggleButton value="off" sx={{ px: 2, textTransform: 'none', fontWeight: 700 }}>
-                              Off
-                            </ToggleButton>
-                          </ToggleButtonGroup>
-                        </Stack>
-
-                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Typography variant="body2" color="text.secondary" fontWeight={600} noWrap>
+                              {migrateProgress.label}
+                            </Typography>
+                            <Typography variant="body2" color="primary.main" fontWeight={800} sx={{ ml: 2 }}>
+                              {migrateProgress.percent}%
+                            </Typography>
+                          </Stack>
+                          <LinearProgress
+                            variant="determinate"
+                            value={migrateProgress.percent}
+                            sx={{ height: 10, borderRadius: 5 }}
+                          />
+                        </Box>
+                      ) : (
+                        <Stack direction="row" gap={1.5} flexWrap="wrap">
                           <Button
                             variant="contained"
                             startIcon={<CloudUploadOutlinedIcon />}
-                            loading={cloudVaultUploading}
-                            onClick={() => void handleCloudVaultBackupNow()}
-                            sx={{ fontWeight: 700 }}
+                            onClick={() => void handleMigrateToCloud()}
                           >
-                            Backup to Cloud Vault Now
-                          </Button>
-                          <Tooltip title="Refresh snapshot list">
-                            <span>
-                              <IconButton
-                                size="small"
-                                onClick={() => void loadCloudVaultData()}
-                                disabled={cloudVaultLoading}
-                              >
-                                <SyncOutlinedIcon fontSize="small" />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        </Stack>
-                      </Stack>
-
-                      {cloudVaultStatus?.lastBackupAt && (
-                        <Typography variant="caption" color="text.secondary">
-                          Last cloud vault snapshot: <strong>{new Date(cloudVaultStatus.lastBackupAt).toLocaleString()}</strong>
-                        </Typography>
-                      )}
-
-                      {/* Snapshots Table / List */}
-                      <Box sx={{ mt: 1 }}>
-                        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-                          <Typography variant="body2" fontWeight={800}>
-                            Cloud Snapshots ({cloudVaultList.length} of max 5)
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Oldest snapshots auto-pruned past 5
-                          </Typography>
-                        </Stack>
-
-                        {cloudVaultLoading && cloudVaultList.length === 0 ? (
-                          <LinearProgress sx={{ my: 2, borderRadius: 1 }} />
-                        ) : cloudVaultList.length === 0 ? (
-                          <Alert severity="info" variant="outlined" sx={{ borderRadius: 1.5 }}>
-                            No snapshots vaulted in cloud yet. Click &apos;Backup to Cloud Vault Now&apos; above to create your first cloud snapshot.
-                          </Alert>
-                        ) : (
-                          <Stack spacing={1}>
-                            {cloudVaultList.map((item) => (
-                              <Paper
-                                key={item.id}
-                                variant="outlined"
-                                sx={{
-                                  p: 1.5,
-                                  borderRadius: 1.5,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  flexWrap: 'wrap',
-                                  gap: 1.5,
-                                  bgcolor: 'background.paper',
-                                  borderColor: 'divider',
-                                  '&:hover': {
-                                    borderColor: 'primary.main',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                                  },
-                                }}
-                              >
-                                <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 220 }}>
-                                  <StorageOutlinedIcon sx={{ color: 'primary.main', fontSize: 24 }} />
-                                  <div>
-                                    <Typography variant="body2" fontWeight={700}>
-                                      {new Date(item.createdAt).toLocaleString(undefined, {
-                                        dateStyle: 'medium',
-                                        timeStyle: 'short',
-                                      })}
-                                    </Typography>
-                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
-                                      <Chip
-                                        label={item.backupType === 'auto' ? 'Daily Auto' : 'Manual'}
-                                        size="small"
-                                        color={item.backupType === 'auto' ? 'success' : 'primary'}
-                                        sx={{ height: 18, fontSize: '0.68rem', fontWeight: 700 }}
-                                      />
-                                      <Typography variant="caption" color="text.secondary">
-                                        {(item.fileSize / (1024 * 1024)).toFixed(2)} MB
-                                      </Typography>
-                                      {item.deviceName && (
-                                        <Typography variant="caption" color="text.secondary">
-                                          • {item.deviceName}
-                                        </Typography>
-                                      )}
-                                    </Stack>
-                                  </div>
-                                </Stack>
-
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    color="warning"
-                                    startIcon={<RestoreOutlinedIcon />}
-                                    loading={cloudVaultRestoringId === item.id}
-                                    onClick={() => void handleCloudVaultRestore(item)}
-                                    sx={{ fontWeight: 700 }}
-                                  >
-                                    Restore
-                                  </Button>
-                                  <Tooltip title="Delete from Cloud">
-                                    <span>
-                                      <IconButton
-                                        size="small"
-                                        color="error"
-                                        disabled={cloudVaultDeletingId === item.id}
-                                        onClick={() => void handleCloudVaultDelete(item)}
-                                      >
-                                        <DeleteOutlineOutlinedIcon fontSize="small" />
-                                      </IconButton>
-                                    </span>
-                                  </Tooltip>
-                                </Stack>
-                              </Paper>
-                            ))}
-                          </Stack>
-                        )}
-                      </Box>
-                    </Stack>
-                  </Paper>
-
-                  <Divider />
-
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <CloudOutlinedIcon sx={{ fontSize: 22, color: 'primary.main' }} />
-                    <Typography variant="subtitle1" fontWeight={800}>
-                      Google Drive Backup (Cloud Auto-Sync)
-                    </Typography>
-                  </Stack>
-                  <Typography variant="body2" color="text.secondary">
-                    Connect your Google account with 0-configuration (like WhatsApp). CareFlow automatically creates a 
-                    <strong>CareFlow Backups</strong> folder in your Google Drive and backs up your clinic data safely.
-                  </Typography>
-                  {drive?.connected ? (
-                    <Stack spacing={1.5}>
-                      <Alert severity="success">
-                        Connected as <strong>{drive.email}</strong>
-                      </Alert>
-                      <Typography variant="body2" fontWeight={700}>Backup Schedule</Typography>
-                      <ToggleButtonGroup
-                        exclusive
-                        value={drive.schedule}
-                        onChange={(_e, val: DriveSchedule | null) => {
-                          if (val) void handleGoogleSchedule(val);
-                        }}
-                        sx={{ flexWrap: 'wrap', gap: 1 }}
-                      >
-                        {([
-                          { value: 'off', label: 'Off' },
-                          { value: 'daily', label: 'Daily (Recommended)' },
-                          { value: 'weekly', label: 'Weekly' },
-                          { value: 'monthly', label: 'Monthly' },
-                        ] as const).map((opt) => (
-                          <ToggleButton key={opt.value} value={opt.value} sx={{ px: 2, py: 0.75, textTransform: 'none', fontWeight: 700 }}>
-                            {opt.label}
-                          </ToggleButton>
-                        ))}
-                      </ToggleButtonGroup>
-                      {drive.lastBackupAt && (
-                        <Typography variant="caption" color="text.secondary">
-                          Last Drive backup: {new Date(drive.lastBackupAt).toLocaleString()}
-                        </Typography>
-                      )}
-                      <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="center">
-                        <Button
-                          variant="contained"
-                          startIcon={<CloudUploadOutlinedIcon />}
-                          loading={driveUploading}
-                          onClick={() => void handleGoogleBackupNow()}
-                        >
-                          Backup Now to Drive
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          color="warning"
-                          startIcon={<CloudDownloadOutlinedIcon />}
-                          onClick={() => void handleOpenDriveRestore()}
-                        >
-                          Restore from Drive
-                        </Button>
-                        <Button color="inherit" sx={{ color: 'text.secondary' }} onClick={() => void handleGoogleDisconnect()}>
-                          Disconnect
-                        </Button>
-                      </Stack>
-
-                      {/* Google Drive Restore Dialog */}
-                      <Dialog
-                        open={driveRestoreOpen}
-                        onClose={() => !driveRestoreLoading && setDriveRestoreOpen(false)}
-                        maxWidth="sm"
-                        fullWidth
-                        PaperProps={{ sx: { borderRadius: 1.5 } }}
-                      >
-                        <DialogTitle sx={{ fontWeight: 800 }}>Restore from Google Drive</DialogTitle>
-                        <DialogContent dividers>
-                          {driveRestoreLoading ? (
-                            <Box sx={{ py: 3 }}>
-                              <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-                                <Typography variant="body2" fontWeight={600}>{driveProgress.label}</Typography>
-                                <Typography variant="body2" fontWeight={800} color="primary.main">{driveProgress.percent}%</Typography>
-                              </Stack>
-                              <LinearProgress variant="determinate" value={driveProgress.percent} sx={{ height: 8, borderRadius: 1 }} />
-                            </Box>
-                          ) : driveFilesLoading ? (
-                            <Box sx={{ py: 4, textAlign: 'center' }}>
-                              <CircularProgress size={32} />
-                              <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-                                Fetching backups from Google Drive…
-                              </Typography>
-                            </Box>
-                          ) : driveFiles.length === 0 ? (
-                            <Alert severity="info">No backups found in your Google Drive &apos;CareFlow Backups&apos; folder yet.</Alert>
-                          ) : (
-                            <Stack spacing={1.5}>
-                              <Typography variant="body2" color="text.secondary">
-                                Select a backup to restore onto this PC. This will safely restore the complete database and patient documents:
-                              </Typography>
-                              <RadioGroup
-                                value={selectedDriveFile}
-                                onChange={(_e, val) => setSelectedDriveFile(val)}
-                              >
-                                {driveFiles.map((file) => (
-                                  <Paper
-                                    key={file.id}
-                                    variant="outlined"
-                                    sx={{
-                                      p: 1.5,
-                                      mb: 1,
-                                      borderRadius: 1,
-                                      borderColor: selectedDriveFile === file.id ? 'primary.main' : 'divider',
-                                      bgcolor: selectedDriveFile === file.id ? alpha(theme.palette.primary.main, 0.05) : 'background.paper',
-                                      cursor: 'pointer',
-                                    }}
-                                    onClick={() => setSelectedDriveFile(file.id)}
-                                  >
-                                    <FormControlLabel
-                                      value={file.id}
-                                      control={<Radio size="small" />}
-                                      label={
-                                        <Box>
-                                          <Typography variant="body2" fontWeight={700}>{file.name}</Typography>
-                                          <Typography variant="caption" color="text.secondary">
-                                            {new Date(file.createdTime).toLocaleString()} {file.size ? ` • ${(file.size / (1024 * 1024)).toFixed(2)} MB` : ''}
-                                          </Typography>
-                                        </Box>
-                                      }
-                                      sx={{ width: '100%', m: 0 }}
-                                    />
-                                  </Paper>
-                                ))}
-                              </RadioGroup>
-                            </Stack>
-                          )}
-                        </DialogContent>
-                        <DialogActions sx={{ px: 3, py: 2 }}>
-                          <Button disabled={driveRestoreLoading} onClick={() => setDriveRestoreOpen(false)}>
-                            Cancel
+                            Migrate local data to Online DB
                           </Button>
                           <Button
-                            variant="contained"
-                            color="warning"
-                            disabled={!selectedDriveFile || driveRestoreLoading || driveFilesLoading}
-                            onClick={() => void handleConfirmDriveRestore()}
+                            variant="outlined"
+                            startIcon={<CloudDownloadOutlinedIcon />}
+                            onClick={() => void handleMigrateFromCloud()}
                           >
-                            {driveRestoreLoading ? 'Restoring…' : 'Restore Selected'}
+                            Copy Online DB to this PC
                           </Button>
-                        </DialogActions>
-                      </Dialog>
-                    </Stack>
-                  ) : (
-                    <Stack spacing={1.5} alignItems="flex-start">
-                      <Button
-                        variant="contained"
-                        size="large"
-                        startIcon={<CloudOutlinedIcon />}
-                        loading={driveConnecting}
-                        onClick={() => void handleGoogleConnect()}
-                        sx={{ px: 3, py: 1, borderRadius: 2, fontWeight: 700 }}
-                      >
-                        Connect Google Drive
-                      </Button>
-                    </Stack>
-                  )}
-                </Stack>
-              )}
-            </Box>
-          )}
-
-          {settingsTab === 'support' && (
-            <Box sx={{ maxWidth: 520 }}>
-              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-                <SupportAgentOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
-                <Typography variant="h6" fontWeight={700}>Customer Support</Typography>
-              </Stack>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-                Reach {CAREFLOW_BRAND} for license help, billing questions, or technical issues with this clinic.
-              </Typography>
-
-              {supportLoading ? (
-                <Stack spacing={1.5}>
-                  <Skeleton variant="rounded" height={22} width="55%" />
-                  <Skeleton variant="rounded" height={22} width="70%" />
-                  <Skeleton variant="rounded" height={22} width="40%" />
-                </Stack>
-              ) : hasSupportContact ? (
-                <Box
-                  sx={{
-                    px: 2.5,
-                    py: 2.25,
-                    borderRadius: 2.5,
-                    bgcolor: alpha(theme.palette.primary.main, 0.06),
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.16)}`,
-                  }}
-                >
-                  <Stack spacing={1.5}>
-                    {supportPhone && (
-                      <Stack direction="row" spacing={1.25} alignItems="center">
-                        <LocalPhoneOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
-                        <Link
-                          component="button"
-                          type="button"
-                          underline="hover"
-                          color="text.primary"
-                          onClick={() => void copySupportPhone(supportPhone)}
-                          sx={{ fontSize: 15.5, fontWeight: 600, cursor: 'pointer', border: 0, background: 'none', p: 0, font: 'inherit' }}
-                        >
-                          {supportPhone}
-                        </Link>
-                        <Typography variant="caption" color="text.secondary">
-                          Click to copy
-                        </Typography>
-                      </Stack>
-                    )}
-                    {supportEmail && (
-                      <Stack direction="row" spacing={1.25} alignItems="center">
-                        <EmailOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
-                        <Link
-                          component="button"
-                          type="button"
-                          underline="hover"
-                          color="text.primary"
-                          onClick={() => openSupportEmail(supportEmail)}
-                          sx={{ fontSize: 15.5, fontWeight: 600, cursor: 'pointer', border: 0, background: 'none', p: 0, font: 'inherit' }}
-                        >
-                          {supportEmail}
-                        </Link>
-                      </Stack>
-                    )}
-                    {supportWhatsApp && (
-                      <Link
-                        component="button"
-                        type="button"
-                        underline="hover"
-                        color="primary.main"
-                        onClick={() => openSupportWhatsApp(supportPhone)}
-                        sx={{ fontSize: 14.5, fontWeight: 600, pl: 0.25, cursor: 'pointer', border: 0, background: 'none', font: 'inherit', textAlign: 'left' }}
-                      >
-                        WhatsApp {CAREFLOW_BRAND}
-                      </Link>
+                        </Stack>
+                      )
                     )}
                   </Stack>
-                </Box>
-              ) : (
-                <Alert severity="info">
-                  Support contact details are unavailable right now. Check your internet connection and try again later.
-                </Alert>
-              )}
+                ) : (
+                  <Stack spacing={2}>
+                    <Alert severity="info">
+                      Local mode uses this PC’s clinic.db. To bring the latest Online data here, turn Online Database on, click Copy Online DB to this PC, then switch the license back to Local.
+                    </Alert>
+                    <Stack direction="row" gap={1.5} flexWrap="wrap">
+                      <Button
+                        variant="outlined"
+                        startIcon={<BackupOutlinedIcon />}
+                        loading={backupLoading}
+                        onClick={() => void handleBackup()}
+                      >
+                        Create Backup
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="warning"
+                        startIcon={<RestoreOutlinedIcon />}
+                        loading={restoreLoading}
+                        onClick={() => void handleRestore()}
+                      >
+                        Restore Backup
+                      </Button>
+                    </Stack>
 
-              <Divider sx={{ my: 3 }} />
+                    <Divider />
 
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-                Legal & Privacy
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                CareFlow protects your clinic data and patient records with local device storage and secure Google Drive backups.
-              </Typography>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => setPrivacyOpen(true)}
-                sx={{ textTransform: 'none', fontWeight: 600 }}
-              >
-                View Privacy Policy
-              </Button>
-            </Box>
-          )}
+                    {/* CAREFLOW CLOUD VAULT (CENTRAL SERVER BACKUP) */}
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        p: 2.5,
+                        borderRadius: 2,
+                        borderColor: 'primary.main',
+                        bgcolor: (theme) => alpha(theme.palette.primary.main, 0.02),
+                        boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
+                      }}
+                    >
+                      <Stack spacing={2}>
+                        <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
+                          <Stack direction="row" alignItems="center" spacing={1.2}>
+                            <CloudDoneOutlinedIcon sx={{ fontSize: 26, color: 'primary.main' }} />
+                            <div>
+                              <Typography variant="subtitle1" fontWeight={800} sx={{ lineHeight: 1.2 }}>
+                                CareFlow Cloud Vault (Central Server Backup)
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Encrypted off-site storage powered by CareFlow Server &amp; Cloudflare R2
+                              </Typography>
+                            </div>
+                          </Stack>
+                          <Chip
+                            icon={<SecurityOutlinedIcon sx={{ fontSize: '16px !important' }} />}
+                            label={cloudVaultStatus?.licenseKey ? `License: ${cloudVaultStatus.licenseKey.slice(0, 10)}...` : 'Vault Active'}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        </Stack>
 
-          {settingsTab === 'recycle-bin' && (
-            <RecycleBinTab />
-          )}
+                        <Typography variant="body2" color="text.secondary">
+                          Securely vault snapshots of your complete clinic database (.db) and attachments to the central cloud.
+                          Even if your computer crashes or data is accidentally lost, restore with 1-click at any time.
+                        </Typography>
+
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          spacing={2}
+                          justifyContent="space-between"
+                          alignItems={{ xs: 'flex-start', sm: 'center' }}
+                          sx={{
+                            p: 1.5,
+                            borderRadius: 1.5,
+                            bgcolor: (theme) => alpha(theme.palette.background.paper, 0.8),
+                            border: '1px solid',
+                            borderColor: 'divider',
+                          }}
+                        >
+                          <Stack spacing={0.5}>
+                            <Typography variant="caption" fontWeight={700} color="text.secondary">
+                              AUTOMATIC BACKUP SCHEDULE
+                            </Typography>
+                            <ToggleButtonGroup
+                              exclusive
+                              size="small"
+                              value={cloudVaultStatus?.schedule || 'daily'}
+                              onChange={(_e, val: CloudVaultSchedule | null) => {
+                                if (val) void handleCloudVaultSchedule(val);
+                              }}
+                            >
+                              <ToggleButton value="daily" sx={{ px: 2, textTransform: 'none', fontWeight: 700 }}>
+                                Daily (Recommended)
+                              </ToggleButton>
+                              <ToggleButton value="weekly" sx={{ px: 2, textTransform: 'none', fontWeight: 700 }}>
+                                Weekly
+                              </ToggleButton>
+                              <ToggleButton value="off" sx={{ px: 2, textTransform: 'none', fontWeight: 700 }}>
+                                Off
+                              </ToggleButton>
+                            </ToggleButtonGroup>
+                          </Stack>
+
+                          <Stack direction="row" spacing={1.5} alignItems="center">
+                            <Button
+                              variant="contained"
+                              startIcon={<CloudUploadOutlinedIcon />}
+                              loading={cloudVaultUploading}
+                              onClick={() => void handleCloudVaultBackupNow()}
+                              sx={{ fontWeight: 700 }}
+                            >
+                              Backup to Cloud Vault Now
+                            </Button>
+                            <Tooltip title="Refresh snapshot list">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => void loadCloudVaultData()}
+                                  disabled={cloudVaultLoading}
+                                >
+                                  <SyncOutlinedIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </Stack>
+                        </Stack>
+
+                        {cloudVaultStatus?.lastBackupAt && (
+                          <Typography variant="caption" color="text.secondary">
+                            Last cloud vault snapshot: <strong>{new Date(cloudVaultStatus.lastBackupAt).toLocaleString()}</strong>
+                          </Typography>
+                        )}
+
+                        {/* Snapshots Table / List */}
+                        <Box sx={{ mt: 1 }}>
+                          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                            <Typography variant="body2" fontWeight={800}>
+                              Cloud Snapshots ({cloudVaultList.length} of max 5)
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Oldest snapshots auto-pruned past 5
+                            </Typography>
+                          </Stack>
+
+                          {cloudVaultLoading && cloudVaultList.length === 0 ? (
+                            <LinearProgress sx={{ my: 2, borderRadius: 1 }} />
+                          ) : cloudVaultList.length === 0 ? (
+                            <Alert severity="info" variant="outlined" sx={{ borderRadius: 1.5 }}>
+                              No snapshots vaulted in cloud yet. Click &apos;Backup to Cloud Vault Now&apos; above to create your first cloud snapshot.
+                            </Alert>
+                          ) : (
+                            <Stack spacing={1}>
+                              {cloudVaultList.map((item) => (
+                                <Paper
+                                  key={item.id}
+                                  variant="outlined"
+                                  sx={{
+                                    p: 1.5,
+                                    borderRadius: 1.5,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    flexWrap: 'wrap',
+                                    gap: 1.5,
+                                    bgcolor: 'background.paper',
+                                    borderColor: 'divider',
+                                    '&:hover': {
+                                      borderColor: 'primary.main',
+                                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                                    },
+                                  }}
+                                >
+                                  <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 220 }}>
+                                    <StorageOutlinedIcon sx={{ color: 'primary.main', fontSize: 24 }} />
+                                    <div>
+                                      <Typography variant="body2" fontWeight={700}>
+                                        {new Date(item.createdAt).toLocaleString(undefined, {
+                                          dateStyle: 'medium',
+                                          timeStyle: 'short',
+                                        })}
+                                      </Typography>
+                                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
+                                        <Chip
+                                          label={item.backupType === 'auto' ? 'Daily Auto' : 'Manual'}
+                                          size="small"
+                                          color={item.backupType === 'auto' ? 'success' : 'primary'}
+                                          sx={{ height: 18, fontSize: '0.68rem', fontWeight: 700 }}
+                                        />
+                                        <Typography variant="caption" color="text.secondary">
+                                          {(item.fileSize / (1024 * 1024)).toFixed(2)} MB
+                                        </Typography>
+                                        {item.deviceName && (
+                                          <Typography variant="caption" color="text.secondary">
+                                            • {item.deviceName}
+                                          </Typography>
+                                        )}
+                                      </Stack>
+                                    </div>
+                                  </Stack>
+
+                                  <Stack direction="row" spacing={1} alignItems="center">
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      color="warning"
+                                      startIcon={<RestoreOutlinedIcon />}
+                                      loading={cloudVaultRestoringId === item.id}
+                                      onClick={() => void handleCloudVaultRestore(item)}
+                                      sx={{ fontWeight: 700 }}
+                                    >
+                                      Restore
+                                    </Button>
+                                    <Tooltip title="Delete from Cloud">
+                                      <span>
+                                        <IconButton
+                                          size="small"
+                                          color="error"
+                                          disabled={cloudVaultDeletingId === item.id}
+                                          onClick={() => void handleCloudVaultDelete(item)}
+                                        >
+                                          <DeleteOutlineOutlinedIcon fontSize="small" />
+                                        </IconButton>
+                                      </span>
+                                    </Tooltip>
+                                  </Stack>
+                                </Paper>
+                              ))}
+                            </Stack>
+                          )}
+                        </Box>
+                      </Stack>
+                    </Paper>
+
+                    <Divider />
+
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <CloudOutlinedIcon sx={{ fontSize: 22, color: 'primary.main' }} />
+                      <Typography variant="subtitle1" fontWeight={800}>
+                        Google Drive Backup (Cloud Auto-Sync)
+                      </Typography>
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                      Connect your Google account with 0-configuration (like WhatsApp). CareFlow automatically creates a
+                      <strong>CareFlow Backups</strong> folder in your Google Drive and backs up your clinic data safely.
+                    </Typography>
+                    {drive?.connected ? (
+                      <Stack spacing={1.5}>
+                        <Alert severity="success">
+                          Connected as <strong>{drive.email}</strong>
+                        </Alert>
+                        <Typography variant="body2" fontWeight={700}>Backup Schedule</Typography>
+                        <ToggleButtonGroup
+                          exclusive
+                          value={drive.schedule}
+                          onChange={(_e, val: DriveSchedule | null) => {
+                            if (val) void handleGoogleSchedule(val);
+                          }}
+                          sx={{ flexWrap: 'wrap', gap: 1 }}
+                        >
+                          {([
+                            { value: 'off', label: 'Off' },
+                            { value: 'daily', label: 'Daily (Recommended)' },
+                            { value: 'weekly', label: 'Weekly' },
+                            { value: 'monthly', label: 'Monthly' },
+                          ] as const).map((opt) => (
+                            <ToggleButton key={opt.value} value={opt.value} sx={{ px: 2, py: 0.75, textTransform: 'none', fontWeight: 700 }}>
+                              {opt.label}
+                            </ToggleButton>
+                          ))}
+                        </ToggleButtonGroup>
+                        {drive.lastBackupAt && (
+                          <Typography variant="caption" color="text.secondary">
+                            Last Drive backup: {new Date(drive.lastBackupAt).toLocaleString()}
+                          </Typography>
+                        )}
+                        <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="center">
+                          <Button
+                            variant="contained"
+                            startIcon={<CloudUploadOutlinedIcon />}
+                            loading={driveUploading}
+                            onClick={() => void handleGoogleBackupNow()}
+                          >
+                            Backup Now to Drive
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            color="warning"
+                            startIcon={<CloudDownloadOutlinedIcon />}
+                            onClick={() => void handleOpenDriveRestore()}
+                          >
+                            Restore from Drive
+                          </Button>
+                          <Button color="inherit" sx={{ color: 'text.secondary' }} onClick={() => void handleGoogleDisconnect()}>
+                            Disconnect
+                          </Button>
+                        </Stack>
+
+                        {/* Google Drive Restore Dialog */}
+                        <Dialog
+                          open={driveRestoreOpen}
+                          onClose={() => !driveRestoreLoading && setDriveRestoreOpen(false)}
+                          maxWidth="sm"
+                          fullWidth
+                          PaperProps={{ sx: { borderRadius: 1.5 } }}
+                        >
+                          <DialogTitle sx={{ fontWeight: 800 }}>Restore from Google Drive</DialogTitle>
+                          <DialogContent dividers>
+                            {driveRestoreLoading ? (
+                              <Box sx={{ py: 3 }}>
+                                <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+                                  <Typography variant="body2" fontWeight={600}>{driveProgress.label}</Typography>
+                                  <Typography variant="body2" fontWeight={800} color="primary.main">{driveProgress.percent}%</Typography>
+                                </Stack>
+                                <LinearProgress variant="determinate" value={driveProgress.percent} sx={{ height: 8, borderRadius: 1 }} />
+                              </Box>
+                            ) : driveFilesLoading ? (
+                              <Box sx={{ py: 4, textAlign: 'center' }}>
+                                <CircularProgress size={32} />
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+                                  Fetching backups from Google Drive…
+                                </Typography>
+                              </Box>
+                            ) : driveFiles.length === 0 ? (
+                              <Alert severity="info">No backups found in your Google Drive &apos;CareFlow Backups&apos; folder yet.</Alert>
+                            ) : (
+                              <Stack spacing={1.5}>
+                                <Typography variant="body2" color="text.secondary">
+                                  Select a backup to restore onto this PC. This will safely restore the complete database and patient documents:
+                                </Typography>
+                                <RadioGroup
+                                  value={selectedDriveFile}
+                                  onChange={(_e, val) => setSelectedDriveFile(val)}
+                                >
+                                  {driveFiles.map((file) => (
+                                    <Paper
+                                      key={file.id}
+                                      variant="outlined"
+                                      sx={{
+                                        p: 1.5,
+                                        mb: 1,
+                                        borderRadius: 1,
+                                        borderColor: selectedDriveFile === file.id ? 'primary.main' : 'divider',
+                                        bgcolor: selectedDriveFile === file.id ? alpha(theme.palette.primary.main, 0.05) : 'background.paper',
+                                        cursor: 'pointer',
+                                      }}
+                                      onClick={() => setSelectedDriveFile(file.id)}
+                                    >
+                                      <FormControlLabel
+                                        value={file.id}
+                                        control={<Radio size="small" />}
+                                        label={
+                                          <Box>
+                                            <Typography variant="body2" fontWeight={700}>{file.name}</Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                              {new Date(file.createdTime).toLocaleString()} {file.size ? ` • ${(file.size / (1024 * 1024)).toFixed(2)} MB` : ''}
+                                            </Typography>
+                                          </Box>
+                                        }
+                                        sx={{ width: '100%', m: 0 }}
+                                      />
+                                    </Paper>
+                                  ))}
+                                </RadioGroup>
+                              </Stack>
+                            )}
+                          </DialogContent>
+                          <DialogActions sx={{ px: 3, py: 2 }}>
+                            <Button disabled={driveRestoreLoading} onClick={() => setDriveRestoreOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button
+                              variant="contained"
+                              color="warning"
+                              disabled={!selectedDriveFile || driveRestoreLoading || driveFilesLoading}
+                              onClick={() => void handleConfirmDriveRestore()}
+                            >
+                              {driveRestoreLoading ? 'Restoring…' : 'Restore Selected'}
+                            </Button>
+                          </DialogActions>
+                        </Dialog>
+                      </Stack>
+                    ) : (
+                      <Stack spacing={1.5} alignItems="flex-start">
+                        <Button
+                          variant="contained"
+                          size="large"
+                          startIcon={<CloudOutlinedIcon />}
+                          loading={driveConnecting}
+                          onClick={() => void handleGoogleConnect()}
+                          sx={{ px: 3, py: 1, borderRadius: 2, fontWeight: 700 }}
+                        >
+                          Connect Google Drive
+                        </Button>
+                      </Stack>
+                    )}
+                  </Stack>
+                )}
+              </Box>
+            )}
+
+            {settingsTab === 'support' && (
+              <Box sx={{ maxWidth: 520 }}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                  <SupportAgentOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                  <Typography variant="h6" fontWeight={700}>Customer Support</Typography>
+                </Stack>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+                  Reach {CAREFLOW_BRAND} for license help, billing questions, or technical issues with this clinic.
+                </Typography>
+
+                {supportLoading ? (
+                  <Stack spacing={1.5}>
+                    <Skeleton variant="rounded" height={22} width="55%" />
+                    <Skeleton variant="rounded" height={22} width="70%" />
+                    <Skeleton variant="rounded" height={22} width="40%" />
+                  </Stack>
+                ) : hasSupportContact ? (
+                  <Box
+                    sx={{
+                      px: 2.5,
+                      py: 2.25,
+                      borderRadius: 2.5,
+                      bgcolor: alpha(theme.palette.primary.main, 0.06),
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.16)}`,
+                    }}
+                  >
+                    <Stack spacing={1.5}>
+                      {supportPhone && (
+                        <Stack direction="row" spacing={1.25} alignItems="center">
+                          <LocalPhoneOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                          <Link
+                            component="button"
+                            type="button"
+                            underline="hover"
+                            color="text.primary"
+                            onClick={() => void copySupportPhone(supportPhone)}
+                            sx={{ fontSize: 15.5, fontWeight: 600, cursor: 'pointer', border: 0, background: 'none', p: 0, font: 'inherit' }}
+                          >
+                            {supportPhone}
+                          </Link>
+                          <Typography variant="caption" color="text.secondary">
+                            Click to copy
+                          </Typography>
+                        </Stack>
+                      )}
+                      {supportEmail && (
+                        <Stack direction="row" spacing={1.25} alignItems="center">
+                          <EmailOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                          <Link
+                            component="button"
+                            type="button"
+                            underline="hover"
+                            color="text.primary"
+                            onClick={() => openSupportEmail(supportEmail)}
+                            sx={{ fontSize: 15.5, fontWeight: 600, cursor: 'pointer', border: 0, background: 'none', p: 0, font: 'inherit' }}
+                          >
+                            {supportEmail}
+                          </Link>
+                        </Stack>
+                      )}
+                      {supportWhatsApp && (
+                        <Link
+                          component="button"
+                          type="button"
+                          underline="hover"
+                          color="primary.main"
+                          onClick={() => openSupportWhatsApp(supportPhone)}
+                          sx={{ fontSize: 14.5, fontWeight: 600, pl: 0.25, cursor: 'pointer', border: 0, background: 'none', font: 'inherit', textAlign: 'left' }}
+                        >
+                          WhatsApp {CAREFLOW_BRAND}
+                        </Link>
+                      )}
+                    </Stack>
+                  </Box>
+                ) : (
+                  <Alert severity="info">
+                    Support contact details are unavailable right now. Check your internet connection and try again later.
+                  </Alert>
+                )}
+
+                <Divider sx={{ my: 3 }} />
+
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                  Legal & Privacy
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                  CareFlow protects your clinic data and patient records with local device storage and secure Google Drive backups.
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setPrivacyOpen(true)}
+                  sx={{ textTransform: 'none', fontWeight: 600 }}
+                >
+                  View Privacy Policy
+                </Button>
+              </Box>
+            )}
+
+            {settingsTab === 'recycle-bin' && (
+              <RecycleBinTab />
+            )}
           </Box>
 
           {settingsTab !== 'support' && settingsTab !== 'recycle-bin' && (

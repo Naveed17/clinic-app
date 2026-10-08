@@ -58,7 +58,7 @@ import {
 } from '@/components/DialogUI';
 import { PdfBlobPreview } from '@/utils/PdfBlobPreview';
 import { printTokenSlip } from '@/utils/printTokenSlip';
-import { POS_PAPER, POS_RECEIPT } from '@shared/invoicePaper';
+import { POS_PAPER, POS_RECEIPT, resolveTokenSlipShade } from '@shared/invoicePaper';
 import { labResultPreview } from '@/features/lab/labReportPayload';
 import { DoctorAvatar } from '@/components/DoctorAvatar';
 import { TokenFeeFields } from '@/features/tokens/TokenFeeFields';
@@ -366,7 +366,7 @@ const ts = StyleSheet.create({
   },
   logo: { width: 36, height: 36, alignSelf: 'center', marginBottom: 6 },
   shopName: { fontSize: 14, fontWeight: 'bold', textAlign: 'center', marginBottom: 2, color: '#000' },
-  shopSub: { fontSize: 10, textAlign: 'center', color: POS_RECEIPT.muted, marginBottom: 1 },
+  shopSub: { fontSize: 10, textAlign: 'center', marginBottom: 1 },
   stars: { fontSize: 9, textAlign: 'center', color: '#000', marginVertical: 5 },
   title: { fontSize: 11, fontWeight: 'bold', textAlign: 'center', marginVertical: 2, letterSpacing: 1, color: '#000' },
   tokenBox: { borderWidth: 2, borderColor: '#000', marginVertical: 8, paddingVertical: 8, alignItems: 'center' },
@@ -374,14 +374,54 @@ const ts = StyleSheet.create({
   tokenNum: { fontSize: 48, fontWeight: 'bold', lineHeight: 1, letterSpacing: 3, color: '#000' },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
   lbl: { fontSize: 10, color: '#000', fontWeight: 'bold', flexShrink: 0 },
-  val: { fontSize: 10, color: POS_RECEIPT.muted, textAlign: 'right', flex: 1, marginLeft: 8 },
-  footer: { fontSize: 9, color: POS_RECEIPT.muted, textAlign: 'center', marginTop: 10 },
+  val: { fontSize: 10, textAlign: 'right', flex: 1, marginLeft: 8 },
+  valDark: { fontSize: 10, color: '#000000', fontWeight: 'bold', textAlign: 'right', flex: 1, marginLeft: 8 },
+  footer: { fontSize: 9, textAlign: 'center', marginTop: 10 },
   brand: { fontSize: 8, color: '#000', textAlign: 'center', marginTop: 8, fontWeight: 'bold', letterSpacing: 0.5 },
 });
 
-export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhone, logoSrc = DEFAULT_CLINIC_LOGO }: {
-  token: Token; clinicName: string; clinicAddress: string; clinicPhone: string; logoSrc?: string;
+export function TokenSlipDocument({
+  token,
+  clinicName,
+  clinicAddress,
+  clinicPhone,
+  logoSrc = DEFAULT_CLINIC_LOGO,
+  contrast,
+  tokenSlipContrast,
+}: {
+  token: Token;
+  clinicName: string;
+  clinicAddress: string;
+  clinicPhone: string;
+  logoSrc?: string;
+  contrast?: string;
+  tokenSlipContrast?: string;
 }) {
+  const storedContrast = typeof window !== 'undefined' ? localStorage.getItem('careflow_token_slip_contrast') : null;
+  const shade = resolveTokenSlipShade(storedContrast || tokenSlipContrast || contrast || 'gray-900');
+  const valStyle = {
+    fontSize: 10,
+    color: shade.hex,
+    fontWeight: shade.pdfWeight,
+    textAlign: 'right' as const,
+    flex: 1,
+    marginLeft: 8,
+  };
+  const subStyle = {
+    fontSize: 10,
+    textAlign: 'center' as const,
+    color: shade.hex,
+    fontWeight: shade.pdfWeight,
+    marginBottom: 1,
+  };
+  const footerStyle = {
+    fontSize: 9,
+    color: shade.hex,
+    fontWeight: shade.pdfWeight,
+    textAlign: 'center' as const,
+    marginTop: 2,
+    marginBottom: 2,
+  };
   const date = new Date(token.createdAt).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
   const time = new Date(token.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return (
@@ -389,8 +429,8 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
       <Page size={[POS_PAPER.pdfPageWidth, POS_PAPER.pdfPageHeightToken]} style={ts.page} wrap={false}>
         <Image src={logoSrc} style={ts.logo} />
         <Text style={ts.shopName}>{clinicName || POS_RECEIPT.clinicFallback}</Text>
-        {clinicAddress ? <Text style={ts.shopSub}>{clinicAddress}</Text> : null}
-        {clinicPhone ? <Text style={ts.shopSub}>Tel: {clinicPhone}</Text> : null}
+        {clinicAddress ? <Text style={subStyle}>{clinicAddress}</Text> : null}
+        {clinicPhone ? <Text style={subStyle}>Tel: {clinicPhone}</Text> : null}
         <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
         <Text style={ts.title}>PATIENT TOKEN SLIP</Text>
         <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
@@ -399,29 +439,29 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
           <Text style={ts.tokenNum}>{String(token.tokenNumber).padStart(3, '0')}</Text>
         </View>
         <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
-        {token.patient.mrNumber ? <View style={ts.row}><Text style={ts.lbl}>MR #</Text><Text style={ts.val}>{token.patient.mrNumber}</Text></View> : null}
-        <View style={ts.row}><Text style={ts.lbl}>Patient</Text><Text style={ts.val}>{[token.patient.firstName, token.patient.lastName].filter(Boolean).join(' ')}</Text></View>
-        {token.patient.age != null ? <View style={ts.row}><Text style={ts.lbl}>Age</Text><Text style={ts.val}>{String(token.patient.age)}</Text></View> : null}
-        {token.patient.gender ? <View style={ts.row}><Text style={ts.lbl}>Gender</Text><Text style={ts.val}>{token.patient.gender}</Text></View> : null}
+        {token.patient.mrNumber ? <View style={ts.row}><Text style={ts.lbl}>MR #</Text><Text style={valStyle}>{token.patient.mrNumber}</Text></View> : null}
+        <View style={ts.row}><Text style={ts.lbl}>Patient</Text><Text style={valStyle}>{[token.patient.firstName, token.patient.lastName].filter(Boolean).join(' ')}</Text></View>
+        {token.patient.age != null ? <View style={ts.row}><Text style={ts.lbl}>Age</Text><Text style={valStyle}>{String(token.patient.age)}</Text></View> : null}
+        {token.patient.gender ? <View style={ts.row}><Text style={ts.lbl}>Gender</Text><Text style={valStyle}>{token.patient.gender}</Text></View> : null}
         {token.patient.weight != null && Number(token.patient.weight) > 0 ? (
-          <View style={ts.row}><Text style={ts.lbl}>Weight</Text><Text style={ts.val}>{String(token.patient.weight)} kg</Text></View>
+          <View style={ts.row}><Text style={ts.lbl}>Weight</Text><Text style={valStyle}>{String(token.patient.weight)} kg</Text></View>
         ) : null}
         {token.patient.address ? (
-          <View style={ts.row}><Text style={ts.lbl}>Address</Text><Text style={ts.val}>{token.patient.address}</Text></View>
+          <View style={ts.row}><Text style={ts.lbl}>Address</Text><Text style={valStyle}>{token.patient.address}</Text></View>
         ) : null}
-        <View style={ts.row}><Text style={ts.lbl}>Doctor</Text><Text style={ts.val}>Dr. {token.doctor.firstName} {token.doctor.lastName}</Text></View>
+        <View style={ts.row}><Text style={ts.lbl}>Doctor</Text><Text style={valStyle}>Dr. {token.doctor.firstName} {token.doctor.lastName}</Text></View>
         {Number(token.consultationFee ?? 0) > 0 ? (
           <>
             <View style={ts.row}>
               <Text style={ts.lbl}>Fee</Text>
-              <Text style={ts.val}>
+              <Text style={valStyle}>
                 Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(token.consultationFee))}
               </Text>
             </View>
             {Number(token.feeDiscount ?? 0) > 0 ? (
               <View style={ts.row}>
                 <Text style={ts.lbl}>Discount</Text>
-                <Text style={ts.val}>
+                <Text style={valStyle}>
                   - Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(token.feeDiscount))}
                 </Text>
               </View>
@@ -429,7 +469,7 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
             {Number(token.feeDiscount ?? 0) > 0 || Number(token.feeRefunded ?? 0) > 0 ? (
               <View style={ts.row}>
                 <Text style={ts.lbl}>Payable</Text>
-                <Text style={ts.val}>
+                <Text style={valStyle}>
                   Rs. {new Intl.NumberFormat('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(tokenNetFee(token.consultationFee, token.feeDiscount, token.feeRefunded))}
                   {Number(token.feeRefunded ?? 0) > 0 ? ' (refunded)' : ''}
                 </Text>
@@ -437,12 +477,15 @@ export function TokenSlipDocument({ token, clinicName, clinicAddress, clinicPhon
             ) : null}
           </>
         ) : null}
-        <View style={ts.row}><Text style={ts.lbl}>Date</Text><Text style={ts.val}>{date}</Text></View>
-        <View style={ts.row}><Text style={ts.lbl}>Time</Text><Text style={ts.val}>{time}</Text></View>
-        {token.notes ? <View style={ts.row}><Text style={ts.lbl}>Note</Text><Text style={ts.val}>{token.notes}</Text></View> : null}
-        {token.reason ? <View style={ts.row}><Text style={ts.lbl}>Reason</Text><Text style={ts.val}>{token.reason}</Text></View> : null}
+        <View style={ts.row}><Text style={ts.lbl}>Date</Text><Text style={valStyle}>{date}</Text></View>
+        <View style={ts.row}><Text style={ts.lbl}>Time</Text><Text style={valStyle}>{time}</Text></View>
+        {token.notes ? <View style={ts.row}><Text style={ts.lbl}>Note</Text><Text style={valStyle}>{token.notes}</Text></View> : null}
+        {token.reason ? <View style={ts.row}><Text style={ts.lbl}>Reason</Text><Text style={valStyle}>{token.reason}</Text></View> : null}
         <Text style={ts.stars}>{POS_RECEIPT.starLine}</Text>
-        <Text style={ts.footer}>Please wait for your token to be called.{`\n`}{POS_RECEIPT.thankYou}</Text>
+        <View style={{ marginTop: 8, marginBottom: 2, alignItems: 'center' }}>
+          <Text style={footerStyle}>Please wait for your token to be called.</Text>
+          <Text style={footerStyle}>{POS_RECEIPT.thankYou}</Text>
+        </View>
         <Text style={ts.brand}>{POS_RECEIPT.poweredBy}</Text>
       </Page>
     </Document>
@@ -610,23 +653,39 @@ export function TokenPrintPreview({
   autoPrint?: boolean;
 }) {
   const brandLogo = useClinicBrandLogo();
-  const [clinic, setClinic] = useState<{ clinicName: string; clinicAddress: string; clinicPhone: string } | null>(null);
+  const [clinic, setClinic] = useState<{ clinicName: string; clinicAddress: string; clinicPhone: string; tokenSlipContrast?: string } | null>(null);
   const [freshToken, setFreshToken] = useState<Token>(token);
   const [printing, setPrinting] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
   const autoPrintDone = useRef(false);
 
   useEffect(() => {
-    void window.clinic?.settings.get().then((s) => setClinic({
-      clinicName: s.clinicName ?? '',
-      clinicAddress: s.clinicAddress ?? '',
-      clinicPhone: s.clinicPhone ?? '',
-    }));
+    const refreshClinic = () => {
+      const cached = typeof window !== 'undefined' ? localStorage.getItem('careflow_token_slip_contrast') : null;
+      void window.clinic?.settings.get().then((s) => setClinic({
+        clinicName: s.clinicName ?? '',
+        clinicAddress: s.clinicAddress ?? '',
+        clinicPhone: s.clinicPhone ?? '',
+        tokenSlipContrast: cached || s.tokenSlipContrast || 'gray-900',
+      }));
+    };
+    refreshClinic();
+    window.addEventListener('careflow-settings-changed', refreshClinic);
+    window.addEventListener('storage', refreshClinic);
+    return () => {
+      window.removeEventListener('careflow-settings-changed', refreshClinic);
+      window.removeEventListener('storage', refreshClinic);
+    };
+  }, []);
+
+  useEffect(() => {
     // Always fetch fresh token data from DB so prescription is always included
     void window.clinic?.tokens?.getById?.(token.id).then((fresh) => {
       if (fresh) setFreshToken(fresh as Token);
     });
   }, [token.id]);
+
+  const activeContrast = (typeof window !== 'undefined' ? localStorage.getItem('careflow_token_slip_contrast') : null) || clinic?.tokenSlipContrast || 'gray-900';
 
   const documentKey = [
     freshToken.id,
@@ -638,13 +697,14 @@ export function TokenPrintPreview({
     clinic?.clinicName ?? '',
     clinic?.clinicAddress ?? '',
     clinic?.clinicPhone ?? '',
+    activeContrast,
     brandLogo,
   ].join('|');
 
   const pdfDocument = useMemo(() => {
     if (!clinic) return null;
-    return <TokenSlipDocument token={freshToken} logoSrc={brandLogo} {...clinic} />;
-  }, [clinic, freshToken, brandLogo]);
+    return <TokenSlipDocument token={freshToken} logoSrc={brandLogo} contrast={activeContrast} {...clinic} />;
+  }, [clinic, freshToken, brandLogo, activeContrast]);
 
   async function handlePrint(): Promise<void> {
     setPrinting(true);

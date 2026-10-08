@@ -553,7 +553,10 @@ export function InvoicesPage(): React.JSX.Element {
     setPrintingId(invoice.id);
     setPrintError(null);
     try {
-      await printInvoiceReceipt(invoice);
+      await Promise.race([
+        printInvoiceReceipt(invoice),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Print request timed out')), 6000)),
+      ]);
     } catch (err) {
       setPrintError(err instanceof Error ? err.message : 'Print failed');
     } finally {
