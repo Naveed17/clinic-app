@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createPatient, deletePatient, getPatient, listPatients, updatePatient, getDistinctAddresses } from '../../patients/patient.service';
+import { createPatient, deletePatient, getPatient, listPatients, updatePatient, getDistinctAddresses, getDistinctPhones } from '../../patients/patient.service';
 import type { PatientInput, PatientListInput } from '../../patients/patient.service';
 import { asyncHandler } from '../utils/async-handler';
 import { requireRole } from '../middleware/auth';
@@ -29,6 +29,15 @@ export function createPatientsRouter(io: SocketIOServer): Router {
     asyncHandler(async (req, res) => {
       const q = typeof req.query.q === 'string' ? req.query.q : undefined;
       res.json(await getDistinctAddresses(q));
+    }),
+  );
+
+  router.get(
+    '/phones',
+    requireRole(['admin', 'doctor', 'receptionist', 'lab_technician']),
+    asyncHandler(async (req, res) => {
+      const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+      res.json(await getDistinctPhones(q));
     }),
   );
 

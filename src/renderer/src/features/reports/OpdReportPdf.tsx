@@ -409,7 +409,7 @@ export function OpdReportDocument({
             </View>
             <KpiRow
               items={[
-                ['Tokens', `${report.fees.count} (${report.fees.paidCount} Paid · ${report.fees.halfCount} Half · ${report.fees.freeCount} Free)`],
+                ['Tokens', `${report.fees.count} (${report.fees.paidCount} Paid · ${(report.fees.discountedCount ?? 0) > 0 ? `${report.fees.discountedCount} Disc · ` : ''}${report.fees.halfCount} Half · ${report.fees.freeCount} Free)`],
                 ['Collected', money(report.fees.collected)],
                 ['Discount', money(report.fees.discounted)],
                 ['Refunded', money(report.fees.refunded)],
@@ -419,24 +419,26 @@ export function OpdReportDocument({
             {report.fees.byDoctor.length > 0 ? (
               <View style={styles.table}>
                 <View style={styles.tableHeader} wrap={false}>
-                  <Text style={[styles.th, { width: '28%' }]}>Doctor</Text>
-                  <Text style={[styles.th, styles.numBold, { width: '8%' }]}>Tokens</Text>
-                  <Text style={[styles.th, styles.numBold, { width: '8%' }]}>Paid</Text>
-                  <Text style={[styles.th, styles.numBold, { width: '8%' }]}>Half</Text>
-                  <Text style={[styles.th, styles.numBold, { width: '8%' }]}>Free</Text>
+                  <Text style={[styles.th, { width: '24%' }]}>Doctor</Text>
+                  <Text style={[styles.th, styles.numBold, { width: '7%' }]}>Tokens</Text>
+                  <Text style={[styles.th, styles.numBold, { width: '7%' }]}>Paid</Text>
+                  <Text style={[styles.th, styles.numBold, { width: '7%' }]}>Disc</Text>
+                  <Text style={[styles.th, styles.numBold, { width: '7%' }]}>Half</Text>
+                  <Text style={[styles.th, styles.numBold, { width: '7%' }]}>Free</Text>
                   <Text style={[styles.th, styles.numBold, { width: '14%' }]}>Collected</Text>
-                  <Text style={[styles.th, styles.numBold, { width: '12%' }]}>Refunded</Text>
+                  <Text style={[styles.th, styles.numBold, { width: '13%' }]}>Refunded</Text>
                   <Text style={[styles.th, styles.numBold, { width: '14%' }]}>Net</Text>
                 </View>
                 {report.fees.byDoctor.map((row) => (
                   <View key={row.doctorId} style={styles.tableRow} wrap={false}>
-                    <Text style={[styles.td, { width: '28%', paddingRight: 4 }]}>{row.doctorName}</Text>
-                    <Text style={[styles.num, { width: '8%' }]}>{String(row.tokens)}</Text>
-                    <Text style={[styles.num, { width: '8%' }]}>{String(row.paidCount)}</Text>
-                    <Text style={[styles.num, { width: '8%' }]}>{String(row.halfCount)}</Text>
-                    <Text style={[styles.num, { width: '8%' }]}>{String(row.freeCount)}</Text>
+                    <Text style={[styles.td, { width: '24%', paddingRight: 4 }]}>{row.doctorName}</Text>
+                    <Text style={[styles.num, { width: '7%' }]}>{String(row.tokens)}</Text>
+                    <Text style={[styles.num, { width: '7%' }]}>{String(row.paidCount)}</Text>
+                    <Text style={[styles.num, { width: '7%' }]}>{String(row.discountedCount ?? 0)}</Text>
+                    <Text style={[styles.num, { width: '7%' }]}>{String(row.halfCount)}</Text>
+                    <Text style={[styles.num, { width: '7%' }]}>{String(row.freeCount)}</Text>
                     <Text style={[styles.num, { width: '14%' }]}>{money(row.collected)}</Text>
-                    <Text style={[styles.num, { width: '12%' }]}>{money(row.refunded)}</Text>
+                    <Text style={[styles.num, { width: '13%' }]}>{money(row.refunded)}</Text>
                     <Text style={[styles.num, { width: '14%' }]}>{money(row.net)}</Text>
                   </View>
                 ))}

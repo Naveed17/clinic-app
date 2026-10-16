@@ -88,20 +88,22 @@ export async function listAppointments(date?: string) {
       : patientIds.length > 0
         ? { patientId: { in: patientIds } }
         : { id: '__none__' },
-    select: { id: true, tokenNumber: true, patientId: true, doctorId: true, date: true, consultationFee: true },
+    select: { id: true, tokenNumber: true, patientId: true, doctorId: true, date: true, consultationFee: true, feeDiscount: true },
   });
 
   const tokenMap = new Map<string, { id: string; tokenNumber: number; feeType: string }>();
   for (const t of tokens) {
     const fee = Number(t.consultationFee ?? 0);
-    const tokenFeeType = fee === 0 ? 'FREE' : 'PAID';
+    const discount = Number((t as unknown as { feeDiscount?: number }).feeDiscount ?? 0);
+    const isHalf = fee > 0 && discount > 0 && Math.abs(discount - fee / 2) <= 1;
+    const tokenFeeType = fee === 0 || discount >= fee ? 'FREE' : isHalf ? 'HALF' : discount > 0 ? 'DISCOUNTED' : 'PAID';
     tokenMap.set(`${t.patientId}_${t.doctorId}_${t.date}`, { id: t.id, tokenNumber: t.tokenNumber, feeType: tokenFeeType });
   }
 
   return appointments.map((a) => {
     const dateStr = a.startsAt.toLocaleDateString('en-CA');
     const token = tokenMap.get(`${a.patientId}_${a.providerId}_${dateStr}`);
-    const resolvedFeeType = (a as unknown as { feeType?: string }).feeType ?? token?.feeType ?? 'PAID';
+    const resolvedFeeType = token?.feeType ?? (a as unknown as { feeType?: string }).feeType ?? 'PAID';
     const doctorObj = {
       id: a.provider.id,
       firstName: a.provider.firstName,
@@ -122,7 +124,7 @@ export async function listAppointments(date?: string) {
       updatedAt: a.updatedAt.toISOString(),
       reason: a.reason,
       notes: a.notes,
-      feeType: token?.feeType === 'FREE' ? 'FREE' : resolvedFeeType,
+      feeType: resolvedFeeType,
       recurrenceRule: a.recurrenceRule,
       parentId: a.parentId,
       tokenId: token?.id ?? null,
@@ -170,14 +172,16 @@ export async function listAppointmentsByPatient(patientId: string) {
   const tokenMap = new Map<string, { id: string; tokenNumber: number; feeType: string }>();
   for (const t of tokens) {
     const fee = Number(t.consultationFee ?? 0);
-    const tokenFeeType = fee === 0 ? 'FREE' : 'PAID';
+    const discount = Number((t as unknown as { feeDiscount?: number }).feeDiscount ?? 0);
+    const isHalf = fee > 0 && discount > 0 && Math.abs(discount - fee / 2) <= 1;
+    const tokenFeeType = fee === 0 || discount >= fee ? 'FREE' : isHalf ? 'HALF' : discount > 0 ? 'DISCOUNTED' : 'PAID';
     tokenMap.set(`${t.patientId}_${t.doctorId}_${t.date}`, { id: t.id, tokenNumber: t.tokenNumber, feeType: tokenFeeType });
   }
 
   return appointments.map((a) => {
     const dateStr = a.startsAt.toLocaleDateString('en-CA');
     const token = tokenMap.get(`${a.patientId}_${a.providerId}_${dateStr}`);
-    const resolvedFeeType = (a as unknown as { feeType?: string }).feeType ?? token?.feeType ?? 'PAID';
+    const resolvedFeeType = token?.feeType ?? (a as unknown as { feeType?: string }).feeType ?? 'PAID';
     const doctorObj = {
       id: a.provider.id,
       firstName: a.provider.firstName,
@@ -198,7 +202,7 @@ export async function listAppointmentsByPatient(patientId: string) {
       updatedAt: a.updatedAt.toISOString(),
       reason: a.reason,
       notes: a.notes,
-      feeType: token?.feeType === 'FREE' ? 'FREE' : resolvedFeeType,
+      feeType: resolvedFeeType,
       recurrenceRule: a.recurrenceRule,
       parentId: a.parentId,
       tokenId: token?.id ?? null,

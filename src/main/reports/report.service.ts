@@ -264,38 +264,29 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
     const doctorDefaultFee = roundMoney(Number(token.doctorConsultationFee));
     const apptType = String(token.appointmentFeeType || '').toUpperCase();
 
-    let feeType: 'PAID' | 'FREE' | 'HALF' | 'DISCOUNTED';
-    let gross: number;
+    let gross = rawGross > 0 ? rawGross : (doctorDefaultFee > 0 ? doctorDefaultFee : 0);
     let discounted = roundMoney(Number(token.feeDiscount));
     const refunded = roundMoney(Number(token.feeRefunded));
+    let feeType: 'PAID' | 'FREE' | 'HALF' | 'DISCOUNTED';
 
-    if (apptType === 'FREE' || (rawGross === 0 && !token.consultationFee && doctorDefaultFee === 0)) {
+    if (apptType === 'FREE' || (rawGross === 0 && (token.consultationFee !== null && token.consultationFee !== undefined)) || gross === 0) {
       feeType = 'FREE';
       gross = 0;
       discounted = 0;
-    } else if (apptType === 'HALF') {
-      feeType = 'HALF';
-      gross = rawGross > 0 ? rawGross : (doctorDefaultFee > 0 ? doctorDefaultFee : 1000);
-      if (discounted === 0) discounted = roundMoney(gross / 2);
-    } else if (apptType === 'DISCOUNTED') {
-      gross = rawGross > 0 ? rawGross : (doctorDefaultFee > 0 ? doctorDefaultFee : 1000);
-      feeType = 'DISCOUNTED';
-    } else if (rawGross === 0 && (token.consultationFee !== null && token.consultationFee !== undefined)) {
-      // Specifically recorded with 0 fee (e.g. walk-in free checkup)
-      feeType = 'FREE';
-      gross = 0;
-      discounted = 0;
-    } else if (rawGross > 0) {
-      gross = rawGross;
-      const isHalf = discounted > 0 && Math.abs(discounted - gross / 2) <= 1;
-      feeType = discounted >= gross ? 'FREE' : isHalf ? 'HALF' : discounted > 0 ? 'DISCOUNTED' : 'PAID';
-    } else if (doctorDefaultFee > 0 && apptType === 'PAID') {
-      gross = doctorDefaultFee;
-      const isHalf = discounted > 0 && Math.abs(discounted - gross / 2) <= 1;
-      feeType = discounted >= gross ? 'FREE' : isHalf ? 'HALF' : discounted > 0 ? 'DISCOUNTED' : 'PAID';
     } else {
-      gross = 0;
-      feeType = 'FREE';
+      if (apptType === 'HALF' && discounted === 0) {
+        discounted = roundMoney(gross / 2);
+      }
+      const isHalf = discounted > 0 && Math.abs(discounted - gross / 2) <= 1;
+      if (discounted >= gross) {
+        feeType = 'FREE';
+      } else if (isHalf) {
+        feeType = 'HALF';
+      } else if (discounted > 0) {
+        feeType = 'DISCOUNTED';
+      } else {
+        feeType = 'PAID';
+      }
     }
 
     const collected = roundMoney(Math.max(0, gross - discounted));
@@ -325,6 +316,7 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       doctorName: string;
       tokens: number;
       paidCount: number;
+      discountedCount: number;
       halfCount: number;
       freeCount: number;
       collected: number;
@@ -339,6 +331,7 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       doctorName: row.doctorName,
       tokens: 0,
       paidCount: 0,
+      discountedCount: 0,
       halfCount: 0,
       freeCount: 0,
       collected: 0,
@@ -351,6 +344,8 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       current.freeCount += 1;
     } else if (row.feeType === 'HALF') {
       current.halfCount += 1;
+    } else if (row.feeType === 'DISCOUNTED') {
+      current.discountedCount += 1;
     } else {
       current.paidCount += 1;
     }
@@ -363,6 +358,7 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
 
   const overallPaidCount = feeRows.filter((r) => r.feeType === 'PAID').length;
   const overallHalfCount = feeRows.filter((r) => r.feeType === 'HALF').length;
+  const overallDiscountedCount = feeRows.filter((r) => r.feeType === 'DISCOUNTED').length;
   const overallFreeCount = feeRows.filter((r) => r.feeType === 'FREE').length;
 
   return {
@@ -385,6 +381,7 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       count: feeRows.length,
       paidCount: overallPaidCount,
       halfCount: overallHalfCount,
+      discountedCount: overallDiscountedCount,
       freeCount: overallFreeCount,
       collected: roundMoney(feeRows.reduce((sum, row) => sum + (row.consultationFee - row.feeDiscount), 0)),
       discounted: roundMoney(feeRows.reduce((sum, row) => sum + row.feeDiscount, 0)),

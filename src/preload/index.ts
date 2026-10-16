@@ -299,6 +299,11 @@ const api = {
         () => request(`/api/patients/addresses?${toQueryString({ q: query })}`),
         'patients:getAddresses', query,
       ),
+    getPhones: (query?: string) =>
+      call(
+        () => request(`/api/patients/phones?${toQueryString({ q: query })}`),
+        'patients:getPhones', query,
+      ),
   },
   appointments: {
     list: () => call(() => request('/api/appointments'), 'appointments:list'),

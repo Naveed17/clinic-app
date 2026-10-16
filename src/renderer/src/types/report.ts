@@ -39,6 +39,7 @@ export interface OpdDoctorFeeSummary {
   doctorName: string;
   tokens: number;
   paidCount: number;
+  discountedCount?: number;
   halfCount: number;
   freeCount: number;
   collected: number;
@@ -66,6 +67,7 @@ export interface OpdDailyReport {
     byDoctor: OpdDoctorFeeSummary[];
     count: number;
     paidCount: number;
+    discountedCount?: number;
     halfCount: number;
     freeCount: number;
     collected: number;

@@ -11,6 +11,13 @@ declare global {
         update: (id: string, input: unknown) => Promise<unknown>;
         delete: (id: string) => Promise<unknown>;
         getAddresses: (query?: string) => Promise<string[]>;
+        getPhones: (query?: string) => Promise<Array<{
+          phone: string;
+          formattedPhone: string;
+          patientName: string;
+          address?: string | null;
+          count: number;
+        }>>;
       };
       appointments: {
         list: () => Promise<unknown>;

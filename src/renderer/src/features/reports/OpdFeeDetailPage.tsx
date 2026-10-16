@@ -149,6 +149,10 @@ export function OpdFeeDetailPage(): React.JSX.Element {
     },
   ];
 
+  const isFree = fee === 0 || (fee > 0 && discount >= fee);
+  const isHalf = fee > 0 && discount > 0 && Math.abs(discount - fee / 2) <= 1;
+  const isDiscounted = fee > 0 && discount > 0 && !isHalf && !isFree;
+
   const detailRows = [
     {
       icon: <ConfirmationNumberOutlinedIcon sx={{ fontSize: 18, color: 'text.disabled' }} />,
@@ -179,7 +183,16 @@ export function OpdFeeDetailPage(): React.JSX.Element {
     {
       icon: <PaymentsOutlinedIcon sx={{ fontSize: 18, color: 'text.disabled' }} />,
       label: 'Fee Type',
-      value: fee === 0 ? 'Free Checkup' : discount > 0 ? '50% Discount' : 'Paid Visit',
+      value: isFree ? (
+        <Chip label="Free Checkup" size="small" color="success" sx={{ fontWeight: 700, height: 22, fontSize: 11 }} />
+      ) : isHalf ? (
+        <Chip label="50% Discount (Half Fee)" size="small" color="warning" sx={{ fontWeight: 700, height: 22, fontSize: 11 }} />
+      ) : isDiscounted ? (
+        <Chip label={`Discount (${money(discount)})`} size="small" color="info" sx={{ fontWeight: 700, height: 22, fontSize: 11 }} />
+      ) : (
+        <Chip label="Paid Visit" size="small" color="primary" variant="outlined" sx={{ fontWeight: 600, height: 22, fontSize: 11 }} />
+      ),
+      hint: isDiscounted ? `Net payable: ${money(net)}` : undefined,
     },
     {
       icon: <NotesOutlinedIcon sx={{ fontSize: 18, color: 'text.disabled' }} />,
@@ -313,9 +326,13 @@ export function OpdFeeDetailPage(): React.JSX.Element {
                   <Typography variant="caption" color="text.secondary" fontWeight={700}>
                     {row.label}
                   </Typography>
-                  <Typography fontWeight={700} fontSize={14}>
-                    {row.value}
-                  </Typography>
+                  {typeof row.value === 'string' ? (
+                    <Typography fontWeight={700} fontSize={14}>
+                      {row.value}
+                    </Typography>
+                  ) : (
+                    <Box sx={{ mt: 0.25 }}>{row.value}</Box>
+                  )}
                   {row.hint ? (
                     <Typography variant="caption" color="text.secondary" fontWeight={600}>
                       {row.hint}

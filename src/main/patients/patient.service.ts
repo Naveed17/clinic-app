@@ -297,33 +297,134 @@ export async function getDistinctAddresses(query?: string): Promise<string[]> {
   try {
     if (q) {
       const rows = await prisma.$queryRawUnsafe<Array<{ address: string }>>(
-        `SELECT "address", COUNT(*) as count 
+        `SELECT "address", COUNT(*) as "addrCount" 
          FROM "Patient" 
          WHERE "address" IS NOT NULL 
            AND TRIM("address") != '' 
-           AND "isDeleted" = false 
-           AND LOWER("address") LIKE LOWER($1) 
+           AND ("isDeleted" = 0 OR "isDeleted" IS NULL) 
+           AND LOWER("address") LIKE LOWER(?) 
          GROUP BY "address" 
-         ORDER BY count DESC 
-         LIMIT 20`,
+         ORDER BY "addrCount" DESC 
+         LIMIT 50`,
         `%${q}%`,
       );
       return rows.map((r) => r.address).filter(Boolean);
     }
 
     const rows = await prisma.$queryRawUnsafe<Array<{ address: string }>>(
-      `SELECT "address", COUNT(*) as count 
+      `SELECT "address", COUNT(*) as "addrCount" 
        FROM "Patient" 
        WHERE "address" IS NOT NULL 
          AND TRIM("address") != '' 
-         AND "isDeleted" = false 
+         AND ("isDeleted" = 0 OR "isDeleted" IS NULL) 
        GROUP BY "address" 
-       ORDER BY count DESC 
-       LIMIT 50`,
+       ORDER BY "addrCount" DESC 
+       LIMIT 100`,
     );
     return rows.map((r) => r.address).filter(Boolean);
   } catch (err) {
     console.warn('[patient.service] Error fetching distinct addresses:', err);
+    return [];
+  }
+}
+
+export interface DistinctPhoneItem {
+  phone: string;
+  formattedPhone: string;
+  patientName: string;
+  address?: string | null;
+  count: number;
+}
+
+export async function getDistinctPhones(query?: string): Promise<DistinctPhoneItem[]> {
+  const prisma = getPrisma();
+  const q = String(query || '').trim();
+  const digitsOnly = q.replace(/\D/g, '');
+  const digitsWithoutZero = digitsOnly.replace(/^0+/, '');
+
+  try {
+    let rows: Array<{
+      phone: string;
+      firstName: string | null;
+      lastName: string | null;
+      address: string | null;
+      phoneCount: number | bigint;
+    }> = [];
+
+    if (q) {
+      const patternDigits = `%${digitsWithoutZero || digitsOnly || q}%`;
+      const patternQ = `%${q}%`;
+
+      rows = await prisma.$queryRawUnsafe(
+        `SELECT 
+           "phone", 
+           "firstName", 
+           "lastName", 
+           "address", 
+           COUNT(*) as "phoneCount" 
+         FROM "Patient" 
+         WHERE "phone" IS NOT NULL 
+           AND TRIM("phone") != '' 
+           AND ("isDeleted" = 0 OR "isDeleted" IS NULL) 
+           AND (
+             "phone" LIKE ? 
+             OR "phone" LIKE ? 
+             OR "firstName" LIKE ? 
+             OR "lastName" LIKE ? 
+             OR ("firstName" || ' ' || COALESCE("lastName", '')) LIKE ?
+           ) 
+         GROUP BY "phone" 
+         ORDER BY "phoneCount" DESC, "createdAt" DESC 
+         LIMIT 30`,
+        patternDigits,
+        patternQ,
+        patternQ,
+        patternQ,
+        patternQ,
+      );
+    } else {
+      rows = await prisma.$queryRawUnsafe(
+        `SELECT 
+           "phone", 
+           "firstName", 
+           "lastName", 
+           "address", 
+           COUNT(*) as "phoneCount" 
+         FROM "Patient" 
+         WHERE "phone" IS NOT NULL 
+           AND TRIM("phone") != '' 
+           AND ("isDeleted" = 0 OR "isDeleted" IS NULL) 
+         GROUP BY "phone" 
+         ORDER BY "phoneCount" DESC, "createdAt" DESC 
+         LIMIT 50`,
+      );
+    }
+
+    return rows
+      .filter((r) => r.phone && r.phone.trim().length >= 4)
+      .map((r) => {
+        const rawPhone = r.phone.trim();
+        let formatted = rawPhone;
+        const d = rawPhone.replace(/\D/g, '');
+        if (d.startsWith('92') && d.length === 12) {
+          formatted = `0${d.slice(2, 5)} ${d.slice(5)}`;
+        } else if (d.startsWith('0') && d.length === 11) {
+          formatted = `${d.slice(0, 4)} ${d.slice(4)}`;
+        } else if (d.length === 10) {
+          formatted = `0${d.slice(0, 3)} ${d.slice(3)}`;
+        }
+
+        const name = [r.firstName, r.lastName].filter(Boolean).join(' ').trim();
+        return {
+          phone: rawPhone,
+          formattedPhone: formatted,
+          patientName: name || 'Patient',
+          address: r.address ? r.address.trim() : null,
+          count: Number(r.phoneCount || 1),
+        };
+      });
+  } catch (err) {
+    console.warn('[patient.service] Error fetching distinct phones:', err);
     return [];
   }
 }

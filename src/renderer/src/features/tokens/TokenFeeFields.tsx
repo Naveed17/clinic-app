@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   InputAdornment,
   Stack,
   TextField,
@@ -48,8 +49,9 @@ export function TokenFeeFields({
   const followUp = priorVisitsThisWeek > 0;
   const isFree = fee === 0 || (fee > 0 && discount >= fee);
   const isHalf = fee > 0 && discount > 0 && Math.abs(discount - fee / 2) <= 1;
+  const isDiscount = fee > 0 && discount > 0 && !isHalf && !isFree;
 
-  const selectedMode = isFree ? 'free' : isHalf ? 'half' : discount === 0 && fee > 0 ? 'paid' : null;
+  const selectedMode = isFree ? 'free' : isHalf ? 'half' : isDiscount ? 'discount' : discount === 0 && fee > 0 ? 'paid' : null;
 
   function handleModeChange(_e: React.MouseEvent<HTMLElement>, mode: string | null): void {
     if (!mode || disabled) return;
@@ -68,6 +70,10 @@ export function TokenFeeFields({
     } else if (mode === 'half') {
       if (fee > 0) {
         onDiscountChange(String(Math.round((fee / 2) * 100) / 100));
+      }
+    } else if (mode === 'discount') {
+      if (fee > 0 && discount === 0) {
+        onDiscountChange('200');
       }
     }
   }
@@ -141,7 +147,7 @@ export function TokenFeeFields({
             bgcolor: alpha(theme.palette.text.primary, 0.04),
             border: `1px solid ${alpha(theme.palette.text.primary, 0.08)}`,
             gap: '2px',
-            maxWidth: 280,
+            maxWidth: 340,
             ml: 'auto',
             '& .MuiToggleButtonGroup-grouped': {
               border: 'none !important',
@@ -175,16 +181,16 @@ export function TokenFeeFields({
           </ToggleButton>
 
           <ToggleButton
-            value="free"
+            value="discount"
             sx={{
               '&.Mui-selected': {
-                bgcolor: `${theme.palette.success.main} !important`,
-                color: `${theme.palette.success.contrastText} !important`,
+                bgcolor: `${theme.palette.info.main} !important`,
+                color: `${theme.palette.info.contrastText} !important`,
                 fontWeight: '700 !important',
               },
             }}
           >
-            Free Checkup
+            Discount
           </ToggleButton>
 
           {fee > 0 && (
@@ -201,6 +207,19 @@ export function TokenFeeFields({
               50% Off
             </ToggleButton>
           )}
+
+          <ToggleButton
+            value="free"
+            sx={{
+              '&.Mui-selected': {
+                bgcolor: `${theme.palette.success.main} !important`,
+                color: `${theme.palette.success.contrastText} !important`,
+                fontWeight: '700 !important',
+              },
+            }}
+          >
+            Free Checkup
+          </ToggleButton>
         </ToggleButtonGroup>
       </Stack>
 
@@ -234,10 +253,24 @@ export function TokenFeeFields({
         />
       </Stack>
 
-      {(discount > 0 || isFree) && !disabled && (
-        <Box sx={{ mt: -0.5 }}>
-          <Typography variant="caption" color={isFree ? 'success.main' : 'text.secondary'} fontWeight={700} sx={{ fontSize: 11.5 }}>
-            {isFree ? 'Free Checkup (Payable: Rs. 0)' : `Payable: Rs. ${money(payable)} (Discount Rs. ${money(discount)})`}
+      {!disabled && (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: -0.25, flexWrap: 'wrap', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <Typography variant="caption" sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>
+              Status:
+            </Typography>
+            {isFree ? (
+              <Chip label="Free Checkup" size="small" color="success" sx={{ height: 20, fontSize: '0.72rem', fontWeight: 700 }} />
+            ) : isHalf ? (
+              <Chip label="50% Discount (Half Fee)" size="small" color="warning" sx={{ height: 20, fontSize: '0.72rem', fontWeight: 700 }} />
+            ) : isDiscount ? (
+              <Chip label={`Discounted (Rs. ${money(discount)} off)`} size="small" color="info" sx={{ height: 20, fontSize: '0.72rem', fontWeight: 700 }} />
+            ) : (
+              <Chip label="Paid Visit" size="small" color="primary" variant="outlined" sx={{ height: 20, fontSize: '0.72rem', fontWeight: 700 }} />
+            )}
+          </Box>
+          <Typography variant="caption" sx={{ fontSize: 12, fontWeight: 800, color: isFree ? 'success.main' : 'text.primary' }}>
+            Payable: Rs. {money(payable)}
           </Typography>
         </Box>
       )}

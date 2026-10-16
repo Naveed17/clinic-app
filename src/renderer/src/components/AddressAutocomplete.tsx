@@ -56,13 +56,20 @@ export function AddressAutocomplete({
   return (
     <Autocomplete
       freeSolo
-      open={open}
+      open={open && (options.length > 0 || isLoading)}
       onOpen={() => setOpen(true)}
       onClose={() => setOpen(false)}
+      openOnFocus
+      forcePopupIcon
       disabled={disabled}
       fullWidth={fullWidth}
       options={options}
       value={value || ''}
+      slotProps={{
+        popper: {
+          sx: { zIndex: 2600 },
+        },
+      }}
       onInputChange={(_e, newInputValue, reason) => {
         setQuery(newInputValue);
         if (reason === 'input' || reason === 'clear') {
@@ -72,28 +79,35 @@ export function AddressAutocomplete({
       onChange={(_e, selectedValue) => {
         onChange(typeof selectedValue === 'string' ? selectedValue : '');
       }}
-      filterOptions={(x) => x} // Backend queryRaw already filters by substring
-      renderOption={(props, option) => (
-        <Box
-          component="li"
-          {...props}
-          key={option}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1.25,
-            py: 1,
-            px: 1.5,
-            fontSize: '0.875rem',
-            cursor: 'pointer',
-          }}
-        >
-          <PlaceOutlinedIcon sx={{ fontSize: 18, color: 'primary.main', flexShrink: 0 }} />
-          <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
-            {option}
-          </Typography>
-        </Box>
-      )}
+      filterOptions={(opts, state) => {
+        const input = state.inputValue.trim().toLowerCase();
+        if (!input) return opts;
+        return opts.filter((opt) => opt.toLowerCase().includes(input));
+      }}
+      renderOption={(props, option) => {
+        const { key, ...otherProps } = props;
+        return (
+          <Box
+            component="li"
+            key={key ?? option}
+            {...otherProps}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.25,
+              py: 1,
+              px: 1.5,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            <PlaceOutlinedIcon sx={{ fontSize: 18, color: 'primary.main', flexShrink: 0 }} />
+            <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.primary' }}>
+              {option}
+            </Typography>
+          </Box>
+        );
+      }}
       renderInput={(params) => (
         <TextField
           {...params}

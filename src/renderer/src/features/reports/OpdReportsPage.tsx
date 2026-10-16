@@ -244,6 +244,7 @@ export function OpdReportsPage(): React.JSX.Element {
 
   const overallPaid = data?.fees.paidCount ?? feeRows.filter((r) => r.feeType === 'PAID').length;
   const overallHalf = data?.fees.halfCount ?? feeRows.filter((r) => r.feeType === 'HALF').length;
+  const overallDiscounted = data?.fees.discountedCount ?? feeRows.filter((r) => r.feeType === 'DISCOUNTED').length;
   const overallFree = data?.fees.freeCount ?? feeRows.filter((r) => r.feeType === 'FREE').length;
 
   const summaryCards = tab === 'invoices'
@@ -257,7 +258,7 @@ export function OpdReportsPage(): React.JSX.Element {
         {
           label: 'Tokens',
           value: String(data?.fees.count ?? 0),
-          breakdown: `${overallPaid} Paid · ${overallHalf} Half · ${overallFree} Free`,
+          breakdown: `${overallPaid} Paid · ${overallDiscounted > 0 ? `${overallDiscounted} Discount · ` : ''}${overallHalf} Half · ${overallFree} Free`,
           icon: <ConfirmationNumberOutlinedIcon />,
           color: theme.palette.primary.main,
           bg: alpha(theme.palette.primary.main, 0.1),
@@ -393,6 +394,7 @@ export function OpdReportsPage(): React.JSX.Element {
                     <TableCell sx={{ whiteSpace: 'nowrap', pl: 2 }}>Doctor</TableCell>
                     <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>Total Tokens</TableCell>
                     <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>Paid</TableCell>
+                    <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>Discounted</TableCell>
                     <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>Half (50%)</TableCell>
                     <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>Free</TableCell>
                     <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>Collected</TableCell>
@@ -404,6 +406,7 @@ export function OpdReportsPage(): React.JSX.Element {
                   {data?.fees.byDoctor.map((row) => {
                     const docRows = feeRows.filter((r) => r.doctorId === row.doctorId);
                     const pCount = row.paidCount !== undefined ? row.paidCount : docRows.filter((r) => r.feeType === 'PAID').length;
+                    const dCount = row.discountedCount !== undefined ? row.discountedCount : docRows.filter((r) => r.feeType === 'DISCOUNTED').length;
                     const hCount = row.halfCount !== undefined ? row.halfCount : docRows.filter((r) => r.feeType === 'HALF').length;
                     const fCount = row.freeCount !== undefined ? row.freeCount : docRows.filter((r) => r.feeType === 'FREE').length;
                     return (
@@ -416,6 +419,9 @@ export function OpdReportsPage(): React.JSX.Element {
                         </TableCell>
                         <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
                           <Chip label={String(pCount)} size="small" color="primary" variant="outlined" sx={{ fontWeight: 700, minWidth: 32 }} />
+                        </TableCell>
+                        <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                          <Chip label={String(dCount)} size="small" color="info" variant={dCount > 0 ? 'filled' : 'outlined'} sx={{ fontWeight: 700, minWidth: 32 }} />
                         </TableCell>
                         <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
                           <Chip label={String(hCount)} size="small" color="warning" variant={hCount > 0 ? 'filled' : 'outlined'} sx={{ fontWeight: 700, minWidth: 32 }} />
@@ -494,6 +500,7 @@ export function OpdReportsPage(): React.JSX.Element {
                   >
                     <MenuItem value="ALL">All fee types</MenuItem>
                     <MenuItem value="PAID">Paid Visit</MenuItem>
+                    <MenuItem value="DISCOUNTED">Discounted</MenuItem>
                     <MenuItem value="HALF">50% Discount</MenuItem>
                     <MenuItem value="FREE">Free Checkup</MenuItem>
                   </Select>
@@ -661,7 +668,7 @@ export function OpdReportsPage(): React.JSX.Element {
                               <Chip label="Free Checkup" size="small" color="success" variant="filled" sx={{ fontWeight: 700, fontSize: 11 }} />
                             ) : row.feeType === 'HALF' ? (
                               <Chip label="50% Off" size="small" color="warning" variant="filled" sx={{ fontWeight: 700, fontSize: 11 }} />
-                            ) : row.feeType === 'DISCOUNTED' || (row.feeDiscount > 0 && row.feeDiscount < row.consultationFee) ? (
+                            ) : (row.feeType === 'DISCOUNTED' || (row.feeDiscount > 0 && row.feeDiscount < row.consultationFee)) && row.feeDiscount > 0 ? (
                               <Chip label={`Discount (Rs. ${row.feeDiscount})`} size="small" color="info" variant="filled" sx={{ fontWeight: 700, fontSize: 11 }} />
                             ) : (
                               <Chip label="Paid Visit" size="small" color="primary" variant="outlined" sx={{ fontWeight: 600, fontSize: 11 }} />

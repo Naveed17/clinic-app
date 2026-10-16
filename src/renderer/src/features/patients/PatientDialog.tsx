@@ -137,6 +137,7 @@ export function PatientDialog({
       await queryClient.invalidateQueries({ queryKey: ['token-patients'] });
       await queryClient.invalidateQueries({ queryKey: ['invoice-patients'] });
       await queryClient.invalidateQueries({ queryKey: ['patient-distinct-addresses'] });
+      await queryClient.invalidateQueries({ queryKey: ['patient-distinct-phones'] });
       if (savedPatient && !patient) {
         onCreated?.(savedPatient as Patient);
       }
@@ -241,6 +242,12 @@ export function PatientDialog({
                     label="Phone"
                     value={field.value ?? ''}
                     onChange={field.onChange}
+                    enableAutocomplete
+                    onSelectOption={(opt) => {
+                      if (!form.getValues('address') && opt.address) {
+                        form.setValue('address', opt.address, { shouldDirty: true });
+                      }
+                    }}
                   />
                 )}
               />
@@ -279,6 +286,7 @@ export function PatientDialog({
                     label="Phone"
                     value={field.value ?? ''}
                     onChange={field.onChange}
+                    enableAutocomplete
                   />
                 )}
               />

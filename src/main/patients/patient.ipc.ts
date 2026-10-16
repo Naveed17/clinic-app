@@ -1,12 +1,13 @@
 import { ipcMain } from 'electron';
 import type { Server as SocketIOServer } from 'socket.io';
-import { createPatient, deletePatient, getPatient, listPatients, updatePatient, getDistinctAddresses } from './patient.service';
+import { createPatient, deletePatient, getPatient, listPatients, updatePatient, getDistinctAddresses, getDistinctPhones } from './patient.service';
 import { emitNotification } from '../backend/realtime';
 
 export function registerPatientIpc(io?: SocketIOServer): void {
   ipcMain.handle('patients:list', (_, input) => listPatients(input));
   ipcMain.handle('patients:get', (_, id: string) => getPatient(id));
   ipcMain.handle('patients:getAddresses', (_, query?: string) => getDistinctAddresses(query));
+  ipcMain.handle('patients:getPhones', (_, query?: string) => getDistinctPhones(query));
   ipcMain.handle('patients:create', async (_, input) => {
     const patient = await createPatient(input);
     if (io) emitNotification(io, { kind: 'success', title: 'Patient added', message: `${patient.firstName} ${patient.lastName} was added.`, payload: { entity: 'patient', id: patient.id } });

@@ -1044,8 +1044,9 @@ export function AppointmentsPage(): React.JSX.Element {
           >
             <MenuItem value="ALL">All fee types</MenuItem>
             <MenuItem value="PAID">Paid Visit</MenuItem>
-            <MenuItem value="FREE">Free Checkup</MenuItem>
+            <MenuItem value="DISCOUNTED">Discounted</MenuItem>
             <MenuItem value="HALF">50% Discount</MenuItem>
+            <MenuItem value="FREE">Free Checkup</MenuItem>
           </Select>
         </FormControl>
       </Box>

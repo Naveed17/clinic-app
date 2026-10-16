@@ -40,6 +40,13 @@ declare global {
         update: (id: string, input: PatientInput) => Promise<Patient>;
         delete: (id: string) => Promise<void>;
         getAddresses: (query?: string) => Promise<string[]>;
+        getPhones: (query?: string) => Promise<Array<{
+          phone: string;
+          formattedPhone: string;
+          patientName: string;
+          address?: string | null;
+          count: number;
+        }>>;
       };
       tokens: {
         getForPatient: (patientId: string, date: string, doctorId?: string) => Promise<Token | null>;
