@@ -332,7 +332,7 @@ export async function getAppointment(id: string) {
   return getAppointmentById(id);
 }
 
-const SLOT_STEP_MS = 30 * 60 * 1000;
+const SLOT_STEP_MS = 15 * 60 * 1000;
 
 /** Machine-local calendar day containing `date` (not UTC — avoids midnight PKT duplicates). */
 function localDayBounds(date: Date): { dayStart: Date; dayEnd: Date } {
@@ -372,12 +372,12 @@ async function assertSlotFree(
 ): Promise<void> {
   const clash = await findClash(providerId, startsAt, endsAt, excludeId);
   if (clash) {
-    throw new Error('This time slot is busy. The next free slot is 30 minutes later or after the current visit ends.');
+    throw new Error('This time slot is busy. The next free slot is after the current visit ends.');
   }
 }
 
 /**
- * Walk-in / token: prefer the next free 30-min slot inside doctor hours.
+ * Walk-in / token: prefer the next free slot inside doctor hours.
  * If the day is packed or hours have ended, keep the requested time so the queue
  * still works (overbook / after-hours walk-in). Never throws for a full calendar.
  */
@@ -411,14 +411,13 @@ async function resolveWalkInSlot(
 
   let cursor = startsAt.getTime() > windowStart.getTime() ? new Date(startsAt.getTime()) : windowStart;
 
-  for (let i = 0; i < 48; i++) {
+  for (let i = 0; i < 96; i++) {
     const candidateEnd = new Date(cursor.getTime() + durationMs);
     if (candidateEnd.getTime() > windowEnd.getTime()) break;
     const clash = await findClash(providerId, cursor, candidateEnd, excludeId);
     if (!clash) return { startsAt: cursor, endsAt: candidateEnd };
     const afterHit = asDate(clash.endsAt).getTime();
-    const plusStep = cursor.getTime() + SLOT_STEP_MS;
-    cursor = new Date(Math.max(afterHit, plusStep));
+    cursor = new Date(afterHit > cursor.getTime() ? afterHit : cursor.getTime() + SLOT_STEP_MS);
   }
   return { startsAt, endsAt };
 }

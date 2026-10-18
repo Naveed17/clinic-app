@@ -7,7 +7,7 @@ export type DoctorDaySlot = {
   isActive: boolean;
 };
 
-const STEP_MIN = 30;
+const STEP_MIN = 15;
 const SEARCH_DAYS = 14;
 
 function minutesToHm(total: number): string {
@@ -87,14 +87,24 @@ function findTimeOnDay(opts: {
   const windowEnd = atLocal(dateStr, slot.endTime);
   const booked = dayAppointments(appointments, providerId, dateStr, excludeId);
   const durMs = durationMin * 60_000;
-  const stepMs = STEP_MIN * 60_000;
+  const stepMs = Math.min(STEP_MIN, Math.max(5, durationMin)) * 60_000;
 
   let cursor = windowStart.getTime() > earliest.getTime() ? windowStart : earliest;
-  // If we started after clinic open (e.g. booking at 11:41), jump to the next 30-min step
-  // instead of filling leftover morning slots like 09:00 / 09:30.
+  // If we started after clinic open (e.g. booking at 11:41), jump to the next step
+  // instead of filling leftover morning slots.
   if (cursor.getTime() > windowStart.getTime()) {
     const snapped = Math.ceil(cursor.getTime() / stepMs) * stepMs;
     cursor = new Date(snapped);
+  }
+
+  // If there are already booked appointments on this day, prefer continuing immediately
+  // after the latest existing appointment (so new visits queue consecutively rather than
+  // picking an earlier empty morning slot like 09:00 before the first appointment).
+  if (booked.length > 0) {
+    const latestEndMs = Math.max(...booked.map((a) => new Date(a.endsAt).getTime()));
+    if (latestEndMs > cursor.getTime() && latestEndMs + durMs <= windowEnd.getTime()) {
+      cursor = new Date(latestEndMs);
+    }
   }
 
   while (cursor.getTime() + durMs <= windowEnd.getTime()) {
@@ -105,8 +115,27 @@ function findTimeOnDay(opts: {
       return minutesToHm(start.getHours() * 60 + start.getMinutes());
     }
     const afterHit = new Date(hit.endsAt);
-    const plusStep = new Date(start.getTime() + stepMs);
-    cursor = afterHit.getTime() > plusStep.getTime() ? afterHit : plusStep;
+    cursor = afterHit.getTime() > cursor.getTime() ? afterHit : new Date(cursor.getTime() + stepMs);
+  }
+
+  // Fallback: If continuing after the latest appointment exceeded windowEnd, try from
+  // windowStart/earliest in case an earlier cancellation gap exists.
+  if (booked.length > 0) {
+    let fallbackCursor = windowStart.getTime() > earliest.getTime() ? windowStart : earliest;
+    if (fallbackCursor.getTime() > windowStart.getTime()) {
+      const snapped = Math.ceil(fallbackCursor.getTime() / stepMs) * stepMs;
+      fallbackCursor = new Date(snapped);
+    }
+    while (fallbackCursor.getTime() + durMs <= windowEnd.getTime()) {
+      const start = fallbackCursor;
+      const end = new Date(start.getTime() + durMs);
+      const hit = booked.find((a) => overlaps(start, end, a));
+      if (!hit) {
+        return minutesToHm(start.getHours() * 60 + start.getMinutes());
+      }
+      const afterHit = new Date(hit.endsAt);
+      fallbackCursor = afterHit.getTime() > fallbackCursor.getTime() ? afterHit : new Date(fallbackCursor.getTime() + stepMs);
+    }
   }
   return null;
 }

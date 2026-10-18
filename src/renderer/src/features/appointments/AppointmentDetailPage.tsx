@@ -37,10 +37,12 @@ import { chipSx } from '@/components/TableUI';
 import { useAuth } from '@/features/auth/AuthContext';
 import { AppointmentDialog } from '@/features/appointments/AppointmentsPage';
 import { AppointmentVisitList } from '@/features/appointments/AppointmentVisitList';
-import { usePrintAppointmentToken } from '@/features/appointments/printAppointmentToken';
+import { usePrintAppointmentToken, loadTokenForAppointment, appointmentLocalDate } from '@/features/appointments/printAppointmentToken';
+import { printTokenSlip } from '@/utils/printTokenSlip';
 import { TokenPrintPreview } from '@/features/tokens/TokensPage';
 import { appointmentsService } from '@/services/appointments.service';
 import type { Appointment } from '@/types/appointment';
+import type { Token } from '@/types/token';
 
 const statusConfig: Record<string, { label: string; color: 'default' | 'primary' | 'warning' | 'success' | 'error' }> = {
   SCHEDULED: { label: 'Scheduled', color: 'primary' },
@@ -112,6 +114,39 @@ export function AppointmentDetailPage(): React.JSX.Element {
       await invalidate();
     },
     meta: { toast: 'Appointment updated', errorToast: 'Could not update status.' },
+  });
+
+  const issueTokenMutation = useMutation({
+    mutationFn: async (appt: Appointment) => {
+      const apptDate = appointmentLocalDate(appt.startsAt);
+      let token = await loadTokenForAppointment(appt);
+      if (!token) {
+        const fee = Number(appt.provider?.consultationFee ?? 0);
+        let feeDiscount = 0;
+        if (appt.feeType === 'FREE') feeDiscount = fee;
+        else if (appt.feeType === 'HALF') feeDiscount = Math.round(fee / 2);
+        token = (await window.clinic.tokens.create({
+          patientId: appt.patientId,
+          doctorId: appt.providerId,
+          date: apptDate,
+          reason: appt.reason || null,
+          notes: appt.notes || null,
+          consultationFee: fee,
+          feeDiscount,
+        })) as Token;
+      }
+      return token;
+    },
+    onSuccess: async (token: Token) => {
+      await invalidate();
+      await qc.invalidateQueries({ queryKey: ['tokens'] });
+      if (token) {
+        void printTokenSlip(token, { silent: true }).catch(() => {
+          tokenPrint.openTokenPreview(token);
+        });
+      }
+    },
+    meta: { toast: 'Token issued successfully!', errorToast: 'Failed to issue token.' },
   });
 
 
@@ -304,15 +339,29 @@ export function AppointmentDetailPage(): React.JSX.Element {
           </Stack>
 
           <Stack direction="row" gap={1} flexWrap="wrap">
-            <Button
-              startIcon={<PrintOutlinedIcon />}
-              variant="outlined"
-              loading={tokenPrint.printingId === appointment.id}
-              sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
-              onClick={() => tokenPrint.printFor(appointment)}
-            >
-              Print token
-            </Button>
+            {!appointment.tokenNumber && !['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(appointment.status) && (
+              <Button
+                startIcon={<ConfirmationNumberOutlinedIcon />}
+                variant="contained"
+                color="primary"
+                loading={issueTokenMutation.isPending}
+                sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                onClick={() => issueTokenMutation.mutate(appointment)}
+              >
+                Issue token
+              </Button>
+            )}
+            {appointment.tokenNumber ? (
+              <Button
+                startIcon={<PrintOutlinedIcon />}
+                variant="outlined"
+                loading={tokenPrint.printingId === appointment.id}
+                sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none' }}
+                onClick={() => tokenPrint.printFor(appointment)}
+              >
+                Print token
+              </Button>
+            ) : null}
             {(user?.role === 'receptionist' || user?.role === 'doctor' || user?.role === 'lab_technician') && (
               <Button
                 variant="outlined"

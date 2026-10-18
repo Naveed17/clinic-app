@@ -1604,6 +1604,12 @@ export function ReceptionistDashboard(): React.JSX.Element {
       if (!token) {
         const doctor = doctors.find((d) => d.id === appointment.providerId);
         const consultationFee = Number(doctor?.consultationFee ?? 0);
+        let feeDiscount = 0;
+        if (appointment.feeType === 'FREE') {
+          feeDiscount = consultationFee;
+        } else if (appointment.feeType === 'HALF') {
+          feeDiscount = Math.round(consultationFee / 2);
+        }
         token = (await window.clinic.tokens.create({
           patientId: appointment.patientId,
           doctorId: appointment.providerId,
@@ -1611,10 +1617,8 @@ export function ReceptionistDashboard(): React.JSX.Element {
           reason: appointment.reason || null,
           notes: appointment.notes || null,
           consultationFee,
+          feeDiscount,
         })) as Token;
-      }
-      if (appointment.status !== 'CHECKED_IN') {
-        await appointmentsService.updateStatus(appointment.id, 'CHECKED_IN');
       }
       return token;
     },
@@ -1628,7 +1632,7 @@ export function ReceptionistDashboard(): React.JSX.Element {
       }
     },
     meta: {
-      toast: 'Token issued & patient checked in!',
+      toast: 'Token issued successfully!',
       errorToast: 'Failed to issue token.',
     },
   });

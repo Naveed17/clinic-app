@@ -60,7 +60,9 @@ import type { Appointment, AppointmentInput, AppointmentPerson } from '@/types/a
 import type { Token, TokenPerson } from '@/types/token';
 import { TokenFeeFields } from '@/features/tokens/TokenFeeFields';
 import { TokenPrintPreview } from '@/features/tokens/TokensPage';
-import { usePrintAppointmentToken } from '@/features/appointments/printAppointmentToken';
+import { usePrintAppointmentToken, loadTokenForAppointment, appointmentLocalDate } from '@/features/appointments/printAppointmentToken';
+import { printTokenSlip } from '@/utils/printTokenSlip';
+import { showAppToast } from '@/components/AppToast';
 import { nextFreeSlot, doctorOfflineReason, slotSearchFrom, type SlotAdjustReason } from '@/utils/appointmentSlot';
 import { formatTableDate } from '@/utils/formatDate';
 import { playNotificationSound } from '@/utils/sound';
@@ -142,119 +144,7 @@ function personLabel(person: AppointmentPerson): string {
   return [person.firstName, person.lastName].filter(Boolean).join(' ').trim();
 }
 
-function IssueTokenInline({ patientId, date, providerId, onIssued }: {
-  patientId: string;
-  date: string;
-  providerId: string;
-  onIssued: (token: Token) => void;
-}) {
-  const qc = useQueryClient();
-  const { can } = useLicense();
-  const showLabReason = can('labDashboard');
-  const [reason, setReason] = useState('');
-  const [consultationFee, setConsultationFee] = useState('');
-  const [feeDiscount, setFeeDiscount] = useState('');
-  const { data: doctors = [] } = useQuery<TokenPerson[]>({
-    queryKey: ['token-doctors'],
-    queryFn: () => window.clinic.tokens.doctors(),
-  });
-  useEffect(() => {
-    const doctor = doctors.find((d) => d.id === providerId);
-    if (!doctor) return;
-    if (reason === 'Free') {
-      setConsultationFee('0');
-      setFeeDiscount('');
-      return;
-    }
-    setConsultationFee(String(Number(doctor.consultationFee ?? 0)));
-    setFeeDiscount('');
-  }, [providerId, doctors, reason]);
-  const { data: weekVisits } = useQuery({
-    queryKey: ['token-week-visits', patientId, providerId, date],
-    queryFn: () =>
-      window.clinic.tokens.weekVisits(patientId, providerId, date).catch(() => ({ count: 0 })),
-    enabled: Boolean(patientId && providerId && date),
-  });
-  const mutation = useMutation({
-    mutationFn: () =>
-      window.clinic.tokens.create({
-        patientId,
-        doctorId: providerId,
-        date,
-        reason: reason || null,
-        consultationFee: parseFloat(consultationFee) || 0,
-        feeDiscount: parseFloat(feeDiscount) || 0,
-      }) as Promise<Token>,
-    onSuccess: (token) => {
-      void qc.invalidateQueries({ queryKey: ['token-for-patient', patientId, date] });
-      void qc.invalidateQueries({ queryKey: ['tokens'] });
-      onIssued(token);
-    },
-    meta: { silent: true },
-  });
-  return (
-    <Box
-      sx={{
-        mt: 1.5,
-        p: 1.5,
-        border: '1px dashed',
-        borderColor: (theme) => (theme.palette.mode === 'dark' ? alpha(theme.palette.warning.main, 0.4) : 'warning.main'),
-        borderRadius: 1,
-        bgcolor: (theme) => (theme.palette.mode === 'dark' ? alpha(theme.palette.warning.main, 0.12) : 'warning.50'),
-      }}
-    >
-      <Typography
-        variant="caption"
-        fontWeight={600}
-        sx={{
-          mb: 1,
-          display: 'block',
-          color: (theme) => (theme.palette.mode === 'dark' ? 'warning.light' : 'warning.dark'),
-        }}
-      >
-        No token found — issue one now
-      </Typography>
-      <TokenFeeFields
-        consultationFee={consultationFee}
-        feeDiscount={feeDiscount}
-        onFeeChange={setConsultationFee}
-        onDiscountChange={setFeeDiscount}
-        defaultDoctorFee={doctors.find((d) => d.id === providerId)?.consultationFee}
-        priorVisitsThisWeek={weekVisits?.count ?? 0}
-        disabled={!providerId}
-        compact
-      />
-      <Stack direction="row" spacing={1}>
-        <TextField
-          select size="small" label="Reason (optional)" value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          sx={{ flex: 1 }}
-        >
-          <MenuItem value="">— None —</MenuItem>
-          <MenuItem value="Checkup">Checkup</MenuItem>
-          <MenuItem value="Follow-up">Follow-up</MenuItem>
-          <MenuItem value="Urgent">Urgent</MenuItem>
-          <MenuItem value="Consultation">Consultation</MenuItem>
-          {showLabReason && <MenuItem value="Lab Results">Lab Results</MenuItem>}
-          <MenuItem value="Vaccination">Vaccination</MenuItem>
-        </TextField>
-        <Button
-          variant="contained" color="warning" size="small"
-          disabled={!providerId}
-          loading={mutation.isPending}
-          onClick={() => mutation.mutate()}
-        >
-          Issue Token
-        </Button>
-      </Stack>
-      {mutation.isError && (
-        <Typography variant="caption" color="error">
-          {(mutation.error as Error)?.message || 'Failed to issue token.'}
-        </Typography>
-      )}
-    </Box>
-  );
-}
+
 
 export function AppointmentDialog({ appointment, open, onClose, defaultDate, defaultProviderId, defaultPatientId, onSuccess, onCreatedAppointment }: {
   appointment?: Appointment;
@@ -276,7 +166,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   const schema = z.object({
     patientId: z.string().min(1, 'Select a patient.'),
     providerId: z.string().min(1, 'Select a doctor.'),
-    tokenId: isEdit ? z.string() : z.string().min(1, 'Token is required. Please issue a token first.'),
+    tokenId: z.string().optional(),
     date: z.string().min(1, 'Select a date.'),
     time: z.string().min(1, 'Select a time.'),
     duration: z.number().min(15).max(240),
@@ -310,11 +200,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
   const providerId = form.watch('providerId');
   const duration = form.watch('duration');
 
-  const { data: tokenForPatient } = useQuery<Token | null>({
-    queryKey: ['token-for-patient', patientId, date],
-    queryFn: () => window.clinic.tokens.getForPatient(patientId, date) as Promise<Token | null>,
-    enabled: !appointment && !!patientId && !!date,
-  });
+
 
   const { data: schedule = [], isFetched: scheduleFetched } = useQuery({
     queryKey: ['schedule', providerId],
@@ -337,9 +223,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
     ? doctorOfflineReason(schedule, date)
     : null;
 
-  useEffect(() => {
-    if (!appointment) form.setValue('tokenId', tokenForPatient?.id ?? '');
-  }, [tokenForPatient, appointment, form]);
+
 
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
@@ -541,23 +425,7 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
               }}
             />
 
-            {!appointment && (
-              <Box>
-                <TextField
-                  label="Token"
-                  fullWidth
-                  value={tokenForPatient ? `#${String(tokenForPatient.tokenNumber).padStart(3, '0')} — ${tokenForPatient.patient.firstName} ${tokenForPatient.patient.lastName ?? ''}`.trim() : ''}
-                  placeholder={patientId && date ? 'No token found for this patient on selected date' : 'Select patient and date first'}
-                  InputProps={{ readOnly: true }}
-                  error={!!form.formState.errors.tokenId}
-                  helperText={form.formState.errors.tokenId?.message ?? (tokenForPatient ? 'Token auto-linked' : '')}
-                  color={tokenForPatient ? 'success' : undefined}
-                />
-                {patientId && date && !tokenForPatient && !offlineReason && (
-                  <IssueTokenInline patientId={patientId} date={date} providerId={form.watch('providerId')} onIssued={(t) => form.setValue('tokenId', t.id)} />
-                )}
-              </Box>
-            )}
+
 
             <LocalizationProvider dateAdapter={AdapterDateFns}>
               <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' } }}>
@@ -907,6 +775,60 @@ export function AppointmentsPage(): React.JSX.Element {
       void queryClient.invalidateQueries({ queryKey: ['tokens'] });
     },
     meta: { silent: true },
+  });
+
+  const { data: doctorsList = [] } = useQuery<AppointmentPerson[]>({
+    queryKey: ['doctors'],
+    queryFn: appointmentsService.doctors,
+    staleTime: 60_000,
+  });
+
+  const issueTokenMutation = useMutation({
+    mutationFn: async (appointment: Appointment) => {
+      const apptDate = appointmentLocalDate(appointment.startsAt);
+      let token = await loadTokenForAppointment(appointment);
+      if (!token) {
+        const doc = doctorsList.find((d) => d.id === appointment.providerId);
+        const fee = Number(doc?.consultationFee ?? appointment.provider?.consultationFee ?? 0);
+        let feeDiscount = 0;
+        if (appointment.feeType === 'FREE') {
+          feeDiscount = fee;
+        } else if (appointment.feeType === 'HALF') {
+          feeDiscount = Math.round(fee / 2);
+        }
+        token = (await window.clinic.tokens.create({
+          patientId: appointment.patientId,
+          doctorId: appointment.providerId,
+          date: apptDate,
+          reason: appointment.reason || null,
+          notes: appointment.notes || null,
+          consultationFee: fee,
+          feeDiscount,
+        })) as Token;
+      }
+      return token;
+    },
+    onSuccess: async (token: Token) => {
+      await queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      await queryClient.invalidateQueries({ queryKey: ['tokens'] });
+      showAppToast({
+        type: 'success',
+        message: token?.tokenNumber
+          ? `Token #${String(token.tokenNumber).padStart(3, '0')} issued successfully.`
+          : 'Token issued successfully.',
+      });
+      if (token) {
+        void printTokenSlip(token, { silent: true }).catch(() => {
+          tokenPrint.openTokenPreview(token);
+        });
+      }
+    },
+    onError: (err: unknown) => {
+      showAppToast({
+        type: 'error',
+        message: (err as Error)?.message || 'Failed to issue token.',
+      });
+    },
   });
 
   const handleStartConsultation = async (appt: Appointment) => {
@@ -1473,8 +1395,8 @@ export function AppointmentsPage(): React.JSX.Element {
                       bgcolor: alpha(theme.palette.primary.main, 0.1),
                       '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) },
                     }}
-                    loading={statusMutation.isPending && statusMutation.variables?.id === a.id}
-                    onClick={() => { close(); statusMutation.mutate({ id: a.id, status: 'CHECKED_IN' }); }}
+                    loading={issueTokenMutation.isPending && issueTokenMutation.variables?.id === a.id}
+                    onClick={() => { close(); issueTokenMutation.mutate(a); }}
                   >
                     <ConfirmationNumberOutlinedIcon sx={{ fontSize: 17 }} />
                   </IconButton>
