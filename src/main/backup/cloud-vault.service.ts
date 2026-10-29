@@ -7,7 +7,7 @@ import AdmZip from 'adm-zip';
 import { getLicenseRuntimeMeta } from '../license/license.ipc';
 import { getSettings } from '../config/settings';
 import { copyDirRecursive, getClinicDbPath, writeBackupZip } from './backup-zip';
-import { disconnectPrisma, getPrisma } from '../database/client';
+import { disconnectPrisma, resetPrismaConnection, getPrisma } from '../database/client';
 import { getDocumentsRoot, resolveDocPath, toStoredDocPath } from './docs-paths';
 
 export type CloudVaultSchedule = 'off' | 'daily' | 'weekly';
@@ -276,14 +276,14 @@ export async function restoreFromCloudVault(
 
     // 3. Replace local SQLite DB
     copyFileSync(zippedDb, getClinicDbPath());
-    getPrisma();
+    await resetPrismaConnection();
     await remapDocumentPaths();
 
     return { ok: true };
   } catch (err: any) {
     console.error('[CloudVault] Restore failed:', err);
     try {
-      getPrisma();
+      await resetPrismaConnection();
     } catch {
       /* ignore */
     }

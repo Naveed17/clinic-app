@@ -4,7 +4,7 @@ import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import AdmZip from 'adm-zip';
-import { disconnectPrisma, getPrisma } from '../database/client';
+import { disconnectPrisma, resetPrismaConnection, getPrisma } from '../database/client';
 import { getDocumentsRoot, resolveDocPath, toStoredDocPath } from './docs-paths';
 import { isOnlineDatabaseMode } from '../config/settings';
 import { copyDirRecursive, getClinicDbPath, writeBackupZip } from './backup-zip';
@@ -145,13 +145,13 @@ export function registerBackupIpc(): void {
       }
 
       copyFileSync(dbSource, getClinicDbPath());
-      getPrisma();
+      await resetPrismaConnection();
       await remapDocumentPaths();
 
       return { ok: true, mode: selected.toLowerCase().endsWith('.zip') ? 'full' : 'db' };
     } catch (e) {
       try {
-        getPrisma();
+        await resetPrismaConnection();
       } catch {
         /* ignore */
       }
@@ -212,14 +212,14 @@ export function registerBackupIpc(): void {
 
       event.sender.send('backup:google-progress', { percent: 85, label: 'Restoring clinic database…' });
       copyFileSync(dbSource, getClinicDbPath());
-      getPrisma();
+      await resetPrismaConnection();
       await remapDocumentPaths();
 
       event.sender.send('backup:google-progress', { percent: 100, label: 'Restore complete!' });
       return { ok: true };
     } catch (e) {
       try {
-        getPrisma();
+        await resetPrismaConnection();
       } catch {
         /* ignore */
       }

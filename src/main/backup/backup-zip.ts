@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import AdmZip from 'adm-zip';
-import { disconnectPrisma, getPrisma, getClinicDbPath } from '../database/client';
+import { disconnectPrisma, resetPrismaConnection, getPrisma, getClinicDbPath } from '../database/client';
 import { getDocumentsRoot } from './docs-paths';
 
 export { getClinicDbPath };
@@ -34,7 +34,7 @@ export async function writeBackupZip(zipPath: string): Promise<void> {
     mkdirSync(dirname(zipPath), { recursive: true });
     zip.writeZip(zipPath);
   } finally {
-    getPrisma();
+    await resetPrismaConnection().catch(() => {});
   }
 }
 

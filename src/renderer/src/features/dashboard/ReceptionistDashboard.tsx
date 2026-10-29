@@ -43,6 +43,7 @@ import { realtimeService, type RealtimeNotification } from '@/services/realtime.
 import { PrescriptionPrintPreview } from '@/features/tokens/PrescriptionPrintPreview';
 import { TokenPrintPreview } from '@/features/tokens/TokensPage';
 import { printTokenSlip } from '@/utils/printTokenSlip';
+import { showAppToast } from '@/components/AppToast';
 import { usePrintAppointmentToken, loadTokenForAppointment, appointmentLocalDate } from '@/features/appointments/printAppointmentToken';
 import { InvoiceDialog } from '@/features/billing/InvoicesPage';
 import { AppointmentWhatsAppDialog } from '@/features/appointments/AppointmentWhatsAppDialog';
@@ -120,7 +121,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   const walkOfflineReason = doctorId && walkScheduleFetched && !walkScheduleFetching
     ? doctorOfflineReason(walkSchedule, todayStr)
     : null;
-  const walkScheduleReady = Boolean(doctorId) && walkScheduleFetched && !walkScheduleFetching;
+  const walkScheduleReady = Boolean(doctorId) && (walkScheduleFetched || !walkScheduleFetching);
 
   useEffect(() => {
     if (!open || !selectedDoctor) return;
@@ -181,6 +182,9 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
         setPreviewAutoPrint(true);
         setPreviewToken(token);
       }
+    },
+    onError: (err: any) => {
+      showAppToast({ type: 'error', message: err?.message || 'Could not issue token. Please try again.' });
     },
     meta: { silent: true },
   });
@@ -252,6 +256,8 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
                     {...params}
                     label="Doctor"
                     fullWidth
+                    helperText={walkScheduleFetching ? 'Checking doctor availability...' : (walkOfflineReason || undefined)}
+                    error={Boolean(walkOfflineReason)}
                     InputProps={{
                       ...params.InputProps,
                       startAdornment: selected ? (
@@ -336,8 +342,8 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
         )}
         {step === 1 && (
           <SubmitButton
-            disabled={!doctorId || !walkScheduleReady || Boolean(walkOfflineReason)}
-            loading={tokenMutation.isPending || Boolean(doctorId && !walkScheduleReady)}
+            disabled={!doctorId || Boolean(walkOfflineReason)}
+            loading={tokenMutation.isPending}
             onClick={() => tokenMutation.mutate()}
           >
             Issue Token & Print
@@ -486,6 +492,7 @@ function BookAppointmentModal({
     },
     onError: (err) => {
       const msg = (err as Error)?.message || '';
+      showAppToast({ type: 'error', message: msg || 'Could not create appointment.' });
       if (msg.includes('busy') || msg.includes('slot')) {
         const next = nextFreeSlot({
           schedule,

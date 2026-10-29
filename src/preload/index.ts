@@ -128,17 +128,36 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
   })();
   const { token } = getAuthContext();
-  const response = await fetch(`${apiUrl}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(onlineSchemaId ? { 'x-schema-id': onlineSchemaId } : {}),
-      ...(onlineLicenseKey ? { 'x-license-key': onlineLicenseKey } : {}),
-      ...(isOnlineClient || isLanClient ? { 'x-timezone': timeZone } : {}),
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  });
+
+  const controller = new AbortController();
+  const timeoutMs = 25000;
+  const timer = setTimeout(() => {
+    controller.abort(new Error('Request timed out. Please check your network/database connection.'));
+  }, timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(`${apiUrl}${path}`, {
+      signal: init?.signal ?? controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(onlineSchemaId ? { 'x-schema-id': onlineSchemaId } : {}),
+        ...(onlineLicenseKey ? { 'x-license-key': onlineLicenseKey } : {}),
+        ...(isOnlineClient || isLanClient ? { 'x-timezone': timeZone } : {}),
+        ...(init?.headers ?? {}),
+      },
+      ...init,
+    });
+  } catch (err: any) {
+    if (err?.name === 'AbortError' || String(err?.message || '').includes('timed out')) {
+      throw new Error('Request timed out. Please check network/database connection.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+
   if (response.status === 401) {
     window.dispatchEvent(new CustomEvent('clinic:session-expired'));
     throw new Error('Session expired.');
@@ -168,7 +187,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 // LAN client: HTTP to remote server. Local/server: IPC to main process.
 function ipc<T>(channel: string, ...args: unknown[]): Promise<T> {
-  return ipcRenderer.invoke(channel, ...args) as Promise<T>;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`Operation timed out (${channel}). Database may be reconnecting.`));
+    }, 30000);
+  });
+  return Promise.race([
+    ipcRenderer.invoke(channel, ...args) as Promise<T>,
+    timeoutPromise,
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }
 
 type CloudFile = { name: string; mimeType: string; size: number; fileData: string };
@@ -1027,6 +1057,11 @@ const api = {
       };
       ipcRenderer.on('lan:server-reconnected', listener);
       return () => ipcRenderer.removeListener('lan:server-reconnected', listener);
+    },
+    onSystemResumed: (handler: () => void) => {
+      const listener = () => handler();
+      ipcRenderer.on('app:system-resumed', listener);
+      return () => ipcRenderer.removeListener('app:system-resumed', listener);
     },
   },
   license: {

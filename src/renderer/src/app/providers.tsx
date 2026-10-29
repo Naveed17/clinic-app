@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from 'react';
 import React, { useMemo, useState, useEffect } from 'react';
-import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ColorModeContext, type ColorMode } from './colorMode';
 import { ThemeRegistry } from '@/theme';
 import { AuthProvider } from '@/features/auth/AuthContext';
@@ -18,13 +18,22 @@ import { trpc } from '@/utils/trpc';
 function RealtimeBootstrap({ children }: PropsWithChildren): React.JSX.Element {
   useSocket();
   useRealtimeInvalidation();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    const off = window.clinic.settings.onLanReconnected(() => {
+    const offLan = window.clinic.settings?.onLanReconnected?.(() => {
       window.location.reload();
     });
-    return off;
-  }, []);
+    const offResume = window.clinic.settings?.onSystemResumed?.(() => {
+      console.log('[CareFlow] System resumed from sleep — refreshing queries & socket...');
+      void queryClient.invalidateQueries();
+      void window.clinic?.realtime?.connect?.();
+    });
+    return () => {
+      offLan?.();
+      offResume?.();
+    };
+  }, [queryClient]);
 
   return <>{children}<AppointmentToast /><AppToastHost /><UpdateBanner /></>;
 }

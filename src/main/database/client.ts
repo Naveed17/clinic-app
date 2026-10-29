@@ -114,19 +114,33 @@ export function getPrisma(): PrismaClient {
       query: {
         $allModels: {
           async $allOperations({ operation, args, query }: { operation: string; args: any; query: (args: any) => Promise<any> }) {
-            const result = await query(args);
-            if (
-              operation === 'create' ||
-              operation === 'createMany' ||
-              operation === 'update' ||
-              operation === 'updateMany' ||
-              operation === 'upsert' ||
-              operation === 'delete' ||
-              operation === 'deleteMany'
-            ) {
-              notifyDatabaseMutation();
+            try {
+              const result = await query(args);
+              if (
+                operation === 'create' ||
+                operation === 'createMany' ||
+                operation === 'update' ||
+                operation === 'updateMany' ||
+                operation === 'upsert' ||
+                operation === 'delete' ||
+                operation === 'deleteMany'
+              ) {
+                notifyDatabaseMutation();
+              }
+              return result;
+            } catch (err: any) {
+              const msg = String(err?.message || '');
+              if (
+                msg.includes('Engine has stopped') ||
+                msg.includes('Can\'t reach database server') ||
+                msg.includes('Connection closed') ||
+                msg.includes('Response from the query engine was empty')
+              ) {
+                console.error('[Database] Prisma engine disconnected or stopped:', msg);
+                void disconnectPrisma();
+              }
+              throw err;
             }
-            return result;
           },
         },
       },
@@ -195,7 +209,7 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
     await database.$executeRawUnsafe('PRAGMA synchronous = NORMAL');
     await database.$executeRawUnsafe('PRAGMA temp_store = MEMORY');
     await database.$executeRawUnsafe('PRAGMA cache_size = -64000');
-    await database.$executeRawUnsafe('PRAGMA mmap_size = 268435456');
+    await database.$executeRawUnsafe('PRAGMA mmap_size = 0');
     await database.$executeRawUnsafe('PRAGMA busy_timeout = 15000');
   } catch {
     /* Ignore pragma errors on non-SQLite backends */
@@ -1080,5 +1094,20 @@ export async function ensureSoftDeleteColumns(database: PrismaClient = getPrisma
 }
 
 export async function disconnectPrisma(): Promise<void> {
-  await prisma?.$disconnect();
+  if (prisma) {
+    try {
+      await prisma.$disconnect();
+    } catch (err) {
+      console.warn('[Database] Error disconnecting prisma:', err);
+    }
+    prisma = undefined;
+    currentDbPath = undefined;
+    initializedDbPaths.clear();
+    initPromise = undefined;
+  }
+}
+
+export async function resetPrismaConnection(): Promise<PrismaClient> {
+  await disconnectPrisma();
+  return ensureDatabaseReady();
 }

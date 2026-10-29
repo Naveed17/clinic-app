@@ -228,6 +228,7 @@ declare global {
         scan: () => Promise<{ ip: string; port: number; name: string }[]>;
         onServerFound: (handler: (server: { ip: string; port: number; name: string }) => void) => () => void;
         onLanReconnected: (handler: (url: string) => void) => () => void;
+        onSystemResumed: (handler: () => void) => () => void;
       };
       backup: {
         create: () => Promise<{ ok: boolean; canceled?: boolean; path?: string; error?: string }>;

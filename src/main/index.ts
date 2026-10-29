@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, powerMonitor } from 'electron';
 
 // Must run before app ready — locks AppData to CareFlow (not Electron / old productName).
 app.setName('CareFlow');
@@ -19,7 +19,7 @@ if (process.resourcesPath) {
 
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { environment } from './config/environment';
-import { disconnectPrisma, initializeDatabase } from './database/client';
+import { disconnectPrisma, initializeDatabase, resetPrismaConnection, getPrisma } from './database/client';
 import { startBackendServer, type BackendServer } from './backend/server';
 import { registerPatientIpc } from './patients/patient.ipc';
 import { registerAppointmentIpc } from './appointments/appointment.ipc';
@@ -282,8 +282,35 @@ app.whenReady().then(async () => {
   startAutoSync();
   startCloudVaultScheduler();
   startRecycleBinAutoPurgeScheduler(7);
-  initAutoUpdater();
   createWindow();
+
+  powerMonitor.on('suspend', async () => {
+    console.log('[CareFlow] PowerMonitor: System going to sleep (suspend)...');
+    try {
+      const db = getPrisma();
+      await db.$executeRawUnsafe('PRAGMA wal_checkpoint(PASSIVE);').catch(() => {});
+    } catch { /* ignore */ }
+    await disconnectPrisma();
+  });
+
+  powerMonitor.on('resume', async () => {
+    console.log('[CareFlow] PowerMonitor: System resumed from sleep. Reconnecting database & network...');
+    try {
+      await resetPrismaConnection();
+      console.log('[CareFlow] Database connection successfully refreshed after resume.');
+    } catch (err) {
+      console.error('[CareFlow] Failed to refresh database after resume:', err);
+    }
+
+    const settings = getSettings();
+    if (settings.serverMode === 'lan-client' && settings.clientApiUrl) {
+      startLanRetry(settings.clientApiUrl);
+    }
+
+    BrowserWindow.getAllWindows().forEach((win) => {
+      win.webContents.send('app:system-resumed');
+    });
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
