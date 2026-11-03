@@ -274,6 +274,12 @@ export function AppointmentDialog({ appointment, open, onClose, defaultDate, def
       }
       onSuccess?.();
     },
+    onError: (err: any) => {
+      showAppToast({
+        type: 'error',
+        message: err?.message || 'Failed to save appointment. Please check doctor availability or try again.',
+      });
+    },
     meta: { silent: true },
   });
 

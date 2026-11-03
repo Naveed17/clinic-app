@@ -93,6 +93,19 @@ export function notifyDatabaseMutation(): void {
   }
 }
 
+export async function applySqlitePragmas(database: PrismaClient): Promise<void> {
+  try {
+    await database.$queryRawUnsafe('PRAGMA journal_mode = WAL');
+    await database.$executeRawUnsafe('PRAGMA synchronous = NORMAL');
+    await database.$executeRawUnsafe('PRAGMA temp_store = MEMORY');
+    await database.$executeRawUnsafe('PRAGMA cache_size = -64000');
+    await database.$executeRawUnsafe('PRAGMA mmap_size = 0');
+    await database.$executeRawUnsafe('PRAGMA busy_timeout = 15000');
+  } catch {
+    /* Ignore pragma errors on non-SQLite backends */
+  }
+}
+
 export function getPrisma(): PrismaClient {
   const targetDbPath = getClinicDbPath();
   if (prisma && currentDbPath !== targetDbPath) {
@@ -130,14 +143,18 @@ export function getPrisma(): PrismaClient {
               return result;
             } catch (err: any) {
               const msg = String(err?.message || '');
-              if (
+              const isEngineDead =
                 msg.includes('Engine has stopped') ||
-                msg.includes('Can\'t reach database server') ||
+                msg.includes("Can't reach database server") ||
                 msg.includes('Connection closed') ||
-                msg.includes('Response from the query engine was empty')
-              ) {
-                console.error('[Database] Prisma engine disconnected or stopped:', msg);
-                void disconnectPrisma();
+                msg.includes('Response from the query engine was empty');
+              if (isEngineDead) {
+                console.warn('[Database] Prisma engine dropped. Auto-recovering database connection...');
+                prisma = undefined;
+                initializedDbPaths.clear();
+                const fresh = getPrisma();
+                await applySqlitePragmas(fresh).catch(() => {});
+                return await query(args);
               }
               throw err;
             }
@@ -147,6 +164,7 @@ export function getPrisma(): PrismaClient {
     });
 
     prisma = extended as unknown as PrismaClient;
+    void applySqlitePragmas(prisma);
   }
 
   return prisma;
@@ -1093,21 +1111,41 @@ export async function ensureSoftDeleteColumns(database: PrismaClient = getPrisma
   }
 }
 
+export async function ensurePrismaConnected(): Promise<PrismaClient> {
+  try {
+    const db = getPrisma();
+    await db.$queryRawUnsafe('SELECT 1');
+    return db;
+  } catch (err) {
+    console.warn('[Database] Health check failed, auto-recovering Prisma connection...', err);
+    prisma = undefined;
+    initializedDbPaths.clear();
+    initPromise = undefined;
+    const fresh = getPrisma();
+    await applySqlitePragmas(fresh).catch(() => {});
+    await fresh.$queryRawUnsafe('SELECT 1').catch(() => {});
+    return fresh;
+  }
+}
+
 export async function disconnectPrisma(): Promise<void> {
   if (prisma) {
-    try {
-      await prisma.$disconnect();
-    } catch (err) {
-      console.warn('[Database] Error disconnecting prisma:', err);
-    }
+    const old = prisma;
     prisma = undefined;
     currentDbPath = undefined;
     initializedDbPaths.clear();
     initPromise = undefined;
+    try {
+      await old.$disconnect();
+    } catch (err) {
+      console.warn('[Database] Error disconnecting prisma:', err);
+    }
   }
 }
 
 export async function resetPrismaConnection(): Promise<PrismaClient> {
   await disconnectPrisma();
+  const db = getPrisma();
+  await applySqlitePragmas(db).catch(() => {});
   return ensureDatabaseReady();
 }

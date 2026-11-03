@@ -19,7 +19,7 @@ if (process.resourcesPath) {
 
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { environment } from './config/environment';
-import { disconnectPrisma, initializeDatabase, resetPrismaConnection, getPrisma } from './database/client';
+import { disconnectPrisma, initializeDatabase, resetPrismaConnection, ensurePrismaConnected, getPrisma } from './database/client';
 import { startBackendServer, type BackendServer } from './backend/server';
 import { registerPatientIpc } from './patients/patient.ipc';
 import { registerAppointmentIpc } from './appointments/appointment.ipc';
@@ -285,21 +285,22 @@ app.whenReady().then(async () => {
   createWindow();
 
   powerMonitor.on('suspend', async () => {
-    console.log('[CareFlow] PowerMonitor: System going to sleep (suspend)...');
+    console.log('[CareFlow] PowerMonitor: System entering sleep mode. Flushing database checkpoint...');
     try {
       const db = getPrisma();
       await db.$executeRawUnsafe('PRAGMA wal_checkpoint(PASSIVE);').catch(() => {});
     } catch { /* ignore */ }
-    await disconnectPrisma();
+    // NOTE: We deliberately do NOT call disconnectPrisma() here.
+    // Local SQLite file connections should persist across sleep/resume seamlessly without tearing down the engine.
   });
 
   powerMonitor.on('resume', async () => {
-    console.log('[CareFlow] PowerMonitor: System resumed from sleep. Reconnecting database & network...');
+    console.log('[CareFlow] PowerMonitor: System resumed from sleep. Verifying database & network health...');
     try {
-      await resetPrismaConnection();
-      console.log('[CareFlow] Database connection successfully refreshed after resume.');
+      await ensurePrismaConnected();
+      console.log('[CareFlow] Database connection verified & healthy after resume.');
     } catch (err) {
-      console.error('[CareFlow] Failed to refresh database after resume:', err);
+      console.error('[CareFlow] Database verification after resume:', err);
     }
 
     const settings = getSettings();

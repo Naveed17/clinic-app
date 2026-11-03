@@ -411,13 +411,32 @@ async function resolveWalkInSlot(
 
   let cursor = startsAt.getTime() > windowStart.getTime() ? new Date(startsAt.getTime()) : windowStart;
 
+  const db = getPrisma();
+  const existingAppts = await db.appointment.findMany({
+    where: {
+      providerId,
+      status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+      startsAt: { lt: windowEnd },
+      endsAt: { gt: windowStart },
+    },
+    select: { startsAt: true, endsAt: true },
+    orderBy: { startsAt: 'asc' },
+  });
+
+  const apptIntervals = existingAppts.map((a) => ({
+    start: asDate(a.startsAt).getTime(),
+    end: asDate(a.endsAt).getTime(),
+  }));
+
   for (let i = 0; i < 96; i++) {
-    const candidateEnd = new Date(cursor.getTime() + durationMs);
-    if (candidateEnd.getTime() > windowEnd.getTime()) break;
-    const clash = await findClash(providerId, cursor, candidateEnd, excludeId);
-    if (!clash) return { startsAt: cursor, endsAt: candidateEnd };
-    const afterHit = asDate(clash.endsAt).getTime();
-    cursor = new Date(afterHit > cursor.getTime() ? afterHit : cursor.getTime() + SLOT_STEP_MS);
+    const candidateStartMs = cursor.getTime();
+    const candidateEndMs = candidateStartMs + durationMs;
+    if (candidateEndMs > windowEnd.getTime()) break;
+    const clash = apptIntervals.find((a) => a.start < candidateEndMs && a.end > candidateStartMs);
+    if (!clash) return { startsAt: cursor, endsAt: new Date(candidateEndMs) };
+    const afterHit = clash.end;
+    cursor = new Date(afterHit > candidateStartMs ? afterHit : candidateStartMs + SLOT_STEP_MS);
   }
   return { startsAt, endsAt };
 }

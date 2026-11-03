@@ -44,6 +44,7 @@ import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/
 import { DEFAULT_CLINIC_LOGO, useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 import type { Token, TokenInput, TokenPerson, TokenStatus, PrescriptionInput, PrescriptionMedicine } from '@/types/token';
 import { useAuth } from '@/features/auth/AuthContext';
+import { showAppToast } from '@/components/AppToast';
 import { FetchingBar, ListCardsSkeleton, StatCardsSkeleton } from '@/components/LoadingUI';
 import { useLicense } from '@/features/auth/LicenseModulesContext';
 import { appointmentsService } from '@/services/appointments.service';
@@ -180,6 +181,12 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
       setPatientId(''); setDoctorId(''); setNotes(''); setReason(''); setConsultationFee(''); setFeeDiscount('');
       onClose();
       onSuccess?.(token);
+    },
+    onError: (err: any) => {
+      showAppToast({
+        type: 'error',
+        message: err?.message || 'Failed to issue token. Please check doctor schedule or try again.',
+      });
     },
     meta: { silent: true },
   });
