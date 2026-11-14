@@ -5,6 +5,8 @@ import { getSettings, resolveOnlineApiOrigin } from '../config/settings';
 import { getDiscoveredServers } from '../settings/settings.ipc';
 import { getLicenseRuntimeMeta, applyDatabaseModeFromApi } from '../license/license.ipc';
 import { uploadLocalFile } from '../backup/migrate-to-cloud.ipc';
+import { pullMissingCloudDocuments } from '../backup/migrate-from-cloud.ipc';
+import { syncLanFiles } from './lan-files';
 import { onDatabaseMutation } from '../database/client';
 import {
   extractChangesSince,
@@ -68,6 +70,41 @@ function saveLastSyncTime(timestamp: number, schemaId?: string): void {
   } catch (err) {
     console.warn('[SyncService] Failed to save last sync timestamp:', err);
   }
+}
+
+/** Server-time cursor of the last successful cloud pull (ISO). Empty → full pull. */
+function loadCloudPullCursor(schemaId?: string): string {
+  try {
+    const file = getSyncStateFilePath();
+    if (existsSync(file)) {
+      const data = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>;
+      const value = data[`cloudPull_${schemaId || 'default'}`];
+      if (typeof value === 'string' && !Number.isNaN(Date.parse(value))) return value;
+    }
+  } catch { /* ignore */ }
+  return '';
+}
+
+function saveCloudPullCursor(schemaId: string | undefined, cursor: string): void {
+  try {
+    const file = getSyncStateFilePath();
+    let currentData: Record<string, unknown> = {};
+    if (existsSync(file)) {
+      try {
+        currentData = JSON.parse(readFileSync(file, 'utf-8')) as Record<string, unknown>;
+      } catch { /* ignore */ }
+    }
+    currentData[`cloudPull_${schemaId || 'default'}`] = cursor;
+    writeFileSync(file, JSON.stringify(currentData, null, 2), 'utf-8');
+  } catch { /* ignore */ }
+}
+
+/**
+ * After restoring a backup, forget the cloud pull cursor so the next sync re-merges
+ * everything from the cloud (newer cloud edits / deletes win by timestamp).
+ */
+export function resetCloudPullCursor(): void {
+  saveCloudPullCursor(getLicenseRuntimeMeta().schemaId || undefined, '');
 }
 
 interface SyncCheckpointData {
@@ -166,47 +203,58 @@ export type SyncTarget =
   | { type: 'cloud'; url: string; key?: string | null; schemaId?: string; hwid?: string }
   | null;
 
-export function resolveSyncTarget(customPeerUrl?: string): SyncTarget {
-  const meta = getLicenseRuntimeMeta();
-  const settings = getSettings();
-  const isOnlineMode = meta.databaseMode === 'online' || settings.databaseMode === 'online';
+type LanTarget = { type: 'lan'; url: string };
+type CloudTarget = { type: 'cloud'; url: string; key?: string | null; schemaId?: string; hwid?: string };
 
+function isOnlineMode(): boolean {
+  return getLicenseRuntimeMeta().databaseMode === 'online' || getSettings().databaseMode === 'online';
+}
+
+/**
+ * Offline-first: PCs share data with each other over the LAN (primary path).
+ * The LAN server is the hub, so it never syncs with another LAN peer itself.
+ */
+export function resolveLanTarget(customPeerUrl?: string): LanTarget | null {
+  const settings = getSettings();
   if (customPeerUrl && customPeerUrl.trim()) {
     const trimmed = customPeerUrl.trim().replace(/\/+$/, '');
-    if (trimmed.startsWith('https://') || trimmed.includes('.vercel.app')) {
-      if (!isOnlineMode) {
-        return null;
-      }
-      return { type: 'cloud', url: trimmed, key: meta.key, schemaId: meta.schemaId, hwid: meta.hwid };
-    }
+    if (trimmed.startsWith('https://') || trimmed.includes('.vercel.app')) return null;
     return { type: 'lan', url: trimmed };
   }
-
+  if (settings.serverMode === 'lan-server') return null;
   if (settings.clientApiUrl && settings.clientApiUrl.trim()) {
     return { type: 'lan', url: settings.clientApiUrl.trim().replace(/\/+$/, '') };
   }
-
   const discovered = getDiscoveredServers();
   if (discovered && discovered.length > 0) {
     const first = discovered[0];
     return { type: 'lan', url: `http://${first.ip}:${first.port}` };
   }
-
-  // Cloud database sync ONLY runs when license or settings databaseMode is 'online'
-  if (isOnlineMode) {
-    const cloudUrl = resolveOnlineApiOrigin(meta.clinicalApiUrl || settings.clinicalApiUrl);
-    if (cloudUrl) {
-      return {
-        type: 'cloud',
-        url: cloudUrl,
-        key: meta.key,
-        schemaId: meta.schemaId,
-        hwid: meta.hwid,
-      };
-    }
-  }
-
   return null;
+}
+
+/**
+ * Online DB is an extra: push local data to the cloud (backup + mobile app) and pull
+ * mobile-app changes back. LAN clients skip it — their LAN server does it for them.
+ */
+export function resolveCloudTarget(customPeerUrl?: string): CloudTarget | null {
+  if (!isOnlineMode()) return null;
+  const meta = getLicenseRuntimeMeta();
+  const settings = getSettings();
+  if (customPeerUrl && customPeerUrl.trim()) {
+    const trimmed = customPeerUrl.trim().replace(/\/+$/, '');
+    if (!(trimmed.startsWith('https://') || trimmed.includes('.vercel.app'))) return null;
+    return { type: 'cloud', url: trimmed, key: meta.key, schemaId: meta.schemaId, hwid: meta.hwid };
+  }
+  if (settings.serverMode === 'lan-client') return null;
+  const cloudUrl = resolveOnlineApiOrigin(meta.clinicalApiUrl || settings.clinicalApiUrl);
+  if (!cloudUrl) return null;
+  return { type: 'cloud', url: cloudUrl, key: meta.key, schemaId: meta.schemaId, hwid: meta.hwid };
+}
+
+/** Primary sync peer (LAN first, else cloud). */
+export function resolveSyncTarget(customPeerUrl?: string): SyncTarget {
+  return resolveLanTarget(customPeerUrl) ?? resolveCloudTarget(customPeerUrl);
 }
 
 export function resolvePeerUrl(): string | null {
@@ -252,6 +300,8 @@ async function syncWithCloud(
     updateProgress(5, isInitialSync ? 'Checking cloud database records...' : 'Scanning local changes...');
 
     let remoteTables: Record<string, number> = {};
+    let remoteFiles: { patient?: number; lab?: number } | undefined;
+    let serverTime = '';
     try {
       const statusRes = await fetch(`${target.url}/api/clinic/migrate/export/status`, {
         headers: {
@@ -260,9 +310,19 @@ async function syncWithCloud(
         },
       });
       if (statusRes.ok) {
-        const statusData = (await statusRes.json()) as { tables?: Record<string, number> };
+        const statusData = (await statusRes.json()) as {
+          tables?: Record<string, number>;
+          files?: { patient?: number; lab?: number };
+          serverTime?: string;
+        };
+        if (statusData && typeof statusData.serverTime === 'string') {
+          serverTime = statusData.serverTime;
+        }
         if (statusData && statusData.tables) {
           remoteTables = statusData.tables;
+        }
+        if (statusData && statusData.files) {
+          remoteFiles = statusData.files;
         }
       }
     } catch { /* ignore */ }
@@ -405,10 +465,11 @@ async function syncWithCloud(
     }
 
     // Upload any modified Patient Documents & Lab Reports (PDFs / images) to Cloudflare R2
+    let failedFileUploads = 0;
     const patientDocChanges = changes['PatientDocument'] || [];
     for (const doc of patientDocChanges) {
       try {
-        await uploadLocalFile({
+        const res = await uploadLocalFile({
           kind: 'patient',
           ownerId: String(doc.patientId || ''),
           id: String(doc.id || ''),
@@ -417,7 +478,9 @@ async function syncWithCloud(
           size: Number(doc.size || 0),
           storedPath: String(doc.filePath || ''),
         });
+        if (res === 'failed') failedFileUploads++;
       } catch (err) {
+        failedFileUploads++;
         console.warn('[SyncService] Failed to sync patient doc to R2:', err);
       }
     }
@@ -425,7 +488,7 @@ async function syncWithCloud(
     const labReportChanges = changes['LabReport'] || [];
     for (const report of labReportChanges) {
       try {
-        await uploadLocalFile({
+        const res = await uploadLocalFile({
           kind: 'lab',
           ownerId: String(report.labOrderId || ''),
           id: String(report.id || ''),
@@ -434,9 +497,15 @@ async function syncWithCloud(
           size: Number(report.size || 0),
           storedPath: String(report.filePath || ''),
         });
+        if (res === 'failed') failedFileUploads++;
       } catch (err) {
+        failedFileUploads++;
         console.warn('[SyncService] Failed to sync lab report to R2:', err);
       }
+    }
+    if (failedFileUploads > 0) {
+      // Keep lastSyncTime unchanged so these documents are retried on the next sync.
+      throw new Error(`${failedFileUploads} document(s) could not be uploaded. Will retry.`);
     }
 
     // Push local deletions to cloud so removed records and R2 files are also deleted from Neon & R2
@@ -459,28 +528,69 @@ async function syncWithCloud(
   }
 
     // Phase B: Pull updates from Cloud into local SQLite database (Two-Way Sync)
+    // Incremental: only rows the server changed since our last pull (server-side "syncedAt"),
+    // plus cloud deletions (tombstones). First sync / old server → full pull.
     let pulledCount = 0;
-    const PULL_BATCH = 50;
+    const PULL_BATCH = 200;
     const cloudHeaders = {
       ...(target.key ? { 'x-license-key': target.key } : {}),
       ...(target.schemaId ? { 'x-schema-id': target.schemaId } : {}),
       ...(target.hwid ? { 'x-hwid': target.hwid } : {}),
     };
+    const pullCursor = serverTime ? loadCloudPullCursor(target.schemaId || undefined) : '';
+    // 2-minute overlap covers transactions that committed after the cursor was taken.
+    const pullSince = pullCursor ? new Date(Date.parse(pullCursor) - 2 * 60 * 1000).toISOString() : '';
+    let pullComplete = true;
 
-    updateProgress(85, 'Downloading updates from cloud...');
+    // B1. Cloud deletions (from other PCs / mobile app)
+    updateProgress(85, 'Checking deletions from cloud...');
+    try {
+      let offset = 0;
+      for (;;) {
+        const qs = `${pullSince ? `since=${encodeURIComponent(pullSince)}&` : ''}offset=${offset}&limit=1000`;
+        const delRes = await fetch(`${target.url}/api/clinic/migrate/export/deletions?${qs}`, { headers: cloudHeaders });
+        if (!delRes.ok) {
+          // 404 = server without tombstone support yet; keep working, retry next time.
+          if (delRes.status !== 404) pullComplete = false;
+          break;
+        }
+        const delData = (await delRes.json()) as { deletions?: SyncDeletedItem[] };
+        const dels = delData.deletions || [];
+        if (!dels.length) break;
+        const { appliedDeletions } = await applyIncomingChanges({}, dels);
+        pulledCount += appliedDeletions;
+        offset += dels.length;
+        if (dels.length < 1000) break;
+      }
+    } catch (e) {
+      pullComplete = false;
+      console.warn('[SyncService] Failed pulling cloud deletions:', e);
+    }
+
+    // B2. Changed rows (falls back to a full pull if the server rejects "since")
+    let incremental = Boolean(pullSince);
+    updateProgress(88, pullSince ? 'Downloading changes from cloud...' : 'Downloading cloud records...');
     for (const table of SYNC_TABLES) {
       if (table === 'PatientDocument' || table === 'LabReport') continue;
-      const remoteCount = remoteTables[table] || 0;
-      if (remoteCount === 0) continue;
+      if (!incremental && (remoteTables[table] || 0) === 0) continue;
 
       let offset = 0;
-      while (offset < remoteCount) {
+      for (;;) {
         try {
-          const pullRes = await fetch(
-            `${target.url}/api/clinic/migrate/export/rows?table=${encodeURIComponent(table)}&offset=${offset}&limit=${PULL_BATCH}`,
-            { headers: cloudHeaders },
-          );
-          if (!pullRes.ok) break;
+          const qs = `table=${encodeURIComponent(table)}&offset=${offset}&limit=${PULL_BATCH}${
+            incremental ? `&since=${encodeURIComponent(pullSince)}` : ''
+          }`;
+          const pullRes = await fetch(`${target.url}/api/clinic/migrate/export/rows?${qs}`, { headers: cloudHeaders });
+          if (!pullRes.ok) {
+            if (incremental) {
+              console.warn(`[SyncService] Incremental pull rejected (${pullRes.status}); falling back to full pull.`);
+              incremental = false;
+              offset = 0;
+              continue;
+            }
+            pullComplete = false;
+            break;
+          }
           const pullData = (await pullRes.json()) as { rows?: Record<string, unknown>[] };
           const rows = pullData.rows || [];
           if (!rows.length) break;
@@ -488,11 +598,27 @@ async function syncWithCloud(
           const { appliedChanges } = await applyIncomingChanges({ [table]: rows }, []);
           pulledCount += appliedChanges;
           offset += rows.length;
+          if (rows.length < PULL_BATCH) break;
         } catch (e) {
+          pullComplete = false;
           console.warn(`[SyncService] Failed pulling ${table}:`, e);
           break;
         }
       }
+    }
+
+    // Advance the cursor only when everything was pulled, so nothing is skipped.
+    if (serverTime && pullComplete) {
+      saveCloudPullCursor(target.schemaId || undefined, serverTime);
+    }
+
+    // Download documents / lab reports added from other PCs or the mobile app.
+    try {
+      updateProgress(95, 'Downloading documents from cloud...');
+      const docs = await pullMissingCloudDocuments(remoteFiles, new Date(newSyncTime - 1));
+      pulledCount += docs.downloaded;
+    } catch (e) {
+      console.warn('[SyncService] Failed pulling cloud documents:', e);
     }
 
     if (pulledCount > 0) {
@@ -562,8 +688,9 @@ export async function triggerSync(opts?: { silent?: boolean; customPeerUrl?: str
     return { ok: false, error: 'Sync already in progress.' };
   }
 
-  const target = resolveSyncTarget(opts?.customPeerUrl);
-  if (!target) {
+  const lanTarget = resolveLanTarget(opts?.customPeerUrl);
+  const cloudTarget = resolveCloudTarget(opts?.customPeerUrl);
+  if (!lanTarget && !cloudTarget) {
     const meta = getLicenseRuntimeMeta();
     const isLocalMode = meta.databaseMode !== 'online';
     syncStatus = {
@@ -580,12 +707,35 @@ export async function triggerSync(opts?: { silent?: boolean; customPeerUrl?: str
     return { ok: true, recordsSynced: 0 };
   }
 
-  isSyncing = true;
-  if (target.type === 'cloud') {
-    return syncWithCloud(target, opts);
+  // 1. LAN (primary): PCs share data directly, no internet needed.
+  let lanResult: { ok: boolean; recordsSynced?: number; error?: string } | null = null;
+  if (lanTarget) {
+    isSyncing = true;
+    lanResult = await syncWithLanPeer(lanTarget.url);
   }
+  if (!cloudTarget) return lanResult ?? { ok: true, recordsSynced: 0 };
 
-  const targetUrl = target.url;
+  // 2. Cloud (extra): backup + mobile app changes. Never blocks LAN sharing.
+  const lanStatus = syncStatus;
+  isSyncing = true;
+  const cloudResult = await syncWithCloud(cloudTarget, opts);
+  if (lanResult?.ok && !cloudResult.ok) {
+    syncStatus = { ...lanStatus, message: `${lanStatus.message || 'Synced on LAN'} • Cloud not reachable, will retry` };
+    broadcastStatus();
+    return lanResult;
+  }
+  return {
+    ok: cloudResult.ok && (lanResult ? lanResult.ok : true),
+    recordsSynced: (lanResult?.recordsSynced || 0) + (cloudResult.recordsSynced || 0),
+    error: cloudResult.error || lanResult?.error,
+  };
+}
+
+async function syncWithLanPeer(targetUrl: string): Promise<{
+  ok: boolean;
+  recordsSynced?: number;
+  error?: string;
+}> {
   updateProgress(2, 'Connecting to clinic peer...');
 
   try {
@@ -634,6 +784,9 @@ export async function triggerSync(opts?: { silent?: boolean; customPeerUrl?: str
       let completedWork = 0;
 
       if (totalPushRows === 0 && totalPullRows === 0) {
+        // Rows are in sync, but document files may still be pending (e.g. earlier failure).
+        const files = await syncLanFiles(targetUrl).catch(() => ({ uploaded: 0, downloaded: 0, failed: 0 }));
+        if (files.downloaded > 0) notifyDataChanged();
         updateProgress(100, 'All data is up to date.');
         saveLastSyncTime(newSyncTime);
         syncStatus = {
@@ -785,6 +938,14 @@ export async function triggerSync(opts?: { silent?: boolean; customPeerUrl?: str
       saveLastSyncTime(newSyncTime);
     }
 
+    // Document files (PDFs / images) for the rows above
+    updateProgress(97, 'Syncing document files...');
+    const files = await syncLanFiles(targetUrl).catch((e) => {
+      console.warn('[SyncService] LAN file sync failed:', e);
+      return { uploaded: 0, downloaded: 0, failed: 0 };
+    });
+    recordsSynced += files.downloaded;
+
     updateProgress(100, 'Sync complete');
     syncStatus = {
       state: 'synced',
@@ -852,8 +1013,8 @@ export function startAutoSync(): void {
 
   // 3. Heartbeat: 2.5 minutes for online cloud database, 15 minutes for local LAN
   // (Note: all user mutations already auto-sync immediately in 2.5s via scheduleSmartSync)
-  const target = resolveSyncTarget();
-  const pollInterval = target?.type === 'cloud' ? 150 * 1000 : 15 * 60 * 1000;
+  // With Online DB on, poll every 2.5 min so mobile-app changes arrive quickly.
+  const pollInterval = resolveCloudTarget() ? 150 * 1000 : 15 * 60 * 1000;
   autoSyncTimer = setInterval(() => {
     void triggerSync({ silent: true });
   }, pollInterval);

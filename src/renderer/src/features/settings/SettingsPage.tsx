@@ -109,7 +109,7 @@ export function SettingsPage(): React.JSX.Element {
   const isAdmin = user?.role === 'admin';
   const { can } = useLicense();
   const refreshLicenseModules = useRefreshLicenseModules();
-  const { isOnline, schemaId, ready: databaseModeReady, refresh: refreshDatabaseMode } = useDatabaseMode();
+  const { isOnline, ready: databaseModeReady, refresh: refreshDatabaseMode } = useDatabaseMode();
   const { status: syncStatus, syncNow: triggerPeerSync } = useSync();
   const [syncingManual, setSyncingManual] = useState(false);
 
@@ -138,11 +138,6 @@ export function SettingsPage(): React.JSX.Element {
   const [lanIp, setLanIp] = useState<string>('...');
   const [backupLoading, setBackupLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
-  const [migrateLoading, setMigrateLoading] = useState(false);
-  const [migrateProgress, setMigrateProgress] = useState<{ percent: number; label: string }>({
-    percent: 0,
-    label: 'Starting…',
-  });
   const [saving, setSaving] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [logoError, setLogoError] = useState('');
@@ -156,18 +151,6 @@ export function SettingsPage(): React.JSX.Element {
     void window.clinic?.update?.getVersion?.().then((ver: string) => {
       if (ver) setCurrentVersion(ver);
     });
-  }, []);
-
-  useEffect(() => {
-    const unsub = window.clinic?.backup?.onMigrateProgress?.((progress) => {
-      setMigrateProgress({
-        percent: Math.min(100, Math.max(0, Math.round(progress.percent))),
-        label: progress.label || 'Transferring…',
-      });
-    });
-    return () => {
-      unsub?.();
-    };
   }, []);
 
   // Listen to Context downloading & error state changes dynamically
@@ -385,10 +368,8 @@ export function SettingsPage(): React.JSX.Element {
 
   useEffect(() => {
     if (settingsTab !== 'backup') return;
-    if (!isOnline) {
-      void window.clinic?.backup.googleStatus().then(setDrive);
-    }
-    void loadCloudVaultData();
+    void window.clinic?.backup.googleStatus().then(setDrive);
+    if (isOnline) void loadCloudVaultData();
   }, [settingsTab, isOnline]);
 
   useEffect(() => {
@@ -471,73 +452,6 @@ export function SettingsPage(): React.JSX.Element {
     }
   }
 
-  async function handleMigrateToCloud() {
-    if (!isAdmin) {
-      showAppToast({ type: 'error', message: 'Only an admin can migrate local data.' });
-      return;
-    }
-    const confirmed = window.confirm(
-      'Copy this PC’s offline clinic (patients, visits, invoices, lab, documents and images) into Online DB?\n\nCloud clinic must be empty. Local SQLite stays on this PC as a backup.',
-    );
-    if (!confirmed) return;
-    setMigrateProgress({ percent: 0, label: 'Starting…' });
-    setMigrateLoading(true);
-    try {
-      const result = await window.clinic?.backup.migrateToCloud();
-      if (result?.ok) {
-        const files = result.files;
-        const extra = files
-          ? ` Documents: ${files.uploaded} uploaded, ${files.skipped} skipped, ${files.failed} failed.`
-          : '';
-        showAppToast({ type: 'success', message: `Local clinic copied to Online DB.${extra}` });
-      } else {
-        showAppToast({ type: 'error', message: result?.error ?? 'Migration failed.' });
-      }
-    } catch (err) {
-      showAppToast({
-        type: 'error',
-        message: err instanceof Error ? err.message : 'Migration failed.',
-      });
-    } finally {
-      setMigrateLoading(false);
-    }
-  }
-
-  async function handleMigrateFromCloud() {
-    if (!isAdmin) {
-      showAppToast({ type: 'error', message: 'Only an admin can copy Online data to this PC.' });
-      return;
-    }
-    const confirmed = window.confirm(
-      'Replace this PC’s local clinic.db with the current Online DB (patients, visits, invoices, lab, documents and images)?\n\nThis overwrites local data. After it finishes, switch the license to Local mode and this copy will open.',
-    );
-    if (!confirmed) return;
-    setMigrateProgress({ percent: 0, label: 'Starting…' });
-    setMigrateLoading(true);
-    try {
-      const result = await window.clinic?.backup.migrateFromCloud();
-      if (result?.ok) {
-        const files = result.files;
-        const extra = files
-          ? ` Documents: ${files.uploaded} downloaded, ${files.skipped} skipped, ${files.failed} failed.`
-          : '';
-        showAppToast({
-          type: 'success',
-          message: `Online clinic copied to this PC.${extra} Switch the license to Local to use it.`,
-        });
-      } else {
-        showAppToast({ type: 'error', message: result?.error ?? 'Download from Online DB failed.' });
-      }
-    } catch (err) {
-      showAppToast({
-        type: 'error',
-        message: err instanceof Error ? err.message : 'Download from Online DB failed.',
-      });
-    } finally {
-      setMigrateLoading(false);
-    }
-  }
-
   // Update Check & Download Handlers
   async function handleCheckUpdate() {
     try {
@@ -584,7 +498,7 @@ export function SettingsPage(): React.JSX.Element {
     void window.clinic?.settings.get().then((s) => {
       setSettings(s);
       setPrevMode(s.serverMode);
-      if (!isOnline && s.serverMode === 'lan-client' && s.clientApiUrl) {
+      if (s.serverMode === 'lan-client' && s.clientApiUrl) {
         void window.clinic?.settings.testConnection(s.clientApiUrl).then((ok) => setConnectionOk(ok ?? false));
       }
     }).catch(() => {
@@ -935,7 +849,7 @@ export function SettingsPage(): React.JSX.Element {
                   <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>Clinic Information</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                     {isOnline
-                      ? 'Name, contact, and logo on prints. Saved to the cloud so every online PC shares the same clinic profile.'
+                      ? 'Name, contact, and logo on prints. Also synced to the cloud so the mobile app shows the same clinic profile.'
                       : 'Name, contact, and logo on prints, receipts, and the app sidebar.'}
                   </Typography>
                   <Stack spacing={1.5} sx={{ mb: 3 }}>
@@ -1150,153 +1064,6 @@ export function SettingsPage(): React.JSX.Element {
                             })}
                           </Box>
 
-                          {/* Live Thermal Slip Preview */}
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 1,
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              bgcolor: (t) => (t.palette.mode === 'dark' ? alpha(t.palette.background.default, 0.7) : '#fafafa'),
-                              fontFamily: "'Courier New', Courier, monospace",
-                              fontSize: 11,
-                            }}
-                          >
-                            <Typography
-                              sx={{
-                                fontFamily: 'inherit',
-                                fontSize: '0.65rem',
-                                fontWeight: 700,
-                                letterSpacing: 0.5,
-                                color: 'text.secondary',
-                                mb: 1,
-                                textTransform: 'uppercase',
-                              }}
-                            >
-                              Live Slip Preview
-                            </Typography>
-
-                            {/* Slip Clinic Header */}
-                            <Box sx={{ textAlign: 'center', mb: 0.75 }}>
-                              <Typography sx={{ fontFamily: 'inherit', fontSize: '0.85rem', fontWeight: 800, color: '#000' }}>
-                                {settings.clinicName?.trim() || 'CLINIC MANAGEMENT'}
-                              </Typography>
-                              <Typography
-                                sx={{
-                                  fontFamily: 'inherit',
-                                  fontSize: '0.72rem',
-                                  color: currentShade.hex,
-                                  fontWeight: currentShade.weight,
-                                  lineHeight: 1.3,
-                                  transition: 'color 0.15s ease',
-                                }}
-                              >
-                                {settings.clinicAddress?.trim() || 'Ratto Kala'}
-                              </Typography>
-                              <Typography
-                                sx={{
-                                  fontFamily: 'inherit',
-                                  fontSize: '0.72rem',
-                                  color: currentShade.hex,
-                                  fontWeight: currentShade.weight,
-                                  lineHeight: 1.3,
-                                  transition: 'color 0.15s ease',
-                                }}
-                              >
-                                Tel: {settings.clinicPhone?.trim() || '030066455786'}
-                              </Typography>
-                              <Typography sx={{ fontFamily: 'inherit', fontSize: '0.65rem', color: '#000', my: 0.5 }}>
-                                * * * * * * * * * * * * * * *
-                              </Typography>
-                            </Box>
-
-                            {/* Slip Patient & Doctor Rows */}
-                            <Stack spacing={0.35}>
-                              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                <Typography sx={{ fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 700, color: '#000' }}>
-                                  Patient:
-                                </Typography>
-                                <Typography
-                                  sx={{
-                                    fontFamily: 'inherit',
-                                    fontSize: 'inherit',
-                                    fontWeight: currentShade.weight,
-                                    color: currentShade.hex,
-                                    transition: 'color 0.15s ease',
-                                  }}
-                                >
-                                  Gull Khan
-                                </Typography>
-                              </Stack>
-                              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                <Typography sx={{ fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 700, color: '#000' }}>
-                                  Doctor:
-                                </Typography>
-                                <Typography
-                                  sx={{
-                                    fontFamily: 'inherit',
-                                    fontSize: 'inherit',
-                                    fontWeight: currentShade.weight,
-                                    color: currentShade.hex,
-                                    transition: 'color 0.15s ease',
-                                  }}
-                                >
-                                  Dr. Ahmed Ali
-                                </Typography>
-                              </Stack>
-                              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                <Typography sx={{ fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 700, color: '#000' }}>
-                                  Time:
-                                </Typography>
-                                <Typography
-                                  sx={{
-                                    fontFamily: 'inherit',
-                                    fontSize: 'inherit',
-                                    fontWeight: currentShade.weight,
-                                    color: currentShade.hex,
-                                    transition: 'color 0.15s ease',
-                                  }}
-                                >
-                                  10:57 AM
-                                </Typography>
-                              </Stack>
-                            </Stack>
-
-                            {/* Slip Footer with Dynamic Shade */}
-                            <Box sx={{ textAlign: 'center', mt: 0.75 }}>
-                              <Typography sx={{ fontFamily: 'inherit', fontSize: '0.65rem', color: '#000', my: 0.5 }}>
-                                * * * * * * * * * * * * * * *
-                              </Typography>
-                              <Typography
-                                sx={{
-                                  fontFamily: 'inherit',
-                                  fontSize: '0.72rem',
-                                  color: currentShade.hex,
-                                  fontWeight: currentShade.weight,
-                                  lineHeight: 1.3,
-                                  transition: 'color 0.15s ease',
-                                }}
-                              >
-                                Please wait for your token to be called.
-                              </Typography>
-                              <Typography
-                                sx={{
-                                  fontFamily: 'inherit',
-                                  fontSize: '0.72rem',
-                                  color: currentShade.hex,
-                                  fontWeight: currentShade.weight,
-                                  lineHeight: 1.3,
-                                  transition: 'color 0.15s ease',
-                                }}
-                              >
-                                THANK YOU!
-                              </Typography>
-                              <Typography sx={{ fontFamily: 'inherit', fontSize: '0.62rem', fontWeight: 800, color: '#000', mt: 0.5 }}>
-                                Powered by CareFlow
-                              </Typography>
-                            </Box>
-                          </Box>
-
                           <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75, fontSize: '0.72rem' }}>
                             {currentShade.id === 'gray-900'
                               ? '★ Gray-900: Pure black (Recommended for thermal printers).'
@@ -1369,25 +1136,15 @@ export function SettingsPage(): React.JSX.Element {
                   <Box>
                     <Typography variant="h6" fontWeight={700}>Network Settings</Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                      {isOnline
-                        ? 'This license uses online Postgres — LAN roles are disabled.'
-                        : 'Configure how this machine connects to the clinic network.'}
+                      Configure how this machine connects to the clinic network.
                     </Typography>
-                    {isOnline && (
-                      <Alert severity="info" sx={{ mt: 1.5 }}>
-                        Online database mode is active
-                        {schemaId ? ` (tenant ${schemaId})` : ''}.
-                        Clinic data is stored in the shared cloud schema, filtered per license.
-                      </Alert>
-                    )}
-                    {!isOnline && settings?.serverMode === 'lan-client' && connectionOk === false && (
+                    {settings?.serverMode === 'lan-client' && connectionOk === false && (
                       <Alert severity="error" sx={{ mt: 1.5 }}>
                         LAN server unreachable. App has fallen back to local mode. Please check the server URL and save again.
                       </Alert>
                     )}
                   </Box>
 
-                  {isOnline ? null : (
                     <>
                       <Divider />
 
@@ -1663,13 +1420,12 @@ export function SettingsPage(): React.JSX.Element {
                         </Stack>
                       </Paper>
                     </>
-                  )}
                 </Stack>
               </Stack>
             )}
 
             {settingsTab === 'announcements' && (
-              <Box sx={{ maxWidth: 640, pb: 4 }}>
+              <Box sx={{ width: '100%', pb: 4 }}>
                 <TokenAudioSettingsContent />
               </Box>
             )}
@@ -1755,7 +1511,7 @@ export function SettingsPage(): React.JSX.Element {
             )}
 
             {settingsTab === 'backup' && (
-              <Box sx={{ maxWidth: 560 }}>
+              <Box sx={{ width: '100%' }}>
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                   <BackupOutlinedIcon sx={{ fontSize: 20, color: 'primary.main' }} />
                   <Typography variant="h6" fontWeight={700}>Backup & Restore</Typography>
@@ -1763,57 +1519,11 @@ export function SettingsPage(): React.JSX.Element {
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
                   Full backup (.zip) includes the database plus patient/lab documents so images and PDFs work after restore on another PC. Legacy .db-only backups are still supported.
                 </Typography>
-                {isOnline ? (
                   <Stack spacing={2}>
                     <Alert severity="info">
-                      Online database is on. Local ZIP backup is disabled. Copy local → Online (empty cloud only), or copy Online → this PC so you can switch the license back to Local with the latest cloud data.
-                    </Alert>
-                    {isAdmin && (
-                      migrateLoading ? (
-                        <Box sx={{ width: '100%', pt: 0.5 }}>
-                          <Stack
-                            direction="row"
-                            justifyContent="space-between"
-                            alignItems="center"
-                            sx={{ mb: 0.75 }}
-                          >
-                            <Typography variant="body2" color="text.secondary" fontWeight={600} noWrap>
-                              {migrateProgress.label}
-                            </Typography>
-                            <Typography variant="body2" color="primary.main" fontWeight={800} sx={{ ml: 2 }}>
-                              {migrateProgress.percent}%
-                            </Typography>
-                          </Stack>
-                          <LinearProgress
-                            variant="determinate"
-                            value={migrateProgress.percent}
-                            sx={{ height: 10, borderRadius: 5 }}
-                          />
-                        </Box>
-                      ) : (
-                        <Stack direction="row" gap={1.5} flexWrap="wrap">
-                          <Button
-                            variant="contained"
-                            startIcon={<CloudUploadOutlinedIcon />}
-                            onClick={() => void handleMigrateToCloud()}
-                          >
-                            Migrate local data to Online DB
-                          </Button>
-                          <Button
-                            variant="outlined"
-                            startIcon={<CloudDownloadOutlinedIcon />}
-                            onClick={() => void handleMigrateFromCloud()}
-                          >
-                            Copy Online DB to this PC
-                          </Button>
-                        </Stack>
-                      )
-                    )}
-                  </Stack>
-                ) : (
-                  <Stack spacing={2}>
-                    <Alert severity="info">
-                      Local mode uses this PC’s clinic.db. To bring the latest Online data here, turn Online Database on, click Copy Online DB to this PC, then switch the license back to Local.
+                      {isOnline
+                        ? 'All data is saved on this PC and shared with other PCs over the LAN. Online Database is an extra: it also copies data to the cloud for the mobile app and keeps off-site Cloud Vault backups.'
+                        : 'All data is saved on this PC and shared with other PCs over the LAN. Use ZIP or Google Drive backups. Turn on Online Database for the mobile app and Cloud Vault backups.'}
                     </Alert>
                     <Stack direction="row" gap={1.5} flexWrap="wrap">
                       <Button
@@ -1835,6 +1545,8 @@ export function SettingsPage(): React.JSX.Element {
                       </Button>
                     </Stack>
 
+                    {isOnline && (
+                      <>
                     <Divider />
 
                     {/* CAREFLOW CLOUD VAULT (CENTRAL SERVER BACKUP) */}
@@ -2044,6 +1756,8 @@ export function SettingsPage(): React.JSX.Element {
                     </Paper>
 
                     <Divider />
+                      </>
+                    )}
 
                     <Stack direction="row" alignItems="center" spacing={1}>
                       <CloudOutlinedIcon sx={{ fontSize: 22, color: 'primary.main' }} />
@@ -2206,7 +1920,6 @@ export function SettingsPage(): React.JSX.Element {
                       </Stack>
                     )}
                   </Stack>
-                )}
               </Box>
             )}
 

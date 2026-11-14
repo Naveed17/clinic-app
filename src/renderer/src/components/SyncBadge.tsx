@@ -1,179 +1,185 @@
 import { useState, type ReactNode } from 'react';
 import { IconButton, Tooltip, CircularProgress, Typography, Stack } from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
-import SyncOutlinedIcon from '@mui/icons-material/SyncOutlined';
+import { useTheme } from '@mui/material/styles';
 import SyncDisabledOutlinedIcon from '@mui/icons-material/SyncDisabledOutlined';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import WifiOffOutlinedIcon from '@mui/icons-material/WifiOffOutlined';
 import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined';
 import LanOutlinedIcon from '@mui/icons-material/LanOutlined';
 import CloudDoneOutlinedIcon from '@mui/icons-material/CloudDoneOutlined';
+import CloudOutlinedIcon from '@mui/icons-material/CloudOutlined';
 import CloudOffOutlinedIcon from '@mui/icons-material/CloudOffOutlined';
 import SyncProblemOutlinedIcon from '@mui/icons-material/SyncProblemOutlined';
-import { useSync } from '@/context/SyncContext';
+import { useSync, type SyncStatus } from '@/context/SyncContext';
 import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { showAppToast } from './AppToast';
 
+type PeerKind = 'cloud' | 'lan' | 'none';
+
+/** Where the last sync attempt went — derived from the main-process status, not from license mode. */
+function peerKindOf(status: SyncStatus): PeerKind {
+  if (status.peerName === 'Cloud' || /^https:\/\//i.test(status.peerUrl || '')) return 'cloud';
+  if (status.peerUrl) return 'lan';
+  return 'none';
+}
+
+function lanPeerLabel(status: SyncStatus): string {
+  const name = (status.peerName || '').trim();
+  if (name && name.toLowerCase() !== 'cloud') return name;
+  return (status.peerUrl || '').replace(/^https?:\/\//i, '') || 'LAN server';
+}
+
+function formatTime(ms: number | null): string {
+  return ms ? new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'just now';
+}
+
+/**
+ * Offline-first sync indicator. Data always lives on this PC (or the LAN server);
+ * the badge only reports background sync with the LAN server and/or the cloud.
+ */
 export function SyncBadge(): React.JSX.Element | null {
   const theme = useTheme();
   const { isOnline } = useDatabaseMode();
   const { status, isSyncing, syncNow } = useSync();
   const [animating, setAnimating] = useState(false);
 
-  // In offline-first mode, SyncBadge displays cloud/peer sync status
   const handleManualSync = async () => {
     if (isSyncing || animating) return;
     setAnimating(true);
     try {
       const res = await syncNow();
-      if (res.ok) {
-        const count = res.recordsSynced || 0;
+      const latest = ((await window.clinic?.sync?.status?.().catch(() => null)) as SyncStatus | null) ?? status;
+      const kind = peerKindOf(latest);
+      const target = kind === 'cloud' ? 'cloud' : kind === 'lan' ? lanPeerLabel(latest) : null;
+
+      if (!res.ok) {
+        showAppToast({
+          type: 'error',
+          message:
+            (res.error || (target ? `${target} not reachable.` : 'Sync failed.')) +
+            ' Working offline — changes are saved on this PC and will sync automatically.',
+        });
+        return;
+      }
+      if (!target) {
         showAppToast({
           type: 'success',
-          message: count > 0 ? `Synced ${count} record${count === 1 ? '' : 's'}` : 'Data is up to date',
+          message: 'Local Mode: all data is saved on this PC. No LAN server or cloud to sync with.',
         });
-      } else {
-        showAppToast({
-          type: isOnline ? 'error' : 'success',
-          message: isOnline
-            ? (res.error || 'Cloud not reachable. Working offline.')
-            : (status.peerName ? `Synced with local peer (${status.peerName})` : 'Local Database active. Data is safely stored on this PC.'),
-        });
+        return;
       }
+      const count = res.recordsSynced || 0;
+      showAppToast({
+        type: 'success',
+        message:
+          count > 0
+            ? `Synced ${count} record${count === 1 ? '' : 's'} with ${target}`
+            : `Up to date with ${target}`,
+      });
     } finally {
       setAnimating(false);
     }
   };
 
-  const getStatusDisplay = (): {
-    label: string;
-    color: string;
-    bgColor: string;
-    borderColor: string;
-    icon: ReactNode;
-    tooltip: ReactNode;
-  } => {
-    if (status.state === 'synced') {
-      const timeStr = status.lastSyncTime
-        ? new Date(status.lastSyncTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : 'Just now';
-      const cleanPeer = (status.peerName || '').replace(/\s*\(Neon\)/i, '').trim();
-      const isPeerCloud = !cleanPeer || cleanPeer.toLowerCase() === 'cloud';
-      const displayLabel = isOnline
-        ? 'Cloud Synced'
-        : (!isPeerCloud && cleanPeer ? `Synced: ${cleanPeer}` : 'Local Synced');
-      const peerText = isPeerCloud ? 'Cloud' : (cleanPeer || (isOnline ? 'Cloud' : 'local clinic network'));
+  const tip = (icon: ReactNode, text: string): ReactNode => (
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.25 }}>
+      {icon}
+      <Typography variant="caption" sx={{ fontSize: 12 }}>
+        {text}
+      </Typography>
+    </Stack>
+  );
+
+  const getStatusDisplay = (): { color: string; icon: ReactNode; tooltip: ReactNode } => {
+    const kind = peerKindOf(status);
+
+    // 1. Sync in progress
+    if (isSyncing || animating || status.state === 'syncing') {
+      const pct = status.progress?.percent;
+      const showPct = typeof pct === 'number' && pct > 5 && pct < 100;
+      const text =
+        status.progress?.label ||
+        status.message ||
+        (kind === 'lan' ? 'Syncing with LAN server...' : 'Syncing with cloud...');
       return {
-        label: displayLabel,
-        color: theme.palette.success.main,
-        bgColor: 'transparent',
-        borderColor: 'transparent',
-        icon: <CloudDoneOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
-        tooltip: (
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.25 }}>
-            <CloudDoneOutlinedIcon sx={{ fontSize: 16, color: theme.palette.success.light }} />
-            <Typography variant="caption" sx={{ fontSize: 12 }}>
-              Synced with {peerText} at {timeStr} • Click to sync now
-            </Typography>
-          </Stack>
-        ),
+        color: theme.palette.info.main,
+        icon: <CircularProgress size={20} thickness={4} color="inherit" />,
+        tooltip: tip(<CircularProgress size={14} thickness={4} color="inherit" />, showPct ? `${text} (${pct}%)` : text),
       };
     }
 
-    if (status.state === 'error' && !animating) {
-      return {
-        label: 'Sync Retry',
-        color: theme.palette.warning.main,
-        bgColor: 'transparent',
-        borderColor: 'transparent',
-        icon: <SyncProblemOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
-        tooltip: (
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.25 }}>
-            <ErrorOutlineIcon sx={{ fontSize: 16, color: theme.palette.warning.light }} />
-            <Typography variant="caption" sx={{ fontSize: 12 }}>
-              {status.message || 'Connection issue'} • Click to retry sync
-            </Typography>
-          </Stack>
-        ),
-      };
-    }
-
-    if (status.state === 'offline' && !animating) {
-      if (!isOnline) {
-        const hasPeer = Boolean(status.peerName);
+    // 2. Last sync succeeded
+    if (status.state === 'synced' && kind !== 'none') {
+      const time = formatTime(status.lastSyncTime);
+      if (kind === 'cloud') {
         return {
-          label: hasPeer ? `Local: ${status.peerName}` : 'Local Mode',
           color: theme.palette.success.main,
-          bgColor: 'transparent',
-          borderColor: 'transparent',
-          icon: hasPeer ? <LanOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} /> : <StorageOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
-          tooltip: (
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.25 }}>
-              <StorageOutlinedIcon sx={{ fontSize: 16, color: theme.palette.success.light }} />
-              <Typography variant="caption" sx={{ fontSize: 12 }}>
-                {hasPeer
-                  ? `Connected to local clinic network (${status.peerName}). All data is saved and synced locally.`
-                  : 'Operating in Local Database Mode. All clinic data is stored securely on this PC/LAN.'}
-              </Typography>
-            </Stack>
+          icon: <CloudDoneOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
+          tooltip: tip(
+            <CloudDoneOutlinedIcon sx={{ fontSize: 16, color: theme.palette.success.light }} />,
+            `Synced with cloud at ${time}. Data is saved on this PC and backed up online. Click to sync now.`,
           ),
         };
       }
-
-      // Online Cloud Mode, but cloud is temporarily unreachable
       return {
-        label: 'Cloud Offline',
-        color: theme.palette.text.secondary,
-        bgColor: 'transparent',
-        borderColor: 'transparent',
+        color: theme.palette.success.main,
+        icon: <LanOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
+        tooltip: tip(
+          <LanOutlinedIcon sx={{ fontSize: 16, color: theme.palette.success.light }} />,
+          `Synced with ${lanPeerLabel(status)} at ${time}. Click to sync now.`,
+        ),
+      };
+    }
+
+    // 3. Last sync failed (server error) — data is still safe locally
+    if (status.state === 'error') {
+      return {
+        color: theme.palette.warning.main,
+        icon: <SyncProblemOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
+        tooltip: tip(
+          <SyncProblemOutlinedIcon sx={{ fontSize: 16, color: theme.palette.warning.light }} />,
+          `${status.message || 'Sync failed'}. Data is saved on this PC. Click to retry.`,
+        ),
+      };
+    }
+
+    // 4. Peer not reachable (no internet / LAN server down)
+    if (status.state === 'offline' && kind === 'cloud') {
+      return {
+        color: theme.palette.warning.main,
         icon: <CloudOffOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
-        tooltip: (
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.25 }}>
-            <WifiOffOutlinedIcon sx={{ fontSize: 16, color: 'inherit' }} />
-            <Typography variant="caption" sx={{ fontSize: 12 }}>
-              Cloud database not reachable. Working offline locally. Changes will auto-sync when internet is restored.
-            </Typography>
-          </Stack>
+        tooltip: tip(
+          <CloudOffOutlinedIcon sx={{ fontSize: 16, color: 'inherit' }} />,
+          'Cloud not reachable. Working offline on this PC — changes will sync automatically when internet is back.',
         ),
       };
     }
-
-    if (isSyncing || animating) {
-      const pct = status.progress?.percent;
-      const showPct = typeof pct === 'number' && pct > 5 && pct < 100;
-      const labelText = showPct ? `Syncing ${pct}%` : 'Syncing...';
-      const tooltipText = status.progress?.label || status.message || (isOnline ? 'Exchanging changes with cloud...' : 'Syncing with local clinic network...');
+    if (status.state === 'offline' && kind === 'lan') {
       return {
-        label: labelText,
-        color: theme.palette.info.main,
-        bgColor: 'transparent',
-        borderColor: 'transparent',
-        icon: <CircularProgress size={20} thickness={4} color="inherit" />,
-        tooltip: (
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.25 }}>
-            <CircularProgress size={14} thickness={4} color="inherit" />
-            <Typography variant="caption" sx={{ fontSize: 12 }}>
-              {tooltipText}
-            </Typography>
-          </Stack>
+        color: theme.palette.warning.main,
+        icon: <SyncDisabledOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
+        tooltip: tip(
+          <SyncDisabledOutlinedIcon sx={{ fontSize: 16, color: 'inherit' }} />,
+          `${lanPeerLabel(status)} not reachable. Working offline on this PC — changes will sync when the LAN server is back.`,
         ),
       };
     }
 
+    // 5. Nothing synced yet / no sync target
+    if (isOnline) {
+      return {
+        color: theme.palette.primary.main,
+        icon: <CloudOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
+        tooltip: tip(
+          <CloudOutlinedIcon sx={{ fontSize: 16, color: 'inherit' }} />,
+          'Cloud sync is on. Data is saved on this PC and syncs to the cloud in the background. Click to sync now.',
+        ),
+      };
+    }
     return {
-      label: isOnline ? 'Cloud Sync' : 'Local Mode',
-      color: isOnline ? theme.palette.primary.main : theme.palette.success.main,
-      bgColor: 'transparent',
-      borderColor: 'transparent',
-      icon: isOnline ? <CloudDoneOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} /> : <StorageOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
-      tooltip: (
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.25 }}>
-          {isOnline ? <CloudDoneOutlinedIcon sx={{ fontSize: 16, color: 'inherit' }} /> : <StorageOutlinedIcon sx={{ fontSize: 16, color: 'inherit' }} />}
-          <Typography variant="caption" sx={{ fontSize: 12 }}>
-            {isOnline ? 'Cloud Sync active. Click to sync now.' : 'Local Database active. All data is saved on this PC.'}
-          </Typography>
-        </Stack>
+      color: theme.palette.success.main,
+      icon: <StorageOutlinedIcon fontSize="small" sx={{ color: 'inherit' }} />,
+      tooltip: tip(
+        <StorageOutlinedIcon sx={{ fontSize: 16, color: theme.palette.success.light }} />,
+        'Local Mode. All clinic data is stored on this PC.',
       ),
     };
   };
@@ -182,13 +188,7 @@ export function SyncBadge(): React.JSX.Element | null {
 
   return (
     <Tooltip title={display.tooltip} arrow placement="bottom">
-      <IconButton
-        onClick={() => void handleManualSync()}
-        size="small"
-        sx={{
-          color: display.color,
-        }}
-      >
+      <IconButton onClick={() => void handleManualSync()} size="small" sx={{ color: display.color }}>
         {display.icon}
       </IconButton>
     </Tooltip>

@@ -5,10 +5,11 @@ import { tmpdir, hostname } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { getLicenseRuntimeMeta } from '../license/license.ipc';
-import { getSettings } from '../config/settings';
+import { getSettings, isOnlineDatabaseMode } from '../config/settings';
 import { copyDirRecursive, getClinicDbPath, writeBackupZip } from './backup-zip';
 import { disconnectPrisma, resetPrismaConnection, getPrisma } from '../database/client';
 import { getDocumentsRoot, resolveDocPath, toStoredDocPath } from './docs-paths';
+import { resetCloudPullCursor } from '../sync/sync.service';
 
 export type CloudVaultSchedule = 'off' | 'daily' | 'weekly';
 
@@ -278,6 +279,8 @@ export async function restoreFromCloudVault(
     copyFileSync(zippedDb, getClinicDbPath());
     await resetPrismaConnection();
     await remapDocumentPaths();
+    // Re-merge with the cloud on the next sync.
+    resetCloudPullCursor();
 
     return { ok: true };
   } catch (err: any) {
@@ -332,6 +335,8 @@ let isAutoBackupRunning = false;
  */
 export async function checkAndPerformDailyCloudBackup(): Promise<void> {
   if (isAutoBackupRunning) return;
+  // Cloud Vault (off-site snapshots) is an Online Database perk.
+  if (!isOnlineDatabaseMode()) return;
 
   const status = getCloudVaultStatus();
   if (!status.enabled || status.schedule === 'off') return;

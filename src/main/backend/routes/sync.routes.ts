@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
+import { existsSync } from 'node:fs';
 import type { Server as SocketIOServer } from 'socket.io';
 import { asyncHandler } from '../utils/async-handler';
 import { getSettings } from '../../config/settings';
@@ -16,6 +17,7 @@ import type {
   SyncDeletedItem,
 } from '../../sync/sync.types';
 import { emitDataChange } from '../realtime';
+import { docFileAbsPath, findMissingDocFiles, isDocTable, saveDocFile } from '../../sync/lan-files';
 
 export function createSyncRouter(io?: SocketIOServer): Router {
   const router = Router();
@@ -113,6 +115,61 @@ export function createSyncRouter(io?: SocketIOServer): Router {
       } else {
         res.json({ ok: true, applied: 0 });
       }
+    }),
+  );
+
+  // 8. Document files (PatientDocument / LabReport) — rows sync above, files sync here.
+  router.post(
+    '/files/missing',
+    asyncHandler(async (req, res) => {
+      const table = req.body?.table;
+      if (!isDocTable(table)) {
+        res.status(400).json({ ok: false, error: 'Unknown document table.' });
+        return;
+      }
+      const ids = (Array.isArray(req.body?.ids) ? req.body.ids : [])
+        .map((v: unknown) => String(v || '').trim())
+        .filter(Boolean)
+        .slice(0, 1000);
+      res.json({ ok: true, missing: await findMissingDocFiles(table, ids) });
+    }),
+  );
+
+  router.get(
+    '/file',
+    asyncHandler(async (req, res) => {
+      const table = req.query.table;
+      const id = String(req.query.id || '').trim();
+      if (!isDocTable(table) || !id) {
+        res.status(400).json({ ok: false, error: 'table and id are required.' });
+        return;
+      }
+      const abs = await docFileAbsPath(table, id);
+      if (!abs || !existsSync(abs)) {
+        res.status(404).json({ ok: false, error: 'File not found.' });
+        return;
+      }
+      res.sendFile(abs);
+    }),
+  );
+
+  router.post(
+    '/file',
+    express.raw({ type: () => true, limit: '60mb' }),
+    asyncHandler(async (req, res) => {
+      const table = req.query.table;
+      const id = String(req.query.id || '').trim();
+      if (!isDocTable(table) || !id || !Buffer.isBuffer(req.body) || !req.body.length) {
+        res.status(400).json({ ok: false, error: 'table, id and file body are required.' });
+        return;
+      }
+      const result = await saveDocFile(table, id, req.body);
+      if (result === 'unknown') {
+        res.status(404).json({ ok: false, error: 'Document row not found on server.' });
+        return;
+      }
+      if (result === 'saved' && io) emitDataChange(io, table, 'sync');
+      res.json({ ok: true, result });
     }),
   );
 

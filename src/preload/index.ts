@@ -3,6 +3,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { io, type Socket } from 'socket.io-client';
 
 let apiUrl = '';
+/** Cloud API origin (online mode only) — documents + clinic meta. */
+let cloudUrl = '';
 let isLanClient = false;
 let isOnlineClient = false;
 let onlineSchemaId = '';
@@ -26,12 +28,12 @@ const settingsReady = ipcRenderer
       if (meta?.key) onlineLicenseKey = meta.key;
     } catch { /* ignore */ }
 
+    // Offline-first: online mode only adds a cloud origin (documents, clinic meta).
+    // All clinical data still goes through local IPC / LAN server like local mode.
     if (s.databaseMode === 'online' && s.clinicalApiUrl) {
-      apiUrl = s.clinicalApiUrl.replace(/\/+$/, '').replace(/\/api$/i, '');
+      cloudUrl = s.clinicalApiUrl.replace(/\/+$/, '').replace(/\/api$/i, '');
       isOnlineClient = true;
-      isLanClient = false; // Offline-first: Keep local IPC for all operations!
       if (s.schemaId) onlineSchemaId = s.schemaId;
-      return;
     }
     if (s.serverMode === 'lan-client' && s.clientApiUrl) {
       // If main fell back to a local backend (server unreachable), app:get-api-url is set.
@@ -118,7 +120,15 @@ function onlineErrorMessage(raw: string, status: number): string {
   return `Request failed with status ${status}.`;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+function request<T>(path: string, init?: RequestInit): Promise<T> {
+  return requestTo<T>(() => apiUrl, path, init);
+}
+
+function cloudRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  return requestTo<T>(() => cloudUrl, path, init);
+}
+
+async function requestTo<T>(base: () => string, path: string, init?: RequestInit): Promise<T> {
   await settingsReady;
   const timeZone = (() => {
     try {
@@ -137,7 +147,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   let response: Response;
   try {
-    response = await fetch(`${apiUrl}${path}`, {
+    response = await fetch(`${base()}${path}`, {
       signal: init?.signal ?? controller.signal,
       headers: {
         'Content-Type': 'application/json',
@@ -199,67 +209,6 @@ function ipc<T>(channel: string, ...args: unknown[]): Promise<T> {
   ]).finally(() => {
     if (timer) clearTimeout(timer);
   });
-}
-
-type CloudFile = { name: string; mimeType: string; size: number; fileData: string };
-type UploadPlan = {
-  storage: 'r2' | 'inline';
-  id?: string;
-  uploadUrl?: string;
-  contentType?: string;
-  maxBytes?: number;
-};
-
-async function resolveCloudFileData(doc: {
-  fileData?: string | null;
-  downloadUrl?: string | null;
-}): Promise<string | null> {
-  if (doc.fileData) return doc.fileData;
-  if (doc.downloadUrl) {
-    const fetched = await ipc<{ ok: boolean; fileData?: string; error?: string }>(
-      'docs:fetch-url',
-      doc.downloadUrl,
-    );
-    if (!fetched.ok || !fetched.fileData) return null;
-    return fetched.fileData;
-  }
-  return null;
-}
-
-async function uploadOnlineFiles(
-  files: CloudFile[],
-  beginPath: string,
-  completePath: (id: string) => string,
-  inlinePath: string,
-  deletePath: (id: string) => string,
-): Promise<{ id: string; name: string }[]> {
-  const results: { id: string; name: string }[] = [];
-  for (const file of files) {
-    const plan = await request<UploadPlan>(beginPath, {
-      method: 'POST',
-      body: JSON.stringify({ name: file.name, mimeType: file.mimeType, size: file.size }),
-    });
-    if (plan.storage === 'r2' && plan.uploadUrl && plan.id) {
-      const put = await ipc<{ ok: boolean; error?: string }>('docs:put-url', {
-        url: plan.uploadUrl,
-        contentType: plan.contentType,
-        fileData: file.fileData,
-      });
-      if (!put.ok) {
-        await request(deletePath(plan.id), { method: 'DELETE' }).catch(() => undefined);
-        throw new Error(put.error || 'Cloud upload failed.');
-      }
-      results.push(await request(completePath(plan.id), { method: 'POST' }));
-    } else {
-      results.push(
-        await request(inlinePath, {
-          method: 'POST',
-          body: JSON.stringify(file),
-        }),
-      );
-    }
-  }
-  return results;
 }
 
 function call<T>(httpFn: () => Promise<T>, ipcChannel: string, ...ipcArgs: unknown[]): Promise<T> {
@@ -527,119 +476,21 @@ const api = {
         cloudRestore: (backupId: string) => ipc('backup:cloud-restore', backupId),
         cloudDelete: (backupId: string) => ipc('backup:cloud-delete', backupId),
       },
+  // Offline-first: documents are always stored locally (same as local mode).
+  // Cloud sync uploads/downloads the files in the background in online mode.
   docs: {
     patient: {
-      list: (patientId: string) =>
-        isOnlineClient
-          ? request(`/api/docs/patients/${encodeURIComponent(patientId)}`)
-          : ipc('docs:patient:list', patientId),
-      upload: async (patientId: string) => {
-        if (!isOnlineClient) return ipc('docs:patient:upload', patientId);
-        const files = await ipc<CloudFile[]>('docs:pick-files', {
-          title: 'Select Document',
-          extensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'txt'],
-          maxBytes: 25 * 1024 * 1024,
-        });
-        if (!files.length) return [];
-        return uploadOnlineFiles(
-          files,
-          `/api/docs/patients/${encodeURIComponent(patientId)}/uploads`,
-          (id) => `/api/docs/${encodeURIComponent(id)}/complete`,
-          `/api/docs/patients/${encodeURIComponent(patientId)}`,
-          (id) => `/api/docs/${encodeURIComponent(id)}`,
-        );
-      },
-      delete: (id: string) =>
-        isOnlineClient
-          ? request(`/api/docs/${encodeURIComponent(id)}`, { method: 'DELETE' })
-          : ipc('docs:patient:delete', id),
-      open: async (id: string) => {
-        if (!isOnlineClient) return ipc('docs:patient:open', id);
-        const doc = await request<{
-          name: string;
-          mimeType: string;
-          fileData: string | null;
-          downloadUrl?: string | null;
-          open?: { type: string; name: string; data: string };
-        }>(`/api/docs/${encodeURIComponent(id)}`);
-        if (doc.open?.type === 'pdf' || doc.open?.type === 'image') return doc.open;
-        const fileData = await resolveCloudFileData(doc);
-        return ipc('docs:open-buffer', {
-          name: doc.name,
-          mimeType: doc.mimeType,
-          fileData,
-        });
-      },
-      whatsapp: async (id: string, phone?: string) => {
-        if (!isOnlineClient) return ipc('docs:patient:whatsapp', id, phone);
-        const doc = await request<{
-          name: string;
-          mimeType: string;
-          fileData: string | null;
-          downloadUrl?: string | null;
-          patient?: {
-            firstName?: string;
-            lastName?: string;
-            phone?: string | null;
-            mrNumber?: string | null;
-          };
-        }>(`/api/docs/${encodeURIComponent(id)}`);
-        const fileData = await resolveCloudFileData(doc);
-        if (!fileData) return { success: false, error: 'File not found.' };
-        return ipc('docs:whatsapp-from-buffer', {
-          fileName: doc.name,
-          mimeType: doc.mimeType,
-          fileData,
-          phone: phone || doc.patient?.phone,
-          context: {
-            patientName: `${doc.patient?.firstName ?? ''} ${doc.patient?.lastName ?? ''}`.trim(),
-            mrNumber: doc.patient?.mrNumber ?? null,
-          },
-        });
-      },
+      list: (patientId: string) => ipc('docs:patient:list', patientId),
+      upload: (patientId: string) => ipc('docs:patient:upload', patientId),
+      delete: (id: string) => ipc('docs:patient:delete', id),
+      open: (id: string) => ipc('docs:patient:open', id),
+      whatsapp: (id: string, phone?: string) => ipc('docs:patient:whatsapp', id, phone),
     },
     lab: {
-      list: (labOrderId: string) =>
-        isOnlineClient
-          ? request(`/api/docs/lab/${encodeURIComponent(labOrderId)}`)
-          : ipc('docs:lab:list', labOrderId),
-      upload: async (labOrderId: string) => {
-        if (!isOnlineClient) return ipc('docs:lab:upload', labOrderId);
-        const files = await ipc<CloudFile[]>('docs:pick-files', {
-          title: 'Attach Lab Report',
-          extensions: ['pdf', 'jpg', 'jpeg', 'png'],
-          maxBytes: 25 * 1024 * 1024,
-        });
-        if (!files.length) return [];
-        return uploadOnlineFiles(
-          files,
-          `/api/docs/lab/${encodeURIComponent(labOrderId)}/uploads`,
-          (id) => `/api/docs/lab-report/${encodeURIComponent(id)}/complete`,
-          `/api/docs/lab/${encodeURIComponent(labOrderId)}`,
-          (id) => `/api/docs/lab-report/${encodeURIComponent(id)}`,
-        );
-      },
-      delete: (id: string) =>
-        isOnlineClient
-          ? request(`/api/docs/lab-report/${encodeURIComponent(id)}`, { method: 'DELETE' })
-          : ipc('docs:lab:delete', id),
-      open: async (id: string) => {
-        if (!isOnlineClient) return ipc('docs:lab:open', id);
-        const report = await request<{
-          name: string;
-          mimeType: string;
-          fileData: string | null;
-          downloadUrl?: string | null;
-          open?: { type: string; name: string; data: string };
-        }>(`/api/docs/lab-report/${encodeURIComponent(id)}`);
-        if (report.open?.type === 'pdf' || report.open?.type === 'image') return report.open;
-        const fileData = await resolveCloudFileData(report);
-        await ipc('docs:open-buffer', {
-          name: report.name,
-          mimeType: report.mimeType,
-          fileData,
-        });
-      },
+      list: (labOrderId: string) => ipc('docs:lab:list', labOrderId),
+      upload: (labOrderId: string) => ipc('docs:lab:upload', labOrderId),
+      delete: (id: string) => ipc('docs:lab:delete', id),
+      open: (id: string) => ipc('docs:lab:open', id),
     },
   },
   tokens: {
@@ -1004,7 +855,7 @@ const api = {
       const local = await ipc<Record<string, unknown>>('settings:get');
       if (!isOnlineClient) return local;
       try {
-        const meta = await request<{
+        const meta = await cloudRequest<{
           clinicName?: string;
           clinicAddress?: string;
           clinicPhone?: string;
@@ -1026,7 +877,7 @@ const api = {
       if (isOnlineClient && patch && typeof patch === 'object') {
         const p = patch as Record<string, unknown>;
         try {
-          await request('/api/clinic/meta', {
+          await cloudRequest('/api/clinic/meta', {
             method: 'PUT',
             body: JSON.stringify({
               clinicName: p.clinicName ?? saved.clinicName ?? '',

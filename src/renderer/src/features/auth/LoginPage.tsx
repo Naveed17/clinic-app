@@ -24,7 +24,6 @@ import {
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { useDatabaseMode } from '@/context/DatabaseModeProvider';
 import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 import { DoctorAvatar, avatarFallbackFromRole } from '@/components/DoctorAvatar';
 
@@ -142,7 +141,6 @@ export function LoginPage(): React.JSX.Element {
   const [connectError, setConnectError] = useState('');
   const [connected, setConnected] = useState(false);
   const [serverMode, setServerMode] = useState<string>('local');
-  const { isOnline } = useDatabaseMode();
 
   useEffect(() => {
     void window.clinic?.auth.directory?.()
@@ -282,30 +280,30 @@ export function LoginPage(): React.JSX.Element {
         }}
       >
         {/* Machine Role Badge */}
-        {!isOnline && serverMode && (
+        {serverMode && (
           <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1.5 }}>
-            {!isOnline && serverMode === 'lan-server' && (
+            {serverMode === 'lan-server' && (
               <Stack direction="row" alignItems="center" spacing={0.6}
                 sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(15,118,110,0.25)', border: '1px solid rgba(15,118,110,0.5)' }}>
                 <DnsOutlinedIcon sx={{ fontSize: 13, color: '#4ade80' }} />
                 <Typography variant="caption" sx={{ color: '#4ade80', fontWeight: 700, fontSize: 11 }}>LAN Server</Typography>
               </Stack>
             )}
-            {!isOnline && serverMode === 'local' && (
+            {serverMode === 'local' && (
               <Stack direction="row" alignItems="center" spacing={0.6}
                 sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)' }}>
                 <LaptopOutlinedIcon sx={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }} />
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, fontSize: 11 }}>Standalone</Typography>
               </Stack>
             )}
-            {!isOnline && serverMode === 'lan-client' && connected && (
+            {serverMode === 'lan-client' && connected && (
               <Stack direction="row" alignItems="center" spacing={0.6}
                 sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.4)' }}>
                 <CheckCircleOutlineIcon sx={{ fontSize: 13, color: '#60a5fa' }} />
                 <Typography variant="caption" sx={{ color: '#60a5fa', fontWeight: 700, fontSize: 11 }}>LAN Client — Connected</Typography>
               </Stack>
             )}
-            {!isOnline && serverMode === 'lan-client' && !connected && (
+            {serverMode === 'lan-client' && !connected && (
               <Stack direction="row" alignItems="center" spacing={0.6}
                 sx={{ px: 1.2, py: 0.4, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)' }}>
                 <WifiTetheringIcon sx={{ fontSize: 13, color: '#f87171' }} />

@@ -65,11 +65,12 @@ export function SyncProvider({ children }: PropsWithChildren): React.JSX.Element
 
     // Instant browser network detection
     const handleOffline = () => {
-      setStatus((prev) => ({
-        ...prev,
-        state: 'offline',
-        message: 'No internet connection. Working offline.',
-      }));
+      // Internet loss only affects cloud sync — a LAN server stays reachable without internet.
+      setStatus((prev) => {
+        const isCloudPeer = prev.peerName === 'Cloud' || /^https:\/\//i.test(prev.peerUrl || '');
+        if (!isCloudPeer) return prev;
+        return { ...prev, state: 'offline', message: 'No internet connection. Working offline.' };
+      });
     };
 
     const handleOnline = () => {

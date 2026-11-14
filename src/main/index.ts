@@ -196,17 +196,16 @@ app.whenReady().then(async () => {
       (meta.databaseMode === 'online' && Boolean(meta.clinicalApiUrl || settings.clinicalApiUrl));
 
     if (online) {
-      // Online = Vercel Nest API → Neon Postgres only (no local SQLite / LAN).
-      const clinicalOrigin = resolveOnlineApiOrigin(settings.clinicalApiUrl || meta.clinicalApiUrl);
+      // Offline-first: online mode only adds cloud sync/backups on top of the
+      // normal local SQLite + LAN flow below. Just persist the cloud origin.
       saveDatabaseModeSettings({
         databaseMode: 'online',
-        clinicalApiUrl: clinicalOrigin,
+        clinicalApiUrl: resolveOnlineApiOrigin(settings.clinicalApiUrl || meta.clinicalApiUrl),
         schemaId: settings.schemaId || meta.schemaId || '',
-        serverMode: 'local',
-        clientApiUrl: '',
       });
-      process.env.CLINIC_API_URL = clinicalOrigin;
-    } else if (settings.serverMode === 'lan-client' && settings.clientApiUrl) {
+    }
+
+    if (settings.serverMode === 'lan-client' && settings.clientApiUrl) {
       // Verify remote server is reachable before committing to client mode
       const reachable = await new Promise<boolean>((resolve) => {
         const { request } = require('node:http') as typeof import('node:http');
@@ -275,13 +274,12 @@ app.whenReady().then(async () => {
   registerRecycleBinIpc(backendServer?.io);
   registerSyncIpc();
   registerTtsIpc();
-  // LAN discovery only when not on cloud Postgres
-  if (!isOnlineDatabaseMode()) {
-    startDiscoveryListener();
-  }
+  // LAN discovery runs in both local and online mode (offline-first).
+  startDiscoveryListener();
   startAutoSync();
   startCloudVaultScheduler();
   startRecycleBinAutoPurgeScheduler(7);
+  initAutoUpdater();
   createWindow();
 
   powerMonitor.on('suspend', async () => {

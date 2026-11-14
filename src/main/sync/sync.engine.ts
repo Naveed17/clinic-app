@@ -1,4 +1,6 @@
+import { existsSync, unlinkSync } from 'node:fs';
 import { getPrisma } from '../database/client';
+import { resolveDocPath } from '../backup/docs-paths';
 import {
   SYNC_TABLES,
   SYNC_COLUMNS,
@@ -321,8 +323,9 @@ export async function applyIncomingChanges(
         `;
 
         try {
-          await db.$executeRawUnsafe(sql, ...values);
-          appliedChanges++;
+          // Count only real inserts/updates (LWW no-op returns 0) so re-pulled rows are not reported.
+          const affected = await db.$executeRawUnsafe(sql, ...values);
+          if (affected > 0) appliedChanges++;
         } catch (err) {
           console.warn(`[SyncEngine] Failed upsert for ${table} row ${row.id}:`, err);
         }
@@ -337,7 +340,22 @@ export async function applyIncomingChanges(
         if (!validTable) continue;
 
         try {
-          await db.$executeRawUnsafe(`DELETE FROM "${validTable}" WHERE id = ?`, del.id);
+          // Document rows: also remove the file from disk.
+          let docFile: string | null = null;
+          if (validTable === 'PatientDocument' || validTable === 'LabReport') {
+            const found = await db
+              .$queryRawUnsafe<Array<{ filePath: string | null }>>(`SELECT filePath FROM "${validTable}" WHERE id = ?`, del.id)
+              .catch(() => []);
+            docFile = found[0]?.filePath ?? null;
+          }
+          const removed = await db.$executeRawUnsafe(`DELETE FROM "${validTable}" WHERE id = ?`, del.id);
+          if (removed === 0) continue; // already gone here — nothing to apply
+          if (docFile) {
+            try {
+              const abs = resolveDocPath(docFile);
+              if (existsSync(abs)) unlinkSync(abs);
+            } catch { /* file cleanup is best-effort */ }
+          }
           await db.$executeRawUnsafe(
             `INSERT OR REPLACE INTO "_DeletedRecord" ("id", "tableName", "deletedAt") VALUES (?, ?, ?)`,
             del.id,

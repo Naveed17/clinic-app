@@ -7,6 +7,7 @@ import AdmZip from 'adm-zip';
 import { disconnectPrisma, resetPrismaConnection, getPrisma } from '../database/client';
 import { getDocumentsRoot, resolveDocPath, toStoredDocPath } from './docs-paths';
 import { isOnlineDatabaseMode } from '../config/settings';
+import { resetCloudPullCursor } from '../sync/sync.service';
 import { copyDirRecursive, getClinicDbPath, writeBackupZip } from './backup-zip';
 import {
   backupToGoogleDriveNow,
@@ -77,12 +78,6 @@ export function registerBackupIpc(): void {
   ipcMain.removeHandler('backup:cloud-delete');
 
   ipcMain.handle('backup:create', async () => {
-    if (isOnlineDatabaseMode()) {
-      return {
-        ok: false,
-        error: 'Backup is not available in online database mode. Data is stored in the cloud.',
-      };
-    }
     const stamp = new Date().toISOString().slice(0, 10);
     const { filePath, canceled } = await dialog.showSaveDialog({
       title: 'Save Clinic Backup (ZIP)',
@@ -102,12 +97,6 @@ export function registerBackupIpc(): void {
   });
 
   ipcMain.handle('backup:restore', async () => {
-    if (isOnlineDatabaseMode()) {
-      return {
-        ok: false,
-        error: 'Restore is not available in online database mode. Data is stored in the cloud.',
-      };
-    }
     const { filePaths, canceled } = await dialog.showOpenDialog({
       title: 'Select Backup File',
       filters: [
@@ -147,6 +136,8 @@ export function registerBackupIpc(): void {
       copyFileSync(dbSource, getClinicDbPath());
       await resetPrismaConnection();
       await remapDocumentPaths();
+      // Online DB: re-merge with the cloud on next sync (restore never blocks cloud).
+      if (isOnlineDatabaseMode()) resetCloudPullCursor();
 
       return { ok: true, mode: selected.toLowerCase().endsWith('.zip') ? 'full' : 'db' };
     } catch (e) {
@@ -181,9 +172,6 @@ export function registerBackupIpc(): void {
   ipcMain.handle('backup:google-now', () => backupToGoogleDriveNow());
   ipcMain.handle('backup:google-list', () => listGoogleDriveBackups());
   ipcMain.handle('backup:google-restore', async (event, fileId: string) => {
-    if (isOnlineDatabaseMode()) {
-      return { ok: false, error: 'Restore is not available in online database mode.' };
-    }
     const staging = join(tmpdir(), `careflow-drive-restore-${randomUUID()}`);
     const downloadZip = join(tmpdir(), `drive-backup-${Date.now()}.zip`);
     try {
@@ -214,6 +202,8 @@ export function registerBackupIpc(): void {
       copyFileSync(dbSource, getClinicDbPath());
       await resetPrismaConnection();
       await remapDocumentPaths();
+      // Online DB: re-merge with the cloud on next sync (restore never blocks cloud).
+      if (isOnlineDatabaseMode()) resetCloudPullCursor();
 
       event.sender.send('backup:google-progress', { percent: 100, label: 'Restore complete!' });
       return { ok: true };

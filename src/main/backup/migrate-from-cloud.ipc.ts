@@ -1,10 +1,10 @@
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { getPrisma, initializeDatabase } from '../database/client';
 import { isOnlineDatabaseMode, saveSettings } from '../config/settings';
 import { seedDefaultAdmin } from '../auth/seed';
-import { getDocsDir, toStoredDocPath } from './docs-paths';
+import { getDocsDir, resolveDocPath, toStoredDocPath } from './docs-paths';
 import {
   clinicMigrateApi,
   TABLE_LABELS,
@@ -148,7 +148,10 @@ function bufferFromInline(fileData: string): Buffer {
   return Buffer.from(idx >= 0 ? text.slice(idx + 7) : text, 'base64');
 }
 
-async function saveCloudFile(item: FileListItem): Promise<'uploaded' | 'skipped' | 'failed'> {
+async function saveCloudFile(
+  item: FileListItem,
+  updatedAt: Date = new Date(),
+): Promise<'uploaded' | 'skipped' | 'failed'> {
   try {
     let buffer: Buffer | null = null;
     if (item.downloadUrl) {
@@ -181,28 +184,30 @@ async function saveCloudFile(item: FileListItem): Promise<'uploaded' | 'skipped'
     const filePath = toStoredDocPath(absolute);
     const db = getPrisma();
     if (item.kind === 'lab') {
-      await db.labReport.create({
-        data: {
-          id: item.id,
-          labOrderId: item.ownerId,
-          name: item.name || `${item.id}.${ext}`,
-          filePath,
-          mimeType: item.mimeType || ext,
-          size: buffer.length,
-          updatedAt: new Date(),
-        },
+      const data = {
+        labOrderId: item.ownerId,
+        name: item.name || `${item.id}.${ext}`,
+        filePath,
+        mimeType: item.mimeType || ext,
+        size: buffer.length,
+      };
+      await db.labReport.upsert({
+        where: { id: item.id },
+        create: { id: item.id, ...data, updatedAt },
+        update: { ...data, updatedAt },
       });
     } else {
-      await db.patientDocument.create({
-        data: {
-          id: item.id,
-          patientId: item.ownerId,
-          name: item.name || `${item.id}.${ext}`,
-          filePath,
-          mimeType: item.mimeType || ext,
-          size: buffer.length,
-          updatedAt: new Date(),
-        },
+      const data = {
+        patientId: item.ownerId,
+        name: item.name || `${item.id}.${ext}`,
+        filePath,
+        mimeType: item.mimeType || ext,
+        size: buffer.length,
+      };
+      await db.patientDocument.upsert({
+        where: { id: item.id },
+        create: { id: item.id, ...data, updatedAt },
+        update: { ...data, updatedAt },
       });
     }
     return 'uploaded';
@@ -210,6 +215,57 @@ async function saveCloudFile(item: FileListItem): Promise<'uploaded' | 'skipped'
     console.warn('[migrate-from-cloud] file failed', item.id, (err as Error).message);
     return 'failed';
   }
+}
+
+/**
+ * Background cloud sync (offline-first): download patient documents / lab reports
+ * that exist in the cloud (e.g. uploaded from another PC or the mobile app) but
+ * are missing on this PC. Only lists cloud files when cloud and local counts differ.
+ */
+export async function pullMissingCloudDocuments(
+  remoteCounts?: { patient?: number; lab?: number },
+  /** Stamp before this sync's cut-off so downloaded files are not re-uploaded next sync. */
+  updatedAt?: Date,
+): Promise<{ downloaded: number; failed: number }> {
+  const db = getPrisma();
+  const result = { downloaded: 0, failed: 0 };
+
+  for (const kind of ['patient', 'lab'] as const) {
+    const table = kind === 'lab' ? 'LabReport' : 'PatientDocument';
+    const localRows = await db.$queryRawUnsafe<Array<{ id: string; filePath: string | null }>>(
+      `SELECT id, filePath FROM "${table}"`,
+    );
+    const remoteCount = Number(remoteCounts?.[kind] ?? -1);
+    // Cheap check first: only list cloud files when counts differ.
+    if (remoteCount >= 0 && remoteCount === localRows.length) continue;
+    if (remoteCount === 0) continue;
+
+    const haveFile = new Set(
+      localRows.filter((r) => r.filePath && existsSync(resolveDocPath(r.filePath))).map((r) => r.id),
+    );
+    const deletedRows = await db
+      .$queryRawUnsafe<Array<{ id: string }>>(`SELECT id FROM "_DeletedRecord" WHERE "tableName" = ?`, table)
+      .catch(() => [] as Array<{ id: string }>);
+    const deletedLocally = new Set(deletedRows.map((r) => r.id));
+
+    let offset = 0;
+    for (;;) {
+      const page = await clinicMigrateApi<{ items: FileListItem[] }>(
+        `/api/clinic/migrate/export/files?kind=${kind}&offset=${offset}&limit=100`,
+      );
+      const items = Array.isArray(page.items) ? page.items : [];
+      if (!items.length) break;
+      for (const item of items) {
+        if (haveFile.has(item.id) || deletedLocally.has(item.id)) continue;
+        const status = await saveCloudFile({ ...item, kind }, updatedAt);
+        if (status === 'uploaded') result.downloaded += 1;
+        else if (status === 'failed') result.failed += 1;
+      }
+      offset += items.length;
+      if (items.length < 100) break;
+    }
+  }
+  return result;
 }
 
 export type MigrateFromCloudResult = {

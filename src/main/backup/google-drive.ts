@@ -4,7 +4,6 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { isOnlineDatabaseMode } from '../config/settings';
 import { defaultBackupFileName, writeBackupZip } from './backup-zip';
 
 const LICENSE_API = process.env.API_BASE_URL || 'https://clinic-license-six.vercel.app/api';
@@ -406,9 +405,6 @@ export function setGoogleDriveSchedule(schedule: DriveSchedule): DriveState | nu
 }
 
 export async function backupToGoogleDriveNow(): Promise<{ ok: boolean; name?: string; error?: string }> {
-  if (isOnlineDatabaseMode()) {
-    return { ok: false, error: 'Google Drive backup is for local database mode.' };
-  }
   if (backupInFlight) return { ok: false, error: 'A Google Drive backup is already running.' };
   const state = readState();
   if (!state) return { ok: false, error: 'Connect Google Drive first.' };
@@ -456,7 +452,6 @@ function dueForSchedule(state: DriveState, now = new Date()): boolean {
 }
 
 async function runScheduledBackup(): Promise<void> {
-  if (isOnlineDatabaseMode()) return;
   const state = readState();
   if (!state || !dueForSchedule(state)) return;
   await backupToGoogleDriveNow();

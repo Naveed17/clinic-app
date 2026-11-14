@@ -164,15 +164,13 @@ export function getSettings(): AppSettings {
 }
 
 /**
- * Online mode → only Vercel API → Neon.
- * No LAN, no localhost clinical URL, no local SQLite for clinic data.
+ * Offline-first: online mode only adds cloud sync / backups / mobile access.
+ * LAN roles (standalone / server / client) and local SQLite stay exactly as in local mode.
  */
 function normalizeOnlineSettings(settings: AppSettings): AppSettings {
   if (settings.databaseMode !== 'online') return settings;
   return {
     ...settings,
-    serverMode: 'local',
-    clientApiUrl: '',
     clinicalApiUrl: resolveOnlineApiOrigin(settings.clinicalApiUrl),
   };
 }

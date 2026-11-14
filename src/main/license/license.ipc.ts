@@ -319,7 +319,6 @@ export function applyDatabaseModeFromApi(key: string, data: LicenseApiExtras & {
     databaseMode,
     clinicalApiUrl: databaseMode === 'online' ? clinicalApiUrl : '',
     schemaId: databaseMode === 'online' ? schemaId : '',
-    ...(databaseMode === 'online' ? { serverMode: 'local' as const, clientApiUrl: '' } : {}),
   });
 }
 

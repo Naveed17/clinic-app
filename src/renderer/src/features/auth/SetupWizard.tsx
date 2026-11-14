@@ -15,7 +15,6 @@ import { useClinicBrandLogo } from '@/utils/clinicBrandLogo';
 type Mode = 'local' | 'lan-server' | 'lan-client';
 
 const STEPS_LOCAL = ['Welcome', 'Machine Role', 'Done'];
-const STEPS_ONLINE = ['Welcome', 'Done'];
 
 function normalizeServerUrl(raw: string): string {
   const trimmed = raw.trim().replace(/\/+$/, '');
@@ -40,11 +39,12 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState('');
-  const { isOnline: onlineMode } = useDatabaseMode();
+  // Offline-first: online mode only adds cloud sync, so LAN role setup is the same.
+  const { isOnline: cloudSync } = useDatabaseMode();
 
   const serverUrl = normalizeServerUrl(selectedUrl || manualUrl);
-  const steps = onlineMode ? STEPS_ONLINE : STEPS_LOCAL;
-  const stepperIndex = onlineMode ? (step >= 2 ? 1 : 0) : step;
+  const steps = STEPS_LOCAL;
+  const stepperIndex = step;
 
   async function handleScan() {
     setScanning(true);
@@ -96,7 +96,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
     setError('');
 
     try {
-      if (!onlineMode && mode === 'lan-client') {
+      if (mode === 'lan-client') {
         if (!serverUrl) {
           setError('Please select or enter a server URL.');
           setStep(1);
@@ -114,8 +114,8 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
         clinicName: clinicName.trim() || 'CareFlow Clinic',
         clinicPhone: clinicPhone.trim() || '',
         clinicAddress: clinicAddress.trim() || '',
-        serverMode: onlineMode ? 'local' : mode,
-        clientApiUrl: !onlineMode && mode === 'lan-client' ? serverUrl : '',
+        serverMode: mode,
+        clientApiUrl: mode === 'lan-client' ? serverUrl : '',
         setupDone: true,
       });
 
@@ -206,7 +206,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
             <Button
               variant="contained"
               disabled={!clinicName.trim()}
-              onClick={() => setStep(onlineMode ? 2 : 1)}
+              onClick={() => setStep(1)}
               sx={{ py: 1.2, fontWeight: 700 }}
             >
               Next
@@ -215,7 +215,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
         )}
 
         {/* Step 1: Machine Role (local / LAN only) */}
-        {step === 1 && !onlineMode && (
+        {step === 1 && (
           <Stack spacing={3}>
             <Box>
               <Typography variant="h6">Machine Role</Typography>
@@ -342,14 +342,12 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                 <strong>{clinicName}</strong> is configured as{' '}
                 <strong>
-                  {onlineMode
-                    ? 'Online Database (cloud)'
-                    : mode === 'local'
+                  {mode === 'local'
                       ? 'Standalone'
                       : mode === 'lan-server'
                         ? 'LAN Server'
                         : 'LAN Client'}
-                </strong>.
+                </strong>{cloudSync ? ' with Cloud Sync' : ''}.
               </Typography>
               {mode === 'lan-client' && serverUrl && (
                 <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', display: 'block', mt: 0.5 }}>
@@ -359,7 +357,7 @@ export function SetupWizard({ onDone }: { onDone: () => void }): React.JSX.Eleme
             </Box>
             {error && <Alert severity="error" sx={{ width: '100%', textAlign: 'left' }}>{error}</Alert>}
             <Stack direction="row" spacing={1} width="100%">
-              <Button variant="outlined" disabled={saving} onClick={() => { setError(''); setStep(onlineMode ? 0 : 1); }}>Back</Button>
+              <Button variant="outlined" disabled={saving} onClick={() => { setError(''); setStep(1); }}>Back</Button>
               <Button variant="contained" sx={{ flex: 1 }} loading={saving} onClick={() => void handleFinish()}>
                 Finish & Launch
               </Button>
