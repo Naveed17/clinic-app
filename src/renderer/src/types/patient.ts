@@ -15,6 +15,8 @@ export interface Patient {
   bloodGroup: string | null;
   allergies: string | null;
   chronicConditions: string | null;
+  /** Free-text notes (shared with the mobile app). */
+  notes?: string | null;
   primaryDoctorId?: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -36,6 +38,7 @@ export interface PatientInput {
   bloodGroup?: string | null;
   allergies?: string | null;
   chronicConditions?: string | null;
+  notes?: string | null;
   primaryDoctorId?: string | null;
 }
 

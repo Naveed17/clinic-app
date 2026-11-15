@@ -1,6 +1,6 @@
 {
   "name": "care-flow",
-  "version": "1.0.97",
+  "version": "1.0.98",
   "repository": {
     "type": "git",
     "url": "https://github.com/Naveed17/clinic-app.git"
@@ -23,7 +23,8 @@
     "prisma:studio": "node scripts/studio.js",
     "db:reset": "del /f /q \"%APPDATA%\\CareFlow\\clinic.db\" && echo Database reset done!",
     "dist": "npm run prisma:generate && npm run build && npx electron-builder",
-    "dist:publish": "npm run prisma:generate && npm run build && npx electron-builder --win -p always"
+    "dist:publish": "npm run prisma:generate && npm run build && npx electron-builder --win -p always",
+    "publish:only": "node scripts/publish-release.js"
   },
   "build": {
     "appId": "com.careflow.app",
@@ -75,13 +76,11 @@
     "directories": {
       "output": "release"
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "Naveed17",
-        "repo": "clinic-app"
-      }
-    ]
+    "publish": {
+      "provider": "github",
+      "owner": "Naveed17",
+      "repo": "clinic-app"
+    }
   },
   "dependencies": {
     "@date-io/date-fns": "^3.2.1",

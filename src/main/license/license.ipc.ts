@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import os from 'node:os';
 import { saveSettings, getSettings, saveDatabaseModeSettings, type DatabaseMode, resolveOnlineApiOrigin, isUnusableOnlineOrigin } from '../config/settings';
 import { schemaIdForLicenseKey } from '../database/client';
+import { invalidateFileCache, readCachedJson, readCachedText } from '../config/file-cache';
 
 const API_BASE_URL = process.env.API_BASE_URL || 'https://clinic-license-six.vercel.app/api';
 
@@ -100,33 +101,26 @@ function getDeviceName(): string {
   try { return os.hostname() || 'Unknown Device'; } catch { return 'Unknown Device'; }
 }
 export function getSavedKey(): string | null {
+  const saved = (readCachedText(getLicenseFilePath()) || '').trim();
+  if (saved) return saved;
   try {
-    const file = getLicenseFilePath();
-    if (existsSync(file)) {
-      const key = readFileSync(file, 'utf-8').trim();
-      if (key) return key;
-    }
-  } catch { /* ignore */ }
-  try {
-    const cacheFile = getLicenseCacheFilePath();
-    if (!existsSync(cacheFile)) return null;
-    const cache = JSON.parse(readFileSync(cacheFile, 'utf-8')) as LicenseCache;
+    const cache = readCachedJson<LicenseCache>(getLicenseCacheFilePath());
+    if (!cache) return null;
     const key = String(cache.key || '').trim();
     if (!key) return null;
-    try { writeFileSync(getLicenseFilePath(), key, 'utf-8'); } catch { /* still use cache key */ }
+    try {
+      writeFileSync(getLicenseFilePath(), key, 'utf-8');
+      invalidateFileCache(getLicenseFilePath());
+    } catch { /* still use cache key */ }
     return key;
   } catch {
     return null;
   }
 }
 export function getLicenseCache(key: string): LicenseCache | null {
-  try {
-    const file = getLicenseCacheFilePath();
-    if (!existsSync(file)) return null;
-    const cache = JSON.parse(readFileSync(file, 'utf-8')) as LicenseCache;
-    if (cache.key !== key) return null;
-    return cache;
-  } catch { return null; }
+  const cache = readCachedJson<LicenseCache>(getLicenseCacheFilePath());
+  if (!cache || cache.key !== key) return null;
+  return cache;
 }
 function rememberGate(key: string, lastGate: 'ok' | 'blocked', lastReason?: string): void {
   try {
@@ -191,14 +185,10 @@ function saveLicenseCache(
   } catch { /* ignore */ }
 }
 function getCachedModules(key: string): Record<string, boolean> | null {
-  try {
-    const file = getModulesCacheFilePath();
-    if (!existsSync(file)) return null;
-    const cache = JSON.parse(readFileSync(file, 'utf-8')) as ModulesCache;
-    if (cache.key !== key || !cache.modules || typeof cache.modules !== 'object') return null;
-    if (!Object.values(cache.modules).every((v) => typeof v === 'boolean')) return null;
-    return cache.modules;
-  } catch { return null; }
+  const cache = readCachedJson<ModulesCache>(getModulesCacheFilePath());
+  if (!cache || cache.key !== key || !cache.modules || typeof cache.modules !== 'object') return null;
+  if (!Object.values(cache.modules).every((v) => typeof v === 'boolean')) return null;
+  return { ...cache.modules };
 }
 
 const DEFAULT_MODULE_FALLBACKS: Record<string, boolean> = {
@@ -258,6 +248,7 @@ function clearLocalLicense(): void {
       if (existsSync(file)) unlinkSync(file);
     } catch { /* ignore */ }
   }
+  invalidateFileCache();
 }
 
 /** Backend deleted the key, or device was removed/unlinked from license. */
@@ -578,6 +569,7 @@ export function registerLicenseIpc(): void {
       } & LicenseApiExtras;
       if (data.ok) {
         writeFileSync(getLicenseFilePath(), formattedKey, 'utf-8');
+        invalidateFileCache();
         applyDatabaseModeFromApi(formattedKey, data);
         try { unlinkSync(getModulesCacheFilePath()); } catch { /* ignore */ }
 

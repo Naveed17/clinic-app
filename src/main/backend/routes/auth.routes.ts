@@ -58,7 +58,7 @@ export function createAuthRouter(): Router {
       res.status(403).json({ error: 'This account has been deactivated. Please contact the administrator.' });
       return;
     }
-    if (!user.passwordHash || !bcrypt.compareSync(password, user.passwordHash)) {
+    if (!user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
       res.status(401).json({ error: 'Invalid email or password.' });
       return;
     }
@@ -77,6 +77,7 @@ export function createAuthRouter(): Router {
     const token = signToken({ userId: user.id, role });
     const userAvatar = user.avatar?.trim() || user.doctorProfile?.avatar?.trim() || null;
     res.json({
+      defaultPassword: password === 'admin123',
       token,
       id: user.id,
       name: `${user.firstName} ${user.lastName}`.trim(),
@@ -90,11 +91,11 @@ export function createAuthRouter(): Router {
     const { userId, currentPassword, newPassword } = req.body as { userId: string; currentPassword: string; newPassword: string };
     const user = await getPrisma().user.findUnique({ where: { id: userId }, select: { passwordHash: true } });
     if (!user) { res.status(404).json({ ok: false, error: 'User not found.' }); return; }
-    if (!bcrypt.compareSync(currentPassword, user.passwordHash)) {
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
       res.status(400).json({ ok: false, error: 'Current password is incorrect.' });
       return;
     }
-    await getPrisma().user.update({ where: { id: userId }, data: { passwordHash: bcrypt.hashSync(newPassword, 10) } });
+    await getPrisma().user.update({ where: { id: userId }, data: { passwordHash: await bcrypt.hash(newPassword, 10) } });
     res.json({ ok: true });
   }));
 

@@ -58,6 +58,7 @@ export function OpdReportPrint({
     report.invoices.collected,
     report.fees.count,
     report.fees.net,
+    report.fees.unpaid ?? 0,
     report.fees.discounted,
     clinic.clinicName,
     clinic.clinicPhone,

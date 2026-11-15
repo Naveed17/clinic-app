@@ -283,6 +283,11 @@ const api = {
         () => request(`/api/patients/phones?${toQueryString({ q: query })}`),
         'patients:getPhones', query,
       ),
+    ledger: (id: string) =>
+      call(
+        () => request(`/api/patients/${encodeURIComponent(id)}/ledger`),
+        'patients:ledger', id,
+      ),
   },
   appointments: {
     list: () => call(() => request('/api/appointments'), 'appointments:list'),
@@ -568,6 +573,11 @@ const api = {
       call(
         () => request(`/api/tokens/${id}`, { method: 'DELETE' }),
         'tokens:delete', id,
+      ),
+    collectFee: (id: string, amount?: number) =>
+      call(
+        () => request(`/api/tokens/${id}/collect-fee`, { method: 'POST', body: JSON.stringify({ amount }) }),
+        'tokens:collect-fee', id, amount,
       ),
     refundFee: (id: string, amount?: number) =>
       call(

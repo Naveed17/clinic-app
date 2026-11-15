@@ -17,9 +17,10 @@ import {
   updateTokenVitals,
   upsertPrescription,
   refundTokenFee,
+  collectTokenFee,
   countPriorVisitsThisWeek,
 } from './token.service';
-import { emitNotification } from '../backend/realtime';
+import { emitNotification, emitDataChange } from '../backend/realtime';
 
 export function registerTokenIpc(io?: SocketIOServer): void {
   ipcMain.handle('tokens:get-for-patient', (_, patientId: string, date: string, doctorId?: string) =>
@@ -72,6 +73,11 @@ export function registerTokenIpc(io?: SocketIOServer): void {
   );
   ipcMain.handle('tokens:delete', (_, id: string) => deleteToken(id));
   ipcMain.handle('tokens:refund-fee', (_, id: string, amount?: number) => refundTokenFee(id, amount));
+  ipcMain.handle('tokens:collect-fee', async (_, id: string, amount?: number) => {
+    const token = await collectTokenFee(id, amount);
+    if (io) emitDataChange(io, 'token', 'updated');
+    return token;
+  });
   ipcMain.handle('tokens:upsert-prescription', async (_, tokenId: string, input) => {
     const result = await upsertPrescription(tokenId, input);
     if (io) {

@@ -2,6 +2,7 @@ import { app } from 'electron';
 import { join } from 'node:path';
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { invalidateFileCache, readCachedJson, readCachedText } from './file-cache';
 
 export type DatabaseMode = 'local' | 'online';
 
@@ -59,33 +60,20 @@ const DEFAULTS: AppSettings = {
 };
 
 function getSavedLicenseKey(): string | null {
-  try {
-    const file = join(app.getPath('userData'), 'license.dat');
-    if (existsSync(file)) {
-      const key = readFileSync(file, 'utf-8').trim();
-      if (key) return key;
-    }
-  } catch { /* ignore */ }
-  try {
-    const cacheFile = join(app.getPath('userData'), 'license-cache.json');
-    if (existsSync(cacheFile)) {
-      const cache = JSON.parse(readFileSync(cacheFile, 'utf-8')) as { key?: string };
-      if (cache?.key) return cache.key;
-    }
-  } catch { /* ignore */ }
-  return null;
+  const userData = app.getPath('userData');
+  const key = (readCachedText(join(userData, 'license.dat')) || '').trim();
+  if (key) return key;
+  const cache = readCachedJson<{ key?: string }>(join(userData, 'license-cache.json'));
+  return cache?.key ? String(cache.key) : null;
 }
 
 function getActiveSchemaId(): string {
   const key = getSavedLicenseKey();
   if (!key) return '';
-  try {
-    const cacheFile = join(app.getPath('userData'), 'license-cache.json');
-    if (existsSync(cacheFile)) {
-      const cache = JSON.parse(readFileSync(cacheFile, 'utf-8')) as { key?: string; schemaId?: string };
-      if (cache?.key === key && cache?.schemaId) return cache.schemaId;
-    }
-  } catch { /* ignore */ }
+  const cache = readCachedJson<{ key?: string; schemaId?: string }>(
+    join(app.getPath('userData'), 'license-cache.json'),
+  );
+  if (cache?.key === key && cache?.schemaId) return cache.schemaId;
   const hash = createHash('sha256').update(key.toUpperCase()).digest('hex').slice(0, 16);
   return `lic_${hash}`;
 }
@@ -154,9 +142,8 @@ export function resolveOnlineApiOrigin(savedClinicalApiUrl = ''): string {
 export function getSettings(): AppSettings {
   try {
     const path = getPath();
-    const raw = existsSync(path)
-      ? { ...DEFAULTS, ...(JSON.parse(readFileSync(path, 'utf-8')) as Partial<AppSettings>) }
-      : { ...DEFAULTS };
+    const saved = readCachedJson<Partial<AppSettings>>(path);
+    const raw = saved ? { ...DEFAULTS, ...saved } : { ...DEFAULTS };
     return normalizeOnlineSettings(raw);
   } catch {
     return { ...DEFAULTS };
@@ -184,7 +171,9 @@ export function saveSettings(settings: Partial<AppSettings>): AppSettings {
   delete safePatch.clinicalApiUrl;
   delete safePatch.schemaId;
   const next = normalizeOnlineSettings({ ...current, ...safePatch });
-  writeFileSync(getPath(), JSON.stringify(next, null, 2), 'utf-8');
+  const target = getPath();
+  writeFileSync(target, JSON.stringify(next, null, 2), 'utf-8');
+  invalidateFileCache(target);
   return next;
 }
 
@@ -195,7 +184,9 @@ export function saveDatabaseModeSettings(
 ): AppSettings {
   const current = getSettings();
   const next = normalizeOnlineSettings({ ...current, ...patch });
-  writeFileSync(getPath(), JSON.stringify(next, null, 2), 'utf-8');
+  const target = getPath();
+  writeFileSync(target, JSON.stringify(next, null, 2), 'utf-8');
+  invalidateFileCache(target);
   return next;
 }
 

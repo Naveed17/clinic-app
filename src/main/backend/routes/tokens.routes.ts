@@ -18,6 +18,7 @@ import {
   updateTokenVitals,
   upsertPrescription,
   refundTokenFee,
+  collectTokenFee,
   countPriorVisitsThisWeek,
 } from '../../tokens/token.service';
 import type { TokenStatus } from '@prisma/client';
@@ -99,6 +100,12 @@ export function createTokensRouter(io: SocketIOServer): Router {
     await deleteToken(String(req.params.id));
     emitDataChange(io, 'token', 'deleted');
     res.status(204).end();
+  }));
+  router.post('/:id/collect-fee', asyncHandler(async (req, res) => {
+    const amount = req.body?.amount;
+    const token = await collectTokenFee(String(req.params.id), amount === undefined ? undefined : Number(amount));
+    emitDataChange(io, 'token', 'updated');
+    res.json(token);
   }));
   router.post('/:id/refund-fee', asyncHandler(async (req, res) => {
     const amount = req.body?.amount;

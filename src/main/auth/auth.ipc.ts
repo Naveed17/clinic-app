@@ -66,7 +66,7 @@ export function registerAuthIpc(): void {
       if (!user.isActive) {
         return { ok: false, error: 'This account has been deactivated. Please contact the administrator.' };
       }
-      if (!user.passwordHash || !bcrypt.compareSync(password, user.passwordHash)) {
+      if (!user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
         return { ok: false, error: 'Invalid email or password.' };
       }
 
@@ -92,6 +92,8 @@ export function registerAuthIpc(): void {
         email: user.email,
         role,
         avatar: userAvatar,
+        // Still on the seeded admin password? The UI reminds the user to change it.
+        defaultPassword: password === 'admin123',
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -108,12 +110,12 @@ export function registerAuthIpc(): void {
       select: { passwordHash: true },
     });
     if (!user) return { ok: false, error: 'User not found.' };
-    if (!bcrypt.compareSync(currentPassword, user.passwordHash)) {
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
       return { ok: false, error: 'Current password is incorrect.' };
     }
     await getPrisma().user.update({
       where: { id: userId },
-      data: { passwordHash: bcrypt.hashSync(newPassword, 10) },
+      data: { passwordHash: await bcrypt.hash(newPassword, 10) },
     });
     return { ok: true };
   });

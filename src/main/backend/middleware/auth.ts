@@ -3,7 +3,45 @@ const jwt = require('jsonwebtoken') as typeof import('jsonwebtoken');
 import type { Request, RequestHandler } from 'express';
 import type { AppRole } from '../types';
 
-export const JWT_SECRET = process.env.JWT_SECRET ?? 'clinic-secret-key';
+import { app } from 'electron';
+import { join } from 'node:path';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+
+const INSECURE_DEFAULT = 'clinic-secret-key';
+let cachedSecret: string | null = null;
+
+/**
+ * Per-installation JWT secret (userData/jwt-secret.key), created on first use.
+ * The old shared default let anyone forge an admin token for a LAN server.
+ * JWT_SECRET env still wins when set (dev).
+ */
+export function getJwtSecret(): string {
+  if (cachedSecret) return cachedSecret;
+  const fromEnv = String(process.env.JWT_SECRET || '').trim();
+  if (fromEnv && fromEnv !== INSECURE_DEFAULT) {
+    cachedSecret = fromEnv;
+    return cachedSecret;
+  }
+  const file = join(app.getPath('userData'), 'jwt-secret.key');
+  try {
+    if (existsSync(file)) {
+      const saved = readFileSync(file, 'utf-8').trim();
+      if (saved.length >= 32) {
+        cachedSecret = saved;
+        return cachedSecret;
+      }
+    }
+    const created = randomBytes(48).toString('hex');
+    writeFileSync(file, created, 'utf-8');
+    cachedSecret = created;
+  } catch (err) {
+    // Never block login: fall back to an in-memory secret (sessions reset on restart).
+    console.warn('[auth] Could not persist JWT secret:', err);
+    cachedSecret = randomBytes(48).toString('hex');
+  }
+  return cachedSecret;
+}
 export const JWT_EXPIRES_IN = '8h';
 
 export interface JwtPayload {
@@ -21,7 +59,7 @@ declare global {
 }
 
 export function signToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_EXPIRES_IN });
 }
 
 export const authenticate: RequestHandler = (req, res, next) => {
@@ -31,7 +69,7 @@ export const authenticate: RequestHandler = (req, res, next) => {
     return;
   }
   try {
-    req.user = jwt.verify(header.slice(7), JWT_SECRET) as JwtPayload;
+    req.user = jwt.verify(header.slice(7), getJwtSecret()) as JwtPayload;
     next();
   } catch {
     res.status(401).json({ message: 'Invalid or expired token.' });

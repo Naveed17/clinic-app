@@ -18,6 +18,9 @@ if (process.resourcesPath) {
 }
 
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
+import { installProcessCrashGuards, guardRendererCrashes } from './crash-guard';
+
+installProcessCrashGuards();
 import { environment } from './config/environment';
 import { disconnectPrisma, initializeDatabase, resetPrismaConnection, ensurePrismaConnected, getPrisma } from './database/client';
 import { startBackendServer, type BackendServer } from './backend/server';
@@ -128,6 +131,8 @@ function createWindow(): void {
     },
   });
 
+  guardRendererCrashes(window);
+
   window.on('ready-to-show', () => {
     window.show();
   });
@@ -166,9 +171,6 @@ function createWindow(): void {
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.careflow.app');
 
-  if (app.isPackaged && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'clinic-secret-key')) {
-    console.warn('[CareFlow] JWT_SECRET is not set — using insecure default. Set JWT_SECRET before production deploy.');
-  }
 
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window));
   try {

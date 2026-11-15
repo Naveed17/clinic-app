@@ -32,6 +32,8 @@ export function TokenFeeFields({
   priorVisitsThisWeek = 0,
   compact = false,
   disabled = false,
+  payLater,
+  onPayLaterChange,
 }: {
   consultationFee: string;
   feeDiscount: string;
@@ -41,6 +43,9 @@ export function TokenFeeFields({
   priorVisitsThisWeek?: number;
   compact?: boolean;
   disabled?: boolean;
+  /** When provided, shows "Paid now / Pay later". Pay later = fee goes to the patient's dues. */
+  payLater?: boolean;
+  onPayLaterChange?: (value: boolean) => void;
 }): React.JSX.Element {
   const theme = useTheme();
   const fee = parseFloat(consultationFee) || 0;
@@ -272,6 +277,29 @@ export function TokenFeeFields({
           <Typography variant="caption" sx={{ fontSize: 12, fontWeight: 800, color: isFree ? 'success.main' : 'text.primary' }}>
             Payable: Rs. {money(payable)}
           </Typography>
+        </Box>
+      )}
+      {!disabled && onPayLaterChange && payable > 0 && (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+          <Typography variant="caption" sx={{ fontSize: 11, fontWeight: 700, color: 'text.secondary' }}>
+            Fee received:
+          </Typography>
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={payLater ? 'later' : 'now'}
+            onChange={(_e, v: string | null) => {
+              if (v) onPayLaterChange(v === 'later');
+            }}
+            sx={{ height: 28, '& .MuiToggleButton-root': { px: 1.5, py: 0, fontSize: 11.5, fontWeight: 700, textTransform: 'none' } }}
+          >
+            <ToggleButton value="now" color="success">
+              Paid now
+            </ToggleButton>
+            <ToggleButton value="later" color="error">
+              Pay later (dues)
+            </ToggleButton>
+          </ToggleButtonGroup>
         </Box>
       )}
     </Stack>

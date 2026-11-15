@@ -37,6 +37,7 @@ const patientSchema = z.object({
   bloodGroup: z.string(),
   allergies: z.string().trim(),
   chronicConditions: z.string().trim(),
+  notes: z.string().trim().max(2000, 'Notes can be at most 2000 characters.'),
 });
 
 export type PatientFormValues = z.infer<typeof patientSchema>;
@@ -44,7 +45,7 @@ export type PatientFormValues = z.infer<typeof patientSchema>;
 const emptyFormValues: PatientFormValues = {
   firstName: '', lastName: '', weight: '', ageValue: '', ageUnit: 'years', gender: '', phone: '',
   email: '', address: '', emergencyContactName: '', emergencyContactPhone: '',
-  bloodGroup: '', allergies: '', chronicConditions: '',
+  bloodGroup: '', allergies: '', chronicConditions: '', notes: '',
 };
 
 const selectMenuProps = {
@@ -72,6 +73,7 @@ function toFormValues(patient?: Patient): PatientFormValues {
     bloodGroup: patient.bloodGroup ?? '',
     allergies: patient.allergies ?? '',
     chronicConditions: patient.chronicConditions ?? '',
+    notes: patient.notes ?? '',
   };
 }
 
@@ -96,6 +98,7 @@ function toPatientInput(values: PatientFormValues, primaryDoctorId?: string | nu
     bloodGroup: values.bloodGroup || null,
     allergies: values.allergies || null,
     chronicConditions: values.chronicConditions || null,
+    notes: values.notes || null,
     ...(primaryDoctorId ? { primaryDoctorId } : {}),
   };
 }
@@ -303,6 +306,17 @@ export function PatientDialog({
               <TextField fullWidth label="Allergies" placeholder="e.g. Penicillin, Dust" {...form.register('allergies')} />
               <TextField fullWidth label="Chronic Conditions" placeholder="e.g. Diabetes, Hypertension" {...form.register('chronicConditions')} />
             </Box>
+            <TextField
+              fullWidth
+              multiline
+              minRows={2}
+              maxRows={6}
+              label="Notes"
+              placeholder="Any other information about this patient"
+              error={Boolean(form.formState.errors.notes)}
+              helperText={form.formState.errors.notes?.message}
+              {...form.register('notes')}
+            />
           </Stack>
         </DialogContent>
         <DialogActions sx={dialogActionsSx}>

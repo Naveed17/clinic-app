@@ -131,7 +131,7 @@ export async function createUser(input: UserInput) {
       firstName: input.firstName.trim(),
       lastName: input.lastName.trim(),
       email: input.email.trim().toLowerCase(),
-      passwordHash: bcrypt.hashSync(input.password, 10),
+      passwordHash: await bcrypt.hash(input.password, 10),
       role: input.role,
       isActive: input.isActive,
       ...(input.role === 'DOCTOR' && input.doctorProfile
@@ -180,7 +180,7 @@ export async function updateUser(id: string, input: UserUpdateInput) {
     email: input.email.trim().toLowerCase(),
     role: input.role,
     isActive: input.isActive,
-    ...(input.password ? { passwordHash: bcrypt.hashSync(input.password, 10) } : {}),
+    ...(input.password ? { passwordHash: await bcrypt.hash(input.password, 10) } : {}),
     ...(input.role === 'DOCTOR' && input.doctorProfile
       ? {
           doctorProfile: {

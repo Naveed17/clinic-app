@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useMemo, useEffect, type PropsWithChildren } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { showAppToast } from '@/components/AppToast';
 
 export type UserRole = 'admin' | 'doctor' | 'receptionist' | 'lab_technician' | 'pharmacist';
 
@@ -118,6 +119,7 @@ export function AuthProvider({ children }: PropsWithChildren): React.JSX.Element
               token?: string;
               error?: string;
               blocked?: boolean;
+              defaultPassword?: boolean;
             }
           | null
           | undefined;
@@ -137,6 +139,13 @@ export function AuthProvider({ children }: PropsWithChildren): React.JSX.Element
         setUser(authUser);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
         if (result.token) localStorage.setItem(TOKEN_KEY, result.token);
+        if (result.defaultPassword) {
+          showAppToast({
+            type: 'error',
+            message:
+              'You are still using the default password (admin123). Please change it from your profile to keep clinic data safe.',
+          });
+        }
         return true;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);

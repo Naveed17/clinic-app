@@ -3,6 +3,7 @@ import { createPatient, deletePatient, getPatient, listPatients, updatePatient, 
 import type { PatientInput, PatientListInput } from '../../patients/patient.service';
 import { asyncHandler } from '../utils/async-handler';
 import { requireRole } from '../middleware/auth';
+import { getPatientLedger } from '../../patients/ledger.service';
 import { emitNotification, emitDataChange } from '../realtime';
 import type { Server as SocketIOServer } from 'socket.io';
 
@@ -38,6 +39,14 @@ export function createPatientsRouter(io: SocketIOServer): Router {
     asyncHandler(async (req, res) => {
       const q = typeof req.query.q === 'string' ? req.query.q : undefined;
       res.json(await getDistinctPhones(q));
+    }),
+  );
+
+  router.get(
+    '/:id/ledger',
+    requireRole(['admin', 'doctor', 'receptionist']),
+    asyncHandler(async (req, res) => {
+      res.json(await getPatientLedger(String(req.params.id)));
     }),
   );
 

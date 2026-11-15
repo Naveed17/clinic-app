@@ -416,6 +416,17 @@ export function OpdReportDocument({
                 ['Net', money(report.fees.net)],
               ]}
             />
+            {(report.fees.unpaid ?? 0) > 0 && (
+              <KpiRow
+                items={[
+                  ['Received', money(report.fees.received ?? 0)],
+                  [
+                    'Unpaid (pay later)',
+                    `${money(report.fees.unpaid ?? 0)} · ${report.fees.unpaidCount ?? 0} visit${report.fees.unpaidCount === 1 ? '' : 's'}`,
+                  ],
+                ]}
+              />
+            )}
             {report.fees.byDoctor.length > 0 ? (
               <View style={styles.table}>
                 <View style={styles.tableHeader} wrap={false}>

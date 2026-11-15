@@ -2,25 +2,16 @@ import { app } from 'electron';
 import { PrismaClient } from '@prisma/client';
 import { join } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
-import { existsSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, copyFileSync, writeFileSync } from 'node:fs';
 import { seedDefaultAdmin } from '../auth/seed';
+import { readCachedJson, readCachedText } from '../config/file-cache';
 
 function getSavedLicenseKey(): string | null {
-  try {
-    const file = join(app.getPath('userData'), 'license.dat');
-    if (existsSync(file)) {
-      const key = readFileSync(file, 'utf-8').trim();
-      if (key) return key;
-    }
-  } catch { /* ignore */ }
-  try {
-    const cacheFile = join(app.getPath('userData'), 'license-cache.json');
-    if (existsSync(cacheFile)) {
-      const cache = JSON.parse(readFileSync(cacheFile, 'utf-8')) as { key?: string; schemaId?: string };
-      if (cache?.key) return cache.key;
-    }
-  } catch { /* ignore */ }
-  return null;
+  const userData = app.getPath('userData');
+  const key = (readCachedText(join(userData, 'license.dat')) || '').trim();
+  if (key) return key;
+  const cache = readCachedJson<{ key?: string }>(join(userData, 'license-cache.json'));
+  return cache?.key ? String(cache.key) : null;
 }
 
 export function schemaIdForLicenseKey(key: string): string {
@@ -33,13 +24,10 @@ export function schemaIdForLicenseKey(key: string): string {
 export function getActiveSchemaId(): string {
   const key = getSavedLicenseKey();
   if (!key) return '';
-  try {
-    const cacheFile = join(app.getPath('userData'), 'license-cache.json');
-    if (existsSync(cacheFile)) {
-      const cache = JSON.parse(readFileSync(cacheFile, 'utf-8')) as { key?: string; schemaId?: string };
-      if (cache?.key === key && cache?.schemaId) return cache.schemaId;
-    }
-  } catch { /* ignore */ }
+  const cache = readCachedJson<{ key?: string; schemaId?: string }>(
+    join(app.getPath('userData'), 'license-cache.json'),
+  );
+  if (cache?.key === key && cache?.schemaId) return cache.schemaId;
   return schemaIdForLicenseKey(key);
 }
 
@@ -106,6 +94,17 @@ export async function applySqlitePragmas(database: PrismaClient): Promise<void> 
   }
 }
 
+const READ_OPERATIONS = new Set([
+  'findUnique',
+  'findUniqueOrThrow',
+  'findFirst',
+  'findFirstOrThrow',
+  'findMany',
+  'count',
+  'aggregate',
+  'groupBy',
+]);
+
 export function getPrisma(): PrismaClient {
   const targetDbPath = getClinicDbPath();
   if (prisma && currentDbPath !== targetDbPath) {
@@ -126,7 +125,7 @@ export function getPrisma(): PrismaClient {
     const extended = baseClient.$extends({
       query: {
         $allModels: {
-          async $allOperations({ operation, args, query }: { operation: string; args: any; query: (args: any) => Promise<any> }) {
+          async $allOperations({ model, operation, args, query }: { model: string; operation: string; args: any; query: (args: any) => Promise<any> }) {
             try {
               const result = await query(args);
               if (
@@ -150,11 +149,21 @@ export function getPrisma(): PrismaClient {
                 msg.includes('Response from the query engine was empty');
               if (isEngineDead) {
                 console.warn('[Database] Prisma engine dropped. Auto-recovering database connection...');
-                prisma = undefined;
-                initializedDbPaths.clear();
+                if (prisma === extended) {
+                  prisma = undefined;
+                  void baseClient.$disconnect().catch(() => {});
+                }
                 const fresh = getPrisma();
                 await applySqlitePragmas(fresh).catch(() => {});
-                return await query(args);
+                // Only re-run reads. A write may already have been committed before the engine
+                // dropped; running it again could create a duplicate invoice / token.
+                if (READ_OPERATIONS.has(operation)) {
+                  const delegate = (fresh as any)[model.charAt(0).toLowerCase() + model.slice(1)];
+                  if (delegate && typeof delegate[operation] === 'function') {
+                    return await delegate[operation](args);
+                  }
+                }
+                throw new Error('Database connection was reset. Please try the action again.');
               }
               throw err;
             }
@@ -336,6 +345,8 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
   if (!patientCols.includes('bloodGroup')) await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "bloodGroup" TEXT');
   if (!patientCols.includes('allergies')) await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "allergies" TEXT');
   if (!patientCols.includes('chronicConditions')) await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "chronicConditions" TEXT');
+  // Free-text notes (also used by the mobile app / cloud). Read & written with raw SQL in patient.service.
+  if (!patientCols.includes('notes')) await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "notes" TEXT');
   if (!patientCols.includes('weight')) await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "weight" REAL');
   if (!patientCols.includes('mrNumber')) {
     await database.$executeRawUnsafe('ALTER TABLE "Patient" ADD COLUMN "mrNumber" TEXT NOT NULL DEFAULT \'\'');
@@ -621,6 +632,17 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
       'ALTER TABLE "Token" ADD COLUMN "feeDiscount" DECIMAL NOT NULL DEFAULT 0',
     );
   }
+  // OPD fee paid / unpaid. feePaid = amount taken when the token was issued (NULL = paid in
+  // full, which is how every older token is treated); feeCollected = amount collected later.
+  if (!tokenCols.includes('feePaid')) {
+    await database.$executeRawUnsafe('ALTER TABLE "Token" ADD COLUMN "feePaid" DECIMAL');
+  }
+  if (!tokenCols.includes('feeCollected')) {
+    await database.$executeRawUnsafe('ALTER TABLE "Token" ADD COLUMN "feeCollected" DECIMAL NOT NULL DEFAULT 0');
+  }
+  if (!tokenCols.includes('feeCollectedAt')) {
+    await database.$executeRawUnsafe('ALTER TABLE "Token" ADD COLUMN "feeCollectedAt" DATETIME');
+  }
   if (!tokenCols.includes('priority')) {
     await database.$executeRawUnsafe(
       'ALTER TABLE "Token" ADD COLUMN "priority" TEXT NOT NULL DEFAULT \'NORMAL\'',
@@ -857,9 +879,29 @@ export async function initializeDatabase(database: PrismaClient = getPrisma()): 
 
   await initializeSyncTombstones(database);
   await normalizeDateTimeStorage(database);
+  await ensureSyncIndexes(database);
 }
 
 /** Track deletions for two-way peer sync so records deleted on one machine are pruned on the other. */
+/** Index updatedAt on every synced table so "changed since" sync scans use an index range. */
+async function ensureSyncIndexes(database: PrismaClient): Promise<void> {
+  const tables = [
+    'User', 'DoctorProfile', 'DoctorSchedule', 'DoctorAttendance', 'Patient', 'Medicine',
+    'MedicineBatch', 'Appointment', 'Token', 'Prescription', 'Invoice', 'InvoiceItem',
+    'Payment', 'LabOrder', 'LabReport', 'PatientDocument',
+  ];
+  for (const table of tables) {
+    try {
+      await database.$executeRawUnsafe(
+        `CREATE INDEX IF NOT EXISTS "${table}_updatedAt_idx" ON "${table}"("updatedAt")`,
+      );
+    } catch (err) {
+      // Never block startup on an index; sync still works (just slower).
+      console.warn(`[Database] Could not create updatedAt index on ${table}:`, err);
+    }
+  }
+}
+
 async function initializeSyncTombstones(database: PrismaClient): Promise<void> {
   try {
     await database.$executeRawUnsafe(`
@@ -1039,7 +1081,7 @@ const DATETIME_STORAGE_COLUMNS: { table: string; cols: string[] }[] = [
   { table: 'Payment', cols: ['paidAt', 'createdAt', 'updatedAt'] },
   { table: 'LabOrder', cols: ['orderedAt', 'createdAt', 'updatedAt'] },
   { table: 'LabReport', cols: ['uploadedAt', 'createdAt', 'updatedAt'] },
-  { table: 'Token', cols: ['createdAt', 'updatedAt'] },
+  { table: 'Token', cols: ['createdAt', 'updatedAt', 'feeCollectedAt'] },
   { table: 'Prescription', cols: ['dispensedAt', 'createdAt', 'updatedAt'] },
   { table: 'Medicine', cols: ['createdAt', 'updatedAt', 'deletedAt'] },
   { table: 'MedicineBatch', cols: ['expiryDate', 'createdAt', 'updatedAt'] },

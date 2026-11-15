@@ -60,8 +60,9 @@ export async function getReportSummary(): Promise<{
   const [apptCountRes, todaysInvoices, monthlyInvoices] = await Promise.all([
     database.$queryRawUnsafe<{ count: number | bigint }[]>(
       `SELECT COUNT(DISTINCT "patientId") as count FROM "Appointment" WHERE "startsAt" >= ? AND "startsAt" < ? AND "status" <> 'CANCELLED'`,
-      today.toISOString(),
-      tomorrow.toISOString(),
+      // Dates are stored as epoch ms integers — compare with numbers, not ISO text.
+      today.getTime(),
+      tomorrow.getTime(),
     ),
     database.invoice.aggregate({
       where: { createdAt: { gte: today, lt: tomorrow } },
@@ -120,6 +121,8 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
     consultationFee: unknown;
     feeDiscount: unknown;
     feeRefunded: unknown;
+    feePaid: unknown;
+    feeCollected: unknown;
     patientId: string;
     doctorId: string;
     createdAt: Date | string;
@@ -137,6 +140,7 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       ? database.$queryRawUnsafe<TokenReportRow[]>(
           `
           SELECT t.id, t.tokenNumber, t.date, t.status, t.consultationFee, t.feeDiscount, t.feeRefunded,
+            t.feePaid, t.feeCollected,
             t.patientId, t.doctorId, t.createdAt,
             p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
             u.firstName as doctorFirstName, u.lastName as doctorLastName,
@@ -156,6 +160,7 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       : database.$queryRawUnsafe<TokenReportRow[]>(
           `
           SELECT t.id, t.tokenNumber, t.date, t.status, t.consultationFee, t.feeDiscount, t.feeRefunded,
+            t.feePaid, t.feeCollected,
             t.patientId, t.doctorId, t.createdAt,
             p.firstName as patientFirstName, p.lastName as patientLastName, p.mrNumber as patientMrNumber,
             u.firstName as doctorFirstName, u.lastName as doctorLastName,
@@ -290,6 +295,12 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
     }
 
     const collected = roundMoney(Math.max(0, gross - discounted));
+    const net = roundMoney(Math.max(0, collected - refunded));
+    // Pay-later tokens: feePaid = taken at the visit (NULL = paid in full), feeCollected = later.
+    const paidAtVisit =
+      token.feePaid === null || token.feePaid === undefined ? net : Math.min(net, roundMoney(Number(token.feePaid) || 0));
+    const received = roundMoney(Math.min(net, paidAtVisit + roundMoney(Number(token.feeCollected) || 0)));
+    const unpaid = roundMoney(Math.max(0, net - received));
 
     return {
       id: token.id,
@@ -304,7 +315,9 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       consultationFee: gross,
       feeDiscount: discounted,
       feeRefunded: refunded,
-      net: roundMoney(Math.max(0, collected - refunded)),
+      net,
+      received,
+      unpaid,
       createdAt: token.createdAt instanceof Date ? token.createdAt.toISOString() : String(token.createdAt),
     };
   });
@@ -323,6 +336,9 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       discounted: number;
       refunded: number;
       net: number;
+      received: number;
+      unpaid: number;
+      unpaidCount: number;
     }
   >();
   for (const row of feeRows) {
@@ -338,6 +354,9 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       discounted: 0,
       refunded: 0,
       net: 0,
+      received: 0,
+      unpaid: 0,
+      unpaidCount: 0,
     };
     current.tokens += 1;
     if (row.feeType === 'FREE') {
@@ -353,6 +372,9 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
     current.discounted = roundMoney(current.discounted + row.feeDiscount);
     current.refunded = roundMoney(current.refunded + row.feeRefunded);
     current.net = roundMoney(current.net + row.net);
+    current.received = roundMoney(current.received + row.received);
+    current.unpaid = roundMoney(current.unpaid + row.unpaid);
+    if (row.unpaid > 0) current.unpaidCount += 1;
     byDoctorMap.set(row.doctorId, current);
   }
 
@@ -387,6 +409,11 @@ export async function getOpdDailyReport(input: OpdReportInput = {}) {
       discounted: roundMoney(feeRows.reduce((sum, row) => sum + row.feeDiscount, 0)),
       refunded: roundMoney(feeRows.reduce((sum, row) => sum + row.feeRefunded, 0)),
       net: roundMoney(feeRows.reduce((sum, row) => sum + row.net, 0)),
+      /** Actually received (at the visit + collected later). */
+      received: roundMoney(feeRows.reduce((sum, row) => sum + row.received, 0)),
+      /** Pay-later fees not collected yet. */
+      unpaid: roundMoney(feeRows.reduce((sum, row) => sum + row.unpaid, 0)),
+      unpaidCount: feeRows.filter((row) => row.unpaid > 0).length,
     },
   };
 }
@@ -398,10 +425,6 @@ function statsStartOfDay(d: Date): Date {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
-}
-
-function statsSameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 function statsTopReasonFromList(list: { reason: string | null }[]): { topReason: string; topCount: number } {
@@ -474,24 +497,63 @@ export async function getClinicStatistics(): Promise<ClinicStatistics> {
   const completionRate = totalAppts ? Math.round((completedAppts / totalAppts) * 100) : 0;
   const totalRevenue = invoices.reduce((s, inv) => s + Number(inv.total || 0), 0);
 
-  // Status counts
+  // One pass: bucket every record by its LOCAL year / month / day (same rules as before:
+  // new Date(x).getFullYear()/getMonth()/getDate()), instead of re-filtering all rows per bucket.
+  const dayKey = (y: number, m: number, d: number) => `${y}-${m}-${d}`;
+  const monthKey = (y: number, m: number) => `${y}-${m}`;
+  const add = (map: Map<string | number, number>, key: string | number, by: number) =>
+    map.set(key, (map.get(key) ?? 0) + by);
+  const push = <T,>(map: Map<string, T[]>, key: string, item: T) => {
+    const list = map.get(key);
+    if (list) list.push(item);
+    else map.set(key, [item]);
+  };
+
   const statusCounts: Record<string, number> = {};
-  appts.forEach((a) => {
+  const apptsByDay = new Map<string | number, number>();
+  const apptsByMonth = new Map<string | number, number>();
+  const apptsByYear = new Map<string | number, number>();
+  const apptListByMonth = new Map<string, typeof appts>();
+  const apptListByDay = new Map<string, typeof appts>();
+  const yearSet = new Set<number>([currentYear]);
+  for (const a of appts) {
     statusCounts[a.status] = (statusCounts[a.status] ?? 0) + 1;
-  });
+    const t = new Date(a.startsAt);
+    const y = t.getFullYear();
+    const m = t.getMonth();
+    const d = t.getDate();
+    if (Number.isNaN(y)) continue;
+    yearSet.add(y);
+    add(apptsByDay, dayKey(y, m, d), 1);
+    add(apptsByMonth, monthKey(y, m), 1);
+    add(apptsByYear, y, 1);
+    push(apptListByMonth, monthKey(y, m), a);
+    push(apptListByDay, dayKey(y, m, d), a);
+  }
+
+  const revByDay = new Map<string | number, number>();
+  const revByMonth = new Map<string | number, number>();
+  const revByYear = new Map<string | number, number>();
+  for (const inv of invoices) {
+    const t = new Date(inv.createdAt);
+    const y = t.getFullYear();
+    if (Number.isNaN(y)) continue;
+    const m = t.getMonth();
+    const amount = Number(inv.total || 0);
+    add(revByDay, dayKey(y, m, t.getDate()), amount);
+    add(revByMonth, monthKey(y, m), amount);
+    add(revByYear, y, amount);
+  }
 
   // Overview Weekly (last 7 days)
   const weekly = Array.from({ length: 7 }, (_, i) => {
     const day = statsStartOfDay(now);
     day.setDate(day.getDate() - (6 - i));
-    const dayAppts = appts.filter((a) => statsSameDay(new Date(a.startsAt), day)).length;
-    const dayRevenue = invoices
-      .filter((inv) => statsSameDay(new Date(inv.createdAt), day))
-      .reduce((s, inv) => s + Number(inv.total || 0), 0);
+    const key = dayKey(day.getFullYear(), day.getMonth(), day.getDate());
     return {
       label: `${STATS_WEEKDAYS[day.getDay()]} ${day.getDate()}`,
-      appointments: dayAppts,
-      revenue: dayRevenue,
+      appointments: apptsByDay.get(key) ?? 0,
+      revenue: revByDay.get(key) ?? 0,
     };
   });
 
@@ -500,55 +562,31 @@ export async function getClinicStatistics(): Promise<ClinicStatistics> {
     const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
     const y = d.getFullYear();
     const m = d.getMonth();
-    const monthAppts = appts.filter((a) => {
-      const t = new Date(a.startsAt);
-      return t.getFullYear() === y && t.getMonth() === m;
-    }).length;
-    const monthRevenue = invoices
-      .filter((inv) => {
-        const t = new Date(inv.createdAt);
-        return t.getFullYear() === y && t.getMonth() === m;
-      })
-      .reduce((s, inv) => s + Number(inv.total || 0), 0);
     return {
       label: `${STATS_MONTHS[m]} ${String(y).slice(2)}`,
-      appointments: monthAppts,
-      revenue: monthRevenue,
+      appointments: apptsByMonth.get(monthKey(y, m)) ?? 0,
+      revenue: revByMonth.get(monthKey(y, m)) ?? 0,
     };
   });
 
   // Overview Yearly (last 5 years)
   const yearly = Array.from({ length: 5 }, (_, i) => {
     const y = now.getFullYear() - (4 - i);
-    const yearAppts = appts.filter((a) => new Date(a.startsAt).getFullYear() === y).length;
-    const yearRevenue = invoices
-      .filter((inv) => new Date(inv.createdAt).getFullYear() === y)
-      .reduce((s, inv) => s + Number(inv.total || 0), 0);
-    return { label: String(y), appointments: yearAppts, revenue: yearRevenue };
+    return { label: String(y), appointments: apptsByYear.get(y) ?? 0, revenue: revByYear.get(y) ?? 0 };
   });
 
   // Monthly breakdown for Jan - Dec of current year
   const monthlyAppts = STATS_MONTHS.map((month, i) => ({
     month,
-    appointments: appts.filter((a) => {
-      const d = new Date(a.startsAt);
-      return d.getFullYear() === currentYear && d.getMonth() === i;
-    }).length,
+    appointments: apptsByMonth.get(monthKey(currentYear, i)) ?? 0,
   }));
 
   const monthlyRevenue = STATS_MONTHS.map((month, i) => ({
     month,
-    revenue: invoices
-      .filter((inv) => {
-        const d = new Date(inv.createdAt);
-        return d.getFullYear() === currentYear && d.getMonth() === i;
-      })
-      .reduce((sum, inv) => sum + Number(inv.total || 0), 0),
+    revenue: revByMonth.get(monthKey(currentYear, i)) ?? 0,
   }));
 
   // Reason Years
-  const yearSet = new Set<number>([currentYear]);
-  appts.forEach((a) => yearSet.add(new Date(a.startsAt).getFullYear()));
   const reasonYears = Array.from(yearSet).sort((a, b) => b - a);
 
   // Reason Trends
@@ -557,10 +595,7 @@ export async function getClinicStatistics(): Promise<ClinicStatistics> {
 
   for (const yr of reasonYears) {
     reasonTrendsByYear[yr] = STATS_MONTHS.map((month, i) => {
-      const inMonth = appts.filter((a) => {
-        const d = new Date(a.startsAt);
-        return d.getFullYear() === yr && d.getMonth() === i;
-      });
+      const inMonth = apptListByMonth.get(monthKey(yr, i)) ?? [];
       const top = statsTopReasonFromList(inMonth);
       return {
         label: month,
@@ -576,10 +611,7 @@ export async function getClinicStatistics(): Promise<ClinicStatistics> {
 
     reasonTrendsByMonth[yr] = Array.from({ length: daysInMonth }, (_, i) => {
       const day = i + 1;
-      const inDay = appts.filter((a) => {
-        const d = new Date(a.startsAt);
-        return d.getFullYear() === yr && d.getMonth() === monthIdx && d.getDate() === day;
-      });
+      const inDay = apptListByDay.get(dayKey(yr, monthIdx, day)) ?? [];
       const top = statsTopReasonFromList(inDay);
       return {
         label: String(day),

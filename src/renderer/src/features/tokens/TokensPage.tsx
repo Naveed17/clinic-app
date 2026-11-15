@@ -97,6 +97,7 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
   const [reason, setReason] = useState('');
   const [consultationFee, setConsultationFee] = useState('');
   const [feeDiscount, setFeeDiscount] = useState('');
+  const [payLater, setPayLater] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -172,13 +173,14 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
         reason,
         consultationFee: parseFloat(consultationFee) || 0,
         feeDiscount: parseFloat(feeDiscount) || 0,
+        ...(payLater ? { feePaid: 0 } : {}),
       }) as Promise<Token>;
     },
     onSuccess: async (token: Token) => {
       playNotificationSound();
       await qc.invalidateQueries({ queryKey: ['tokens'] });
       await qc.invalidateQueries({ queryKey: ['appointments'] });
-      setPatientId(''); setDoctorId(''); setNotes(''); setReason(''); setConsultationFee(''); setFeeDiscount('');
+      setPatientId(''); setDoctorId(''); setNotes(''); setReason(''); setConsultationFee(''); setFeeDiscount(''); setPayLater(false);
       onClose();
       onSuccess?.(token);
     },
@@ -257,6 +259,8 @@ export function IssueTokenDialog({ open, onClose, date, defaultPatientId, defaul
             defaultDoctorFee={selectedDoctor?.consultationFee}
             priorVisitsThisWeek={weekVisits?.count ?? 0}
             disabled={!doctorId}
+            payLater={payLater}
+            onPayLaterChange={setPayLater}
           />
           <FormControl fullWidth>
             <InputLabel>Reason (optional)</InputLabel>

@@ -30,7 +30,7 @@ export const SYNC_COLUMNS: Record<SyncTableName, string[]> = {
   Patient: [
     'id', 'mrNumber', 'firstName', 'lastName', 'weight', 'dateOfBirth', 'gender', 'phone', 'email', 'address',
     'emergencyContactName', 'emergencyContactPhone', 'bloodGroup', 'allergies', 'chronicConditions',
-    'primaryDoctorId', 'isDeleted', 'deletedAt', 'createdAt', 'updatedAt',
+    'primaryDoctorId', 'notes', 'isDeleted', 'deletedAt', 'createdAt', 'updatedAt',
   ],
   Medicine: [
     'id', 'name', 'mg', 'genericName', 'categoryId', 'barcode', 'unit', 'rackNumber', 'minStockAlert',
@@ -46,7 +46,8 @@ export const SYNC_COLUMNS: Record<SyncTableName, string[]> = {
   ],
   Token: [
     'id', 'tokenNumber', 'date', 'patientId', 'doctorId', 'status', 'notes', 'reason',
-    'consultationFee', 'feeDiscount', 'feeRefunded', 'createdAt', 'updatedAt',
+    'consultationFee', 'feeDiscount', 'feeRefunded', 'feePaid', 'feeCollected', 'feeCollectedAt',
+    'priority', 'vitals', 'createdAt', 'updatedAt',
   ],
   Prescription: [
     'id', 'tokenId', 'diagnosis', 'medicines', 'tests', 'advice', 'thumbName', 'thumbnail',

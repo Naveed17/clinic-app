@@ -1,5 +1,6 @@
 import { existsSync, unlinkSync } from 'node:fs';
 import { getPrisma } from '../database/client';
+import { queueFailedRow, retryQueuedRows } from './sync-retry';
 import { resolveDocPath } from '../backup/docs-paths';
 import {
   SYNC_TABLES,
@@ -40,8 +41,8 @@ export async function extractChangesSince(sinceMs: number): Promise<{
       } else {
         rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(
           `SELECT * FROM "${table}" 
-           WHERE (typeof(updatedAt) = 'integer' AND updatedAt > ?)
-              OR (typeof(updatedAt) = 'text' AND CAST(ROUND((julianday(updatedAt) - 2440587.5) * 86400000) AS INTEGER) > ?)
+           WHERE ("updatedAt" > ? AND "updatedAt" <= 9007199254740991)
+          OR ("updatedAt" >= '' AND CAST(ROUND((julianday("updatedAt") - 2440587.5) * 86400000) AS INTEGER) > ?)
            ORDER BY updatedAt ASC`,
           sinceMs,
           sinceMs,
@@ -111,8 +112,8 @@ export async function extractManifest(sinceMs: number): Promise<{
     try {
       const res = await db.$queryRawUnsafe<Array<{ count: number | bigint }>>(
         `SELECT COUNT(*) as count FROM "${table}" 
-         WHERE (typeof(updatedAt) = 'integer' AND updatedAt > ?)
-            OR (typeof(updatedAt) = 'text' AND CAST(ROUND((julianday(updatedAt) - 2440587.5) * 86400000) AS INTEGER) > ?)`,
+         WHERE ("updatedAt" > ? AND "updatedAt" <= 9007199254740991)
+          OR ("updatedAt" >= '' AND CAST(ROUND((julianday("updatedAt") - 2440587.5) * 86400000) AS INTEGER) > ?)`,
         sinceMs,
         sinceMs,
       );
@@ -155,8 +156,8 @@ export async function extractTableRows(
   const db = getPrisma();
   const rows = await db.$queryRawUnsafe<Record<string, unknown>[]>(
     `SELECT * FROM "${table}" 
-     WHERE (typeof(updatedAt) = 'integer' AND updatedAt > ?)
-        OR (typeof(updatedAt) = 'text' AND CAST(ROUND((julianday(updatedAt) - 2440587.5) * 86400000) AS INTEGER) > ?)
+     WHERE ("updatedAt" > ? AND "updatedAt" <= 9007199254740991)
+          OR ("updatedAt" >= '' AND CAST(ROUND((julianday("updatedAt") - 2440587.5) * 86400000) AS INTEGER) > ?)
      ORDER BY updatedAt ASC
      LIMIT ? OFFSET ?`,
     sinceMs,
@@ -214,21 +215,75 @@ export async function extractDeletions(sinceMs: number): Promise<SyncDeletedItem
   return deletions;
 }
 
+type Db = ReturnType<typeof getPrisma>;
+
+async function nextFreeMrNumber(db: Db): Promise<string> {
+  const res = await db.$queryRawUnsafe<Array<{ maxNum: number | bigint | null }>>(
+    `SELECT MAX(CAST(SUBSTR("mrNumber", 4) AS INTEGER)) AS maxNum FROM "Patient" WHERE "mrNumber" LIKE 'MR-%'`,
+  );
+  let candidate = Number(res?.[0]?.maxNum ?? 0) + 1;
+  for (;;) {
+    const mr = `MR-${String(candidate).padStart(5, '0')}`;
+    const taken = await db.$queryRawUnsafe<Array<{ id: string }>>(
+      `SELECT id FROM "Patient" WHERE "mrNumber" = ? LIMIT 1`,
+      mr,
+    );
+    if (!taken.length) return mr;
+    candidate++;
+  }
+}
+
+/** Patient.mrNumber / Token(date, tokenNumber, doctorId) conflicts → renumber the incoming row. */
+async function renumberOnConflict(db: Db, table: SyncTableName, row: Record<string, unknown>): Promise<void> {
+  try {
+    if (table === 'Patient' && row.mrNumber) {
+      const clash = await db.$queryRawUnsafe<Array<{ id: string }>>(
+        `SELECT id FROM "Patient" WHERE "mrNumber" = ? AND id != ? LIMIT 1`,
+        String(row.mrNumber),
+        String(row.id),
+      );
+      if (clash.length) {
+        row.mrNumber = await nextFreeMrNumber(db);
+        row.updatedAt = Date.now();
+      }
+    } else if (table === 'Token' && row.date && row.tokenNumber != null && row.doctorId) {
+      const clash = await db.$queryRawUnsafe<Array<{ id: string }>>(
+        `SELECT id FROM "Token" WHERE "date" = ? AND "tokenNumber" = ? AND "doctorId" = ? AND id != ? LIMIT 1`,
+        String(row.date),
+        Number(row.tokenNumber),
+        String(row.doctorId),
+        String(row.id),
+      );
+      if (clash.length) {
+        const next = await db.$queryRawUnsafe<Array<{ n: number | bigint }>>(
+          `SELECT COALESCE(MAX("tokenNumber"), 0) + 1 AS n FROM "Token" WHERE "date" = ? AND "doctorId" = ?`,
+          String(row.date),
+          String(row.doctorId),
+        );
+        row.tokenNumber = Number(next?.[0]?.n ?? 1);
+        row.updatedAt = Date.now();
+      }
+    }
+  } catch (err) {
+    console.warn(`[SyncEngine] Renumber check failed for ${table} ${String(row.id)}:`, err);
+  }
+}
+
 /**
  * Applies incoming rows & deletions into local database using atomic Last-Write-Wins.
  */
 export async function applyIncomingChanges(
   changes: SyncChanges,
   deletions: SyncDeletedItem[],
-): Promise<{ appliedChanges: number; appliedDeletions: number }> {
+): Promise<{ appliedChanges: number; appliedDeletions: number; failedRows: number }> {
   const db = getPrisma();
   let appliedChanges = 0;
   let appliedDeletions = 0;
+  let failedRows = 0;
 
-  // Temporarily disable foreign keys during sync upsert so table ordering won't block circular/foreign refs
-  try {
-    await db.$executeRawUnsafe('PRAGMA foreign_keys = OFF');
-  } catch { /* ignore */ }
+  // Note: no PRAGMA foreign_keys toggling here. Prisma uses a pool of SQLite connections, so a
+  // pragma only reaches one random connection. Rows that fail (e.g. parent not synced yet) are
+  // queued and retried on the next sync instead (see sync-retry.ts).
 
   try {
     // 1. Apply Changes
@@ -249,6 +304,11 @@ export async function applyIncomingChanges(
         if (table === 'Appointment' && row.status) {
           if (row.status === 'CONFIRMED' || row.status === 'PENDING') row.status = 'SCHEDULED';
         }
+
+        // Offline PCs number MR / tokens on their own, so the same number can arrive for a
+        // different record. Give the incoming row the next free number (never drop or delete it)
+        // and bump updatedAt so the new number syncs back to the PC it came from.
+        await renumberOnConflict(db, table, row);
 
         const colsPresent = Object.keys(row).filter((c) => allowedCols.includes(c));
         if (colsPresent.length === 0) continue;
@@ -328,13 +388,20 @@ export async function applyIncomingChanges(
           if (affected > 0) appliedChanges++;
         } catch (err) {
           console.warn(`[SyncEngine] Failed upsert for ${table} row ${row.id}:`, err);
+          failedRows++;
+          await queueFailedRow(table, row, err);
         }
       }
     }
 
     // 2. Apply Deletions
     if (deletions && deletions.length > 0) {
-      for (const del of deletions) {
+      const order = (name: string) => {
+        const i = SYNC_TABLES.findIndex((t) => t.toLowerCase() === String(name || '').toLowerCase());
+        return i < 0 ? -1 : i;
+      };
+      const childFirst = [...deletions].sort((a, b) => order(b.tableName) - order(a.tableName));
+      for (const del of childFirst) {
         if (!del.id || !del.tableName) continue;
         const validTable = SYNC_TABLES.find((t) => t.toLowerCase() === del.tableName.toLowerCase());
         if (!validTable) continue;
@@ -369,10 +436,16 @@ export async function applyIncomingChanges(
       }
     }
   } finally {
-    try {
-      await db.$executeRawUnsafe('PRAGMA foreign_keys = ON');
-    } catch { /* ignore */ }
+    /* nothing to restore */
   }
 
-  return { appliedChanges, appliedDeletions };
+  return { appliedChanges, appliedDeletions, failedRows };
+}
+
+/** Re-apply rows that failed in an earlier sync (their parent row may have arrived since). */
+export async function retryPendingRows(): Promise<{ applied: number; stillPending: number }> {
+  return retryQueuedRows(async (table, row) => {
+    const { failedRows } = await applyIncomingChanges({ [table]: [row] }, []);
+    return failedRows === 0;
+  });
 }

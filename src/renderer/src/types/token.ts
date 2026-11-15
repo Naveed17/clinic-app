@@ -55,6 +55,8 @@ export interface TokenInput {
   reason?: string | null;
   consultationFee?: number;
   feeDiscount?: number;
+  /** Amount received at issue; 0 = pay later (goes to the patient dues). Omit = paid in full. */
+  feePaid?: number | null;
   priority?: TokenPriority | string;
   vitals?: TokenVitals | null;
 }

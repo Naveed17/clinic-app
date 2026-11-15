@@ -9,6 +9,7 @@ import {
   extractTableRows,
   extractDeletions,
   applyIncomingChanges,
+  retryPendingRows,
 } from '../../sync/sync.engine';
 import type {
   SyncExchangePayload,
@@ -17,6 +18,7 @@ import type {
   SyncDeletedItem,
 } from '../../sync/sync.types';
 import { emitDataChange } from '../realtime';
+import { requireLanAuth } from '../../sync/lan-auth';
 import { docFileAbsPath, findMissingDocFiles, isDocTable, saveDocFile } from '../../sync/lan-files';
 
 export function createSyncRouter(io?: SocketIOServer): Router {
@@ -33,6 +35,9 @@ export function createSyncRouter(io?: SocketIOServer): Router {
       });
     }),
   );
+
+  // Everything below /status needs the clinic license HMAC (see sync/lan-auth.ts).
+  router.use(requireLanAuth);
 
   // 2. Manifest: returns count of changed rows per table since `since`
   router.get(
@@ -91,8 +96,10 @@ export function createSyncRouter(io?: SocketIOServer): Router {
 
       if (table && rows.length > 0) {
         const { appliedChanges } = await applyIncomingChanges({ [table]: rows }, []);
-        if (appliedChanges > 0 && io) {
-          emitDataChange(io, table, 'sync');
+        // Earlier rows that failed (parent missing) may apply now that this chunk arrived.
+        const retried = await retryPendingRows().catch(() => ({ applied: 0, stillPending: 0 }));
+        if ((appliedChanges > 0 || retried.applied > 0) && io) {
+          emitDataChange(io, retried.applied > 0 ? 'all' : table, 'sync');
         }
         res.json({ ok: true, applied: appliedChanges });
       } else {

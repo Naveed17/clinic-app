@@ -4,6 +4,7 @@ import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import LocalHospitalOutlinedIcon from '@mui/icons-material/LocalHospitalOutlined';
 import UndoOutlinedIcon from '@mui/icons-material/UndoOutlined';
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
+import MoneyOffOutlinedIcon from '@mui/icons-material/MoneyOffOutlined';
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
@@ -307,9 +308,10 @@ export function OpdReportsPage(): React.JSX.Element {
         acc.discount += Number(r.feeDiscount) || 0;
         acc.refunded += Number(r.feeRefunded) || 0;
         acc.net += Number(r.net) || 0;
+        acc.unpaid += Number(r.unpaid) || 0;
         return acc;
       },
-      { fee: 0, discount: 0, refunded: 0, net: 0 }
+      { fee: 0, discount: 0, refunded: 0, net: 0, unpaid: 0 }
     );
   }, [feeRows]);
 
@@ -372,6 +374,8 @@ export function OpdReportsPage(): React.JSX.Element {
           { key: 'feeDiscount', label: 'Discount (Rs)' },
           { key: 'feeRefunded', label: 'Refunded (Rs)' },
           { key: 'net', label: 'Net Payable (Rs)' },
+          { key: 'received', label: 'Received (Rs)' },
+          { key: 'unpaid', label: 'Unpaid (Rs)' },
         ]
       );
     }
@@ -463,12 +467,28 @@ export function OpdReportsPage(): React.JSX.Element {
       {
         label: 'Net Doctor Settlement',
         value: money(data?.fees.net ?? 0),
-        subText: 'Net payable after relief & refunds',
+        subText:
+          (data?.fees.unpaid ?? 0) > 0
+            ? `${money(data?.fees.received ?? 0)} received so far`
+            : 'Net payable after relief & refunds',
         badge: 'Net Settlement',
         icon: <AccountBalanceWalletOutlinedIcon fontSize="medium" />,
         color: theme.palette.success.main,
         bg: alpha(theme.palette.success.main, 0.08),
         borderColor: alpha(theme.palette.success.main, 0.25),
+      },
+      {
+        label: 'Unpaid Fees',
+        value: money(data?.fees.unpaid ?? 0),
+        subText:
+          (data?.fees.unpaidCount ?? 0) > 0
+            ? `${data?.fees.unpaidCount} visit${data?.fees.unpaidCount === 1 ? '' : 's'} on pay later`
+            : 'All consultation fees received',
+        badge: 'Dues',
+        icon: <MoneyOffOutlinedIcon fontSize="medium" />,
+        color: (data?.fees.unpaid ?? 0) > 0 ? theme.palette.error.main : theme.palette.success.main,
+        bg: alpha((data?.fees.unpaid ?? 0) > 0 ? theme.palette.error.main : theme.palette.success.main, 0.08),
+        borderColor: alpha((data?.fees.unpaid ?? 0) > 0 ? theme.palette.error.main : theme.palette.success.main, 0.25),
       },
     ];
 
@@ -938,6 +958,11 @@ export function OpdReportsPage(): React.JSX.Element {
                         <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{money(row.refunded)}</TableCell>
                         <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                           <Typography fontWeight={900} color="success.main" fontSize={14.5}>{money(row.net)}</Typography>
+                          {(row.unpaid ?? 0) > 0 && (
+                            <Typography fontSize={11.5} fontWeight={700} color="error.main">
+                              Unpaid {money(row.unpaid ?? 0)}
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell align="center" sx={{ whiteSpace: 'nowrap', pr: 2 }}>
                           <Button
@@ -1352,6 +1377,11 @@ export function OpdReportsPage(): React.JSX.Element {
                             <Typography fontWeight={800} color="success.main" fontSize={13.5}>
                               {money(row.net)}
                             </Typography>
+                            {(row.unpaid ?? 0) > 0 && (
+                              <Typography fontSize={11.5} fontWeight={700} color="error.main">
+                                Unpaid {money(row.unpaid ?? 0)}
+                              </Typography>
+                            )}
                           </TableCell>
                           <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
                             <Tooltip title="View Consultation Fee Details">
@@ -1412,6 +1442,11 @@ export function OpdReportsPage(): React.JSX.Element {
                   <Typography fontSize={13} color="success.main">
                     Total Net: <strong>{money(feeTotals.net)}</strong>
                   </Typography>
+                  {feeTotals.unpaid > 0 && (
+                    <Typography fontSize={13} color="error.main">
+                      Unpaid: <strong>{money(feeTotals.unpaid)}</strong>
+                    </Typography>
+                  )}
                 </Stack>
               )}
             </Box>

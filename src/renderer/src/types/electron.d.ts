@@ -7,6 +7,7 @@ import type { LabOrder } from './lab';
 import type { GlobalSearchResult } from './search';
 import type { ChatMessage, ChatMessageInput } from './chat';
 import type { Medicine } from './medicine';
+import type { PatientLedger } from './ledger';
 
 declare global {
   interface Window {
@@ -40,6 +41,7 @@ declare global {
         update: (id: string, input: PatientInput) => Promise<Patient>;
         delete: (id: string) => Promise<void>;
         getAddresses: (query?: string) => Promise<string[]>;
+        ledger: (id: string) => Promise<PatientLedger>;
         getPhones: (query?: string) => Promise<Array<{
           phone: string;
           formattedPhone: string;
@@ -68,6 +70,7 @@ declare global {
         updatePriority: (id: string, priority: string) => Promise<Token>;
         updateVitals: (id: string, vitals: unknown) => Promise<Token>;
         refundFee: (id: string, amount?: number) => Promise<Token>;
+        collectFee: (id: string, amount?: number) => Promise<Token>;
         delete: (id: string) => Promise<void>;
       };
       appointments: {

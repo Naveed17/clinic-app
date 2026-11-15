@@ -241,7 +241,7 @@ export async function updateCatalogMedicine(
     trimmed,
     strength,
     type ?? medicine.unit ?? DEFAULT_MEDICINE_TYPE,
-    new Date().toISOString(),
+    Date.now(),
     id,
   );
   await ensurePriceBatch(id, price);

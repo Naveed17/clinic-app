@@ -25,6 +25,8 @@ export interface PatientInput {
   bloodGroup?: string | null;
   allergies?: string | null;
   chronicConditions?: string | null;
+  /** Free-text notes. Omit to leave existing notes unchanged on update. */
+  notes?: string | null;
   /** Doctor who registered / owns this patient (not an appointment). */
   primaryDoctorId?: string | null;
 }
@@ -125,6 +127,28 @@ function normalizePatientRow(row: any): Patient {
     createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
     updatedAt: row.updatedAt instanceof Date ? row.updatedAt : new Date(row.updatedAt),
   };
+}
+
+/** notes is not in the Prisma model (kept out so an older generated client can never break). */
+async function writeNotes(id: string, notes: string | null | undefined): Promise<void> {
+  if (notes === undefined) return;
+  await getPrisma().$executeRawUnsafe(
+    `UPDATE "Patient" SET "notes" = ? WHERE id = ?`,
+    notes === null ? null : String(notes).trim() || null,
+    id,
+  );
+}
+
+async function withNotes<T extends { id: string }>(patient: T): Promise<T & { notes: string | null }> {
+  try {
+    const rows = await getPrisma().$queryRawUnsafe<Array<{ notes: string | null }>>(
+      `SELECT "notes" FROM "Patient" WHERE id = ?`,
+      patient.id,
+    );
+    return { ...patient, notes: rows[0]?.notes ?? null };
+  } catch {
+    return { ...patient, notes: null };
+  }
 }
 
 export async function listPatients({ page, pageSize, search, providerId }: PatientListInput): Promise<{
@@ -235,7 +259,9 @@ export async function createPatient(input: PatientInput): Promise<Patient> {
   for (let attempt = 0; attempt < 5; attempt++) {
     const mrNumber = await generateMrNumber();
     try {
-      return await prisma.patient.create({ data: { ...data, mrNumber } });
+      const created = await prisma.patient.create({ data: { ...data, mrNumber } });
+      await writeNotes(created.id, input.notes);
+      return withNotes(created);
     } catch (err: any) {
       if (err?.code === 'P2002' && attempt < 4) {
         try {
@@ -269,7 +295,9 @@ export async function updatePatient(id: string, input: PatientInput): Promise<Pa
       delete (data as { primaryDoctor?: unknown }).primaryDoctor;
     }
   }
-  return getPrisma().patient.update({ where: { id }, data });
+  const updated = await getPrisma().patient.update({ where: { id }, data });
+  await writeNotes(id, input.notes);
+  return withNotes(updated);
 }
 
 export async function deletePatient(id: string): Promise<void> {
@@ -288,7 +316,7 @@ export async function getPatient(id: string): Promise<Patient | null> {
     where: { id },
   });
   if (!patient || patient.isDeleted) return null;
-  return patient;
+  return withNotes(patient);
 }
 
 export async function getDistinctAddresses(query?: string): Promise<string[]> {

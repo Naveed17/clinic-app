@@ -2,10 +2,12 @@ import { ipcMain } from 'electron';
 import type { Server as SocketIOServer } from 'socket.io';
 import { createPatient, deletePatient, getPatient, listPatients, updatePatient, getDistinctAddresses, getDistinctPhones } from './patient.service';
 import { emitNotification } from '../backend/realtime';
+import { getPatientLedger } from './ledger.service';
 
 export function registerPatientIpc(io?: SocketIOServer): void {
   ipcMain.handle('patients:list', (_, input) => listPatients(input));
   ipcMain.handle('patients:get', (_, id: string) => getPatient(id));
+  ipcMain.handle('patients:ledger', (_, id: string) => getPatientLedger(id));
   ipcMain.handle('patients:getAddresses', (_, query?: string) => getDistinctAddresses(query));
   ipcMain.handle('patients:getPhones', (_, query?: string) => getDistinctPhones(query));
   ipcMain.handle('patients:create', async (_, input) => {

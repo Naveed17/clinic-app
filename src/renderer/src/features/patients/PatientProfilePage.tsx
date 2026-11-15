@@ -39,6 +39,8 @@ import { AppointmentVisitList } from '@/features/appointments/AppointmentVisitLi
 import { usePrintAppointmentToken } from '@/features/appointments/printAppointmentToken';
 import { TokenPrintPreview } from '@/features/tokens/TokensPage';
 import type { LabOrder } from '@/types/lab';
+import { PatientLedgerPanel } from './PatientLedgerPanel';
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
 
 const money = (v: number) => `Rs. ${new Intl.NumberFormat('en-PK').format(v)}`;
 
@@ -226,6 +228,12 @@ export function PatientProfilePage(): React.JSX.Element {
     queryFn: () => (id ? invoicesService.listByPatient(id) : []),
     enabled: showBilling && Boolean(id),
   });
+  // Same query key as PatientLedgerPanel, so the Dues card and the Ledger tab share one fetch.
+  const ledger = useQuery({
+    queryKey: ['patient-ledger', id],
+    queryFn: () => patientsService.ledger(id as string),
+    enabled: showBilling && Boolean(id),
+  });
   const labOrders = useQuery<LabOrder[]>({
     queryKey: ['lab-orders-patient', id],
     queryFn: () => (id ? window.clinic.lab.listByPatient(id) : Promise.resolve([])),
@@ -277,12 +285,24 @@ export function PatientProfilePage(): React.JSX.Element {
     ...(showBilling
       ? [{ label: 'Total Billed', value: money(totalBilled), icon: <ReceiptOutlinedIcon />, bg: alpha(theme.palette.warning.main, 0.12), color: theme.palette.warning.dark }]
       : []),
+    ...(showBilling
+      ? [{
+          label: (ledger.data?.totals.due ?? 0) < -0.009 ? 'Advance' : 'Dues',
+          value: ledger.data ? money(Math.abs(ledger.data.totals.due)) : '—',
+          icon: <AccountBalanceWalletOutlinedIcon />,
+          bg: alpha((ledger.data?.totals.due ?? 0) > 0.009 ? theme.palette.error.main : theme.palette.success.main, 0.1),
+          color: (ledger.data?.totals.due ?? 0) > 0.009 ? theme.palette.error.main : theme.palette.success.dark,
+        }]
+      : []),
   ];
 
   const tabs = [
     { label: 'Appointments', count: patientAppointments.length, icon: <CalendarMonthOutlinedIcon sx={{ fontSize: 18 }} />, value: 0 },
     ...(showBilling
-      ? [{ label: 'Billing', count: patientInvoices.length, icon: <ReceiptOutlinedIcon sx={{ fontSize: 18 }} />, value: 1 }]
+      ? [
+          { label: 'Billing', count: patientInvoices.length, icon: <ReceiptOutlinedIcon sx={{ fontSize: 18 }} />, value: 1 },
+          { label: 'Ledger', count: null, icon: <AccountBalanceWalletOutlinedIcon sx={{ fontSize: 18 }} />, value: 5 },
+        ]
       : []),
     ...(showLab
       ? [{ label: 'Lab', count: patientLab.length, icon: <BiotechOutlinedIcon sx={{ fontSize: 18 }} />, value: 2 }]
@@ -336,7 +356,7 @@ export function PatientProfilePage(): React.JSX.Element {
         </Box>
 
         {/* Summary metrics */}
-        <Box sx={{ display: 'grid', gap: 1.75, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
+        <Box sx={{ display: 'grid', gap: 1.75, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(auto-fit, minmax(170px, 1fr))' } }}>
           {summaryCards.map((c) => (
             <Paper key={c.label} elevation={0} sx={{ p: 2.25, ...softCard, bgcolor: c.bg, border: 'none' }}>
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
@@ -494,6 +514,14 @@ export function PatientProfilePage(): React.JSX.Element {
                   )
                 )}
 
+                {showBilling && tab === 5 && (
+                  <PatientLedgerPanel
+                    patientId={patient.id}
+                    onOpenInvoice={user?.role === 'receptionist' ? (invoiceId) => navigate(`/billing/${invoiceId}`) : undefined}
+                    canCollectFee={user?.role === 'receptionist' || user?.role === 'admin'}
+                  />
+                )}
+
                 {tab === 3 && <PatientDocumentsPanel patient={patient} />}
                 {tab === 4 && <PrescriptionsTabInline patientId={patient.id} patient={patient} />}
               </Box>
@@ -619,6 +647,16 @@ export function PatientProfilePage(): React.JSX.Element {
                     </Box>
                   )}
                 </Stack>
+              </Paper>
+            )}
+
+            {/* Notes (also editable from the mobile app) */}
+            {patient.notes && (
+              <Paper elevation={0} sx={{ p: 2.25, ...softCard }}>
+                <Typography fontWeight={800} fontSize={15} sx={{ mb: 1 }}>Notes</Typography>
+                <Typography fontSize={13} sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {patient.notes}
+                </Typography>
               </Paper>
             )}
 

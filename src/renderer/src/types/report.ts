@@ -31,6 +31,10 @@ export interface OpdFeeRow {
   feeDiscount: number;
   feeRefunded: number;
   net: number;
+  /** Received so far (at the visit + collected later). */
+  received?: number;
+  /** Pay-later fee not collected yet. */
+  unpaid?: number;
   createdAt: string;
 }
 
@@ -46,6 +50,9 @@ export interface OpdDoctorFeeSummary {
   discounted: number;
   refunded: number;
   net: number;
+  received?: number;
+  unpaid?: number;
+  unpaidCount?: number;
 }
 
 export interface OpdDailyReport {
@@ -74,6 +81,9 @@ export interface OpdDailyReport {
     discounted: number;
     refunded: number;
     net: number;
+    received?: number;
+    unpaid?: number;
+    unpaidCount?: number;
   };
 }
 

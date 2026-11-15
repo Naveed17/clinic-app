@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, normalize, sep } from 'node:path';
 import { getPrisma } from '../database/client';
 import { getDocumentsRoot, resolveDocPath } from '../backup/docs-paths';
+import { lanFetch } from './lan-auth';
 
 /**
  * LAN document file sync (offline-first).
@@ -92,7 +93,7 @@ export async function syncLanFiles(peerUrl: string): Promise<{ uploaded: number;
     // 1. Push: which of our files does the server lack?
     for (let i = 0; i < withFile.length; i += CHECK_CHUNK) {
       const chunk = withFile.slice(i, i + CHECK_CHUNK);
-      const res = await fetch(`${peerUrl}/api/sync/files/missing`, {
+      const res = await lanFetch(`${peerUrl}/api/sync/files/missing`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ table, ids: chunk.map((c) => c.id) }),
@@ -110,7 +111,7 @@ export async function syncLanFiles(peerUrl: string): Promise<{ uploaded: number;
       for (const item of chunk) {
         if (!missing.has(item.id)) continue;
         try {
-          const up = await fetch(
+          const up = await lanFetch(
             `${peerUrl}/api/sync/file?table=${table}&id=${encodeURIComponent(item.id)}`,
             {
               method: 'POST',
@@ -129,7 +130,7 @@ export async function syncLanFiles(peerUrl: string): Promise<{ uploaded: number;
     // 2. Pull: files we have rows for but not on disk
     for (const item of withoutFile) {
       try {
-        const res = await fetch(`${peerUrl}/api/sync/file?table=${table}&id=${encodeURIComponent(item.id)}`);
+        const res = await lanFetch(`${peerUrl}/api/sync/file?table=${table}&id=${encodeURIComponent(item.id)}`);
         if (res.status === 404) continue; // server doesn't have it (yet)
         if (!res.ok) {
           result.failed++;

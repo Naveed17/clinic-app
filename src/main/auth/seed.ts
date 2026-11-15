@@ -19,7 +19,7 @@ export async function seedDefaultAdmin(): Promise<void> {
         firstName: 'Admin',
         lastName: 'User',
         email: 'admin@clinic.com',
-        passwordHash: bcrypt.hashSync('admin123', 10),
+        passwordHash: await bcrypt.hash('admin123', 10),
         role: 'ADMIN',
         isActive: true,
         updatedAt: new Date(),

@@ -19,6 +19,11 @@ export interface TokenInput {
   reason?: string | null;
   consultationFee?: number;
   feeDiscount?: number;
+  /**
+   * Amount actually received when the token is issued. Omit (or pay the full payable) for a
+   * normal paid visit; 0 = fee will be collected later (shows as dues in the patient ledger).
+   */
+  feePaid?: number | null;
   priority?: string;
   vitals?: unknown;
 }
@@ -435,7 +440,7 @@ export async function createToken(input: TokenInput) {
     await getPrisma().$executeRawUnsafe(
       `UPDATE "Token" SET feeDiscount = ?, updatedAt = ? WHERE id = ?`,
       feeDiscount,
-      new Date().toISOString(),
+      Date.now(),
       existing.id,
     );
     return mapTokenRecord({
@@ -490,6 +495,14 @@ export async function createToken(input: TokenInput) {
         feeDiscount,
         token.id,
       );
+      // Unpaid / partly paid visit: remember what was received now (NULL = paid in full).
+      if (input.feePaid !== undefined && input.feePaid !== null && Number.isFinite(Number(input.feePaid))) {
+        const payable = Math.max(0, mapTokenFee(consultationFee - feeDiscount));
+        const paidNow = Math.min(Math.max(0, mapTokenFee(Number(input.feePaid))), payable);
+        if (paidNow < payable - 0.009) {
+          await getPrisma().$executeRawUnsafe(`UPDATE "Token" SET "feePaid" = ? WHERE id = ?`, paidNow, token.id);
+        }
+      }
       const isHalf = consultationFee > 0 && feeDiscount > 0 && Math.abs(feeDiscount - consultationFee / 2) <= 1;
       const derivedFeeType = consultationFee === 0 || feeDiscount >= consultationFee ? 'FREE' : isHalf ? 'HALF' : feeDiscount > 0 ? 'DISCOUNTED' : 'PAID';
       const { dayStart, dayEnd } = localDayBoundsFromDateStr(input.date);
@@ -498,8 +511,8 @@ export async function createToken(input: TokenInput) {
         derivedFeeType,
         input.patientId,
         input.doctorId,
-        dayStart.toISOString(),
-        dayEnd.toISOString(),
+        dayStart.getTime(),
+        dayEnd.getTime(),
       );
       return mapTokenRecord({
         ...token,
@@ -525,7 +538,7 @@ export async function updateTokenStatus(id: string, status: TokenStatus | string
   await getPrisma().$executeRawUnsafe(
     `UPDATE "Token" SET status = ?, updatedAt = ? WHERE id = ?`,
     status,
-    new Date().toISOString(),
+    Date.now(),
     id,
   );
   const token = await getTokenById(id);
@@ -552,7 +565,7 @@ export async function updateTokenPriority(id: string, priority: string) {
   await getPrisma().$executeRawUnsafe(
     `UPDATE "Token" SET "priority" = ?, "updatedAt" = ? WHERE id = ?`,
     safePriority,
-    new Date().toISOString(),
+    Date.now(),
     id,
   );
   return getTokenById(id);
@@ -563,7 +576,7 @@ export async function updateTokenVitals(id: string, vitals: unknown) {
   await getPrisma().$executeRawUnsafe(
     `UPDATE "Token" SET "vitals" = ?, "updatedAt" = ? WHERE id = ?`,
     json,
-    new Date().toISOString(),
+    Date.now(),
     id,
   );
   if (vitals && typeof vitals === 'object' && 'weight' in (vitals as Record<string, unknown>)) {
@@ -615,7 +628,7 @@ export async function upsertPrescription(tokenId: string, input: PrescriptionInp
   const existing = await db.$queryRawUnsafe<{ id: string; medicines: string; pharmacyStatus?: string }[]>(
     `SELECT id, medicines, pharmacyStatus FROM "Prescription" WHERE tokenId = ? LIMIT 1`, tokenId
   );
-  const now = new Date().toISOString();
+  const now = Date.now();
   const medicines = JSON.stringify(input.medicines);
   const tests = JSON.stringify(input.tests);
   const thumbName =
@@ -710,7 +723,7 @@ export async function dispensePharmacyPrescription(
   );
   if (!rows[0]) throw new Error('Prescription not found.');
 
-  const now = new Date().toISOString();
+  const now = Date.now();
   const invoiceId = options?.invoiceId?.trim() || null;
 
   await db.$executeRawUnsafe(
@@ -734,7 +747,7 @@ export async function dispensePharmacyPrescription(
 
 export async function linkPrescriptionInvoice(tokenId: string, invoiceId: string): Promise<void> {
   const db = getPrisma();
-  const now = new Date().toISOString();
+  const now = Date.now();
   await db.$executeRawUnsafe(
     `UPDATE "Prescription" SET invoiceId = ?, updatedAt = ? WHERE tokenId = ?`,
     invoiceId,
@@ -804,6 +817,43 @@ export async function countPriorVisitsThisWeek(
   return { count };
 }
 
+/** Fee still owed on a token: payable − (paid at issue) − (collected later) − refunded. */
+async function tokenFeeState(id: string): Promise<{ payable: number; paid: number; due: number } | null> {
+  const rows = await getPrisma().$queryRawUnsafe<Array<{
+    consultationFee: number | null; feeDiscount: number | null; feeRefunded: number | null;
+    feePaid: number | null; feeCollected: number | null;
+  }>>(
+    `SELECT "consultationFee", "feeDiscount", "feeRefunded", "feePaid", "feeCollected" FROM "Token" WHERE id = ?`,
+    id,
+  );
+  const r = rows[0];
+  if (!r) return null;
+  const payable = Math.max(0, mapTokenFee(Number(r.consultationFee || 0) - Number(r.feeDiscount || 0) - Number(r.feeRefunded || 0)));
+  const atIssue = r.feePaid === null || r.feePaid === undefined ? payable : Number(r.feePaid);
+  const paid = mapTokenFee(Math.min(payable, atIssue + Number(r.feeCollected || 0)));
+  return { payable, paid, due: mapTokenFee(Math.max(0, payable - paid)) };
+}
+
+/** Collect an unpaid (or partly paid) consultation fee later. Defaults to the full amount due. */
+export async function collectTokenFee(id: string, amount?: number) {
+  const state = await tokenFeeState(id);
+  if (!state) throw new Error('Token not found.');
+  if (state.due <= 0) throw new Error('This consultation fee is already fully paid.');
+  const collect =
+    amount === undefined || amount === null || Number.isNaN(Number(amount)) ? state.due : mapTokenFee(Number(amount));
+  if (!Number.isFinite(collect) || collect <= 0) throw new Error('Amount must be greater than 0.');
+  if (collect > state.due + 0.009) throw new Error(`Only Rs. ${state.due} is due on this token.`);
+  const now = Date.now();
+  await getPrisma().$executeRawUnsafe(
+    `UPDATE "Token" SET "feeCollected" = COALESCE("feeCollected", 0) + ?, "feeCollectedAt" = ?, "updatedAt" = ? WHERE id = ?`,
+    collect,
+    now,
+    now,
+    id,
+  );
+  return getTokenById(id);
+}
+
 export async function refundTokenFee(id: string, amount?: number) {
   const token = await getTokenById(id);
   if (!token) throw new Error('Token not found.');
@@ -820,7 +870,7 @@ export async function refundTokenFee(id: string, amount?: number) {
   await db.$executeRawUnsafe(
     `UPDATE "Token" SET feeRefunded = ?, updatedAt = ? WHERE id = ?`,
     mapTokenFee(already + refund),
-    new Date().toISOString(),
+    Date.now(),
     id,
   );
   return getTokenById(id);

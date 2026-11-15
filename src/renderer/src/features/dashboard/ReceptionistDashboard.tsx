@@ -97,6 +97,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   const [reason, setReason] = useState('');
   const [consultationFee, setConsultationFee] = useState('');
   const [feeDiscount, setFeeDiscount] = useState('');
+  const [payLater, setPayLater] = useState(false);
   const [previewToken, setPreviewToken] = useState<Token | null>(null);
   const [previewAutoPrint, setPreviewAutoPrint] = useState(false);
 
@@ -166,6 +167,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
         reason: reason || null,
         consultationFee: parseFloat(consultationFee) || 0,
         feeDiscount: parseFloat(feeDiscount) || 0,
+        ...(payLater ? { feePaid: 0 } : {}),
       }) as Token;
       if (token.status === 'WAITING') return token;
       return window.clinic.tokens.updateStatus(token.id, 'WAITING') as Promise<Token>;
@@ -191,7 +193,7 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
 
   function handleClose() {
     setStep(0); setPatientId(''); setDoctorId(''); setReason('');
-    setConsultationFee(''); setFeeDiscount('');
+    setConsultationFee(''); setFeeDiscount(''); setPayLater(false);
     setCreatedToken(null);
     setPreviewToken(null);
     setPreviewAutoPrint(false);
@@ -284,6 +286,8 @@ function WalkInModal({ open, onClose }: { open: boolean; onClose: () => void }) 
               defaultDoctorFee={selectedDoctor?.consultationFee}
               priorVisitsThisWeek={weekVisits?.count ?? 0}
               disabled={!doctorId}
+              payLater={payLater}
+              onPayLaterChange={setPayLater}
             />
             <FormControl fullWidth>
               <InputLabel>Reason (optional)</InputLabel>

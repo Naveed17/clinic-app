@@ -114,7 +114,7 @@ export async function createDoctor(input: DoctorInput) {
       firstName: input.firstName.trim(),
       lastName: input.lastName.trim(),
       email: input.email.trim().toLowerCase(),
-      passwordHash: bcrypt.hashSync(input.password, 10),
+      passwordHash: await bcrypt.hash(input.password, 10),
       role: 'DOCTOR',
       isActive: input.isActive,
       doctorProfile: {
@@ -150,7 +150,7 @@ export async function updateDoctor(id: string, input: DoctorUpdateInput) {
       ...(input.lastName !== undefined ? { lastName: input.lastName.trim() } : {}),
       ...(input.email !== undefined ? { email: input.email.trim().toLowerCase() } : {}),
       ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
-      ...(input.password ? { passwordHash: bcrypt.hashSync(input.password, 10) } : {}),
+      ...(input.password ? { passwordHash: await bcrypt.hash(input.password, 10) } : {}),
       ...(hasProfile ? {
         doctorProfile: {
           upsert: {

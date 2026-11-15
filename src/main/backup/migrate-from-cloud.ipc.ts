@@ -46,7 +46,7 @@ const LOCAL_COLUMNS: Record<string, string[]> = {
   Patient: [
     'id', 'mrNumber', 'firstName', 'lastName', 'weight', 'dateOfBirth', 'phone', 'email', 'address',
     'emergencyContactName', 'emergencyContactPhone', 'bloodGroup', 'allergies', 'chronicConditions',
-    'primaryDoctorId', 'createdAt', 'updatedAt',
+    'primaryDoctorId', 'notes', 'createdAt', 'updatedAt',
   ],
   Medicine: [
     'id', 'name', 'genericName', 'categoryId', 'barcode', 'unit', 'rackNumber', 'minStockAlert',
@@ -60,7 +60,7 @@ const LOCAL_COLUMNS: Record<string, string[]> = {
     'id', 'patientId', 'providerId', 'startsAt', 'endsAt', 'status', 'reason', 'notes',
     'recurrenceRule', 'parentId', 'createdAt', 'updatedAt',
   ],
-  Token: ['id', 'tokenNumber', 'date', 'patientId', 'doctorId', 'status', 'notes', 'reason', 'consultationFee', 'feeDiscount', 'feeRefunded', 'createdAt', 'updatedAt'],
+  Token: ['id', 'tokenNumber', 'date', 'patientId', 'doctorId', 'status', 'notes', 'reason', 'consultationFee', 'feeDiscount', 'feeRefunded', 'feePaid', 'feeCollected', 'feeCollectedAt', 'priority', 'vitals', 'createdAt', 'updatedAt'],
   Prescription: [
     'id', 'tokenId', 'diagnosis', 'medicines', 'tests', 'advice', 'thumbName', 'thumbnail',
     'pharmacyStatus', 'dispensedAt', 'invoiceId', 'createdAt', 'updatedAt',
@@ -123,13 +123,9 @@ async function insertRow(table: string, row: JsonRow): Promise<void> {
 
 async function wipeLocalClinic(): Promise<void> {
   const db = getPrisma();
-  await db.$executeRawUnsafe('PRAGMA foreign_keys = OFF');
-  try {
-    for (const table of WIPE_TABLES) {
-      await db.$executeRawUnsafe(`DELETE FROM "${table}"`);
-    }
-  } finally {
-    await db.$executeRawUnsafe('PRAGMA foreign_keys = ON');
+  // WIPE_TABLES is child-first, so no FK pragma is needed (a pragma would only hit one pooled connection).
+  for (const table of WIPE_TABLES) {
+    await db.$executeRawUnsafe(`DELETE FROM "${table}"`);
   }
 }
 

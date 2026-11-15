@@ -14,4 +14,5 @@ export const patientsService = {
   create: (input: PatientInput) => window.clinic.patients.create(withWhatsAppPhone(input)),
   update: (id: string, input: PatientInput) => window.clinic.patients.update(id, withWhatsAppPhone(input)),
   delete: (id: string) => window.clinic.patients.delete(id),
+  ledger: (id: string) => window.clinic.patients.ledger(id),
 };

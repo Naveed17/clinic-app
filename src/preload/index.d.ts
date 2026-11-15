@@ -11,6 +11,7 @@ declare global {
         update: (id: string, input: unknown) => Promise<unknown>;
         delete: (id: string) => Promise<unknown>;
         getAddresses: (query?: string) => Promise<string[]>;
+        ledger: (id: string) => Promise<unknown>;
         getPhones: (query?: string) => Promise<Array<{
           phone: string;
           formattedPhone: string;

@@ -7,6 +7,7 @@ import { getLicenseRuntimeMeta, applyDatabaseModeFromApi } from '../license/lice
 import { uploadLocalFile } from '../backup/migrate-to-cloud.ipc';
 import { pullMissingCloudDocuments } from '../backup/migrate-from-cloud.ipc';
 import { syncLanFiles } from './lan-files';
+import { lanFetch } from './lan-auth';
 import { onDatabaseMutation } from '../database/client';
 import {
   extractChangesSince,
@@ -14,6 +15,7 @@ import {
   extractTableRows,
   extractDeletions,
   applyIncomingChanges,
+  retryPendingRows,
 } from './sync.engine';
 import {
   SYNC_TABLES,
@@ -171,6 +173,24 @@ function broadcastStatus(): void {
   }
 }
 
+/** PC clock minus server/peer clock (ms), from the last sync. Newer edits win by timestamp,
+ * so a wrong Windows clock can make old edits overwrite new ones. */
+let clockSkewMs = 0;
+const CLOCK_SKEW_WARN_MS = 2 * 60 * 1000;
+
+function noteClockSkew(serverTimeMs: number): void {
+  if (Number.isFinite(serverTimeMs) && serverTimeMs > 0) clockSkewMs = Date.now() - serverTimeMs;
+}
+
+function withPending(message: string, pending: number): string {
+  let out = pending > 0 ? `${message} • ${pending} item${pending === 1 ? '' : 's'} waiting for related data` : message;
+  if (Math.abs(clockSkewMs) > CLOCK_SKEW_WARN_MS) {
+    const minutes = Math.round(Math.abs(clockSkewMs) / 60000);
+    out += ` • ⚠ This PC clock is ${minutes} min ${clockSkewMs > 0 ? 'ahead' : 'behind'}. Fix Windows date/time so the newest changes win.`;
+  }
+  return out;
+}
+
 function notifyDataChanged(): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
@@ -317,6 +337,7 @@ async function syncWithCloud(
         };
         if (statusData && typeof statusData.serverTime === 'string') {
           serverTime = statusData.serverTime;
+          noteClockSkew(Date.parse(serverTime));
         }
         if (statusData && statusData.tables) {
           remoteTables = statusData.tables;
@@ -612,6 +633,10 @@ async function syncWithCloud(
       saveCloudPullCursor(target.schemaId || undefined, serverTime);
     }
 
+    // Rows that failed earlier (e.g. parent not synced yet) — retry now that new data arrived.
+    const cloudRetry = await retryPendingRows().catch(() => ({ applied: 0, stillPending: 0 }));
+    pulledCount += cloudRetry.applied;
+
     // Download documents / lab reports added from other PCs or the mobile app.
     try {
       updateProgress(95, 'Downloading documents from cloud...');
@@ -633,9 +658,12 @@ async function syncWithCloud(
       lastSyncTime: newSyncTime,
       peerUrl: target.url,
       peerName: 'Cloud',
-      message: totalRecords > 0
-        ? `Synced ${totalRecords} record${totalRecords === 1 ? '' : 's'} (${pushedCount} sent, ${pulledCount} received)`
-        : 'All data is up to date',
+      message: withPending(
+        totalRecords > 0
+          ? `Synced ${totalRecords} record${totalRecords === 1 ? '' : 's'} (${pushedCount} sent, ${pulledCount} received)`
+          : 'All data is up to date',
+        cloudRetry.stillPending,
+      ),
       recordsSyncedLastTime: totalRecords,
       progress: undefined,
     };
@@ -768,7 +796,7 @@ async function syncWithLanPeer(targetUrl: string): Promise<{
 
     // 2. Attempt chunked sync using manifest
     updateProgress(5, 'Checking changes on both devices...');
-    const remoteManifestRes = await fetch(`${targetUrl}/api/sync/manifest?since=${since}`).catch(() => null);
+    const remoteManifestRes = await lanFetch(`${targetUrl}/api/sync/manifest?since=${since}`).catch(() => null);
 
     let recordsSynced = 0;
     let newSyncTime = Date.now();
@@ -777,6 +805,7 @@ async function syncWithLanPeer(targetUrl: string): Promise<{
       const remoteManifest = (await remoteManifestRes.json()) as SyncManifest;
       const localManifest = await extractManifest(since);
       newSyncTime = remoteManifest.serverTime || Date.now();
+      noteClockSkew(Number(remoteManifest.serverTime));
 
       const totalPushRows = localManifest.totalRows + localManifest.deletionsCount;
       const totalPullRows = remoteManifest.totalRows + remoteManifest.deletionsCount;
@@ -786,6 +815,8 @@ async function syncWithLanPeer(targetUrl: string): Promise<{
       if (totalPushRows === 0 && totalPullRows === 0) {
         // Rows are in sync, but document files may still be pending (e.g. earlier failure).
         const files = await syncLanFiles(targetUrl).catch(() => ({ uploaded: 0, downloaded: 0, failed: 0 }));
+        const lanRetryIdle = await retryPendingRows().catch(() => ({ applied: 0, stillPending: 0 }));
+        if (lanRetryIdle.applied > 0) notifyDataChanged();
         if (files.downloaded > 0) notifyDataChanged();
         updateProgress(100, 'All data is up to date.');
         saveLastSyncTime(newSyncTime);
@@ -794,7 +825,7 @@ async function syncWithLanPeer(targetUrl: string): Promise<{
           lastSyncTime: newSyncTime,
           peerUrl: targetUrl,
           peerName,
-          message: 'All data is up to date',
+          message: withPending('All data is up to date', lanRetryIdle.stillPending),
           recordsSyncedLastTime: 0,
           progress: { percent: 100, label: 'Up to date' },
         };
@@ -816,7 +847,7 @@ async function syncWithLanPeer(targetUrl: string): Promise<{
           offset += rows.length;
 
           if (rows.length > 0) {
-            const pushRes = await fetch(`${targetUrl}/api/sync/push-chunk`, {
+            const pushRes = await lanFetch(`${targetUrl}/api/sync/push-chunk`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ table, rows }),
@@ -837,7 +868,7 @@ async function syncWithLanPeer(targetUrl: string): Promise<{
       if (localManifest.deletionsCount > 0) {
         const deletions = await extractDeletions(since);
         if (deletions.length > 0) {
-          const delRes = await fetch(`${targetUrl}/api/sync/push-deletions`, {
+          const delRes = await lanFetch(`${targetUrl}/api/sync/push-deletions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ deletions }),
@@ -859,7 +890,7 @@ async function syncWithLanPeer(targetUrl: string): Promise<{
         let offset = 0;
         let hasMore = true;
         while (hasMore) {
-          const pullRes = await fetch(
+          const pullRes = await lanFetch(
             `${targetUrl}/api/sync/table?table=${table}&since=${since}&offset=${offset}&limit=50`,
           );
           if (!pullRes.ok) {
@@ -884,7 +915,7 @@ async function syncWithLanPeer(targetUrl: string): Promise<{
 
       // Pull remote deletions
       if (remoteManifest.deletionsCount > 0) {
-        const delRes = await fetch(`${targetUrl}/api/sync/deletions?since=${since}`);
+        const delRes = await lanFetch(`${targetUrl}/api/sync/deletions?since=${since}`);
         if (delRes.ok) {
           const delData = (await delRes.json()) as { deletions: SyncDeletedItem[] };
           const deletions = delData.deletions || [];
@@ -909,7 +940,7 @@ async function syncWithLanPeer(targetUrl: string): Promise<{
       };
 
       updateProgress(45, 'Sending payload...');
-      const exchangeRes = await fetch(`${targetUrl}/api/sync/exchange`, {
+      const exchangeRes = await lanFetch(`${targetUrl}/api/sync/exchange`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -938,6 +969,10 @@ async function syncWithLanPeer(targetUrl: string): Promise<{
       saveLastSyncTime(newSyncTime);
     }
 
+    // Rows that failed earlier — retry now that the peer's data arrived.
+    const lanRetry = await retryPendingRows().catch(() => ({ applied: 0, stillPending: 0 }));
+    recordsSynced += lanRetry.applied;
+
     // Document files (PDFs / images) for the rows above
     updateProgress(97, 'Syncing document files...');
     const files = await syncLanFiles(targetUrl).catch((e) => {
@@ -952,7 +987,7 @@ async function syncWithLanPeer(targetUrl: string): Promise<{
       lastSyncTime: newSyncTime,
       peerUrl: targetUrl,
       peerName,
-      message: `Successfully synchronized with ${peerName}`,
+      message: withPending(`Successfully synchronized with ${peerName}`, lanRetry.stillPending),
       recordsSyncedLastTime: recordsSynced,
       progress: { percent: 100, label: 'Sync complete' },
     };

@@ -2,8 +2,28 @@ import { randomUUID } from 'node:crypto';
 import type { Server as SocketIOServer, Socket } from 'socket.io';
 import type { RealtimeNotification } from './types';
 
+/** Sync uses DB table names; the renderer's query map uses entity names. */
+const TABLE_TO_ENTITY: Record<string, string> = {
+  Patient: 'patient',
+  PatientDocument: 'patient',
+  Appointment: 'appointment',
+  Token: 'token',
+  Prescription: 'prescription',
+  Invoice: 'invoice',
+  InvoiceItem: 'invoice',
+  Payment: 'invoice',
+  LabOrder: 'lab',
+  LabReport: 'lab',
+  Medicine: 'medicine',
+  MedicineBatch: 'medicine',
+  User: 'doctor',
+  DoctorProfile: 'doctor',
+  DoctorSchedule: 'doctor',
+  DoctorAttendance: 'doctor',
+};
+
 export function emitDataChange(io: SocketIOServer, entity: string, action: string): void {
-  io.emit('data:changed', { entity, action });
+  io.emit('data:changed', { entity: TABLE_TO_ENTITY[entity] ?? entity, action });
 }
 
 export function emitNotification(
